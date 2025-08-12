@@ -34,10 +34,10 @@
             <!-- Вкладки -->
             <ul class="nav nav-tabs" id="mainTabs" role="tablist">
                 <li class="nav-item" v-for="(tab, index) in tabs" :key="index">
-                    <a class="nav-link" :class="{ active: index === 0 }" 
-                       :id="'tab-' + index" 
-                       data-bs-toggle="tab" 
-                       :href="'#content-' + index" 
+                    <a class="nav-link" :class="{ active: index === activeTabIndex }" @click="onTabClick(index, $event)"
+                       :id="'tab-' + index"
+                       data-bs-toggle="tab"
+                       :href="'#content-' + index"
                        role="tab">
                         <span v-text="tab.name"></span>
                     </a>
@@ -46,10 +46,10 @@
 
             <!-- Содержимое вкладок -->
             <div class="tab-content" id="mainTabContent">
-                <div class="tab-pane fade show active" 
-                     v-for="(tab, index) in tabs" 
+                <div :class="['tab-pane', 'fade', (index === activeTabIndex ? 'show active' : '')]"
+                     v-for="(tab, index) in tabs"
                      :key="index"
-                     :id="'content-' + index" 
+                     :id="'content-' + index"
                      role="tabpanel">
                     
                     <!-- Сворачиваемые блоки -->

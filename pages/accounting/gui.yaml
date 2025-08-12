@@ -1,0 +1,16 @@
+url: "/accounting"
+
+tabs:
+  - name: "Вкладка с журналом"
+    content:
+      - name: "Журнал"
+        collapsible: false
+        rows:
+          - widgets: [journal_table]
+
+  - name: "Вкладка с формой"
+    content:
+      - name: "Форма СГУК"
+        collapsible: false
+        rows:
+          - widgets: [form_table]

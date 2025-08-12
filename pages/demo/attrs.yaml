@@ -111,7 +111,6 @@ demo_table_editable:
   info: "Пользователь может изменять значения в ячейках"
   headers: ["Параметр", "Значение"]
   data: [["timeout", "30"], ["retries", "3"]]
-  # редактируемая по умолчанию (readonly не указан)
 
 # === КНОПКИ ===
 
@@ -169,3 +168,8 @@ demo_float_readonly:
   info: "Поле только для чтения"
   readonly: true
   default: 2.718
+
+demo_table_button:
+  widget: button
+  description: "Здесь можно посмотреть на пример учётной системы"
+  url: "/accounting"

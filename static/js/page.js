@@ -9,6 +9,7 @@ const app = createApp({
             allAttrs: {},
             tabs: [],
             widgets: {},
+            activeTabIndex: 0,
             loading: true,
             error: null
         };
@@ -20,6 +21,10 @@ const app = createApp({
                 this.pageConfig = window.pageData.pageConfig;
                 this.allAttrs = window.pageData.allAttrs;
                 this.parseConfiguration();
+                this.$nextTick(() => {
+                    this.setActiveTabFromHash();
+                    window.addEventListener('hashchange', this.onHashChange);
+                });
             } else {
                 this.loadPageConfig();
             }
@@ -43,6 +48,11 @@ const app = createApp({
                 const data = await response.json();
                 this.pageConfig = data.page;
                 this.allAttrs = data.allAttrs;
+                this.parseConfiguration();
+                this.$nextTick(() => {
+                    this.setActiveTabFromHash();
+                    window.addEventListener('hashchange', this.onHashChange);
+                });
             } catch (error) {
                 console.error('Ошибка загрузки конфигурации страницы:', error);
                 throw error;
@@ -67,6 +77,37 @@ const app = createApp({
             }
         },
         
+        setActiveTabFromHash() {
+            try {
+                const hash = window.location.hash || '';
+                const match = hash.match(/^#content-(\d+)$/);
+                if (match) {
+                    const idx = parseInt(match[1], 10);
+                    if (!Number.isNaN(idx) && idx >= 0 && idx < this.tabs.length) {
+                        this.activeTabIndex = idx;
+                        return;
+                    }
+                }
+                this.activeTabIndex = 0;
+            } catch (e) {
+                this.activeTabIndex = 0;
+            }
+        },
+
+        onHashChange() {
+            this.setActiveTabFromHash();
+        },
+
+        onTabClick(index, event) {
+            // Синхронизируем активную вкладку и hash, чтобы не мигали панели
+            this.activeTabIndex = index;
+            const newHash = `#content-${index}`;
+            if (window.location.hash !== newHash) {
+                // Меняем hash без скролла
+                history.replaceState(null, '', newHash);
+            }
+        },
+
         parseTabContent(content) {
             if (!content || !Array.isArray(content)) {
                 console.warn('Invalid content:', content);

@@ -1,0 +1,32 @@
+journal_table:
+  widget: table
+  description: "Журнал учёта"
+  headers:
+    - { label: "Операция", attr: "operation" }
+    - { label: "Документ", attr: "doc" }
+    - { label: "Паспорт", attr: "passport" }
+    - { label: "Масса, кг", attr: "mass_kg" }
+  data: []
+
+form_table:
+  widget: table
+  description: "Сведения о закрытых радионуклидных источниках"
+  headers:
+    - { label: "Операция", attr: "operation" }
+    - { label: "ЗРИ", attr: "zri" }
+    - "Документ":
+      - { label: "код", attr: "doc_code" }
+      - { label: "дата", attr: "doc_date" }
+      - { label: "номер", attr: "doc_number" }
+    - "Паспорт":
+      - { label: "наименование", attr: "passport_name" }
+      - { label: "номер", attr: "passport_number" }
+    - { label: "Масса, кг", attr: "mass_kg" }
+    - { label: "ОКПО изготовителя", attr: "okpo_manufacturer" }
+    - { label: "Дата выпуска", attr: "release_date" }
+    - { label: "НСС, месяцев", attr: "nss_months" }
+    - { label: "ОКПО (поставщика/получателя/перевозчика)", attr: "okpo_counterparty" }
+    - "Прибор/установка/УКТ/иная упаковка":
+      - { label: "наименование", attr: "pack_name" }
+      - { label: "тип/номер", attr: "pack_type_number" }
+  data: []

@@ -52,6 +52,7 @@ tabs:
       - name: "Таблицы"
         rows:
           - widgets: [demo_table, demo_table_editable]
+          - widgets: [demo_table_button]
       
       - name: "Кнопки"
         rows:

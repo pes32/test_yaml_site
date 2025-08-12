@@ -74,8 +74,15 @@ body {
 }
 
 /* Стили для таблиц */
-.widget-table {
+.widget-table-container {
     width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.widget-table {
+    width: max-content; /* позволяет таблице быть шире контейнера при большом числе колонок */
+    min-width: 100%;
     border-collapse: collapse;
     margin-top: 0.5rem;
 }
@@ -85,6 +92,7 @@ body {
     padding: 0.5rem;
     border: 1px solid #dee2e6;
     text-align: left;
+    white-space: normal; /* разрешаем перенос строк в ячейках */
 }
 
 .widget-table th {
