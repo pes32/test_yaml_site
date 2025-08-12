@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>LowCode System - {{ page_config.name if page_config.name else 'main' }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}?v={{ ASSETS_VERSION }}" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- Навигация -->
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="/">
+                    <i class="fas fa-code"></i> LowCode System
+                </a>
+                <div class="navbar-nav me-auto">
+                    <span class="navbar-text">
+                        <i class="fas fa-file-alt"></i> {{ page_config.name if page_config.name else 'main' }}
+                    </span>
+                </div>
+                <div class="navbar-nav">
+                    <a class="nav-link" href="/debug" target="_blank">
+                        <i class="fas fa-bug"></i> Debug
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Основной контент -->
+        <div class="container-fluid mt-3">
+            <!-- Вкладки -->
+            <ul class="nav nav-tabs" id="mainTabs" role="tablist">
+                <li class="nav-item" v-for="(tab, index) in tabs" :key="index">
+                    <a class="nav-link" :class="{ active: index === 0 }" 
+                       :id="'tab-' + index" 
+                       data-bs-toggle="tab" 
+                       :href="'#content-' + index" 
+                       role="tab">
+                        <span v-text="tab.name"></span>
+                    </a>
+                </li>
+            </ul>
+
+            <!-- Содержимое вкладок -->
+            <div class="tab-content" id="mainTabContent">
+                <div class="tab-pane fade show active" 
+                     v-for="(tab, index) in tabs" 
+                     :key="index"
+                     :id="'content-' + index" 
+                     role="tabpanel">
+                    
+                    <!-- Сворачиваемые блоки -->
+                    <div v-for="(section, sidx) in tab.content" :key="sidx" class="mt-3">
+                        <div class="card">
+                            <!-- Заголовок -->
+                            <div class="card-header"
+                                 :id="'heading-' + index + '-' + sidx"
+                                 :data-bs-toggle="section.collapsible ? 'collapse' : null"
+                                 :data-bs-target="section.collapsible ? ('#collapse-' + index + '-' + sidx) : null"
+                                 :style="section.collapsible ? 'cursor: pointer;' : ''">
+                                <h5 class="mb-0 d-flex align-items-center">
+                                    <i v-if="section.collapsible" class="fas fa-chevron-down collapse-icon me-2"></i>
+                                    <span v-text="section.name"></span>
+                                </h5>
+                            </div>
+                            
+                            <!-- Тело (collapsible или статичное) -->
+                            <div :class="section.collapsible ? 'collapse show' : ''" :id="section.collapsible ? ('collapse-' + index + '-' + sidx) : null">
+                                <div class="card-body">
+                                    <!-- Строки -->
+                                    <div v-for="(row, rowIndex) in section.rows" :key="rowIndex" class="row mb-2">
+                                        <div v-if="typeof row === 'string'" class="col-12">
+                                            <span class="text-muted" v-text="row"></span>
+                                        </div>
+                                        <div v-else-if="row.widgets && Array.isArray(row.widgets)" class="col-12">
+                                            <div class="row">
+                                                <div v-for="(item, itemIndex) in row.widgets" :key="itemIndex" class="col-auto">
+                                                    <widget-renderer 
+                                                        :widget-config="getWidgetConfig(item)"
+                                                        :widget-name="item"
+                                                        @execute="executeCommand">
+                                                    </widget-renderer>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div v-else-if="row.columns && typeof row.columns === 'object'" class="col-12">
+                                            <!-- Обработка колонок -->
+                                            <div class="row">
+                                                <div v-for="(column, colIndex) in row.columns" :key="colIndex" 
+                                                     :class="'col-md-' + (12 / Object.keys(row.columns).length)">
+                                                    <div v-for="(item, itemIndex) in column.widgets" :key="itemIndex" class="mb-2">
+                                                        <widget-renderer 
+                                                            :widget-config="getWidgetConfig(item)"
+                                                            :widget-name="item"
+                                                            @execute="executeCommand">
+                                                        </widget-renderer>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальные окна -->
+    <div class="modal fade" id="confirmModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmModalTitle">Подтверждение</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="confirmModalBody">
+                    Вы уверены, что хотите выполнить это действие?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" id="confirmModalAccept">Подтвердить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script>
+        // Передаем данные страницы в JavaScript
+        window.pageData = {
+            pageConfig: {{ page_config | tojson | safe }},
+            allAttrs: {{ all_attrs | tojson | safe }}
+        };
+        console.log('Page data loaded:', window.pageData);
+    </script>
+    <!-- Загружаем виджеты -->
+    <script src="{{ url_for('static', filename='js/widgets/string.js') }}?v={{ ASSETS_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/widgets/int.js') }}?v={{ ASSETS_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/widgets/float.js') }}?v={{ ASSETS_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/widgets/list.js') }}?v={{ ASSETS_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/widgets/ip_widgets.js') }}?v={{ ASSETS_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/widgets/datetime.js') }}?v={{ ASSETS_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/widgets/text.js') }}?v={{ ASSETS_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/widgets/table.js') }}?v={{ ASSETS_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/widgets/button.js') }}?v={{ ASSETS_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/widgets/factory.js') }}?v={{ ASSETS_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/widgets.js') }}?v={{ ASSETS_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/page.js') }}?v={{ ASSETS_VERSION }}"></script>
+</body>
+</html>

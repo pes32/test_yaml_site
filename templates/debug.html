@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Panel - LowCode System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .debug-content {
+            height: 70vh;
+            overflow-y: auto;
+        }
+        .log-entry {
+            font-family: monospace;
+            font-size: 0.9em;
+            padding: 2px 0;
+        }
+        .log-info { color: #0066cc; }
+        .log-error { color: #cc0000; }
+        .log-warning { color: #cc6600; }
+        .debug { color: #666666; }
+    </style>
+</head>
+<body>
+    <div id="debugApp">
+        <nav class="navbar navbar-dark bg-dark">
+            <div class="container-fluid">
+                <span class="navbar-brand">
+                    <i class="fas fa-bug"></i> Debug Panel
+                </span>
+                <span class="navbar-text">
+                    <a href="/" class="text-light text-decoration-none">
+                        <i class="fas fa-arrow-left"></i> Вернуться к приложению
+                    </a>
+                </span>
+            </div>
+        </nav>
+
+        <div class="container-fluid mt-3">
+            <!-- Вкладки дебаг-панели -->
+            <ul class="nav nav-tabs" id="debugTabs" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link active" id="api-tab" data-bs-toggle="tab" href="#api" role="tab">
+                        <i class="fas fa-cogs"></i> API
+                    </a>
+                </li>
+                <!-- Новая вкладка: Страницы -->
+                <li class="nav-item">
+                    <a class="nav-link" id="pages-tab" data-bs-toggle="tab" href="#pages" role="tab">
+                        <i class="fas fa-sitemap"></i> Страницы
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="log-tab" data-bs-toggle="tab" href="#log" role="tab">
+                        <i class="fas fa-list"></i> Log
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="rest-tab" data-bs-toggle="tab" href="#rest" role="tab">
+                        <i class="fas fa-globe"></i> REST
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="sql-tab" data-bs-toggle="tab" href="#sql" role="tab">
+                        <i class="fas fa-database"></i> SQL
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="python-tab" data-bs-toggle="tab" href="#python" role="tab">
+                        <i class="fab fa-python"></i> Python
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="apilog-tab" data-bs-toggle="tab" href="#apilog" role="tab">
+                        <i class="fas fa-file-alt"></i> API Log
+                    </a>
+                </li>
+            </ul>
+
+            <!-- Содержимое вкладок -->
+            <div class="tab-content mt-3" id="debugTabContent">
+                <!-- Вкладка API -->
+                <div class="tab-pane fade show active" id="api" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>Структура Backend API</h5>
+                        </div>
+                        <div class="card-body debug-content">
+                            <pre id="apiStructure">Загрузка структуры API...</pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Вкладка Страницы -->
+                <div class="tab-pane fade" id="pages" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5>Список страниц</h5>
+                            <span class="text-muted">Всего: <span v-text="pages.length"></span></span>
+                        </div>
+                        <div class="card-body debug-content">
+                            <ul class="list-group">
+                                <li class="list-group-item d-flex justify-content-between align-items-center"
+                                    v-for="p in pages" :key="p.name">
+                                    <div>
+                                        <a :href="p.url" v-text="p.url"></a>
+                                        <span class="text-muted ms-2" v-text="p.title"></span>
+                                    </div>
+                                    <span class="badge bg-light text-dark" v-text="p.name"></span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Вкладка Log -->
+                <div class="tab-pane fade" id="log" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5>Логи системы</h5>
+                            <div>
+                                <span class="text-muted me-2">./logs/logs.txt</span>
+                                <button class="btn btn-sm btn-primary" @click="refreshLogs">
+                                    <i class="fas fa-sync-alt"></i> Обновить
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body debug-content">
+                            <div id="logContent">
+                                <div v-for="log in logs" :key="log.timestamp" 
+                                     :class="'log-entry log-' + log.level.toLowerCase()">
+                                    <span class="text-muted" v-text="log.timestamp"></span>
+                                    <span class="badge bg-secondary ms-2" v-text="log.level"></span>
+                                    <span class="ms-2" v-text="log.message"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Вкладка REST -->
+                <div class="tab-pane fade" id="rest" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>REST API Тестер</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Метод:</label>
+                                        <select class="form-select" v-model="restMethod">
+                                            <option value="GET">GET</option>
+                                            <option value="POST">POST</option>
+                                            <option value="PUT">PUT</option>
+                                            <option value="DELETE">DELETE</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">URL:</label>
+                                        <input type="text" class="form-control" v-model="restUrl" placeholder="/api/...">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Body:</label>
+                                        <textarea class="form-control" v-model="restBody" rows="4" placeholder="JSON данные"></textarea>
+                                    </div>
+                                    <button class="btn btn-primary" @click="sendRestRequest">
+                                        <i class="fas fa-paper-plane"></i> Отправить
+                                    </button>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Ответ:</label>
+                                        <ul class="nav nav-tabs" role="tablist">
+                                            <li class="nav-item">
+                                                <a class="nav-link active" data-bs-toggle="tab" href="#restRaw">Raw</a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link" data-bs-toggle="tab" href="#restTable">Table</a>
+                                            </li>
+                                        </ul>
+                                        <div class="tab-content">
+                                            <div class="tab-pane fade show active" id="restRaw">
+                                                <pre class="mt-2" v-text="restResponse"></pre>
+                                            </div>
+                                            <div class="tab-pane fade" id="restTable">
+                                                <div class="mt-2" v-html="restResponseTable"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Вкладка SQL -->
+                <div class="tab-pane fade" id="sql" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>SQL Выполнение</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">SQL Запрос:</label>
+                                        <textarea class="form-control" v-model="sqlQuery" rows="6" placeholder="SELECT * FROM table..."></textarea>
+                                    </div>
+                                    <button class="btn btn-primary" @click="executeSql">
+                                        <i class="fas fa-play"></i> Выполнить
+                                    </button>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Результат:</label>
+                                        <ul class="nav nav-tabs" role="tablist">
+                                            <li class="nav-item">
+                                                <a class="nav-link active" data-bs-toggle="tab" href="#sqlRaw">Raw</a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link" data-bs-toggle="tab" href="#sqlTable">Table</a>
+                                            </li>
+                                        </ul>
+                                        <div class="tab-content">
+                                            <div class="tab-pane fade show active" id="sqlRaw">
+                                                <pre class="mt-2" v-text="sqlResult"></pre>
+                                            </div>
+                                            <div class="tab-pane fade" id="sqlTable">
+                                                <div class="mt-2" v-html="sqlResultTable"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Вкладка Python -->
+                <div class="tab-pane fade" id="python" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>Python Выполнение</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Python Код:</label>
+                                        <textarea class="form-control" v-model="pythonCode" rows="6" placeholder="print('Hello World')"></textarea>
+                                    </div>
+                                    <button class="btn btn-primary" @click="executePython">
+                                        <i class="fas fa-play"></i> Выполнить
+                                    </button>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Результат:</label>
+                                        <ul class="nav nav-tabs" role="tablist">
+                                            <li class="nav-item">
+                                                <a class="nav-link active" data-bs-toggle="tab" href="#pythonRaw">Raw</a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link" data-bs-toggle="tab" href="#pythonTable">Table</a>
+                                            </li>
+                                        </ul>
+                                        <div class="tab-content">
+                                            <div class="tab-pane fade show active" id="pythonRaw">
+                                                <pre class="mt-2" v-text="pythonResult"></pre>
+                                            </div>
+                                            <div class="tab-pane fade" id="pythonTable">
+                                                <div class="mt-2" v-html="pythonResultTable"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Вкладка API Log -->
+                <div class="tab-pane fade" id="apilog" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>API Лог</h5>
+                        </div>
+                        <div class="card-body debug-content">
+                            <div id="apiLogContent">
+                                <div v-for="log in apiLogs" :key="log.id" class="log-entry">
+                                    <span class="text-muted" v-text="log.timestamp"></span>
+                                    <span class="badge bg-info ms-2" v-text="log.method"></span>
+                                    <span class="ms-2" v-text="log.endpoint"></span>
+                                    <span class="text-muted ms-2">(<span v-text="log.duration"></span>ms)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="{{ url_for('static', filename='js/debug.js') }}"></script>
+</body>
+</html>
