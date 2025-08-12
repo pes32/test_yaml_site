@@ -13,6 +13,7 @@ const debugApp = createApp({
             pages: [],
             // Logs
             logs: [],
+            logFilePath: '',
             // REST
             restMethod: 'GET',
             restUrl: '/api/config',
@@ -54,7 +55,7 @@ const debugApp = createApp({
                     this.backendStructure = await res.json();
                     const el = document.getElementById('apiStructure');
                     if (el) {
-                        el.textContent = JSON.stringify(this.backendStructure, null, 2);
+                        el.innerHTML = this.jsonToTable(this.backendStructure);
                     }
                 }
             } catch (e) { /* noop */ }
@@ -81,7 +82,14 @@ const debugApp = createApp({
             try {
                 const response = await fetch('/api/debug/logs');
                 if (response.ok) {
-                    this.logs = await response.json();
+                    const data = await response.json();
+                    // Поддержка формата { logs, path } и старого массива
+                    if (Array.isArray(data)) {
+                        this.logs = data;
+                    } else {
+                        this.logs = data.logs || [];
+                        this.logFilePath = data.path || '';
+                    }
                 }
             } catch (error) { /* noop */ }
         },

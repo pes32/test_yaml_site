@@ -9,6 +9,8 @@ import sys
 import platform
 from flask_cors import CORS
 import logging
+from logging.handlers import RotatingFileHandler
+import re
 from datetime import datetime
 
 app = Flask(__name__)
@@ -17,8 +19,30 @@ CORS(app)
 # Версия ассетов для busting кэша
 app.jinja_env.globals['ASSETS_VERSION'] = int(time.time())
 
-# Настройка логирования
-logging.basicConfig(level=logging.INFO)
+# Настройка логирования в файл с ротацией
+def setup_logging():
+    log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, 'app.log')
+
+    # Базовый логгер уровня INFO
+    logging.basicConfig(level=logging.INFO)
+    formatter = logging.Formatter('%(asctime)s %(levelname)s %(name)s: %(message)s')
+
+    file_handler = RotatingFileHandler(log_file, maxBytes=2 * 1024 * 1024, backupCount=3, encoding='utf-8')
+    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(formatter)
+
+    # Подключаем к логгерам приложения и werkzeug
+    if not any(isinstance(h, RotatingFileHandler) for h in app.logger.handlers):
+        app.logger.addHandler(file_handler)
+    root_logger = logging.getLogger()
+    if not any(isinstance(h, RotatingFileHandler) for h in root_logger.handlers):
+        root_logger.addHandler(file_handler)
+
+    return log_file
+
+LOG_FILE_PATH = setup_logging()
 logger = logging.getLogger(__name__)
 
 def load_pages_config():
@@ -229,12 +253,42 @@ def debug_panel():
 @app.route('/api/debug/logs')
 def get_logs():
     """API для получения логов"""
-    logs = [
-        {"timestamp": datetime.now().isoformat(), "level": "INFO", "message": "Система запущена"},
-        {"timestamp": datetime.now().isoformat(), "level": "INFO", "message": "Конфигурация загружена"},
-        {"timestamp": datetime.now().isoformat(), "level": "INFO", "message": f"Загружено страниц: {len(CONFIG['pages'])}"}
-    ]
-    return jsonify(logs)
+    log_file = LOG_FILE_PATH
+    parsed_logs = []
+    try:
+        if os.path.exists(log_file):
+            with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+                lines = f.readlines()[-300:]  # последние 300 строк
+            pattern = re.compile(r'^(?P<ts>[^ ]+ [^ ]+)\s+(?P<level>[A-Z]+)\s+(?P<logger>[^:]+):\s+(?P<msg>.*)$')
+            for line in lines:
+                line = line.rstrip('\n')
+                m = pattern.match(line)
+                if m:
+                    parsed_logs.append({
+                        'timestamp': m.group('ts'),
+                        'level': m.group('level'),
+                        'message': m.group('msg')
+                    })
+                else:
+                    parsed_logs.append({
+                        'timestamp': '',
+                        'level': 'INFO',
+                        'message': line
+                    })
+        else:
+            # Файла ещё нет — вернём подсказку
+            parsed_logs = [{
+                'timestamp': datetime.now().isoformat(),
+                'level': 'INFO',
+                'message': 'Файл лога ещё не создан. Он появится при первом лог-сообщении.'
+            }]
+    except Exception as e:
+        parsed_logs = [{
+            'timestamp': datetime.now().isoformat(),
+            'level': 'ERROR',
+            'message': f'Ошибка чтения лога: {e}'
+        }]
+    return jsonify({"logs": parsed_logs, "path": log_file})
 
 @app.route('/api/execute', methods=['POST'])
 def execute_command():
