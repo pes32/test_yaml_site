@@ -107,6 +107,45 @@ def load_config():
 # Глобальная конфигурация
 CONFIG = load_config()
 
+# Динамическая регистрация роутов страниц по url из gui.yaml
+def _has_rule(path: str) -> bool:
+    try:
+        for r in app.url_map.iter_rules():
+            if str(r) == path:
+                return True
+    except Exception:
+        pass
+    return False
+
+def _make_page_view(page_name: str):
+    def _view():
+        page_config = CONFIG['pages'][page_name]
+        if 'name' not in page_config:
+            page_config['name'] = page_name
+        return render_template('page.html', page_config=page_config, all_attrs=CONFIG['all_attrs'])
+    return _view
+
+def register_page_urls_from_config():
+    pages = CONFIG.get('pages', {})
+    for name, cfg in pages.items():
+        path = cfg.get('url')
+        if not path:
+            continue
+        if not path.startswith('/'):
+            path = '/' + path
+        # Не перерегистрируем существующие
+        if _has_rule(path):
+            continue
+        endpoint = f"page_by_url__{name}"
+        try:
+            app.add_url_rule(path, endpoint=endpoint, view_func=_make_page_view(name))
+            logger.info(f"Зарегистрирован маршрут страницы '{name}' по URL: {path}")
+        except Exception as e:
+            logger.error(f"Не удалось зарегистрировать маршрут для страницы '{name}' по URL {path}: {e}")
+
+# Регистрируем маршруты один раз при старте
+register_page_urls_from_config()
+
 @app.route('/')
 def index():
     """Главная страница - страница main"""
@@ -169,6 +208,8 @@ def reload_config():
     global CONFIG
     try:
         CONFIG = load_config()
+        # При перезагрузке конфигурации попробуем зарегистрировать новые URL, если появились
+        register_page_urls_from_config()
         return jsonify({
             "success": True,
             "message": "Конфигурация перезагружена",

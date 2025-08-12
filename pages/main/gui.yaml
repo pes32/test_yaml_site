@@ -1,64 +1,8 @@
-# Синтаксис gui.yaml (краткая шпаргалка)
-# url: "/"
-# title: "Главная страница - Демонстрация виджетов"
-# description: "Демонстрация всех доступных виджетов и системные команды"
-# tabs:
-#   - name: "Название вкладки"
-#     content:
-#       - name: "Название блока"
-#         collapsible: true|false   # по умолчанию true (можно сворачивать)
-#         rows:
-#           - widgets: [a, b]       # строка с виджетами
-#           - "Произвольный текст"  # строка с текстом
-#           - columns:               # строка с колонками
-#               - widgets: [c]
-#               - widgets: [d, e]
-
-# GUI для главной страницы - демонстрация всех виджетов
 url: "/"
-title: "Главная страница - Демонстрация виджетов"
-description: "Демонстрация всех доступных виджетов и системные команды"
-
 tabs:
-  - name: "Демонстрация виджетов"
+  - name: "Просто страница"
     content:
-      - name: "Строковые виджеты"
-        rows:
-          - widgets: [demo_string, demo_text]
-      
-      - name: "Числовые виджеты (статичный блок)"
+      - name: "Это имя списка, а по кнопке можно посмотреть все виджеты"
         collapsible: false
         rows:
-          - widgets: [demo_int, demo_float]
-      
-      - name: "Readonly примеры"
-        rows:
-          - widgets: [demo_readonly]
-          - widgets: [demo_int_readonly, demo_float_readonly]
-      
-      - name: "Списки"
-        rows:
-          - widgets: [demo_list, demo_multiselect]
-      
-      - name: "IP адреса"
-        rows:
-          - widgets: [demo_ip, demo_ip_mask]
-      
-      - name: "Дата и время"
-        rows:
-          - widgets: [demo_datetime]
-      
-      - name: "Таблицы"
-        rows:
-          - widgets: [demo_table, demo_table_editable]
-      
-      - name: "Кнопки"
-        rows:
-          - widgets: [demo_button_command, demo_button_url]
-          - widgets: [demo_button_dialog]
-
-  - name: "Вкладка 2"
-    content:
-      - name: "Простой ввод"
-        rows:
-          - widgets: [tab2_simple_string]
+          - widgets: [demo_button]
