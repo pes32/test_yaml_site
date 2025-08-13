@@ -10,6 +10,9 @@
 </head>
 <body>
     <div id="app">
+        <!-- Глобальный модальный менеджер -->
+        <modal-manager ref="modalManager"></modal-manager>
+        
         <!-- Навигация -->
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
             <div class="container-fluid">
@@ -55,8 +58,8 @@
                     <!-- Сворачиваемые блоки -->
                     <div v-for="(section, sidx) in tab.content" :key="sidx" class="mt-3">
                         <div class="card">
-                            <!-- Заголовок -->
-                            <div class="card-header"
+                            <!-- Заголовок (опциональный) -->
+                            <div v-if="section.showHeader" class="card-header"
                                  :id="'heading-' + index + '-' + sidx"
                                  :data-bs-toggle="section.collapsible ? 'collapse' : null"
                                  :data-bs-target="section.collapsible ? ('#collapse-' + index + '-' + sidx) : null"
@@ -150,6 +153,7 @@
     <script src="{{ url_for('static', filename='js/widgets/text.js') }}?v={{ ASSETS_VERSION }}"></script>
     <script src="{{ url_for('static', filename='js/widgets/table.js') }}?v={{ ASSETS_VERSION }}"></script>
     <script src="{{ url_for('static', filename='js/widgets/button.js') }}?v={{ ASSETS_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/widgets/modal.js') }}?v={{ ASSETS_VERSION }}"></script>
     <script src="{{ url_for('static', filename='js/widgets/factory.js') }}?v={{ ASSETS_VERSION }}"></script>
     <script src="{{ url_for('static', filename='js/widgets.js') }}?v={{ ASSETS_VERSION }}"></script>
     <script src="{{ url_for('static', filename='js/page.js') }}?v={{ ASSETS_VERSION }}"></script>

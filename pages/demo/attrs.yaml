@@ -1,13 +1,15 @@
 # Атрибуты для главной страницы - демонстрация всех виджетов
 
 # Общая структура атрибута
-# attribute_structure:                           # Имя атрибута (обязательно)
+# <name_attr>:                                   # Имя атрибута (обязательно)
 #   widget: "тип_виджета"                        # Тип виджета (обязательно)
 #   description: "Описание"                      # Описание поля (обязательно)
 #   info: "Подсказка"                            # Информационное сообщение (опционально)
 #   readonly: true                               # Только для чтения (по умолчанию false)
 #   default: "Значение"                          # Начальное значение (опционально)
 #   command: "имя_команды"                       # Команда для кнопок (опционально)
+#                            - ui                # для обращения к модальному окну
+#                            - pg                # для обращения к  postgress
 #   url: "/путь/к/странице"                      # URL для перехода (опционально)
 #   output_attrs: ["attr1", "attr2"]             # Атрибуты для передачи (опционально)
 #   input_attrs: ["attr3", "attr4"]              # Атрибуты для получения (опционально)
@@ -187,3 +189,24 @@ button_icon_svg_2:
 button_null:
   widget: button
   description: "Пустая кнопка"
+
+popup_button:
+  widget: button
+  description: "Модальное окно"
+  command: popup_element_gui -ui
+
+popup_string:
+  widget: str
+  description: "Строка в модальном окне"
+  default: "Пример текста"
+  info: "Введи в меня текст!"
+
+popup_int:
+  widget: int
+  description: "Целое число в модальном окне"
+  info: "Хочу целое число!"
+
+save_button_popup:
+  widget: button
+  description: "Сохранить"
+  command: save # пока всё равно не работает

@@ -134,6 +134,25 @@ const ButtonWidget = {
                 return;
             }
             
+            // Проверяем специальную команду для закрытия модального окна
+            if (this.widgetConfig.command === 'CLOSE_MODAL') {
+                // Закрываем модальное окно через глобальный менеджер
+                if (this.$root.$refs.modalManager) {
+                    this.$root.$refs.modalManager.closeModal();
+                }
+                return;
+            }
+            
+            // Проверяем, является ли команда UI-командой (содержит -ui)
+            if (this.widgetConfig.command.includes(' -ui')) {
+                const modalName = this.widgetConfig.command.replace(' -ui', '').trim();
+                // Открываем модальное окно через глобальный менеджер
+                if (this.$root.$refs.modalManager) {
+                    this.$root.$refs.modalManager.openModal(modalName);
+                }
+                return;
+            }
+            
             const params = {};
             
             // Собираем параметры из output_attrs

@@ -120,44 +120,27 @@ def load_page_config(page_path, page_name):
 
 def determine_file_type(content, filepath):
     """
-    Автоматически определяет тип YAML файла по содержимому
+    Простое определение типа YAML файла по содержимому
     Возвращает: 'attrs', 'gui' или None
     """
     if not isinstance(content, dict):
         return None
     
-    # Определяем по ключам и структуре содержимого
-    
-    # GUI файл содержит:
-    # - tabs, content, sections, rows, columns
-    # - url, title, description (метаданные страницы)
-    gui_indicators = ['tabs', 'content', 'sections', 'url', 'title', 'description']
-    gui_score = sum(1 for key in gui_indicators if key in content)
-    
-    # Атрибуты содержат:
-    # - виджеты с полями widget, description, default, source и т.д.
-    attrs_indicators = ['widget', 'description', 'default', 'source', 'readonly', 'command', 'dialog']
-    attrs_score = 0
-    
-    # Проверяем значения на наличие атрибутов виджетов
-    for value in content.values():
-        if isinstance(value, dict):
-            # Если значение - словарь с полями виджета
-            if any(key in value for key in attrs_indicators):
-                attrs_score += 1
-            # Если есть вложенные словари с виджетами
-            for nested_value in value.values():
-                if isinstance(nested_value, dict) and any(key in nested_value for key in attrs_indicators):
-                    attrs_score += 1
-    
-    # Определяем тип по наибольшему количеству индикаторов
-    if gui_score > attrs_score:
+    # GUI файл - если есть url (это однозначный индикатор)
+    if 'url' in content:
         return 'gui'
-    elif attrs_score > 0:
+    
+    # Атрибуты - если есть widget (это однозначный индикатор)
+    if 'widget' in content:
         return 'attrs'
-    else:
-        # Если не можем определить, считаем по умолчанию атрибутами
-        return 'attrs'
+    
+    # Проверяем вложенные значения для атрибутов
+    for value in content.values():
+        if isinstance(value, dict) and 'widget' in value:
+            return 'attrs'
+    
+    # Если не можем определить, считаем по умолчанию атрибутами
+    return 'attrs'
 
 
 

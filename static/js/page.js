@@ -113,17 +113,24 @@ const app = createApp({
                 console.warn('Invalid content:', content);
                 return [];
             }
-            // Каждый item -> секция { name, rows, collapsible=true|false }
+            // Каждый item -> секция { name?, rows, collapsible=true|false, showHeader }
             const sections = [];
             content.forEach(item => {
-                if (item.name) {
-                    const section = {
-                        name: item.name,
-                        rows: this.parseContentRows(item.rows),
-                        collapsible: item.collapsible !== false // по умолчанию true
-                    };
-                    sections.push(section);
+                // Пропускаем пустые объекты без строк
+                const rows = this.parseContentRows(item.rows);
+                if (!rows.length && !item.name) {
+                    return;
                 }
+
+                const section = {
+                    name: item.name || '',
+                    rows,
+                    // по умолчанию блок сворачиваемый; можно отключить collapsible: false
+                    collapsible: item.collapsible !== false,
+                    // Показывать заголовок? Можно скрыть через header: false или если name пустой
+                    showHeader: item.header !== false && !!item.name
+                };
+                sections.push(section);
             });
             return sections;
         },
@@ -205,4 +212,6 @@ const app = createApp({
 });
 
 app.component('widget-renderer', WidgetRenderer);
+app.component('modal-manager', ModalManager);
+app.component('modal-buttons', ModalButtons);
 app.mount('#app');

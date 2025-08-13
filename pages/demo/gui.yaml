@@ -7,17 +7,29 @@
 #     content:
 #       - name: "Название блока"
 #         collapsible: true|false   # по умолчанию true (можно сворачивать)
+#         header: true|false        # по умолчанию true (можно скрыть заголовок)
 #         rows:
 #           - widgets: [a, b]       # строка с виджетами
 #           - "Произвольный текст"  # строка с текстом
-#           - columns:               # строка с колонками
+#           - columns:              # строка с колонками
 #               - widgets: [c]
 #               - widgets: [d, e]
+#
+# Модальные окна:
+# <name_modal_window>:              # Имя модального окна (используется в command: popup_element_gui -ui)
+#   - name: "Заголовок окна"
+#     tabs:                         # Вкладки в модальном окне (опционально)
+#       - name: "Название вкладки"
+#         content:                  # Содержимое вкладки
+#           - name: "Секция"
+#             rows:
+#               - widgets: [a, b]   # Виджеты в строке
+#   buttons: [<имя_кнопки>, CLOSE]
 
 # GUI для главной страницы - демонстрация всех виджетов
 
 url: "/demo"
-title: "Демо-страница - Демонстрация виджетов"
+title: "Демонстрация виджетов"
 description: "Демонстрация всех доступных виджетов и системные команды"
 
 tabs:
@@ -33,7 +45,10 @@ tabs:
           - widgets: [demo_int, demo_float]
       
       - name: "Readonly примеры"
+        collapsible: false
+        header: false
         rows:
+          - "Это примеры для readonly"
           - widgets: [demo_readonly]
           - widgets: [demo_int_readonly, demo_float_readonly]
       
@@ -55,13 +70,19 @@ tabs:
       
       - name: "Кнопки"
         rows:
+          - "Первая линия кнопок"
           - widgets: [demo_button_command, demo_button_url]
+          - "Кнопка с диалогом"
           - widgets: [demo_button_dialog]
+          - "Кнопки-иконки"
           - widgets: [button_icon_svg, button_null, button_icon_svg_2]
+          - "Модальное окно"
+          - widgets: [popup_button]
 
   - name: "Вкладка с журналом" 
     content:
       - name: "Журнал"
+        header: false
         collapsible: false
         rows:
           - widgets: [journal_table]
@@ -70,5 +91,17 @@ tabs:
     content:
       - name: "Форма СГУК"
         collapsible: false
+        header: false
         rows:
           - widgets: [form_table]
+
+# Модальные окна
+popup_element_gui:
+  - name: "Имя модального окна"
+    tabs:
+      - name: "Имя вкладки"
+        content:
+          - name: "Содержимое модального окна"
+            rows:
+              - widgets: [popup_string, popup_int]
+    buttons: [save_button_popup, CLOSE]
