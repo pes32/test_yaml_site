@@ -4,7 +4,7 @@
 import os
 import time
 import yaml
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, send_from_directory
 import sys
 import platform
 from flask_cors import CORS
@@ -62,41 +62,102 @@ def load_pages_config():
     return pages_config
 
 def load_page_config(page_path, page_name):
-    """Загружает конфигурацию одной страницы"""
+    """Загружает конфигурацию одной страницы, автоматически определяя тип файлов по содержимому"""
     page_config = {
         'name': page_name,
         'attrs': {},
         'gui': {}
     }
     
-    # Загружаем attrs.yaml
-    attrs_file = os.path.join(page_path, 'attrs.yaml')
-    if os.path.exists(attrs_file):
-        try:
-            with open(attrs_file, 'r', encoding='utf-8') as f:
-                page_config['attrs'] = yaml.safe_load(f) or {}
-        except Exception as e:
-            logger.error(f"Ошибка загрузки {attrs_file}: {e}")
-    
-    # Загружаем gui.yaml
-    gui_file = os.path.join(page_path, 'gui.yaml')
-    if os.path.exists(gui_file):
-        try:
-            with open(gui_file, 'r', encoding='utf-8') as f:
-                gui_config = yaml.safe_load(f) or {}
-                page_config['gui'] = gui_config
-                
-                # Добавляем метаданные страницы из GUI конфигурации
-                if 'url' in gui_config:
-                    page_config['url'] = gui_config['url']
-                if 'title' in gui_config:
-                    page_config['title'] = gui_config['title']
-                if 'description' in gui_config:
-                    page_config['description'] = gui_config['description']
-        except Exception as e:
-            logger.error(f"Ошибка загрузки {gui_file}: {e}")
+    # Загружаем ВСЕ .yaml файлы в папке страницы
+    try:
+        if os.path.isdir(page_path):
+            yaml_files = []
+            for fname in os.listdir(page_path):
+                if fname.endswith('.yaml') or fname.endswith('.yml'):
+                    yaml_files.append(os.path.join(page_path, fname))
+            
+            # Сортируем файлы для стабильного порядка загрузки
+            yaml_files.sort()
+            
+            for fpath in yaml_files:
+                try:
+                    with open(fpath, 'r', encoding='utf-8') as f:
+                        loaded = yaml.safe_load(f) or {}
+                        if not isinstance(loaded, dict):
+                            logger.warning(f"Файл {fpath} не содержит словарь, пропущен")
+                            continue
+                        
+                        # Автоматически определяем тип файла по содержимому
+                        file_type = determine_file_type(loaded, fpath)
+                        
+                        if file_type == 'attrs':
+                            # Файл с атрибутами - объединяем с существующими
+                            page_config['attrs'].update(loaded)
+                            logger.info(f"Загружен файл атрибутов: {fpath}")
+                        elif file_type == 'gui':
+                            # Файл с GUI - объединяем с существующим GUI
+                            page_config['gui'].update(loaded)
+                            logger.info(f"Загружен файл GUI: {fpath}")
+                            
+                            # Добавляем метаданные страницы из GUI конфигурации
+                            if 'url' in loaded:
+                                page_config['url'] = loaded['url']
+                            if 'title' in loaded:
+                                page_config['title'] = loaded['title']
+                            if 'description' in loaded:
+                                page_config['description'] = loaded['description']
+                        else:
+                            logger.warning(f"Не удалось определить тип файла {fpath}, пропущен")
+                            
+                except Exception as e:
+                    logger.error(f"Ошибка загрузки {fpath}: {e}")
+                    
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке файлов в {page_path}: {e}")
     
     return page_config
+
+def determine_file_type(content, filepath):
+    """
+    Автоматически определяет тип YAML файла по содержимому
+    Возвращает: 'attrs', 'gui' или None
+    """
+    if not isinstance(content, dict):
+        return None
+    
+    # Определяем по ключам и структуре содержимого
+    
+    # GUI файл содержит:
+    # - tabs, content, sections, rows, columns
+    # - url, title, description (метаданные страницы)
+    gui_indicators = ['tabs', 'content', 'sections', 'url', 'title', 'description']
+    gui_score = sum(1 for key in gui_indicators if key in content)
+    
+    # Атрибуты содержат:
+    # - виджеты с полями widget, description, default, source и т.д.
+    attrs_indicators = ['widget', 'description', 'default', 'source', 'readonly', 'command', 'dialog']
+    attrs_score = 0
+    
+    # Проверяем значения на наличие атрибутов виджетов
+    for value in content.values():
+        if isinstance(value, dict):
+            # Если значение - словарь с полями виджета
+            if any(key in value for key in attrs_indicators):
+                attrs_score += 1
+            # Если есть вложенные словари с виджетами
+            for nested_value in value.values():
+                if isinstance(nested_value, dict) and any(key in nested_value for key in attrs_indicators):
+                    attrs_score += 1
+    
+    # Определяем тип по наибольшему количеству индикаторов
+    if gui_score > attrs_score:
+        return 'gui'
+    elif attrs_score > 0:
+        return 'attrs'
+    else:
+        # Если не можем определить, считаем по умолчанию атрибутами
+        return 'attrs'
 
 
 
@@ -360,6 +421,16 @@ def get_loaded_modules():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# Маршрут для статических иконок из templates/icons
+@app.route('/templates/icons/<path:filename>')
+def serve_icon(filename):
+    """Отдает иконки из папки templates/icons"""
+    try:
+        return send_from_directory('templates/icons', filename, mimetype='image/svg+xml')
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке иконки {filename}: {e}")
+        return f"Ошибка загрузки иконки: {e}", 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8000)

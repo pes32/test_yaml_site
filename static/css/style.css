@@ -67,6 +67,12 @@ body {
     border-color: #0a58ca;
 }
 
+/* При наведении на любую кнопку текст остаётся читаемым */
+.widget-button:hover span,
+.widget-button:hover {
+    color: white !important;
+}
+
 .widget-button:disabled {
     background-color: #6c757d;
     border-color: #6c757d;
@@ -505,4 +511,68 @@ body {
     width: 300px !important;
     min-width: 300px !important;
     max-width: 300px !important;
+}
+
+/* Стили для иконок кнопок */
+.button-icon {
+    margin-right: 0.5rem;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+/* Центрирование иконок в кнопках */
+.widget-button:has(.button-icon) .button-icon,
+.widget-button.icon-only .button-icon {
+    margin: 0 !important;
+    display: block !important;
+}
+
+.widget-button .button-icon:last-child {
+    margin-right: 0;
+}
+
+/* Кнопки с иконками - делаем фон прозрачным */
+.widget-button:has(.button-icon),
+.widget-button:has(i[class*="fas"]) {
+    background-color: transparent !important;
+    border-color: transparent !important;
+    color: #0d6efd !important;
+    width: auto !important;
+    min-width: auto !important;
+}
+
+.widget-button:has(.button-icon):hover,
+.widget-button:has(i[class*="fas"]):hover {
+    background-color: rgba(13, 110, 253, 0.1) !important;
+    border-color: rgba(13, 110, 253, 0.2) !important;
+}
+
+/* При наведении на кнопки с иконками текст остаётся читаемым */
+.widget-button:has(.button-icon):hover span,
+.widget-button:has(i[class*="fas"]):hover span {
+    color: #0d6efd !important;
+}
+
+.widget-button:has(.button-icon):active,
+.widget-button:has(i[class*="fas"]):active {
+    background-color: rgba(13, 110, 253, 0.2) !important;
+    border-color: rgba(13, 110, 253, 0.3) !important;
+}
+
+/* При активном состоянии кнопок с иконками текст остаётся читаемым */
+.widget-button:has(.button-icon):active span,
+.widget-button:has(i[class*="fas"]):active span {
+    color: #0d6efd !important;
+}
+
+/* Кнопки только с иконками (без текста) - стили применяются через JavaScript */
+
+/* Альтернативный селектор для старых браузеров */
+.widget-button:has(.button-icon:only-child) {
+    padding: 0.5rem;
+    min-width: 2.5rem;
+    height: 2.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }

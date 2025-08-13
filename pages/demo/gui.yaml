@@ -52,15 +52,23 @@ tabs:
       - name: "Таблицы"
         rows:
           - widgets: [demo_table, demo_table_editable]
-          - widgets: [demo_table_button]
       
       - name: "Кнопки"
         rows:
           - widgets: [demo_button_command, demo_button_url]
           - widgets: [demo_button_dialog]
+          - widgets: [button_icon_svg, button_null, button_icon_svg_2]
 
-  - name: "Вкладка 2"
+  - name: "Вкладка с журналом" 
     content:
-      - name: "Простой ввод"
+      - name: "Журнал"
+        collapsible: false
         rows:
-          - widgets: [tab2_simple_string]
+          - widgets: [journal_table]
+
+  - name: "Вкладка с формой"
+    content:
+      - name: "Форма СГУК"
+        collapsible: false
+        rows:
+          - widgets: [form_table]

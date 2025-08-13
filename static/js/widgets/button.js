@@ -15,10 +15,23 @@ const ButtonWidget = {
     template: `
         <div class="widget-container">
             <button class="btn widget-button"
+                    :class="{ 'icon-only': widgetConfig.icon && !widgetConfig.description }"
+                    :style="buttonStyle"
                     :disabled="widgetConfig.readonly"
-                    @click="onButtonClick">
-                <i v-if="widgetConfig.icon" :class="'fas fa-' + widgetConfig.icon"></i>
-                <span v-text="widgetConfig.description || 'Кнопка'"></span>
+                    @click="onButtonClick"
+                    :title="widgetConfig.icon ? (widgetConfig.description || 'Кнопка') : null">
+                <!-- SVG иконка -->
+                <img v-if="widgetConfig.icon && !widgetConfig.icon.startsWith('fas')" 
+                     :src="'/templates/icons/' + widgetConfig.icon"
+                     :style="iconStyle"
+                     :alt="widgetConfig.description || 'Кнопка'"
+                     class="button-icon">
+                <!-- FontAwesome иконка -->
+                <i v-else-if="widgetConfig.icon && widgetConfig.icon.startsWith('fas')" 
+                   :class="widgetConfig.icon"></i>
+                <!-- Текст кнопки (только если нет иконки) -->
+                <span v-if="!widgetConfig.icon" 
+                      v-text="widgetConfig.description || 'Кнопка'"></span>
             </button>
             
             <div v-if="widgetConfig.info" class="widget-info">
@@ -30,6 +43,53 @@ const ButtonWidget = {
         return {
             value: ''
         };
+    },
+    computed: {
+        iconStyle() {
+            if (!this.widgetConfig.icon || this.widgetConfig.icon.startsWith('fas')) {
+                return {};
+            }
+            
+            const size = this.widgetConfig.size || 16;
+            return {
+                height: `${size}px`,
+                width: 'auto',
+                verticalAlign: 'middle'
+            };
+        },
+        
+        buttonStyle() {
+            if (this.widgetConfig.size) {
+                const size = this.widgetConfig.size;
+                const basePadding = Math.max(4, size * 0.125);
+                const horizontalPadding = Math.max(8, size * 0.25);
+                
+                // Если есть иконка, делаем кнопку с отступами 2px от иконки
+                if (this.widgetConfig.icon) {
+                    const iconPadding = 2; // отступ от границы иконки
+                    const buttonSize = size + (iconPadding * 2); // размер кнопки = размер иконки + отступы
+                    
+                    return {
+                        height: `${buttonSize}px`,
+                        width: `${buttonSize}px`,
+                        minHeight: `${buttonSize}px`,
+                        minWidth: `${buttonSize}px`,
+                        padding: `${iconPadding}px`,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                    };
+                }
+                
+                // Обычная кнопка с текстом
+                return {
+                    height: `${size}px`,
+                    minHeight: `${size}px`,
+                    padding: `${basePadding}px ${horizontalPadding}px`
+                };
+            }
+            return {};
+        }
     },
     methods: {
         onButtonClick() {
