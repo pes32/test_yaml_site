@@ -20,6 +20,7 @@ const debugApp = createApp({
             restBody: '',
             restResponse: '',
             restResponseTable: '',
+            restRequests: [],
             // SQL
             sqlQuery: 'SELECT 1 as test',
             sqlResult: '',
@@ -37,6 +38,7 @@ const debugApp = createApp({
         await this.loadModules();
         await this.loadPages();
         await this.loadLogs();
+        await this.loadRestRequests();
         this.loadApiStructure();
         setInterval(() => { this.loadLogs(); }, 10000);
     },
@@ -55,7 +57,8 @@ const debugApp = createApp({
                     this.backendStructure = await res.json();
                     const el = document.getElementById('apiStructure');
                     if (el) {
-                        el.innerHTML = this.jsonToTable(this.backendStructure);
+                        const tree = this.buildAsciiTree(this.backendStructure);
+                        el.innerHTML = `<pre style="font-family: monospace; font-size: 0.85rem;">${tree}</pre>`;
                     }
                 }
             } catch (e) { /* noop */ }
@@ -93,6 +96,18 @@ const debugApp = createApp({
                 }
             } catch (error) { /* noop */ }
         },
+
+        // alias для шаблона
+        refreshLogs() { this.loadLogs(); },
+
+        async loadRestRequests() {
+            try {
+                const res = await fetch('/api/debug/routes?include_debug=1');
+                if (res.ok) {
+                    this.restRequests = await res.json();
+                }
+            } catch (e) { /* noop */ }
+        },
         loadApiStructure() {
             const apiStructure = document.getElementById('apiStructure');
             if (apiStructure && !apiStructure.textContent) {
@@ -129,6 +144,43 @@ const debugApp = createApp({
             this.pythonResult = output;
             this.pythonResultTable = `<div class="bg-light p-3 rounded"><strong>Output:</strong><br>Hello World<br><br><strong>Execution time:</strong> 0.001s</div>`;
         },
+        selectRest(r) {
+            this.restUrl = r.rule;
+            // выбираем подходящий метод; если текущий допустим — оставляем
+            if (!r.methods.includes(this.restMethod)) {
+                this.restMethod = r.methods[0] || 'GET';
+            }
+        },
+        buildAsciiTree(data) {
+            const lines = [];
+
+            const walk = (key, value, prefix, isLast) => {
+                const connector = isLast ? '└──' : '├──';
+                const line = `${prefix}${connector} ${key}`;
+                lines.push(line);
+
+                const newPrefix = prefix + (isLast ? '    ' : '│   ');
+
+                if (Array.isArray(value)) {
+                    value.forEach((item, idx) => {
+                        walk(Array.isArray(item) || typeof item === 'object' ? idx : String(item), item, newPrefix, idx === value.length - 1);
+                    });
+                } else if (value && typeof value === 'object') {
+                    const entries = Object.entries(value);
+                    entries.forEach(([k, v], idx) => {
+                        walk(k, v, newPrefix, idx === entries.length - 1);
+                    });
+                } else {
+                    // leaf, просто значение
+                }
+            };
+
+            const entries = Object.entries(data || {});
+            entries.forEach(([k, v], idx) => walk(k, v, '', idx === entries.length - 1));
+
+            return lines.join('\n');
+        },
+
         jsonToTable(data) {
             if (typeof data !== 'object' || data === null) return `<div>${data}</div>`;
             if (Array.isArray(data)) {

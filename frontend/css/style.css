@@ -153,7 +153,12 @@ body {
 }
 
 .widget-table tbody tr:nth-child(even) {
-    background-color: #f8f9fa;
+    background-color: #ffffff; /* более заметный оттенок */
+}
+
+/* Поведение при наведении для читабельности */
+.widget-table tbody tr:hover {
+    background-color: #dfe6f0;
 }
 
 /* Стили для списков */
@@ -516,9 +521,9 @@ body {
     width: auto !important;
 }
 
-/* Выравнивание виджетов в строке по вертикали */
+/* Выравнивание виджетов в строке по вертикали (кверху) */
 .card-body .row {
-    align-items: flex-end;
+    align-items: flex-start;
 }
 
 /* Убираем нижний отступ у виджетов в строке */

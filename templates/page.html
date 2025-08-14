@@ -18,7 +18,7 @@
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
             <div class="container-fluid">
                 <a class="navbar-brand" href="/">
-                    <i class="fas fa-code"></i> LowCode System
+                    <i class="fas fa-code"></i> YAML System
                 </a>
                 <div class="navbar-nav me-auto">
                     <span class="navbar-text">
@@ -136,12 +136,12 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Передаем данные страницы без смешивания Jinja и JS -->
+    <script id="page-data" type="application/json">
+        {{ {"pageConfig": page_config, "allAttrs": all_attrs} | tojson }}
+    </script>
     <script>
-        // Передаем данные страницы в JavaScript
-        window.pageData = {
-            pageConfig: {{ page_config | tojson | safe }},
-            allAttrs: {{ all_attrs | tojson | safe }}
-        };
+        window.pageData = JSON.parse(document.getElementById('page-data').textContent);
         console.log('Page data loaded:', window.pageData);
     </script>
     <!-- Загружаем виджеты -->

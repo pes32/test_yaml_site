@@ -406,7 +406,12 @@ const TableWidget = {
 
         onCellKeydown(rowIndex, cellIndex, event) {
             // При нажатии ENTER на последней ячейке создаем новую строку
-            if (event.key === 'Enter' && cellIndex === this.tableColumns.length - 1) {
+            if (
+                event.key === 'Enter' &&
+                cellIndex === this.tableColumns.length - 1 &&
+                rowIndex === this.tableData.length - 1
+            ) {
+                // Только если курсор в последней ячейке последней строки
                 event.preventDefault();
                 this.addNewRow();
             }

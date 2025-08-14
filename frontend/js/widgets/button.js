@@ -147,8 +147,9 @@ const ButtonWidget = {
             if (this.widgetConfig.command.includes(' -ui')) {
                 const modalName = this.widgetConfig.command.replace(' -ui', '').trim();
                 // Открываем модальное окно через глобальный менеджер
-                if (this.$root.$refs.modalManager) {
-                    this.$root.$refs.modalManager.openModal(modalName);
+                const mgr = (this.$root && this.$root.$refs && this.$root.$refs.modalManager) || window.modalManager;
+                if (mgr && typeof mgr.openModal === 'function') {
+                    mgr.openModal(modalName);
                 }
                 return;
             }

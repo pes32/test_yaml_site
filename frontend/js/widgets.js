@@ -106,6 +106,12 @@ const ModalManager = {
             activeTabIndex: 0
         };
     },
+    mounted() {
+        // Делаем менеджер доступным глобально на случай, если ref недоступен
+        if (typeof window !== 'undefined') {
+            window.modalManager = this;
+        }
+    },
     template: `
         <div v-if="showModal" class="modal-overlay" @click="closeModal">
             <div class="modal-content" @click.stop>
@@ -191,8 +197,10 @@ const ModalManager = {
         }
     },
     methods: {
-        openModal(modalName) {
+        async openModal(modalName) {
             this.loadModalConfig(modalName);
+            // лениво подгружаем атрибуты (ждём завершения)
+            await this.ensureModalAttrsLoaded();
             this.showModal = true;
         },
         
@@ -268,6 +276,64 @@ const ModalManager = {
         onWidgetExecute(data) {
             // Передаем события от виджетов в модальном окне
             this.$emit('execute', data);
+        },
+        /** Собирает имена виджетов, встречающихся в modalConfig */
+        collectModalWidgetNames() {
+            const names = new Set();
+            if (!this.modalConfig) return [];
+
+            const walkRows = (rows) => {
+                if (!Array.isArray(rows)) return;
+                rows.forEach((row) => {
+                    if (typeof row === "string") return;
+                    if (row.widgets && Array.isArray(row.widgets)) {
+                        row.widgets.forEach((w) => names.add(w));
+                    }
+                    if (row.columns && typeof row.columns === "object") {
+                        Object.values(row.columns).forEach((col) => {
+                            if (col.widgets && Array.isArray(col.widgets)) {
+                                col.widgets.forEach((w) => names.add(w));
+                            }
+                        });
+                    }
+                });
+            };
+
+            const tabs = this.modalConfig.tabs || [];
+            tabs.forEach((tab) => {
+                (tab.content || []).forEach((section) => {
+                    walkRows(section.rows);
+                });
+            });
+
+            // Добавляем кнопки модального окна (кроме специальной CLOSE)
+            if (Array.isArray(this.modalConfig.buttons)) {
+                this.modalConfig.buttons.forEach((btn) => {
+                    if (btn && btn !== 'CLOSE') names.add(btn);
+                });
+            }
+
+            return Array.from(names);
+        },
+        /** Загружает недостающие атрибуты для модального окна */
+        async ensureModalAttrsLoaded() {
+            try {
+                const required = this.collectModalWidgetNames();
+                if (!required.length) return;
+                const globalAttrs = (window.pageData && window.pageData.allAttrs) || {};
+                const namesToLoad = required.filter((n) => !(n in globalAttrs));
+                if (!namesToLoad.length) return;
+
+                const query = encodeURIComponent(namesToLoad.join(","));
+                const resp = await fetch(`/api/attrs?names=${query}`);
+                if (!resp.ok) return;
+                const data = await resp.json();
+                // merge
+                Object.assign(globalAttrs, data);
+                if (window.pageData) window.pageData.allAttrs = globalAttrs;
+            } catch (e) {
+                console.error("Не удалось подгрузить атрибуты для модального окна", e);
+            }
         }
     }
 };
