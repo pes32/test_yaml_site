@@ -1,32 +1,66 @@
 journal_table:
   widget: table
   description: "Журнал учёта"
-  headers:
-    - { label: "Операция", attr: "operation" }
-    - { label: "Документ", attr: "doc" }
-    - { label: "Паспорт", attr: "passport" }
-    - { label: "Масса, кг", attr: "mass_kg" }
-  data: []
+  source: proc_name
+  table_attrs: |
+    operation /Операция
+    doc /Документ
+    passport /Паспорт
+    mass_kg /Масса, кг
 
 form_table:
   widget: table
   description: "Сведения о закрытых радионуклидных источниках"
-  headers:
-    - { label: "Операция", attr: "operation" }
-    - { label: "ЗРИ", attr: "zri" }
-    - "Документ":
-      - { label: "код", attr: "doc_code" }
-      - { label: "дата", attr: "doc_date" }
-      - { label: "номер", attr: "doc_number" }
-    - "Паспорт":
-      - { label: "наименование", attr: "passport_name" }
-      - { label: "номер", attr: "passport_number" }
-    - { label: "Масса, кг", attr: "mass_kg" }
-    - { label: "ОКПО изготовителя", attr: "okpo_manufacturer" }
-    - { label: "Дата выпуска", attr: "release_date" }
-    - { label: "НСС, месяцев", attr: "nss_months" }
-    - { label: "ОКПО (поставщика/получателя/перевозчика)", attr: "okpo_counterparty" }
-    - "Прибор/установка/УКТ/иная упаковка":
-      - { label: "наименование", attr: "pack_name" }
-      - { label: "тип/номер", attr: "pack_type_number" }
-  data: []
+  source: proc_name
+  table_attrs: |
+    operation /Операция
+    zri /ЗРИ
+    /Документ
+    doc_code /Код :doc_code_list
+    doc_date /Дата :datetime
+    doc_number /Номер
+
+    passport_name /Паспорт наименование
+    passport_number /Паспорт номер
+    mass_kg /Масса, кг
+    okpo_manufacturer /ОКПО изготовителя
+    release_date /Дата выпуска
+    nss_months /НСС, месяцев
+    okpo_counterparty /ОКПО (поставщика/получателя/перевозчика)
+
+    /Прибор/установка/УКТ/иная упаковка
+    pack_name /Hаименование
+    pack_type_number /Hомер
+
+doc_code_list:
+  widget: list
+  source: ["Значение 1", "Значение 2", "Значение 3", "Значение 4"]
+
+pack_types:
+  widget: list
+  multiselect: true
+  source: ["Значение 1", "Значение 2", "Значение 3", "Значение 4"]
+
+# Новый формат описания таблицы
+form_table_new:
+  widget: table
+  description: "Сведения о закрытых радионуклидных источниках (новый формат)"
+  source: proc_name
+  table_attrs: |
+    id /Код №1
+    /Период
+    t_days /Дней :80 №2
+    t_years /Лет
+
+    /МЗА
+    mzua_tro /ТРО :100 №4
+    mzua_gro /ЖРО №5
+
+    mza /Суммарная №6
+    v_rao /Объём РАО :100 #,.3f №7
+    finance
+    pack_type /Тип упаковки :80 :pack_types №8
+    address /ip-адрес :ip
+    op_date /Дата операции :datetime
+
+

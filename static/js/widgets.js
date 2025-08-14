@@ -1,5 +1,4 @@
-// Загрузчик виджетов для LowCode System
-
+// Загрузчик виджетов
 // Создаем глобальный компонент WidgetRenderer для Vue.js
 // Этот компонент использует фабрику виджетов для динамического рендеринга
 
@@ -214,7 +213,6 @@ const ModalManager = {
                 // Сначала ищем на верхнем уровне pageConfig
                 if (pageConfig[modalName]) {
                     this.modalConfig = pageConfig[modalName];
-                    console.log('Modal config found at top level:', this.modalConfig);
                     return;
                 }
                 
@@ -225,14 +223,12 @@ const ModalManager = {
                     // Если это массив, берем первый элемент
                     if (Array.isArray(guiConfig) && guiConfig.length > 0) {
                         this.modalConfig = guiConfig[0];
-                        console.log('Modal config found in gui (array):', this.modalConfig);
                         return;
                     }
                     
                     // Если это объект, используем как есть
                     if (typeof guiConfig === 'object') {
                         this.modalConfig = guiConfig;
-                        console.log('Modal config found in gui (object):', this.modalConfig);
                         return;
                     }
                 }

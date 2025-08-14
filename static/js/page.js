@@ -155,18 +155,7 @@ const app = createApp({
             };
         },
         
-        getColumnClass(columnIndex) {
-            if (columnIndex.includes('100px')) {
-                return 'col-auto';
-            } else {
-                const colNum = columnIndex.replace('column_', '');
-                return `col-md-${12 / parseInt(colNum)}`;
-            }
-        },
-        
-        safeId(text) {
-            return String(text || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-        },
+        // Методы ниже были неиспользуемыми и удалены: getColumnClass, safeId.
         
         async executeCommand(commandData) {
             try {
@@ -184,7 +173,7 @@ const app = createApp({
                 const result = await response.json();
                 if (result.success) {
                     this.showNotification('Команда выполнена успешно', 'success');
-                    this.updateInputAttrs(commandData);
+                    // Если потребуется обновить связанные атрибуты, можно реализовать здесь
                 } else {
                     this.showNotification('Ошибка выполнения команды', 'danger');
                 }
@@ -192,9 +181,6 @@ const app = createApp({
                 console.error('Ошибка выполнения команды:', error);
                 this.showNotification('Ошибка выполнения команды', 'danger');
             }
-        },
-        
-        updateInputAttrs(commandData) {
         },
         
         showNotification(message, type = 'info') {

@@ -25,7 +25,8 @@ class WidgetFactory {
     // Регистрация нового типа виджета
     register(type, WidgetComponent) {
         this.widgetTypes.set(type, WidgetComponent);
-
+        // Возвращаем this, чтобы можно было вызывать методы цепочкой
+        return this;
     }
     
     // Получение компонента виджета по типу

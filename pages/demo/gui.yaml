@@ -43,6 +43,17 @@ tabs:
         collapsible: false
         rows:
           - widgets: [demo_int, demo_float]
+
+      - name: "Кнопки"
+        rows:
+          - "Первая линия кнопок"
+          - widgets: [demo_button_command, demo_button_url]
+          - "Кнопка с диалогом"
+          - widgets: [demo_button_dialog]
+          - "Кнопки-иконки"
+          - widgets: [button_icon_svg, button_null, button_icon_svg_2]
+          - "Модальное окно"
+          - widgets: [popup_button]
       
       - name: "Readonly примеры"
         collapsible: false
@@ -67,17 +78,6 @@ tabs:
       - name: "Таблицы"
         rows:
           - widgets: [demo_table, demo_table_editable]
-      
-      - name: "Кнопки"
-        rows:
-          - "Первая линия кнопок"
-          - widgets: [demo_button_command, demo_button_url]
-          - "Кнопка с диалогом"
-          - widgets: [demo_button_dialog]
-          - "Кнопки-иконки"
-          - widgets: [button_icon_svg, button_null, button_icon_svg_2]
-          - "Модальное окно"
-          - widgets: [popup_button]
 
   - name: "Вкладка с журналом" 
     content:
@@ -94,6 +94,12 @@ tabs:
         header: false
         rows:
           - widgets: [form_table]
+      
+      - name: "Новый формат таблицы"
+        collapsible: false
+        header: false
+        rows:
+          - widgets: [form_table_new]
 
 # Модальные окна
 popup_element_gui:

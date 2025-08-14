@@ -24,25 +24,21 @@ const ListWidget = {
                         type="button" 
                         data-bs-toggle="dropdown" 
                         :data-bs-auto-close="widgetConfig.multiselect ? 'outside' : true"
+                        data-bs-container="body"
                         aria-expanded="false"
                         ref="dropdownToggle"
                         :disabled="widgetConfig.readonly"
                         :tabindex="widgetConfig.readonly ? -1 : null"
-                        :title="getDisplayValue()"
-                        :data-bs-toggle="widgetConfig.multiselect ? 'tooltip' : 'dropdown'"
-                        :data-bs-placement="'top'"
-                        @keydown.tab="onTab">
+                        :title="getDisplayValue()">
                     <span v-text="getDisplayValue()"></span>
                 </button>
-                <ul class="dropdown-menu" @keydown.tab="onTab">
+                <ul class="dropdown-menu widget-dd-menu" @keydown.tab="onTab">
                     <li v-for="item in listSource" :key="item">
                         <a class="dropdown-item" 
                            href="#" 
                            @click.prevent="selectItem(item, $event)"
                            :class="{ 'active': isItemSelected(item) }"
-                           :title="item"
-                           :data-bs-toggle="tooltip"
-                           :data-bs-placement="'top'">
+                           :title="item">
                             <span v-text="item"></span>
                         </a>
                     </li>
@@ -187,30 +183,7 @@ const ListWidget = {
             return this.value;
         },
         
-        initTooltips() {
-            // Инициализируем Bootstrap tooltips для элементов списка и кнопки
-            this.$nextTick(() => {
-                // Tooltips для элементов списка
-                const tooltipElements = this.$el.querySelectorAll('[data-bs-toggle="tooltip"]');
-                tooltipElements.forEach(element => {
-                    new bootstrap.Tooltip(element, {
-                        trigger: 'hover',
-                        placement: 'top'
-                    });
-                });
-                
-                // Tooltip для кнопки выбора (только для multiselect)
-                if (this.widgetConfig.multiselect) {
-                    const toggleButton = this.$refs.dropdownToggle;
-                    if (toggleButton) {
-                        new bootstrap.Tooltip(toggleButton, {
-                            trigger: 'hover',
-                            placement: 'top'
-                        });
-                    }
-                }
-            });
-        }
+        // initTooltips убран — тултипы не требуются
     },
     
     mounted() {
@@ -235,14 +208,10 @@ const ListWidget = {
             }
         }
         
-        // Инициализируем tooltips
-        this.initTooltips();
+        // без tooltips
     },
     
-    updated() {
-        // Переинициализируем tooltips при обновлении компонента
-        this.initTooltips();
-    }
+    beforeUnmount() {}
 };
 
 // Регистрируем виджет глобально
