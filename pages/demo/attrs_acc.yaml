@@ -8,30 +8,6 @@ journal_table:
     passport /Паспорт
     mass_kg /Масса, кг
 
-form_table:
-  widget: table
-  description: "Сведения о закрытых радионуклидных источниках"
-  source: proc_name
-  table_attrs: |
-    operation /Операция
-    zri /ЗРИ
-    /Документ
-    doc_code /Код :doc_code_list
-    doc_date /Дата :datetime
-    doc_number /Номер
-
-    passport_name /Паспорт наименование
-    passport_number /Паспорт номер
-    mass_kg /Масса, кг
-    okpo_manufacturer /ОКПО изготовителя
-    release_date /Дата выпуска
-    nss_months /НСС, месяцев
-    okpo_counterparty /ОКПО (поставщика/получателя/перевозчика)
-
-    /Прибор/установка/УКТ/иная упаковка
-    pack_name /Hаименование
-    pack_type_number /Hомер
-
 doc_code_list:
   widget: list
   source: ["Значение 1", "Значение 2", "Значение 3", "Значение 4"]
@@ -41,13 +17,16 @@ pack_types:
   multiselect: true
   source: ["Значение 1", "Значение 2", "Значение 3", "Значение 4"]
 
-# Новый формат описания таблицы
-form_table_new:
+form_table:
   widget: table
-  description: "Сведения о закрытых радионуклидных источниках (новый формат)"
+  description: "Таблица ввода данных"
   source: proc_name
   table_attrs: |
-    id /Код №1
+    attr_id /Код №1
+    attr_datetime /Дата и время :datetime №2
+    attr_date /Дата :date №3
+    attr_time /Время :time №4
+
     /Период
     t_days /Дней :80 №2
     t_years /Лет

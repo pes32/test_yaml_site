@@ -74,6 +74,7 @@ tabs:
       - name: "Дата и время"
         rows:
           - widgets: [demo_datetime]
+          - widgets: [date_widget, time_widget]
       
       - name: "Таблицы"
         rows:
@@ -89,17 +90,11 @@ tabs:
 
   - name: "Вкладка с формой"
     content:
-      - name: "Форма СГУК"
+      - name: "Не отображаемое имя таблицы"
         collapsible: false
         header: false
         rows:
           - widgets: [form_table]
-      
-      - name: "Новый формат таблицы"
-        collapsible: false
-        header: false
-        rows:
-          - widgets: [form_table_new]
 
 # Модальные окна
 popup_element_gui:

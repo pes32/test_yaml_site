@@ -16,6 +16,8 @@ class WidgetFactory {
         this.register('ip', IpWidget);
         this.register('ip_mask', IpMaskWidget);
         this.register('datetime', DateTimeWidget);
+        this.register('date', DateWidget);
+        this.register('time', TimeWidget);
         this.register('text', TextWidget);
         this.register('table', TableWidget);
         this.register('button', ButtonWidget);

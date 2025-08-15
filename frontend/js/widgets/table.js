@@ -51,6 +51,18 @@ const TableWidget = {
                                            @input="onCellInput(rowIndex, cellIndex, $event)"
                                            @blur="onCellFormat(rowIndex, cellIndex, column)"
                                            @keydown="onCellKeydown(rowIndex, cellIndex, $event)"/>
+                                    <input v-else-if="column.type==='date'"
+                                           type="date"
+                                           class="cell-input"
+                                           :value="safeCell(row, cellIndex)"
+                                           @input="onCellInput(rowIndex, cellIndex, $event)"
+                                           @keydown="onCellKeydown(rowIndex, cellIndex, $event)"/>
+                                    <input v-else-if="column.type==='time'"
+                                           type="time"
+                                           class="cell-input"
+                                           :value="safeCell(row, cellIndex)"
+                                           @input="onCellInput(rowIndex, cellIndex, $event)"
+                                           @keydown="onCellKeydown(rowIndex, cellIndex, $event)"/>
                                     <component v-else-if="column.type==='ip' && ipCellWidget"
                                                :is="ipCellWidget"
                                                :widget-config="cellWidgetConfig()"
@@ -172,6 +184,20 @@ const TableWidget = {
             if (column.type === 'datetime') {
                 const d = new Date(value);
                 return isNaN(d.getTime()) ? asString : d.toLocaleString('ru-RU');
+            }
+
+            if (column.type === 'date') {
+                const d = new Date(value);
+                return isNaN(d.getTime()) ? asString : d.toLocaleDateString('ru-RU');
+            }
+
+            if (column.type === 'time') {
+                // Ожидаем формат HH:MM, допускаем HH:MM:SS
+                const m = String(value).match(/^([0-2]\d:[0-5]\d)(?::[0-5]\d)?$/);
+                if (m) return m[1];
+                const d = new Date(`1970-01-01T${value}`);
+                if (!isNaN(d.getTime())) return d.toTimeString().slice(0, 5);
+                return asString;
             }
 
             if (column.type === 'list') return asString;
@@ -504,7 +530,7 @@ const TableWidget = {
                     const value = tok.substring(1);
                     if (/^\d+$/.test(value)) {
                         width = value + 'px';
-                    } else if (value === 'ip' || value === 'ip_mask' || value === 'datetime' || value === 'int' || value === 'float') {
+                    } else if (value === 'ip' || value === 'ip_mask' || value === 'datetime' || value === 'date' || value === 'time' || value === 'int' || value === 'float') {
                         type = value;
                     } else {
                         source = value;

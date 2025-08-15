@@ -212,3 +212,13 @@ save_button_popup:
   widget: button
   description: "Сохранить"
   command: save # пока всё равно не работает
+
+date_widget:
+  widget: date
+  description: "Дата"
+  info: "Здесь можно ввести дату"
+
+time_widget:
+  widget: time
+  description: "Время"
+  info: "Здесь можно ввести время"

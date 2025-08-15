@@ -27,7 +27,7 @@ test_site/
 │       ├── widgets.js      # Рендерер виджетов + ModalManager
 │       └── widgets/        # Модульные виджеты
 │           ├── button.js
-│           ├── datetime.js
+│           ├── datetime_widgets.js
 │           ├── factory.js
 │           ├── float.js
 │           ├── int.js
