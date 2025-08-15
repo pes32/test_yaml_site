@@ -109,3 +109,43 @@ def register_debug_routes(app, CONFIG: Dict[str, Any], LOG_FILE_PATH: str):
         ]
         routes_sorted = sorted(routes, key=lambda x: x["rule"])
         return jsonify(routes_sorted)
+
+    # -------- API: /api/debug/sql --------
+    @app.route("/api/debug/sql/test", methods=["GET"])
+    def api_sql_test_connection():
+        """Тестирует подключение к базе данных."""
+        try:
+            from .database import db_manager
+            result = db_manager.test_connection()
+            return jsonify(result)
+        except Exception as e:
+            logger.error("Ошибка при тестировании подключения к БД: %s", e)
+            return jsonify({
+                "success": False,
+                "error": f"Ошибка при тестировании подключения: {str(e)}"
+            }), 500
+
+    @app.route("/api/debug/sql/execute", methods=["POST"])
+    def api_sql_execute():
+        """Выполняет SQL запрос."""
+        try:
+            data = request.get_json(silent=True) or {}
+            query = data.get("query", "").strip()
+            
+            if not query:
+                return jsonify({
+                    "success": False,
+                    "error": "Не указан SQL запрос"
+                }), 400
+            
+            from .database import db_manager
+            result = db_manager.execute_query(query)
+            
+            return jsonify(result)
+            
+        except Exception as e:
+            logger.error("Ошибка при выполнении SQL запроса: %s", e)
+            return jsonify({
+                "success": False,
+                "error": f"Ошибка сервера: {str(e)}"
+            }), 500

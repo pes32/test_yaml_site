@@ -22,9 +22,10 @@ const debugApp = createApp({
             restResponseTable: '',
             restRequests: [],
             // SQL
-            sqlQuery: 'SELECT 1 as test',
+            sqlQuery: 'SELECT * FROM projects',
             sqlResult: '',
             sqlResultTable: '',
+            dbConnectionStatus: '',
             // Python
             pythonCode: "print('Hello World')",
             pythonResult: '',
@@ -136,8 +137,51 @@ const debugApp = createApp({
             }
         },
         async executeSql() {
-            this.sqlResult = `SQL Query: ${this.sqlQuery}\n\nResult:\n+-----+\n|test |\n+-----+\n|1    |\n+-----+\n1 row in set (0.001 sec)`;
-            this.sqlResultTable = `<table class="table table-striped"><thead><tr><th>test</th></tr></thead><tbody><tr><td>1</td></tr></tbody></table>`;
+            if (!this.sqlQuery.trim()) {
+                this.sqlResult = 'Ошибка: Введите SQL запрос';
+                this.sqlResultTable = '<div class="text-danger">Ошибка: Введите SQL запрос</div>';
+                return;
+            }
+
+            try {
+                // Показываем индикатор загрузки
+                this.sqlResult = 'Выполнение запроса...';
+                this.sqlResultTable = '<div class="text-info">Выполнение запроса...</div>';
+
+                const response = await fetch('/api/debug/sql/execute', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query: this.sqlQuery
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    if (result.data && Array.isArray(result.data)) {
+                        // SELECT запросы с данными
+                        this.sqlResult = `SQL Query: ${result.query}\n\nResult:\nВозвращено записей: ${result.row_count}\n\n${JSON.stringify(result.data, null, 2)}`;
+                        this.sqlResultTable = this.formatSqlTable(result.data, result.columns);
+                    } else if (result.affected_rows !== undefined) {
+                        // INSERT/UPDATE/DELETE запросы
+                        this.sqlResult = `SQL Query: ${result.query}\n\n${result.message}`;
+                        this.sqlResultTable = `<div class="alert alert-success">${result.message}</div>`;
+                    } else {
+                        // DDL или другие запросы
+                        this.sqlResult = `SQL Query: ${result.query}\n\n${result.message}`;
+                        this.sqlResultTable = `<div class="alert alert-success">${result.message}</div>`;
+                    }
+                } else {
+                    this.sqlResult = `SQL Query: ${result.query || this.sqlQuery}\n\nОшибка: ${result.error}`;
+                    this.sqlResultTable = `<div class="alert alert-danger"><strong>Ошибка:</strong><br>${result.error}</div>`;
+                }
+            } catch (error) {
+                this.sqlResult = `SQL Query: ${this.sqlQuery}\n\nОшибка сети: ${error.message}`;
+                this.sqlResultTable = `<div class="alert alert-danger"><strong>Ошибка сети:</strong><br>${error.message}</div>`;
+            }
         },
         async executePython() {
             const output = `Python Code:\n${this.pythonCode}\n\nOutput:\nHello World\n\nExecution time: 0.001s`;
@@ -204,6 +248,80 @@ const debugApp = createApp({
             });
             table += '</tbody></table>';
             return table;
+        },
+
+        formatSqlTable(data, columns) {
+            if (!data || !Array.isArray(data)) {
+                return '<div>Нет данных для отображения</div>';
+            }
+
+            if (data.length === 0) {
+                return '<div class="alert alert-info">Запрос выполнен успешно, но не вернул данных</div>';
+            }
+
+            // Используем переданные колонки или извлекаем из первой записи
+            const tableColumns = columns && columns.length > 0 ? columns : Object.keys(data[0] || {});
+            
+            let table = '<table class="table table-striped table-bordered"><thead class="table-dark"><tr>';
+            tableColumns.forEach(col => {
+                table += `<th>${col}</th>`;
+            });
+            table += '</tr></thead><tbody>';
+
+            data.forEach(row => {
+                table += '<tr>';
+                tableColumns.forEach(col => {
+                    let value = row[col];
+                    if (value === null) {
+                        value = '<span class="text-muted">NULL</span>';
+                    } else if (typeof value === 'object') {
+                        value = `<pre class="mb-0">${JSON.stringify(value, null, 2)}</pre>`;
+                    } else {
+                        value = String(value);
+                    }
+                    table += `<td>${value}</td>`;
+                });
+                table += '</tr>';
+            });
+
+            table += '</tbody></table>';
+            table += `<div class="text-muted mt-2">Показано записей: ${data.length}</div>`;
+            
+            return table;
+        },
+
+        async testDbConnection() {
+            try {
+                this.dbConnectionStatus = '<div class="text-info">Тестирование подключения...</div>';
+                
+                const response = await fetch('/api/debug/sql/test');
+                const result = await response.json();
+                
+                if (result.success) {
+                    this.dbConnectionStatus = `
+                        <div class="alert alert-success">
+                            <strong>✓ Подключение успешно!</strong><br>
+                            База данных: ${result.database}<br>
+                            Сервер: ${result.host}:${result.port}<br>
+                            Версия: ${result.version || 'N/A'}
+                        </div>
+                    `;
+                } else {
+                    this.dbConnectionStatus = `
+                        <div class="alert alert-danger">
+                            <strong>✗ Ошибка подключения</strong><br>
+                            ${result.error}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                this.dbConnectionStatus = `
+                    <div class="alert alert-danger">
+                        <strong>✗ Ошибка сети</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
         }
     }
 });
