@@ -8,10 +8,6 @@ journal_table:
     passport /Паспорт
     mass_kg /Масса, кг
 
-doc_code_list:
-  widget: list
-  source: ["Значение 1", "Значение 2", "Значение 3", "Значение 4"]
-
 pack_types:
   widget: list
   multiselect: true

@@ -41,7 +41,6 @@ const debugApp = createApp({
         await this.loadLogs();
         await this.loadRestRequests();
         this.loadApiStructure();
-        setInterval(() => { this.loadLogs(); }, 10000);
     },
     computed: {
         filteredModules() {

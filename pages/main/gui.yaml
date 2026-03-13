@@ -1,8 +1,12 @@
 url: "/"
-tabs:
-  - name: "Просто страница"
-    content:
-      - name: "Это имя списка, а по кнопке можно посмотреть все виджеты"
-        collapsible: false
-        rows:
-          - widgets: [demo_button]
+
+menu "Главная":
+  - icon: "test.svg"
+  - box "Это имя списка, а по кнопке можно посмотреть все виджеты":
+    - row: demo_button
+
+menu "Ещё страница":
+  - icon: "test.svg"
+  - box "Это ещё одна страница":
+    - "Такая же ссылка на примеры"
+    - row: demo_button

@@ -1,109 +1,191 @@
 # backend/config.py
-"""Загрузка YAML-конфигураций страниц и сбор агрегированной конфигурации системы."""
+"""Загрузка YAML-конфигурации страниц.
+
+Одна страница состоит из одного GUI-файла (`gui.yaml` или `gui.yml`) и
+любого количества attrs-фрагментов в той же папке страницы.
+"""
 
 from __future__ import annotations
 
-import os
-import yaml
 import logging
-from typing import Dict, Any
+import os
+from typing import Any, Dict
+
+import yaml
 
 logger = logging.getLogger(__name__)
 
-# ----------------------------------------------------------------------------
-# Вспомогательные функции для разбора YAML-файлов страниц
-# ----------------------------------------------------------------------------
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+PAGES_DIR = os.path.join(ROOT_DIR, "pages")
+GUI_FILENAMES = {"gui.yaml", "gui.yml"}
+RESERVED_PAGE_PREFIXES = ("/api", "/debug", "/frontend", "/page/", "/templates")
+RESERVED_PAGE_PATHS = {"/favicon.ico"}
 
-def determine_file_type(content: Dict[str, Any], filepath: str) -> str | None:
-    """Грубое определение типа YAML-файла.
 
-    Возвращает `'attrs'`, `'gui'` или `None`.
-    """
-    if not isinstance(content, dict):
-        return None
+class ConfigLoadError(Exception):
+    """Фатальная ошибка при построении snapshot конфигурации."""
 
-    if "url" in content:
-        return "gui"
-    if "widget" in content:
-        return "attrs"
 
-    for value in content.values():
-        if isinstance(value, dict) and "widget" in value:
-            return "attrs"
-    return "attrs"
+def load_yaml_dict(filepath: str) -> Dict[str, Any]:
+    """Загружает YAML-файл и требует словарь на верхнем уровне."""
+    try:
+        with open(filepath, "r", encoding="utf-8") as handle:
+            loaded = yaml.safe_load(handle) or {}
+    except yaml.YAMLError as exc:
+        raise ConfigLoadError(f"Ошибка парсинга YAML {filepath}: {exc}") from exc
+    except FileNotFoundError as exc:
+        raise ConfigLoadError(f"YAML-файл не найден: {filepath}") from exc
+    except OSError as exc:
+        raise ConfigLoadError(f"Ошибка чтения {filepath}: {exc}") from exc
+
+    if not isinstance(loaded, dict):
+        raise ConfigLoadError(f"{filepath} должен содержать YAML-словарь")
+
+    return loaded
+
+
+def list_page_directories(pages_dir: str = PAGES_DIR) -> list[str]:
+    """Возвращает список директорий страниц в детерминированном порядке."""
+    if not os.path.isdir(pages_dir):
+        return []
+
+    return [
+        os.path.join(pages_dir, name)
+        for name in sorted(os.listdir(pages_dir))
+        if os.path.isdir(os.path.join(pages_dir, name))
+    ]
+
+
+def list_yaml_files(page_path: str) -> list[str]:
+    """Возвращает YAML-файлы страницы в детерминированном порядке."""
+    if not os.path.isdir(page_path):
+        return []
+
+    return [
+        os.path.join(page_path, name)
+        for name in sorted(os.listdir(page_path))
+        if name.endswith((".yaml", ".yml"))
+    ]
+
+
+def normalize_page_url(value: Any, page_name: str) -> str:
+    """Нормализует URL страницы или строит fallback по имени."""
+    raw = str(value).strip() if value is not None else ""
+    if not raw:
+        return f"/page/{page_name}"
+    if not raw.startswith("/"):
+        return "/" + raw
+    return raw
+
+
+def is_reserved_page_url(path: str) -> bool:
+    """Проверяет конфликт страницы с системными маршрутами."""
+    if path in RESERVED_PAGE_PATHS:
+        return True
+
+    return any(path == prefix or path.startswith(prefix + "/") for prefix in RESERVED_PAGE_PREFIXES)
+
+
+def find_gui_file(yaml_files: list[str], page_name: str) -> str:
+    """Находит единственный GUI-файл страницы."""
+    gui_files = [path for path in yaml_files if os.path.basename(path) in GUI_FILENAMES]
+
+    if not gui_files:
+        raise ConfigLoadError(f"У страницы {page_name} отсутствует gui.yaml")
+
+    if len(gui_files) > 1:
+        raise ConfigLoadError(
+            f"У страницы {page_name} найдено несколько GUI-файлов: {', '.join(gui_files)}"
+        )
+
+    return gui_files[0]
+
+
+def merge_attrs_files(attr_files: list[str], page_name: str) -> Dict[str, Any]:
+    """Мержит attrs-фрагменты страницы и логирует дубли ключей."""
+    merged: Dict[str, Any] = {}
+    attr_sources: Dict[str, str] = {}
+
+    for filepath in attr_files:
+        loaded = load_yaml_dict(filepath)
+        for attr_name, attr_config in loaded.items():
+            previous = attr_sources.get(attr_name)
+            if previous:
+                logger.warning(
+                    "Дубликат attrs '%s' на странице '%s': %s переопределяет %s",
+                    attr_name,
+                    page_name,
+                    filepath,
+                    previous,
+                )
+            merged[attr_name] = attr_config
+            attr_sources[attr_name] = filepath
+
+    return merged
 
 
 def load_page_config(page_path: str, page_name: str) -> Dict[str, Any]:
-    """Загружает **все** YAML-файлы папки страницы и формирует её конфигурацию."""
-    page_config: Dict[str, Any] = {"name": page_name, "attrs": {}, "gui": {}}
+    """Загружает одну страницу из GUI-файла и attrs-фрагментов."""
+    yaml_files = list_yaml_files(page_path)
+    gui_file = find_gui_file(yaml_files, page_name)
+    gui = load_yaml_dict(gui_file)
+    attr_files = [path for path in yaml_files if path != gui_file]
+    attrs = merge_attrs_files(attr_files, page_name)
+    url = normalize_page_url(gui.get("url"), page_name)
 
-    try:
-        if os.path.isdir(page_path):
-            yaml_files = sorted([
-                os.path.join(page_path, fname)
-                for fname in os.listdir(page_path)
-                if fname.endswith((".yaml", ".yml"))
-            ])
-            for fpath in yaml_files:
-                try:
-                    with open(fpath, "r", encoding="utf-8") as f:
-                        loaded = yaml.safe_load(f) or {}
-                    if not isinstance(loaded, dict):
-                        logger.warning("%s не содержит словарь, пропущен", fpath)
-                        continue
-
-                    file_type = determine_file_type(loaded, fpath)
-                    if file_type == "attrs":
-                        page_config["attrs"].update(loaded)
-                        logger.info("Загружены атрибуты: %s", fpath)
-                    elif file_type == "gui":
-                        page_config["gui"].update(loaded)
-                        logger.info("Загружен GUI: %s", fpath)
-
-                        # метаданные страницы
-                        for key in ("url", "title", "description"):
-                            if key in loaded:
-                                page_config[key] = loaded[key]
-                    else:
-                        logger.warning("%s — неизвестный тип, пропущен", fpath)
-                except Exception as e:  # pragma: no cover
-                    logger.error("Ошибка загрузки %s: %s", fpath, e)
-    except Exception as e:  # pragma: no cover
-        logger.error("Ошибка обхода %s: %s", page_path, e)
+    page_config: Dict[str, Any] = {
+        "name": page_name,
+        "url": url,
+        "title": gui.get("title", page_name),
+        "description": gui.get("description", ""),
+        "gui": gui,
+        "attrs": attrs,
+    }
 
     return page_config
 
 
-def load_pages_config() -> Dict[str, Any]:
-    pages_config: Dict[str, Any] = {}
-    pages_dir = "pages"
-    if os.path.exists(pages_dir):
-        for page_folder in os.listdir(pages_dir):
-            page_path = os.path.join(pages_dir, page_folder)
-            if os.path.isdir(page_path):
-                page_cfg = load_page_config(page_path, page_folder)
-                if page_cfg:
-                    pages_config[page_folder] = page_cfg
-    return pages_config
+def build_config_snapshot(pages_dir: str = PAGES_DIR) -> Dict[str, Any]:
+    """Строит полный snapshot конфигурации из каталога pages/."""
+    pages: Dict[str, Any] = {}
+    pages_by_url: Dict[str, str] = {}
+    page_attrs: Dict[str, Dict[str, Any]] = {}
 
+    for page_path in list_page_directories(pages_dir):
+        page_name = os.path.basename(page_path)
+        page_config = load_page_config(page_path, page_name)
 
-# ----------------------------------------------------------------------------
-# Агрегированная конфигурация всей системы
-# ----------------------------------------------------------------------------
+        pages[page_name] = page_config
+        page_attrs[page_name] = page_config["attrs"]
+
+        page_url = page_config["url"]
+        if is_reserved_page_url(page_url):
+            logger.warning(
+                "URL страницы '%s' конфликтует с системным маршрутом и не будет опубликован: %s",
+                page_name,
+                page_url,
+            )
+            continue
+
+        previous_page = pages_by_url.get(page_url)
+        if previous_page:
+            logger.warning(
+                "Дубликат URL %s: страница '%s' конфликтует с '%s' и не будет опубликована по URL",
+                page_url,
+                page_name,
+                previous_page,
+            )
+            continue
+
+        pages_by_url[page_url] = page_name
+
+    return {
+        "pages": pages,
+        "pages_by_url": pages_by_url,
+        "page_attrs": page_attrs,
+    }
+
 
 def load_config() -> Dict[str, Any]:
-    config: Dict[str, Any] = {"legacy": {}}
-
-    # страницы
-    config["pages"] = load_pages_config()
-
-    # все атрибуты
-    all_attrs: Dict[str, Any] = {}
-    legacy_attrs = (config.get("legacy") or {}).get("attrs") or {}
-    if isinstance(legacy_attrs, dict):
-        all_attrs.update(legacy_attrs)
-    for page_cfg in config["pages"].values():
-        all_attrs.update(page_cfg.get("attrs", {}))
-
-    config["all_attrs"] = all_attrs
-    return config
+    """Legacy-обёртка над актуальной сборкой snapshot."""
+    return build_config_snapshot()

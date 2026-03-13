@@ -27,3 +27,8 @@ def register_static_routes(app):
     @app.route("/favicon.ico")
     def favicon():  # noqa: D401
         return send_from_directory(app.static_folder, "favicon.ico", mimetype="image/x-icon")
+
+    # Заглушка для sourcemap Bootstrap, чтобы не шумела консоль 404 в dev
+    @app.route('/frontend/js/vendor/bootstrap.bundle.min.js.map')
+    def serve_bootstrap_map():
+        return ("", 204)

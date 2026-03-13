@@ -1,108 +1,80 @@
 # Синтаксис gui.yaml (краткая шпаргалка)
 # url: "/"
-# title: "Главная страница - Демонстрация виджетов"
-# description: "Демонстрация всех доступных виджетов и системные команды"
-# tabs:
-#   - name: "Название вкладки"
-#     content:
-#       - name: "Название блока"
-#         collapsible: true|false   # по умолчанию true (можно сворачивать)
-#         header: true|false        # по умолчанию true (можно скрыть заголовок)
-#         rows:
-#           - widgets: [a, b]       # строка с виджетами
-#           - "Произвольный текст"  # строка с текстом
-#           - columns:              # строка с колонками
-#               - widgets: [c]
-#               - widgets: [d, e]
+# title: "Название страницы"
+# description: "Описание страницы"
+# menu "Название меню":
+#   - icon: "icon.svg"
+#   - tab "Название вкладки":
+#     - icon: "tab.svg"
+#     - collapse "Название блока":
+#       - row: widget_a, widget_b
+#     - box:
+#       - rows:
+#         - "Произвольный текст"
+#         - row: widget_c, widget_d
+#   - box "Меню без вкладок":
+#     - row: widget_e
 #
 # Модальные окна:
-# <name_modal_window>:              # Имя модального окна (используется в command: popup_element_gui -ui)
-#   - name: "Заголовок окна"
-#     tabs:                         # Вкладки в модальном окне (опционально)
-#       - name: "Название вкладки"
-#         content:                  # Содержимое вкладки
-#           - name: "Секция"
-#             rows:
-#               - widgets: [a, b]   # Виджеты в строке
-#   buttons: [<имя_кнопки>, CLOSE]
+# popup_element_gui "Имя модального окна":
+#   - row: popup_string, popup_int
+#   - button: save_button_popup, CLOSE
 
 # GUI для главной страницы - демонстрация всех виджетов
 
 url: "/demo"
-title: "Демонстрация виджетов"
-description: "Демонстрация всех доступных виджетов и системные команды"
 
-tabs:
-  - name: "Демонстрация виджетов"
-    content:
-      - name: "Строковые виджеты"
-        rows:
-          - widgets: [demo_string, demo_text]
-      
-      - name: "Числовые виджеты (статичный блок)"
-        collapsible: false
-        rows:
-          - widgets: [demo_int, demo_float]
+menu "Строковые виджеты":
+  - icon: "test.svg"
 
-      - name: "Кнопки"
-        rows:
-          - "Первая линия кнопок"
-          - widgets: [demo_button_command, demo_button_url]
-          - "Кнопка с диалогом"
-          - widgets: [demo_button_dialog]
-          - "Кнопки-иконки"
-          - widgets: [button_icon_svg, button_null, button_icon_svg_2]
-          - "Модальное окно"
-          - widgets: [popup_button]
-      
-      - name: "Readonly примеры"
-        collapsible: false
-        header: false
-        rows:
-          - "Это примеры для readonly"
-          - widgets: [demo_readonly]
-          - widgets: [demo_int_readonly, demo_float_readonly]
-      
-      - name: "Списки"
-        rows:
-          - widgets: [demo_list, demo_multiselect]
-      
-      - name: "IP адреса"
-        rows:
-          - widgets: [demo_ip, demo_ip_mask]
-      
-      - name: "Дата и время"
-        rows:
-          - widgets: [demo_datetime]
-          - widgets: [date_widget, time_widget]
-      
-      - name: "Таблицы"
-        rows:
-          - widgets: [demo_table, demo_table_editable]
+  - tab "Демонстрация строковых виджетов":
+    - icon: "test.svg"
 
-  - name: "Вкладка с журналом" 
-    content:
-      - name: "Журнал"
-        header: false
-        collapsible: false
-        rows:
-          - widgets: [journal_table]
+    - collapse "Строковые виджеты":
+      - icon: "test.svg"
+      - row: demo_string, demo_text
 
-  - name: "Вкладка с формой"
-    content:
-      - name: "Не отображаемое имя таблицы"
-        collapsible: false
-        header: false
-        rows:
-          - widgets: [form_table]
+    - box "Числовые виджеты (статичный блок)":
+      - icon: "test.svg"
+      - row: demo_int, demo_float
+
+    - box:
+        - "Это примеры для readonly"
+        - row: demo_readonly
+        - row: demo_int_readonly, demo_float_readonly
+
+    - collapse "Списки":
+      - row: demo_list, demo_multiselect
+
+    - box "IP адреса":
+      - row: demo_ip, demo_ip_mask
+
+    - collapse "Дата и время":
+      - row: demo_datetime
+      - row: date_widget, time_widget
+
+  - tab "Демонстрация кнопок":
+    - icon: "test.svg"
+    - collapse "Кнопки":
+      - icon: "test.svg"
+      - row: demo_button_command, demo_button_url
+      - row: demo_button_dialog
+      - row: button_icon_svg, button_null, button_icon_svg_2
+      - row: popup_button
 
 # Модальные окна
-popup_element_gui:
-  - name: "Имя модального окна"
-    tabs:
-      - name: "Имя вкладки"
-        content:
-          - name: "Содержимое модального окна"
-            rows:
-              - widgets: [popup_string, popup_int]
-    buttons: [save_button_popup, CLOSE]
+popup_element_gui "Имя модального окна":
+  - row: popup_string, popup_int
+  - button: save_button_popup, CLOSE
+
+menu "Таблицы":
+  - icon: "test.svg"
+  - tab "Демо-таблицы":
+    - box "Таблицы":
+      - row: demo_table, demo_table_editable
+
+  - tab "Вкладка с журналом":
+    - row: journal_table
+
+  - tab "Вкладка с формой":
+    - row: form_table

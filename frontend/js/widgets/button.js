@@ -24,7 +24,8 @@ const ButtonWidget = {
                 <img v-if="widgetConfig.icon && !widgetConfig.icon.startsWith('fas')" 
                      :src="'/templates/icons/' + widgetConfig.icon"
                      :style="iconStyle"
-                     :alt="widgetConfig.description || 'Кнопка'"
+                     alt=""
+                     @error="onIconError"
                      class="button-icon">
                 <!-- FontAwesome иконка -->
                 <i v-else-if="widgetConfig.icon && widgetConfig.icon.startsWith('fas')" 
@@ -92,6 +93,15 @@ const ButtonWidget = {
         }
     },
     methods: {
+        onIconError(event) {
+            const img = event && event.target;
+            if (!img) {
+                return;
+            }
+
+            img.style.display = 'none';
+        },
+
         onButtonClick() {
             // Проверяем, есть ли URL для перехода
             if (this.widgetConfig.url) {

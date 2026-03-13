@@ -2,22 +2,41 @@
 """REST-эндпоинты, не относящиеся к debug-панели."""
 from __future__ import annotations
 
-from flask import jsonify, request
-from typing import Dict, Any
 import logging
+from typing import Any
+
+from flask import jsonify, make_response, request
 
 logger = logging.getLogger(__name__)
 
 
-def register_api_routes(app, CONFIG: Dict[str, Any], LOG_FILE_PATH: str):  # noqa: ARG001
+def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG001
     """Регистрирует /api/* маршруты."""
+
+    def _no_cache(resp):
+        try:
+            resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            resp.headers["Pragma"] = "no-cache"
+            resp.headers["Expires"] = "0"
+        except Exception:
+            pass
+        return resp
+
+    def _public_page_config(page_config: dict[str, Any]) -> dict[str, Any]:
+        return {
+            key: value
+            for key, value in page_config.items()
+            if key != "attrs"
+        }
 
     @app.route("/api/config")
     def api_get_config():
-        return jsonify(CONFIG)
+        snapshot = config_service.get_snapshot()
+        return _no_cache(make_response(jsonify(snapshot)))
 
     @app.route("/api/pages")
     def api_get_pages():
+        snapshot = config_service.get_snapshot()
         pages_list = [
             {
                 "name": name,
@@ -25,42 +44,58 @@ def register_api_routes(app, CONFIG: Dict[str, Any], LOG_FILE_PATH: str):  # noq
                 "description": cfg.get("description", ""),
                 "url": cfg.get("url", f"/page/{name}"),
             }
-            for name, cfg in CONFIG["pages"].items()
+            for name, cfg in snapshot["pages"].items()
         ]
-        return jsonify(pages_list)
+        return _no_cache(make_response(jsonify(pages_list)))
 
     @app.route("/api/page/<page_name>")
     def api_get_page(page_name):
-        if page_name not in CONFIG["pages"]:
-            return jsonify({"error": "Страница не найдена"}), 404
-        return jsonify({
-            "page": CONFIG["pages"][page_name],
-            "all_attrs": CONFIG["all_attrs"],
-        })
+        page_config = config_service.get_page(page_name)
+        if not page_config:
+            return _no_cache(make_response(jsonify({"error": "Страница не найдена"}), 404))
+
+        return _no_cache(make_response(jsonify({
+            "page": _public_page_config(page_config),
+            "allAttrs": page_config.get("attrs", {}),
+        })))
 
     @app.route("/api/attrs")
     def api_get_attrs():
+        page_name = (request.args.get("page") or "").strip()
+        if not page_name:
+            return _no_cache(make_response(jsonify({"error": "Не указан параметр page"}), 400))
+
+        page_config = config_service.get_page(page_name)
+        if not page_config:
+            return _no_cache(make_response(jsonify({"error": "Страница не найдена"}), 404))
+
+        page_attrs = page_config.get("attrs", {})
         names_param = request.args.get("names")
         if names_param:
             requested = [n.strip() for n in names_param.split(",") if n.strip()]
-            subset = {n: CONFIG["all_attrs"].get(n) for n in requested if n in CONFIG["all_attrs"]}
-            return jsonify(subset)
-        return jsonify(CONFIG["all_attrs"])
+            subset = {n: page_attrs.get(n) for n in requested if n in page_attrs}
+            return _no_cache(make_response(jsonify(subset)))
+
+        return _no_cache(make_response(jsonify(page_attrs)))
 
     @app.route("/api/reload", methods=["POST"])
     def api_reload_config():
-        from .config import load_config  # локальный импорт, чтобы избежать циклов
-
-        nonlocal CONFIG  # type: ignore[misc]
         try:
-            CONFIG.clear()
-            CONFIG.update(load_config())
-            # Динамические страницы нужно пере-регистрировать
-            from .routes_pages import register_page_routes  # noqa: WPS433 (runtime import)
-            register_page_routes(app, CONFIG)
-            return jsonify({"success": True, "message": "Конфигурация перезагружена", "pages_count": len(CONFIG["pages"])})
+            result = config_service.force_reload()
+            snapshot = result["snapshot"]
+            return _no_cache(make_response(jsonify({
+                "success": result["last_error"] is None,
+                "updated": result["updated"],
+                "message": (
+                    "Snapshot конфигурации обновлён"
+                    if result["updated"]
+                    else "Изменений не найдено или сохранён предыдущий валидный snapshot"
+                ),
+                "pagesCount": len(snapshot["pages"]),
+                "lastError": result["last_error"],
+            })))
         except Exception as e:  # pragma: no cover
-            return jsonify({"success": False, "error": str(e)}), 500
+            return _no_cache(make_response(jsonify({"success": False, "error": str(e)}), 500))
 
     @app.route("/api/execute", methods=["POST"])
     def api_execute():

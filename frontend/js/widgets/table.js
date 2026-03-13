@@ -136,7 +136,55 @@ const TableWidget = {
             return Array.isArray(this.tableColumns) && this.tableColumns.some(c => c && c.number != null);
         }
     },
+    watch: {
+        widgetName() {
+            this.initializeTable();
+        },
+
+        widgetConfig() {
+            this.initializeTable();
+        }
+    },
     methods: {
+        initializeTable() {
+            this.headerRows = [];
+            this.tableColumns = [];
+            this.tableData = [];
+            this.showContextMenuFlag = false;
+            this.selectedRowIndex = -1;
+
+            // Инициализация нового формата таблицы
+            this.parseTableAttrs(this.widgetConfig.table_attrs);
+
+            // Инициализация данных
+            if (this.widgetConfig.source && typeof this.widgetConfig.source === 'object' && Array.isArray(this.widgetConfig.source)) {
+                // Если source содержит массив данных (для таблиц только для чтения)
+                this.tableData = JSON.parse(JSON.stringify(this.widgetConfig.source));
+            } else if (this.widgetConfig.data) {
+                // Fallback на старый формат data для обратной совместимости
+                this.tableData = JSON.parse(JSON.stringify(this.widgetConfig.data));
+            } else {
+                this.tableData = [];
+            }
+
+            // Нормализуем данные под число колонок
+            const cols = this.tableColumns.length;
+            if (cols > 0) {
+                if (this.tableData.length === 0 && this.isEditable) {
+                    this.tableData = [Array(cols).fill('')];
+                } else if (this.tableData.length > 0) {
+                    this.tableData = this.tableData.map(row => {
+                        const r = Array.isArray(row) ? [...row] : [];
+                        if (r.length < cols) r.push(...Array(cols - r.length).fill(''));
+                        if (r.length > cols) r.length = cols;
+                        return r;
+                    });
+                }
+            }
+
+            this.onInput();
+        },
+
         getMeasureContext() {
             if (!this._measureCtx) {
                 const canvas = document.createElement('canvas');
@@ -657,39 +705,7 @@ const TableWidget = {
     },
     
     mounted() {
-        
-        // Инициализация нового формата таблицы
-        this.parseTableAttrs(this.widgetConfig.table_attrs);
-
-        // Инициализация данных
-        if (this.widgetConfig.source && typeof this.widgetConfig.source === 'object' && Array.isArray(this.widgetConfig.source)) {
-            // Если source содержит массив данных (для таблиц только для чтения)
-            this.tableData = JSON.parse(JSON.stringify(this.widgetConfig.source));
-        } else if (this.widgetConfig.data) {
-            // Fallback на старый формат data для обратной совместимости
-            this.tableData = JSON.parse(JSON.stringify(this.widgetConfig.data));
-        } else {
-            this.tableData = [];
-        }
-
-        // Нормализуем данные под число колонок
-        const cols = this.tableColumns.length;
-        if (cols > 0) {
-            // Если данных нет и таблица редактируемая, создаем пустую строку
-            if (this.tableData.length === 0 && this.isEditable) {
-            this.tableData = [Array(cols).fill('')];
-            } else if (this.tableData.length > 0) {
-                // Нормализуем существующие данные
-            this.tableData = this.tableData.map(row => {
-                const r = Array.isArray(row) ? [...row] : [];
-                if (r.length < cols) r.push(...Array(cols - r.length).fill(''));
-                if (r.length > cols) r.length = cols;
-                return r;
-            });
-            }
-        }
-
-        this.onInput();
+        this.initializeTable();
     }
 };
 

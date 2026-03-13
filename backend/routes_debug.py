@@ -7,7 +7,7 @@ import platform
 import re
 from datetime import datetime
 from typing import Dict, Any
-from flask import jsonify, render_template, send_from_directory, request
+from flask import jsonify, make_response, render_template, send_from_directory, request
 import logging
 
 logger = logging.getLogger(__name__)
@@ -87,7 +87,11 @@ def register_debug_routes(app, CONFIG: Dict[str, Any], LOG_FILE_PATH: str):
                 })
         except Exception as e:  # pragma: no cover
             parsed_logs = [{"timestamp": datetime.now().isoformat(), "level": "ERROR", "message": str(e)}]
-        return jsonify({"logs": parsed_logs, "path": log_file})
+        response = make_response(jsonify({"logs": parsed_logs, "path": log_file}))
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
 
     # -------- API: /api/debug/routes --------
     @app.route("/api/debug/routes")

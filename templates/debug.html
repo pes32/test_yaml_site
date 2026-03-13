@@ -112,7 +112,10 @@
                             <div>
                                 <span class="text-muted me-2" v-text="logFilePath || '—'">
                                 </span>
-                                <button class="btn btn-sm btn-primary" @click="refreshLogs">
+                                <span class="text-muted me-2" v-if="logsLastUpdated">
+                                    Обновлено: <span v-text="logsLastUpdated"></span>
+                                </span>
+                                <button class="btn btn-sm btn-primary" type="button" :disabled="logsLoading" @click="refreshLogs">
                                     <i class="fas fa-sync-alt"></i> Обновить
                                 </button>
                             </div>

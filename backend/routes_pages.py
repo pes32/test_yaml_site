@@ -2,62 +2,53 @@
 """Маршруты, связанные с отображением страниц пользовательского интерфейса."""
 from __future__ import annotations
 
-from flask import render_template
-from typing import Dict, Any
-import logging
+from typing import Any
 
-logger = logging.getLogger(__name__)
+from flask import abort, render_template, request
 
 
-def register_page_routes(app, CONFIG: Dict[str, Any]):
-    """Регистрирует набор маршрутов, использующих данные `CONFIG`."""
+def register_page_routes(app, config_service):
+    """Регистрирует стабильные page routes поверх live snapshot."""
 
-    # ------------------------------------------------------------------
-    # Вспомогательные функции
-    # ------------------------------------------------------------------
-    def _has_rule(path: str) -> bool:
-        try:
-            return any(str(r) == path for r in app.url_map.iter_rules())
-        except Exception:
-            return False
+    def _public_page_config(page_config: dict[str, Any]) -> dict[str, Any]:
+        return {
+            key: value
+            for key, value in page_config.items()
+            if key != "attrs"
+        }
 
-    def _make_page_view(page_name: str):
-        def _view():
-            page_config = CONFIG["pages"][page_name]
-            page_config.setdefault("name", page_name)
-            return render_template("page.html", page_config=page_config, all_attrs={})
-        return _view
+    def _render_page(page_config: dict[str, Any]):
+        return render_template(
+            "page.html",
+            page_config=_public_page_config(page_config),
+            all_attrs=page_config.get("attrs", {}),
+        )
 
-    def register_page_urls_from_config():
-        for name, cfg in CONFIG.get("pages", {}).items():
-            path = cfg.get("url")
-            if not path:
-                continue
-            if not path.startswith("/"):
-                path = "/" + path
-            if _has_rule(path):
-                continue
-            endpoint = f"page_by_url__{name}"
-            try:
-                app.add_url_rule(path, endpoint=endpoint, view_func=_make_page_view(name))
-                logger.info("Зарегистрирован маршрут страницы '%s' по URL: %s", name, path)
-            except Exception as e:  # pragma: no cover
-                logger.error("Не удалось зарегистрировать маршрут %s: %s", name, e)
-
-    # регистрируем динамические URL один раз
-    register_page_urls_from_config()
-
-    # ------------------------------------------------------------------
-    # Статические роуты
-    # ------------------------------------------------------------------
     @app.route("/")
     def index():
-        return render_template("page.html", page_config=CONFIG["pages"]["main"], all_attrs={})
+        snapshot = config_service.get_snapshot()
+        page_name = snapshot["pages_by_url"].get("/") or ("main" if "main" in snapshot["pages"] else None)
+        if not page_name:
+            abort(404)
+
+        page_config = snapshot["pages"].get(page_name)
+        if not page_config:
+            abort(404)
+
+        return _render_page(page_config)
 
     @app.route("/page/<page_name>")
     def page(page_name):
-        if page_name not in CONFIG["pages"]:
+        page_config = config_service.get_page(page_name)
+        if not page_config:
             return "Страница не найдена", 404
-        page_config = CONFIG["pages"][page_name]
-        page_config.setdefault("name", page_name)
-        return render_template("page.html", page_config=page_config, all_attrs={})
+
+        return _render_page(page_config)
+
+    @app.route("/<path:requested_path>")
+    def page_by_path(requested_path):
+        page_config = config_service.get_page_by_url(request.path)
+        if not page_config:
+            return "Страница не найдена", 404
+
+        return _render_page(page_config)

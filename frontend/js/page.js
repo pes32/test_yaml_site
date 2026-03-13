@@ -7,30 +7,58 @@ const app = createApp({
         return {
             pageConfig: null,
             allAttrs: {},
-            tabs: [],
+            menus: [],
             widgets: {},
-            // Список уже загруженных имён атрибутов, чтобы не запрашивать дважды
             loadedAttrNames: [],
+            activeMenuIndex: 0,
             activeTabIndex: 0,
             loading: true,
             error: null
         };
     },
-    
-    mounted() {
+
+    computed: {
+        activeMenu() {
+            return this.menus[this.activeMenuIndex] || null;
+        },
+
+        activeTabs() {
+            if (!this.activeMenu || !Array.isArray(this.activeMenu.tabs)) {
+                return [];
+            }
+
+            return this.activeMenu.tabs;
+        },
+
+        activeSections() {
+            if (!this.activeMenu) {
+                return [];
+            }
+
+            if (this.activeTabs.length) {
+                const safeIndex = Math.max(0, Math.min(this.activeTabIndex, this.activeTabs.length - 1));
+                const activeTab = this.activeTabs[safeIndex];
+                return activeTab && Array.isArray(activeTab.content) ? activeTab.content : [];
+            }
+
+            return Array.isArray(this.activeMenu.content) ? this.activeMenu.content : [];
+        }
+    },
+
+    async mounted() {
         try {
             if (window.pageData) {
                 this.pageConfig = window.pageData.pageConfig;
-                this.allAttrs = window.pageData.allAttrs;
+                this.allAttrs = window.pageData.allAttrs || {};
+                this.loadedAttrNames = Object.keys(this.allAttrs);
                 this.parseConfiguration();
                 this.$nextTick(() => {
-                    this.setActiveTabFromHash();
-                    // Подгружаем атрибуты для активной вкладки
-                    this.fetchTabAttrs(this.activeTabIndex);
+                    this.setActiveViewFromHash();
+                    this.fetchActiveViewAttrs();
                     window.addEventListener('hashchange', this.onHashChange);
                 });
             } else {
-                this.loadPageConfig();
+                await this.loadPageConfig();
             }
         } catch (error) {
             console.error('Ошибка загрузки конфигурации страницы:', error);
@@ -39,23 +67,38 @@ const app = createApp({
             this.loading = false;
         }
     },
-    
+
+    beforeUnmount() {
+        window.removeEventListener('hashchange', this.onHashChange);
+    },
+
     methods: {
         async loadPageConfig() {
             try {
                 const pathParts = window.location.pathname.split('/');
                 const pageName = pathParts[pathParts.length - 1];
                 const response = await fetch(`/api/page/${pageName}`);
+
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
+
                 const data = await response.json();
                 this.pageConfig = data.page;
-                this.allAttrs = data.allAttrs;
+                this.allAttrs = data.allAttrs || {};
+                this.loadedAttrNames = Object.keys(this.allAttrs);
+
+                if (!window.pageData) {
+                    window.pageData = {};
+                }
+
+                window.pageData.pageConfig = this.pageConfig;
+                window.pageData.allAttrs = this.allAttrs;
+
                 this.parseConfiguration();
                 this.$nextTick(() => {
-                    this.setActiveTabFromHash();
-                    this.fetchTabAttrs(this.activeTabIndex);
+                    this.setActiveViewFromHash();
+                    this.fetchActiveViewAttrs();
                     window.addEventListener('hashchange', this.onHashChange);
                 });
             } catch (error) {
@@ -63,207 +106,224 @@ const app = createApp({
                 throw error;
             }
         },
-        
+
         parseConfiguration() {
             this.parseGuiConfig();
-            // Атрибуты будут подгружаться лениво
+            this.parseAttrsConfig();
         },
-        
+
         parseGuiConfig() {
             const gui = this.pageConfig.gui || this.pageConfig;
-            this.tabs = [];
-            if (gui.tabs && Array.isArray(gui.tabs)) {
-                this.tabs = gui.tabs.map(tab => ({
-                    name: tab.name,
-                    content: this.parseTabContent(tab.content)
-                }));
-            } else {
-                console.warn('No tabs found in GUI config');
+            const parsed = window.GuiParser
+                ? window.GuiParser.parsePageGui(gui)
+                : { menus: [], modals: {} };
+
+            this.menus = parsed.menus || [];
+
+            if (window.pageData) {
+                window.pageData.parsedGui = parsed;
+            }
+
+            this.normalizeActiveState();
+
+            if (!this.menus.length) {
+                console.warn('No menus found in GUI config');
             }
         },
-        
-        setActiveTabFromHash() {
-            try {
-                const hash = window.location.hash || '';
-                const match = hash.match(/^#content-(\d+)$/);
-                if (match) {
-                    const idx = parseInt(match[1], 10);
-                    if (!Number.isNaN(idx) && idx >= 0 && idx < this.tabs.length) {
-                        this.activeTabIndex = idx;
-                        return;
-                    }
-                }
+
+        normalizeActiveState() {
+            if (!this.menus.length) {
+                this.activeMenuIndex = 0;
                 this.activeTabIndex = 0;
-            } catch (e) {
+                return;
+            }
+
+            if (this.activeMenuIndex < 0 || this.activeMenuIndex >= this.menus.length) {
+                this.activeMenuIndex = 0;
+            }
+
+            const menu = this.activeMenu;
+            const tabs = menu && Array.isArray(menu.tabs) ? menu.tabs : [];
+
+            if (!tabs.length) {
                 this.activeTabIndex = 0;
+                return;
+            }
+
+            if (this.activeTabIndex < 0 || this.activeTabIndex >= tabs.length) {
+                this.activeTabIndex = 0;
+            }
+        },
+
+        setActiveViewFromHash() {
+            const hash = window.location.hash || '';
+            const match = hash.match(/^#menu-(\d+)(?:-tab-(\d+))?$/);
+
+            if (!match) {
+                this.activeMenuIndex = 0;
+                this.activeTabIndex = 0;
+                this.normalizeActiveState();
+                return;
+            }
+
+            const menuIndex = parseInt(match[1], 10);
+            const tabIndex = match[2] !== undefined ? parseInt(match[2], 10) : 0;
+
+            this.activeMenuIndex = Number.isNaN(menuIndex) ? 0 : menuIndex;
+            this.activeTabIndex = Number.isNaN(tabIndex) ? 0 : tabIndex;
+            this.normalizeActiveState();
+        },
+
+        updateHash() {
+            if (!this.activeMenu) {
+                return;
+            }
+
+            let newHash = `#menu-${this.activeMenuIndex}`;
+            if (this.activeTabs.length) {
+                newHash += `-tab-${this.activeTabIndex}`;
+            }
+
+            if (window.location.hash !== newHash) {
+                history.replaceState(null, '', newHash);
             }
         },
 
         onHashChange() {
-            this.setActiveTabFromHash();
+            this.setActiveViewFromHash();
+            this.fetchActiveViewAttrs();
         },
 
-        onTabClick(index, event) {
-            // Синхронизируем активную вкладку и hash, чтобы не мигали панели
+        onMenuClick(index) {
+            if (index < 0 || index >= this.menus.length) {
+                return;
+            }
+
+            this.activeMenuIndex = index;
+            this.activeTabIndex = 0;
+            this.normalizeActiveState();
+            this.updateHash();
+            this.fetchActiveViewAttrs();
+        },
+
+        onTabClick(index) {
+            if (!this.activeTabs.length || index < 0 || index >= this.activeTabs.length) {
+                return;
+            }
+
             this.activeTabIndex = index;
-            const newHash = `#content-${index}`;
-            if (window.location.hash !== newHash) {
-                // Меняем hash без скролла
-                history.replaceState(null, '', newHash);
-            }
-            // При переключении вкладки загружаем её атрибуты (если ещё не делали)
-            this.fetchTabAttrs(index);
+            this.normalizeActiveState();
+            this.updateHash();
+            this.fetchActiveViewAttrs();
         },
 
-        parseTabContent(content) {
-            if (!content || !Array.isArray(content)) {
-                console.warn('Invalid content:', content);
-                return [];
-            }
-            // Каждый item -> секция { name?, rows, collapsible=true|false, showHeader }
-            const sections = [];
-            content.forEach(item => {
-                // Пропускаем пустые объекты без строк
-                const rows = this.parseContentRows(item.rows);
-                if (!rows.length && !item.name) {
-                    return;
-                }
-
-                const section = {
-                    name: item.name || '',
-                    rows,
-                    // по умолчанию блок сворачиваемый; можно отключить collapsible: false
-                    collapsible: item.collapsible !== false,
-                    // Показывать заголовок? Можно скрыть через header: false или если name пустой
-                    showHeader: item.header !== false && !!item.name
-                };
-                sections.push(section);
-            });
-            return sections;
-        },
-        
-        parseContentRows(rows) {
-            if (!rows || !Array.isArray(rows)) {
-                console.warn('Invalid rows:', rows);
-                return [];
-            }
-            // Возвращаем как есть (массив строк/массивов/объектов)
-            return rows;
-        },
-        
         parseAttrsConfig() {
-            // Обновляем основной словарь виджетов
-            this.widgets = this.allAttrs;
+            this.widgets = this.allAttrs || {};
         },
 
-        /* ====================== Ленивая загрузка атрибутов ====================== */
-        /**
-         * Собирает список имён виджетов, встречающихся во вкладке
-         */
-        collectWidgetNames(tab) {
-            const names = new Set();
-
-            const processRow = (row) => {
-                if (!row) return;
-                if (typeof row === 'string') return;
-                if (row.widgets && Array.isArray(row.widgets)) {
-                    row.widgets.forEach(w => names.add(w));
-                } else if (row.columns && typeof row.columns === 'object') {
-                    Object.values(row.columns).forEach(col => {
-                        if (col.widgets && Array.isArray(col.widgets)) {
-                            col.widgets.forEach(w => names.add(w));
-                        }
-                    });
-                }
-            };
-
-            if (tab && Array.isArray(tab.content)) {
-                tab.content.forEach(section => {
-                    if (section.rows && Array.isArray(section.rows)) {
-                        section.rows.forEach(processRow);
-                    }
-                });
+        getCurrentPageName() {
+            if (this.pageConfig && this.pageConfig.name) {
+                return this.pageConfig.name;
             }
 
-            return Array.from(names);
+            if (window.pageData && window.pageData.pageConfig && window.pageData.pageConfig.name) {
+                return window.pageData.pageConfig.name;
+            }
+
+            return '';
         },
 
-        /**
-         * Загружает атрибуты для указанной вкладки, если они ещё не были загружены
-         */
-        async fetchTabAttrs(tabIndex) {
-            if (!this.tabs || !this.tabs[tabIndex]) return;
+        collectActiveWidgetNames() {
+            if (!window.GuiParser || !this.activeMenu) {
+                return [];
+            }
 
-            // Определяем, какие атрибуты нужны для этой вкладки
-            const required = this.collectWidgetNames(this.tabs[tabIndex]);
-            const toLoad = required.filter(name => !this.loadedAttrNames.includes(name));
+            return window.GuiParser.collectWidgetNamesFromMenu(this.activeMenu, this.activeTabIndex);
+        },
 
-            if (toLoad.length === 0) return; // всё уже загружено
+        async fetchActiveViewAttrs() {
+            if (!this.activeMenu) {
+                return;
+            }
+
+            const required = this.collectActiveWidgetNames();
+            const toLoad = required.filter((name) => !this.loadedAttrNames.includes(name));
+
+            if (toLoad.length === 0) {
+                return;
+            }
 
             try {
                 const query = encodeURIComponent(toLoad.join(','));
-                const resp = await fetch(`/api/attrs?names=${query}`);
-                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const pageName = encodeURIComponent(this.getCurrentPageName());
+                const resp = await fetch(`/api/attrs?page=${pageName}&names=${query}`);
+                if (!resp.ok) {
+                    throw new Error(`HTTP ${resp.status}`);
+                }
+
                 const data = await resp.json();
 
-                // Обновляем хранилища
                 Object.assign(this.allAttrs, data);
                 Object.assign(this.widgets, data);
                 this.loadedAttrNames.push(...toLoad);
 
-                // Обновляем глобальный объект, чтобы видели модальные окна и т.д.
                 if (window.pageData) {
-                    if (!window.pageData.allAttrs) window.pageData.allAttrs = {};
+                    if (!window.pageData.allAttrs) {
+                        window.pageData.allAttrs = {};
+                    }
+
                     Object.assign(window.pageData.allAttrs, data);
                 }
 
-                // Убеждаемся, что реактивность отработала
                 this.parseAttrsConfig();
-
-                // Проверяем таблицы на дополнительные зависимости (list источники)
                 await this.loadTableListSources(Object.keys(data));
-            } catch (e) {
-                console.error('Не удалось загрузить атрибуты для вкладки', e);
+            } catch (error) {
+                console.error('Не удалось загрузить атрибуты для активного меню', error);
                 this.showNotification('Ошибка загрузки данных', 'danger');
             }
         },
 
-        /**
-         * Из переданных имён атрибутов (только что загруженных) ищет table-виджеты
-         * и, если в их table_attrs встречаются источники списков (:attr_name),
-         * подгружает их, если они ещё не были загружены.
-         */
         async loadTableListSources(attrNames) {
-            if (!attrNames || attrNames.length === 0) return;
+            if (!attrNames || attrNames.length === 0) {
+                return;
+            }
 
             const extra = new Set();
-
             const builtinTokens = new Set(['ip', 'ip_mask', 'datetime', 'int', 'float']);
 
-            attrNames.forEach(name => {
+            attrNames.forEach((name) => {
                 const cfg = this.allAttrs[name];
-                if (!cfg || cfg.widget !== 'table' || !cfg.table_attrs) return;
+                if (!cfg || cfg.widget !== 'table' || !cfg.table_attrs) {
+                    return;
+                }
 
                 const text = String(cfg.table_attrs);
-                // Ищем все :token после символа ':'
                 const re = /:([A-Za-z_][A-Za-z0-9_]*)/g;
-                let m;
-                while ((m = re.exec(text)) !== null) {
-                    const token = m[1];
-                    if (builtinTokens.has(token)) continue;
-                    if (!this.loadedAttrNames.includes(token)) {
-                        extra.add(token);
+                let match;
+
+                while ((match = re.exec(text)) !== null) {
+                    const token = match[1];
+                    if (builtinTokens.has(token) || this.loadedAttrNames.includes(token)) {
+                        continue;
                     }
+
+                    extra.add(token);
                 }
             });
 
             const extraNames = Array.from(extra);
-            if (extraNames.length === 0) return;
+            if (extraNames.length === 0) {
+                return;
+            }
 
             try {
                 const query = encodeURIComponent(extraNames.join(','));
-                const resp = await fetch(`/api/attrs?names=${query}`);
-                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const pageName = encodeURIComponent(this.getCurrentPageName());
+                const resp = await fetch(`/api/attrs?page=${pageName}&names=${query}`);
+                if (!resp.ok) {
+                    throw new Error(`HTTP ${resp.status}`);
+                }
+
                 const data = await resp.json();
 
                 Object.assign(this.allAttrs, data);
@@ -271,25 +331,51 @@ const app = createApp({
                 this.loadedAttrNames.push(...extraNames);
 
                 if (window.pageData) {
-                    if (!window.pageData.allAttrs) window.pageData.allAttrs = {};
+                    if (!window.pageData.allAttrs) {
+                        window.pageData.allAttrs = {};
+                    }
+
                     Object.assign(window.pageData.allAttrs, data);
                 }
 
                 this.parseAttrsConfig();
-            } catch (e) {
-                console.error('Не удалось загрузить list-источники таблиц', e);
+            } catch (error) {
+                console.error('Не удалось загрузить list-источники таблиц', error);
             }
         },
-        
+
         getWidgetConfig(widgetName) {
             return this.widgets[widgetName] || {
                 widget: 'str',
                 description: widgetName
             };
         },
-        
-        // Методы ниже были неиспользуемыми и удалены: getColumnClass, safeId.
-        
+
+        getSectionCollapseId(sectionIndex) {
+            const tabPart = this.activeTabs.length ? this.activeTabIndex : 'content';
+            return `page-section-${this.activeMenuIndex}-${tabPart}-${sectionIndex}`;
+        },
+
+        isFontIcon(icon) {
+            return window.GuiParser ? window.GuiParser.isFontIcon(icon) : false;
+        },
+
+        getIconSrc(icon) {
+            return window.GuiParser ? window.GuiParser.getIconSrc(icon) : null;
+        },
+
+        onIconError(event) {
+            const img = event && event.target;
+            if (!img) {
+                return;
+            }
+
+            img.style.display = 'none';
+            if (img.parentElement) {
+                img.parentElement.style.display = 'none';
+            }
+        },
+
         async executeCommand(commandData) {
             try {
                 const widgetConfig = this.getWidgetConfig(commandData.widget);
@@ -297,16 +383,23 @@ const app = createApp({
                     window.location.href = widgetConfig.url;
                     return;
                 }
+
                 const response = await fetch('/api/execute', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ command: commandData.command, params: commandData.params })
+                    body: JSON.stringify({
+                        command: commandData.command,
+                        params: commandData.params
+                    })
                 });
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
                 const result = await response.json();
                 if (result.success) {
                     this.showNotification('Команда выполнена успешно', 'success');
-                    // Если потребуется обновить связанные атрибуты, можно реализовать здесь
                 } else {
                     this.showNotification('Ошибка выполнения команды', 'danger');
                 }
@@ -315,17 +408,28 @@ const app = createApp({
                 this.showNotification('Ошибка выполнения команды', 'danger');
             }
         },
-        
-        showNotification(message, type = 'info') {
+
+        showNotification(message, type) {
+            const alertType = type || 'info';
             const alertDiv = document.createElement('div');
-            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.className = `alert alert-${alertType} alert-dismissible fade show`;
             alertDiv.innerHTML = `
                 ${message}
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             `;
-            const container = document.querySelector('.container-fluid');
-            container.insertBefore(alertDiv, container.firstChild);
-            setTimeout(() => { if (alertDiv.parentNode) alertDiv.remove(); }, 5000);
+
+            const container = document.querySelector('.page-content-column')
+                || document.querySelector('.container-fluid');
+
+            if (container) {
+                container.insertBefore(alertDiv, container.firstChild);
+            }
+
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
+            }, 5000);
         }
     }
 });
