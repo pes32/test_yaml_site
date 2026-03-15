@@ -1,47 +1,43 @@
 // Виджеты для даты и времени (datetime, date, time)
 
 const DateTimeWidget = {
+    components: { Md3Field: window.Md3Field },
+    mixins: [window.widgetMixin],
     props: {
-        widgetConfig: {
-            type: Object,
-            required: true
-        },
-        widgetName: {
-            type: String,
-            required: true
-        }
+        widgetConfig: { type: Object, required: true },
+        widgetName: { type: String, required: true }
     },
     emits: ['input'],
     template: `
-        <div class="widget-container">
-            <div class="md3-field" :class="{ filled: hasValue }">
-                <div class="md3-field-wrap md3-datetime-wrap"
-                     :class="{ floating: labelFloats, focused: isFocused, filled: hasValue, 'widget-readonly': widgetConfig.readonly }">
-                    <div class="widget-datetime">
-                        <input type="date"
-                               class="form-control"
-                               :disabled="widgetConfig.readonly"
-                               :tabindex="widgetConfig.readonly ? -1 : null"
-                               v-model="dateValue"
-                               @input="onDateTimeInput"
-                               @focus="isFocused = true"
-                               @blur="isFocused = false">
-                        <input type="time"
-                               class="form-control"
-                               :disabled="widgetConfig.readonly"
-                               :tabindex="widgetConfig.readonly ? -1 : null"
-                               v-model="timeValue"
-                               @input="onDateTimeInput"
-                               @focus="isFocused = true"
-                               @blur="isFocused = false">
-                    </div>
-                    <label v-if="widgetConfig.description">{{ widgetConfig.description }}</label>
-                </div>
-                <div v-if="widgetConfig.sup_tex" class="md3-supporting">
-                    <span v-text="widgetConfig.sup_tex"></span>
-                </div>
+        <md3-field
+            :widget-config="widgetConfig"
+            :has-value="hasValue"
+            :label-floats="labelFloats"
+            :is-focused="isFocused"
+            :wrap-extra="{ 'md3-datetime-wrap': true }"
+            :has-supporting="!!widgetConfig.sup_tex">
+            <div class="widget-datetime">
+                <input type="date"
+                       class="form-control"
+                       :disabled="widgetConfig.readonly"
+                       :tabindex="widgetConfig.readonly ? -1 : null"
+                       v-model="dateValue"
+                       @input="onDateTimeInput"
+                       @focus="isFocused = true"
+                       @blur="isFocused = false">
+                <input type="time"
+                       class="form-control"
+                       :disabled="widgetConfig.readonly"
+                       :tabindex="widgetConfig.readonly ? -1 : null"
+                       v-model="timeValue"
+                       @input="onDateTimeInput"
+                       @focus="isFocused = true"
+                       @blur="isFocused = false">
             </div>
-        </div>
+            <template #supporting>
+                <span v-text="widgetConfig.sup_tex"></span>
+            </template>
+        </md3-field>
     `,
     data() {
         return {
@@ -53,212 +49,139 @@ const DateTimeWidget = {
     },
     computed: {
         hasValue() { return Boolean(this.dateValue || this.timeValue); },
-        labelFloats() {
-            return this.hasValue || this.isFocused;
-        }
+        labelFloats() { return this.hasValue || this.isFocused; }
     },
     methods: {
         onDateTimeInput() {
-            if (this.dateValue && this.timeValue) {
-                this.value = `${this.dateValue} ${this.timeValue}`;
-            } else {
-                this.value = '';
-            }
-            this.onInput();
+            this.value = (this.dateValue && this.timeValue)
+                ? `${this.dateValue} ${this.timeValue}`
+                : '';
+            this.emitInput(this.value);
         },
-        
-        onInput() {
-            this.$emit('input', {
-                name: this.widgetName,
-                value: this.value,
-                config: this.widgetConfig
-            });
-        },
-        
         setValue(value) {
             this.value = value;
-            // Парсим значение на дату и время
             if (value) {
                 const date = new Date(value);
                 if (!isNaN(date.getTime())) {
                     this.dateValue = date.toISOString().split('T')[0];
-                    this.timeValue = date.toTimeString().split(' ')[0].substring(0, 5); // Убираем секунды
+                    this.timeValue = date.toTimeString().split(' ')[0].substring(0, 5);
                 }
             }
         },
-        
-        getValue() {
-            return this.value;
-        }
+        getValue() { return this.value; }
     },
-    
     mounted() {
-        // Инициализация значений по умолчанию
         if (this.widgetConfig.default !== undefined) {
             this.value = this.widgetConfig.default;
-        }
-        
-        // Инициализация datetime
-        if (this.widgetConfig.widget === 'datetime') {
+            this.setValue(this.value);
+        } else if (this.widgetConfig.widget === 'datetime') {
             const now = new Date();
             this.dateValue = now.toISOString().split('T')[0];
-            this.timeValue = now.toTimeString().split(' ')[0].substring(0, 5); // Убираем секунды
+            this.timeValue = now.toTimeString().split(' ')[0].substring(0, 5);
         }
     }
 };
 
 const DateWidget = {
+    components: { Md3Field: window.Md3Field },
+    mixins: [window.widgetMixin],
     props: {
-        widgetConfig: {
-            type: Object,
-            required: true
-        },
-        widgetName: {
-            type: String,
-            required: true
-        }
+        widgetConfig: { type: Object, required: true },
+        widgetName: { type: String, required: true }
     },
     emits: ['input'],
     template: `
-        <div class="widget-container">
-            <div class="md3-field" :class="{ filled: hasValue }">
-                <div class="md3-field-wrap"
-                     :class="{ floating: labelFloats, focused: isFocused, filled: hasValue, 'widget-readonly': widgetConfig.readonly }">
-                    <input type="date"
-                           class="form-control"
-                           :disabled="widgetConfig.readonly"
-                           :tabindex="widgetConfig.readonly ? -1 : null"
-                           v-model="value"
-                           @input="onInput"
-                           @focus="isFocused = true"
-                           @blur="isFocused = false">
-                    <label v-if="widgetConfig.description">{{ widgetConfig.description }}</label>
-                </div>
-                <div v-if="widgetConfig.sup_tex" class="md3-supporting">
-                    <span v-text="widgetConfig.sup_tex"></span>
-                </div>
-            </div>
-        </div>
+        <md3-field
+            :widget-config="widgetConfig"
+            :has-value="hasValue"
+            :label-floats="labelFloats"
+            :is-focused="isFocused"
+            :wrap-extra="{}"
+            :has-supporting="!!widgetConfig.sup_tex">
+            <input type="date"
+                   class="form-control"
+                   :disabled="widgetConfig.readonly"
+                   :tabindex="widgetConfig.readonly ? -1 : null"
+                   v-model="value"
+                   @input="onInput"
+                   @focus="isFocused = true"
+                   @blur="isFocused = false">
+            <template #supporting>
+                <span v-text="widgetConfig.sup_tex"></span>
+            </template>
+        </md3-field>
     `,
     data() {
-        return {
-            value: '',
-            isFocused: false
-        };
+        return { value: '', isFocused: false };
     },
     computed: {
         hasValue() { return Boolean(this.value); },
-        labelFloats() {
-            return this.hasValue || this.isFocused;
-        }
+        labelFloats() { return this.hasValue || this.isFocused; }
     },
     methods: {
-        onInput() {
-            this.$emit('input', {
-                name: this.widgetName,
-                value: this.value,
-                config: this.widgetConfig
-            });
-        },
-        
-        setValue(value) {
-            this.value = value;
-        },
-        
-        getValue() {
-            return this.value;
-        }
+        onInput() { this.emitInput(this.value); },
+        setValue(value) { this.value = value; },
+        getValue() { return this.value; }
     },
-    
     mounted() {
-        // Инициализация значений по умолчанию
         if (this.widgetConfig.default !== undefined) {
             this.value = this.widgetConfig.default;
         } else if (this.widgetConfig.widget === 'date') {
-            // Устанавливаем текущую дату по умолчанию
-            const now = new Date();
-            this.value = now.toISOString().split('T')[0];
+            this.value = new Date().toISOString().split('T')[0];
         }
     }
 };
 
 const TimeWidget = {
+    components: { Md3Field: window.Md3Field },
+    mixins: [window.widgetMixin],
     props: {
-        widgetConfig: {
-            type: Object,
-            required: true
-        },
-        widgetName: {
-            type: String,
-            required: true
-        }
+        widgetConfig: { type: Object, required: true },
+        widgetName: { type: String, required: true }
     },
     emits: ['input'],
     template: `
-        <div class="widget-container">
-            <div class="md3-field" :class="{ filled: hasValue }">
-                <div class="md3-field-wrap"
-                     :class="{ floating: labelFloats, focused: isFocused, filled: hasValue, 'widget-readonly': widgetConfig.readonly }">
-                    <input type="time"
-                           class="form-control"
-                           :disabled="widgetConfig.readonly"
-                           :tabindex="widgetConfig.readonly ? -1 : null"
-                           v-model="value"
-                           @input="onInput"
-                           @focus="isFocused = true"
-                           @blur="isFocused = false">
-                    <label v-if="widgetConfig.description">{{ widgetConfig.description }}</label>
-                </div>
-                <div v-if="widgetConfig.sup_tex" class="md3-supporting">
-                    <span v-text="widgetConfig.sup_tex"></span>
-                </div>
-            </div>
-        </div>
+        <md3-field
+            :widget-config="widgetConfig"
+            :has-value="hasValue"
+            :label-floats="labelFloats"
+            :is-focused="isFocused"
+            :wrap-extra="{}"
+            :has-supporting="!!widgetConfig.sup_tex">
+            <input type="time"
+                   class="form-control"
+                   :disabled="widgetConfig.readonly"
+                   :tabindex="widgetConfig.readonly ? -1 : null"
+                   v-model="value"
+                   @input="onInput"
+                   @focus="isFocused = true"
+                   @blur="isFocused = false">
+            <template #supporting>
+                <span v-text="widgetConfig.sup_tex"></span>
+            </template>
+        </md3-field>
     `,
     data() {
-        return {
-            value: '',
-            isFocused: false
-        };
+        return { value: '', isFocused: false };
     },
     computed: {
         hasValue() { return Boolean(this.value); },
-        labelFloats() {
-            return this.hasValue || this.isFocused;
-        }
+        labelFloats() { return this.hasValue || this.isFocused; }
     },
     methods: {
-        onInput() {
-            this.$emit('input', {
-                name: this.widgetName,
-                value: this.value,
-                config: this.widgetConfig
-            });
-        },
-        
-        setValue(value) {
-            this.value = value;
-        },
-        
-        getValue() {
-            return this.value;
-        }
+        onInput() { this.emitInput(this.value); },
+        setValue(value) { this.value = value; },
+        getValue() { return this.value; }
     },
-    
     mounted() {
-        // Инициализация значений по умолчанию
         if (this.widgetConfig.default !== undefined) {
             this.value = this.widgetConfig.default;
         } else if (this.widgetConfig.widget === 'time') {
-            // Устанавливаем текущее время по умолчанию (без секунд)
-            const now = new Date();
-            const timeString = now.toTimeString().split(' ')[0].substring(0, 5); // Берем только HH:MM
-            this.value = timeString;
+            this.value = new Date().toTimeString().split(' ')[0].substring(0, 5);
         }
     }
 };
 
-// Регистрируем виджеты глобально
 if (typeof window !== 'undefined') {
     window.DateTimeWidget = DateTimeWidget;
     window.DateWidget = DateWidget;

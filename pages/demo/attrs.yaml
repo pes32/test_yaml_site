@@ -168,11 +168,7 @@ demo_readonly:
   sup_tex: "Поле, которое нельзя редактировать"
   readonly: true
   default: "Это значение нельзя изменить"
-
-# Вкладка 2: простой ввод строки
-tab2_simple_string:
-  description: "Строка на второй вкладке"
-  default: ""
+  width: 550
 
 # Целое число (readonly)
 demo_int_readonly:

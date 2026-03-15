@@ -4,34 +4,36 @@
 function createIpLikeWidget(maskTemplate, validateFn, maxDigits) {
     const hasSlash = maskTemplate.includes('/');
     return {
+        components: { Md3Field: window.Md3Field },
+        mixins: [window.widgetMixin],
         props: {
             widgetConfig: { type: Object, required: true },
             widgetName: { type: String, required: true }
         },
         emits: ['input'],
         template: `
-            <div class="widget-container">
-                <div class="md3-field" :class="{ filled: hasValue }">
-                    <div class="md3-field-wrap"
-                         :class="{ floating: labelFloats, focused: isFocused, filled: hasValue, error: !!error, 'widget-readonly': widgetConfig.readonly }">
-                        <input type="text"
-                               class="form-control widget-ip"
-                               :disabled="widgetConfig.readonly"
-                               :tabindex="widgetConfig.readonly ? -1 : null"
-                               :maxlength="maxLength"
-                               v-model="inputValue"
-                               @input="onInputHandler"
-                               @keydown="onKeyDown"
-                               @blur="isFocused = false; onBlur()"
-                               @focus="isFocused = true">
-                        <label v-if="widgetConfig.description">{{ widgetConfig.description }}</label>
-                    </div>
-                    <div v-if="widgetConfig.sup_tex || error" class="md3-supporting">
-                        <span v-if="error" class="md3-error" v-text="error"></span>
-                        <span v-else v-text="widgetConfig.sup_tex"></span>
-                    </div>
-                </div>
-            </div>
+            <md3-field
+                :widget-config="widgetConfig"
+                :has-value="hasValue"
+                :label-floats="labelFloats"
+                :is-focused="isFocused"
+                :wrap-extra="{ error: !!error }"
+                :has-supporting="!!(widgetConfig.sup_tex || error)">
+                <input type="text"
+                       class="form-control widget-ip"
+                       :disabled="widgetConfig.readonly"
+                       :tabindex="widgetConfig.readonly ? -1 : null"
+                       :maxlength="maxLength"
+                       v-model="inputValue"
+                       @input="onInputHandler"
+                       @keydown="onKeyDown"
+                       @blur="isFocused = false; onBlur()"
+                       @focus="isFocused = true">
+                <template #supporting>
+                    <span v-if="error" class="md3-error" v-text="error"></span>
+                    <span v-else v-text="widgetConfig.sup_tex"></span>
+                </template>
+            </md3-field>
         `,
         data() {
             return {
@@ -71,12 +73,7 @@ function createIpLikeWidget(maskTemplate, validateFn, maxDigits) {
                 return (value || '').replace(/\D/g, '');
             },
             emitValue() {
-                // Текущее значение — это уже отформатированная строка inputValue
-                this.$emit('input', {
-                    name: this.widgetName,
-                    value: this.inputValue,
-                    config: this.widgetConfig
-                });
+                this.emitInput(this.inputValue);
             },
             onKeyDown(e) {
                 // Обработка Backspace для корректного удаления символов
