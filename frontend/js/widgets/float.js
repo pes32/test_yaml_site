@@ -14,32 +14,38 @@ const FloatWidget = {
     emits: ['input'],
     template: `
         <div class="widget-container">
-            <div v-if="widgetConfig.description" class="widget-label">
-                <span v-text="widgetConfig.description"></span>
-            </div>
-            
-            <input type="text" 
-                   class="form-control widget-input"
-                   :class="{ 'widget-readonly': widgetConfig.readonly, 'is-invalid': floatError }"
-                   :disabled="widgetConfig.readonly"
-                   :tabindex="widgetConfig.readonly ? -1 : null"
-                   v-model="value"
-                   @input="onFloatInput"
-                   placeholder="Введите дробное число">
-            <div v-if="floatError" class="invalid-feedback">
-                <span v-text="floatError"></span>
-            </div>
-            
-            <div v-if="widgetConfig.info" class="widget-info">
-                <span v-text="widgetConfig.info"></span>
+            <div class="md3-field" :class="{ filled: hasValue }">
+                <div class="md3-field-wrap"
+                     :class="{ floating: labelFloats, focused: isFocused, filled: hasValue, error: !!floatError, 'widget-readonly': widgetConfig.readonly }">
+                    <input type="text"
+                           class="form-control"
+                           :disabled="widgetConfig.readonly"
+                           :tabindex="widgetConfig.readonly ? -1 : null"
+                           v-model="value"
+                           @input="onFloatInput"
+                           @focus="isFocused = true"
+                           @blur="isFocused = false">
+                    <label v-if="widgetConfig.description">{{ widgetConfig.description }}</label>
+                </div>
+                <div v-if="widgetConfig.sup_tex || floatError" class="md3-supporting">
+                    <span v-if="floatError" class="md3-error" v-text="floatError"></span>
+                    <span v-else v-text="widgetConfig.sup_tex"></span>
+                </div>
             </div>
         </div>
     `,
     data() {
         return {
             value: '',
-            floatError: ''
+            floatError: '',
+            isFocused: false
         };
+    },
+    computed: {
+        hasValue() { return Boolean(this.value); },
+        labelFloats() {
+            return this.hasValue || this.isFocused;
+        }
     },
     methods: {
         onFloatInput() {

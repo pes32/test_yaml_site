@@ -92,8 +92,8 @@ const TableWidget = {
                 </table>
             </div>
             
-            <div v-if="widgetConfig.info" class="widget-info">
-                <span v-text="widgetConfig.info"></span>
+            <div v-if="widgetConfig.sup_tex" class="widget-info">
+                <span v-text="widgetConfig.sup_tex"></span>
             </div>
             
             <!-- Контекстное меню для таблицы -->

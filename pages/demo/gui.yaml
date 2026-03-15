@@ -59,7 +59,7 @@ menu "Строковые виджеты":
       - icon: "test.svg"
       - row: demo_button_command, demo_button_url
       - row: demo_button_dialog
-      - row: button_icon_svg, button_null, button_icon_svg_2
+      - row: button_icon_svg, button_null, button_with_icon
       - row: popup_button
 
 # Модальные окна

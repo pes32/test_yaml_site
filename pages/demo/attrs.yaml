@@ -3,8 +3,8 @@
 # Общая структура атрибута
 # <name_attr>:                                   # Имя атрибута (обязательно)
 #   widget: "тип_виджета"                        # Тип виджета (обязательно)
-#   description: "Описание"                      # Описание поля (обязательно)
-#   info: "Подсказка"                            # Информационное сообщение (опционально)
+#   description: "Описание"                      # Описание (обязательно. Не используется в кнопках-иконках)
+#   sup_tex: "Подсказка"                         # Информационное сообщение (опционально)
 #   readonly: true                               # Только для чтения (по умолчанию false)
 #   default: "Значение"                          # Начальное значение (опционально)
 #   command: "имя_команды"                       # Команда для кнопок (опционально)
@@ -12,10 +12,11 @@
 #                            - pg                # для обращения к  postgress
 #   url: "/путь/к/странице"                      # URL для перехода (опционально)
 #   source: ["значение1", "значение2"]           # Источник данных для списков (опционально)
-#   multiselect: true                           # Множественный выбор для списков (опционально)
+#   multiselect: true                            # Множественный выбор для списков (опционально)
 #   headers: ["Параметр", "Значение"]            # Заголовки для таблиц (опционально)
-#   icon: "test.svg"                             # Иконка в виде svg файла (опционально)
-#   size: 32                                     # Высота кнопки в пикселях (по умолчанию 40)
+#   icon: "test.svg"                             # Иконка (опционально)
+#   hint: "Подсказка"                            # Текст во всплывающей подсказке
+#   width: 34                                    # Ширина кнопки в px (по умолчанию 40)
 #   dialog:                                      # Диалог подтверждения для кнопок (опционально)
 #     title: "Заголовок"
 #     text: "Текст сообщения"
@@ -27,16 +28,16 @@
 # Простая строка
 demo_string:
   description: "Текстовое поле (str)"
-  info: "просто строка"
+  sup_tex: "просто строка"
   default: "Пример текста"
 
 # Многострочный текст
 demo_text:
   widget: text
   description: "Многострочный текст (text)"
-  info: "textarea которая вам не нужна"
+  sup_tex: "textarea, которая вам не нужна"
   default: "Это многострочный текст\nс переносами строк"
-  rows: 4
+  rows: 2
 
 # === ЧИСЛОВЫЕ ВИДЖЕТЫ ===
 
@@ -44,14 +45,14 @@ demo_text:
 demo_int:
   widget: int
   description: "Целое число (int)"
-  info: "Виджет для ввода целых чисел с валидацией"
+  sup_tex: "Виджет для ввода целых чисел с валидацией"
   default: 42
 
 # Число с плавающей точкой
 demo_float:
   widget: float
   description: "Число с плавающей точкой (float)"
-  info: "Виджет для ввода дробных чисел с валидацией"
+  sup_tex: "Виджет для ввода дробных чисел с валидацией"
   default: 3.141592
 
 # === СПИСКИ ===
@@ -60,14 +61,14 @@ demo_float:
 demo_list:
   widget: list
   description: "Выпадающий список (list)"
-  info: "Виджет для выбора из списка опций"
+  sup_tex: "Виджет для выбора из списка опций"
   source: ["Опция 1", "Опция 2", "Опция 3", "Опция 4"]
 
 # Множественный выбор
 demo_multiselect:
   widget: list
   description: "Множественный выбор (list + multiselect)"
-  info: "Виджет для выбора нескольких опций"
+  sup_tex: "Виджет для выбора нескольких опций"
   source: ["Элемент 1", "Элемент 2", "Элемент 3", "Элемент 4", "Элемент 5"]
   multiselect: true
 
@@ -77,13 +78,13 @@ demo_multiselect:
 demo_ip:
   widget: ip
   description: "IP адрес (ip)"
-  info: "Виджет для ввода IP адреса с автоформатированием"
+  sup_tex: "Виджет для ввода IP адреса с автоформатированием"
 
 # IP маска
 demo_ip_mask:
   widget: ip_mask
   description: "IP маска (ip_mask)"
-  info: "Виджет для ввода IP адреса с маской"
+  sup_tex: "Виджет для ввода IP адреса с маской"
   default: "192.168.0.1/12"
 
 # === ДАТА И ВРЕМЯ ===
@@ -92,7 +93,17 @@ demo_ip_mask:
 demo_datetime:
   widget: datetime
   description: "Дата и время (datetime)"
-  info: "Виджет для выбора даты и времени"
+  sup_tex: "Виджет для выбора даты и времени"
+
+date_widget:
+  widget: date
+  description: "Дата"
+  sup_tex: "Здесь можно ввести дату"
+
+time_widget:
+  widget: time
+  description: "Время"
+  sup_tex: "Здесь можно ввести время"  
 
 # === ТАБЛИЦЫ ===
 
@@ -100,7 +111,7 @@ demo_datetime:
 demo_table:
   widget: table
   description: "Таблица (table) — справочная, только просмотр"
-  info: "Статичная таблица без редактирования"
+  sup_tex: "Статичная таблица без редактирования"
   table_attrs: |
     name /Имя
     age /Возраст
@@ -112,32 +123,36 @@ demo_table:
 demo_table_editable:
   widget: table
   description: "Таблица (table) — редактируемая"
-  info: "Пользователь может изменять значения в ячейках"
+  sup_tex: "Пользователь может изменять значения в ячейках"
   table_attrs: |
     param /Параметр
     value /Значение
   source: demo_table_data
 
 # === КНОПКИ ===
+# Типы кнопок:
+# - icon-only: icon + hint (подсказка), без description
+# - icon+text: icon + description
+# - text-only: description
 
 # Кнопка с командой
 demo_button_command:
   widget: button
   description: "Кнопка с командой (button + command)"
-  info: "Кнопка, выполняющая команду"
+  sup_tex: "Кнопка, выполняющая команду"
 
 # Кнопка с переходом
 demo_button_url:
   widget: button
   description: "Кнопка с переходом (button + url)"
-  info: "Кнопка для перехода на другую страницу"
+  sup_tex: "Кнопка для перехода на другую страницу"
   url: "/page/page_2"
 
 # Кнопка с диалогом
 demo_button_dialog:
   widget: button
   description: "Кнопка с диалогом (button + dialog)"
-  info: "Кнопка с подтверждением действия"
+  sup_tex: "Кнопка с подтверждением действия"
   dialog:
     title: "Подтверждение действия"
     text: "Вы уверены, что хотите выполнить это действие?"
@@ -150,7 +165,7 @@ demo_button_dialog:
 demo_readonly:
   widget: str
   description: "Только для чтения (readonly)"
-  info: "Поле, которое нельзя редактировать"
+  sup_tex: "Поле, которое нельзя редактировать"
   readonly: true
   default: "Это значение нельзя изменить"
 
@@ -163,7 +178,7 @@ tab2_simple_string:
 demo_int_readonly:
   widget: int
   description: "Целое число (readonly)"
-  info: "Поле только для чтения"
+  sup_tex: "Поле только для чтения"
   readonly: true
   default: 123
 
@@ -171,26 +186,25 @@ demo_int_readonly:
 demo_float_readonly:
   widget: float
   description: "Дробное число (readonly)"
-  info: "Поле только для чтения"
+  sup_tex: "Поле только для чтения"
   readonly: true
   default: 2.718
 
 # Кнопки-иконки
 button_icon_svg:
   widget: button
-  description: "Кнопка-иконка симметричная (button + icon). Текст читается через хинт"
+  hint: "Кнопка-иконка симметричная (button + icon). Текст читается через хинт"
   icon: "test.svg"
-  size: 34
-
-button_icon_svg_2:
-  widget: button
-  description: "Кнопка-иконка (button + icon). Текст читается через хинт"
-  icon: "test_2.svg"
-  size: 34
+  # width: 34
 
 button_null:
   widget: button
   description: "Пустая кнопка"
+
+button_with_icon:
+  widget: button
+  description: "Кнопка с иконкой"
+  icon: "test.svg"
 
 popup_button:
   widget: button
@@ -201,24 +215,14 @@ popup_string:
   widget: str
   description: "Строка в модальном окне"
   default: "Пример текста"
-  info: "Введи в меня текст!"
+  sup_tex: "Введи в меня текст!"
 
 popup_int:
   widget: int
   description: "Целое число в модальном окне"
-  info: "Хочу целое число!"
+  sup_tex: "Хочу целое число!"
 
 save_button_popup:
   widget: button
   description: "Сохранить"
   command: save # пока всё равно не работает
-
-date_widget:
-  widget: date
-  description: "Дата"
-  info: "Здесь можно ввести дату"
-
-time_widget:
-  widget: time
-  description: "Время"
-  info: "Здесь можно ввести время"

@@ -14,50 +14,60 @@ const ListWidget = {
     emits: ['input'],
     template: `
         <div class="widget-container" @focusout="onFocusOut">
-            <div v-if="widgetConfig.description" class="widget-label">
-                <span v-text="widgetConfig.description"></span>
-            </div>
-            
-            <!-- Выпадающий список -->
-            <div class="dropdown widget-dropdown" ref="dropdownRoot">
-                <button class="btn btn-outline-secondary dropdown-toggle" 
-                        type="button" 
-                        data-bs-toggle="dropdown" 
-                        :data-bs-auto-close="widgetConfig.multiselect ? 'outside' : true"
-                        data-bs-container="body"
-                        aria-expanded="false"
-                        ref="dropdownToggle"
-                        :disabled="widgetConfig.readonly"
-                        :tabindex="widgetConfig.readonly ? -1 : null"
-                        :title="getDisplayValue()">
-                    <span v-text="getDisplayValue()"></span>
-                </button>
-                <ul class="dropdown-menu widget-dd-menu" @keydown.tab="onTab">
-                    <li v-for="item in listSource" :key="item">
-                        <a class="dropdown-item" 
-                           href="#" 
-                           @click.prevent="selectItem(item, $event)"
-                           :class="{ 'active': isItemSelected(item) }"
-                           :title="item">
-                            <span v-text="item"></span>
-                        </a>
-                    </li>
-                </ul>
-            </div>
-            
-            <div v-if="widgetConfig.info" class="widget-info">
-                <span v-text="widgetConfig.info"></span>
+            <div class="md3-field" :class="{ filled: hasValue }">
+                <div class="md3-field-wrap md3-dropdown-wrap"
+                     :class="{ floating: labelFloats, focused: isDropdownOpen, filled: hasValue, 'widget-readonly': widgetConfig.readonly }"
+                     @focusin="isDropdownOpen = true"
+                     @focusout="onListFocusOut">
+                    <div class="dropdown widget-dropdown" ref="dropdownRoot">
+                        <button class="btn md3-dropdown-toggle dropdown-toggle"
+                                type="button"
+                                data-bs-toggle="dropdown"
+                                :data-bs-auto-close="widgetConfig.multiselect ? 'outside' : true"
+                                data-bs-container="body"
+                                aria-expanded="false"
+                                ref="dropdownToggle"
+                                :disabled="widgetConfig.readonly"
+                                :tabindex="widgetConfig.readonly ? -1 : null"
+                                :title="getDisplayValue()">
+                            <span v-text="getDisplayValue()"></span>
+                        </button>
+                        <ul class="dropdown-menu widget-dd-menu" @keydown.tab="onTab">
+                            <li v-for="item in listSource" :key="item">
+                                <a class="dropdown-item"
+                                   href="#"
+                                   @click.prevent="selectItem(item, $event)"
+                                   :class="{ 'active': isItemSelected(item) }"
+                                   :title="item">
+                                    <span v-text="item"></span>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                    <label v-if="widgetConfig.description">{{ widgetConfig.description }}</label>
+                </div>
+                <div v-if="widgetConfig.sup_tex" class="md3-supporting">
+                    <span v-text="widgetConfig.sup_tex"></span>
+                </div>
             </div>
         </div>
     `,
     data() {
         return {
             value: null,
-            lastSelectedItem: null
+            lastSelectedItem: null,
+            isDropdownOpen: false
         };
     },
     computed: {
-        // Получаем источник данных для списка
+        hasValue() {
+            return this.widgetConfig.multiselect
+                ? (Array.isArray(this.value) && this.value.length > 0)
+                : (this.value !== null && this.value !== undefined && this.value !== '');
+        },
+        labelFloats() {
+            return this.hasValue || this.isDropdownOpen;
+        },
         listSource() {
             if (this.widgetConfig.source) {
                 if (Array.isArray(this.widgetConfig.source)) {
@@ -156,7 +166,6 @@ const ListWidget = {
         },
         
         onFocusOut() {
-            // Если фокус ушел за пределы компонента — закрываем (только для multiselect)
             if (!this.widgetConfig.multiselect) return;
             setTimeout(() => {
                 const root = this.$refs.dropdownRoot;
@@ -164,6 +173,13 @@ const ListWidget = {
                 if (!root.contains(document.activeElement)) {
                     this.closeDropdown();
                 }
+            }, 0);
+        },
+        onListFocusOut(e) {
+            setTimeout(() => {
+                const root = this.$refs.dropdownRoot;
+                if (!root || root.contains(document.activeElement)) return;
+                this.isDropdownOpen = false;
             }, 0);
         },
         

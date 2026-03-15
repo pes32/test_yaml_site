@@ -11,37 +11,42 @@ function createIpLikeWidget(maskTemplate, validateFn, maxDigits) {
         emits: ['input'],
         template: `
             <div class="widget-container">
-                <div v-if="widgetConfig.description" class="widget-label">
-                    <span v-text="widgetConfig.description"></span>
-                </div>
-                <input type="text"
-                       class="form-control widget-input widget-ip"
-                       :class="{ 'widget-readonly': widgetConfig.readonly, 'is-invalid': error }"
-                       :disabled="widgetConfig.readonly"
-                       :tabindex="widgetConfig.readonly ? -1 : null"
-                       :maxlength="maxLength"
-                       :placeholder="maskTemplate"
-                       v-model="inputValue"
-                       @input="onInputHandler"
-                       @keydown="onKeyDown"
-                       @blur="onBlur">
-                <div v-if="error" class="invalid-feedback">
-                    <span v-text="error"></span>
-                </div>
-                <div v-if="widgetConfig.info" class="widget-info">
-                    <span v-text="widgetConfig.info"></span>
+                <div class="md3-field" :class="{ filled: hasValue }">
+                    <div class="md3-field-wrap"
+                         :class="{ floating: labelFloats, focused: isFocused, filled: hasValue, error: !!error, 'widget-readonly': widgetConfig.readonly }">
+                        <input type="text"
+                               class="form-control widget-ip"
+                               :disabled="widgetConfig.readonly"
+                               :tabindex="widgetConfig.readonly ? -1 : null"
+                               :maxlength="maxLength"
+                               v-model="inputValue"
+                               @input="onInputHandler"
+                               @keydown="onKeyDown"
+                               @blur="isFocused = false; onBlur()"
+                               @focus="isFocused = true">
+                        <label v-if="widgetConfig.description">{{ widgetConfig.description }}</label>
+                    </div>
+                    <div v-if="widgetConfig.sup_tex || error" class="md3-supporting">
+                        <span v-if="error" class="md3-error" v-text="error"></span>
+                        <span v-else v-text="widgetConfig.sup_tex"></span>
+                    </div>
                 </div>
             </div>
         `,
         data() {
             return {
                 maskTemplate,
-                inputValue: '', // форматированная строка с разделителями
+                inputValue: '',
                 error: '',
-                lastInputLength: 0 // для отслеживания направления изменения
+                lastInputLength: 0,
+                isFocused: false
             };
         },
         computed: {
+            hasValue() { return Boolean(this.inputValue); },
+            labelFloats() {
+                return this.hasValue || this.isFocused;
+            },
             maxLength() {
                 // Макс длина визуальной строки: для IP 15 (xxx.xxx.xxx.xxx), для CIDR 18
                 return this.maskTemplate.length;

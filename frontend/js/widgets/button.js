@@ -15,11 +15,11 @@ const ButtonWidget = {
     template: `
         <div class="widget-container">
             <button class="btn widget-button"
-                    :class="{ 'icon-only': widgetConfig.icon && !widgetConfig.description }"
+                    :class="{ 'icon-only': isIconOnly }"
                     :style="buttonStyle"
                     :disabled="widgetConfig.readonly"
                     @click="onButtonClick"
-                    :title="widgetConfig.icon ? (widgetConfig.description || 'Кнопка') : null">
+                    :title="buttonTitle">
                 <!-- SVG иконка -->
                 <img v-if="widgetConfig.icon && !widgetConfig.icon.startsWith('fas')" 
                      :src="'/templates/icons/' + widgetConfig.icon"
@@ -30,13 +30,13 @@ const ButtonWidget = {
                 <!-- FontAwesome иконка -->
                 <i v-else-if="widgetConfig.icon && widgetConfig.icon.startsWith('fas')" 
                    :class="widgetConfig.icon"></i>
-                <!-- Текст кнопки (только если нет иконки) -->
-                <span v-if="!widgetConfig.icon" 
-                      v-text="widgetConfig.description || 'Кнопка'"></span>
+                <!-- Текст: при icon+text или text-only -->
+                <span v-if="widgetConfig.description" 
+                      v-text="widgetConfig.description"></span>
             </button>
             
-            <div v-if="widgetConfig.info" class="widget-info">
-                <span v-text="widgetConfig.info"></span>
+            <div v-if="widgetConfig.sup_tex" class="widget-info">
+                <span v-text="widgetConfig.sup_tex"></span>
             </div>
         </div>
     `,
@@ -46,47 +46,33 @@ const ButtonWidget = {
         };
     },
     computed: {
+        isIconOnly() {
+            return Boolean(this.widgetConfig.icon && !this.widgetConfig.description);
+        },
+        buttonTitle() {
+            if (this.isIconOnly && this.widgetConfig.hint) return this.widgetConfig.hint;
+            if (this.widgetConfig.description) return this.widgetConfig.description;
+            return 'Кнопка';
+        },
         iconStyle() {
             if (!this.widgetConfig.icon || this.widgetConfig.icon.startsWith('fas')) {
                 return {};
             }
-            
-            const size = this.widgetConfig.size || 16;
+            const size = this.widgetConfig.iconSize || this.widgetConfig.size || 24;
             return {
-                height: `${size}px`,
-                width: 'auto',
-                verticalAlign: 'middle'
+                width: `${size}px`,
+                height: `${size}px`
             };
         },
-        
         buttonStyle() {
-            if (this.widgetConfig.size) {
-                const size = this.widgetConfig.size;
-                const basePadding = Math.max(4, size * 0.125);
-                const horizontalPadding = Math.max(8, size * 0.25);
-                
-                // Если есть иконка, делаем кнопку с отступами 2px от иконки
-                if (this.widgetConfig.icon) {
-                    const iconPadding = 2; // отступ от границы иконки
-                    const buttonSize = size + (iconPadding * 2); // размер кнопки = размер иконки + отступы
-                    
-                    return {
-                        height: `${buttonSize}px`,
-                        width: `${buttonSize}px`,
-                        minHeight: `${buttonSize}px`,
-                        minWidth: `${buttonSize}px`,
-                        padding: `${iconPadding}px`,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                    };
-                }
-                
-                // Обычная кнопка с текстом
+            // Кнопка только с иконкой: высота 40px, ширина из width или 40 (квадрат)
+            if (this.isIconOnly) {
+                const w = this.widgetConfig.width || this.widgetConfig.size || 40;
+                const pad = Math.max(0, Math.floor((40 - 24) / 2));
                 return {
-                    height: `${size}px`,
-                    minHeight: `${size}px`,
-                    padding: `${basePadding}px ${horizontalPadding}px`
+                    width: `${w}px`,
+                    minWidth: `${w}px`,
+                    padding: `${pad}px`
                 };
             }
             return {};

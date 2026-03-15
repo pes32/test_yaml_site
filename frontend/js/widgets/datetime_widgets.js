@@ -14,29 +14,32 @@ const DateTimeWidget = {
     emits: ['input'],
     template: `
         <div class="widget-container">
-            <div v-if="widgetConfig.description" class="widget-label">
-                <span v-text="widgetConfig.description"></span>
-            </div>
-            
-            <div class="widget-datetime">
-                <input type="date" 
-                       class="form-control widget-input"
-                       :class="{ 'widget-readonly': widgetConfig.readonly }"
-                       :disabled="widgetConfig.readonly"
-                       :tabindex="widgetConfig.readonly ? -1 : null"
-                       v-model="dateValue"
-                       @input="onDateTimeInput">
-                <input type="time" 
-                       class="form-control widget-input"
-                       :class="{ 'widget-readonly': widgetConfig.readonly }"
-                       :disabled="widgetConfig.readonly"
-                       :tabindex="widgetConfig.readonly ? -1 : null"
-                       v-model="timeValue"
-                       @input="onDateTimeInput">
-            </div>
-            
-            <div v-if="widgetConfig.info" class="widget-info">
-                <span v-text="widgetConfig.info"></span>
+            <div class="md3-field" :class="{ filled: hasValue }">
+                <div class="md3-field-wrap md3-datetime-wrap"
+                     :class="{ floating: labelFloats, focused: isFocused, filled: hasValue, 'widget-readonly': widgetConfig.readonly }">
+                    <div class="widget-datetime">
+                        <input type="date"
+                               class="form-control"
+                               :disabled="widgetConfig.readonly"
+                               :tabindex="widgetConfig.readonly ? -1 : null"
+                               v-model="dateValue"
+                               @input="onDateTimeInput"
+                               @focus="isFocused = true"
+                               @blur="isFocused = false">
+                        <input type="time"
+                               class="form-control"
+                               :disabled="widgetConfig.readonly"
+                               :tabindex="widgetConfig.readonly ? -1 : null"
+                               v-model="timeValue"
+                               @input="onDateTimeInput"
+                               @focus="isFocused = true"
+                               @blur="isFocused = false">
+                    </div>
+                    <label v-if="widgetConfig.description">{{ widgetConfig.description }}</label>
+                </div>
+                <div v-if="widgetConfig.sup_tex" class="md3-supporting">
+                    <span v-text="widgetConfig.sup_tex"></span>
+                </div>
             </div>
         </div>
     `,
@@ -44,8 +47,15 @@ const DateTimeWidget = {
         return {
             value: '',
             dateValue: '',
-            timeValue: ''
+            timeValue: '',
+            isFocused: false
         };
+    },
+    computed: {
+        hasValue() { return Boolean(this.dateValue || this.timeValue); },
+        labelFloats() {
+            return this.hasValue || this.isFocused;
+        }
     },
     methods: {
         onDateTimeInput() {
@@ -111,29 +121,36 @@ const DateWidget = {
     emits: ['input'],
     template: `
         <div class="widget-container">
-            <div v-if="widgetConfig.description" class="widget-label">
-                <span v-text="widgetConfig.description"></span>
-            </div>
-            
-            <div class="widget-date">
-                <input type="date" 
-                       class="form-control widget-input"
-                       :class="{ 'widget-readonly': widgetConfig.readonly }"
-                       :disabled="widgetConfig.readonly"
-                       :tabindex="widgetConfig.readonly ? -1 : null"
-                       v-model="value"
-                       @input="onInput">
-            </div>
-            
-            <div v-if="widgetConfig.info" class="widget-info">
-                <span v-text="widgetConfig.info"></span>
+            <div class="md3-field" :class="{ filled: hasValue }">
+                <div class="md3-field-wrap"
+                     :class="{ floating: labelFloats, focused: isFocused, filled: hasValue, 'widget-readonly': widgetConfig.readonly }">
+                    <input type="date"
+                           class="form-control"
+                           :disabled="widgetConfig.readonly"
+                           :tabindex="widgetConfig.readonly ? -1 : null"
+                           v-model="value"
+                           @input="onInput"
+                           @focus="isFocused = true"
+                           @blur="isFocused = false">
+                    <label v-if="widgetConfig.description">{{ widgetConfig.description }}</label>
+                </div>
+                <div v-if="widgetConfig.sup_tex" class="md3-supporting">
+                    <span v-text="widgetConfig.sup_tex"></span>
+                </div>
             </div>
         </div>
     `,
     data() {
         return {
-            value: ''
+            value: '',
+            isFocused: false
         };
+    },
+    computed: {
+        hasValue() { return Boolean(this.value); },
+        labelFloats() {
+            return this.hasValue || this.isFocused;
+        }
     },
     methods: {
         onInput() {
@@ -179,29 +196,36 @@ const TimeWidget = {
     emits: ['input'],
     template: `
         <div class="widget-container">
-            <div v-if="widgetConfig.description" class="widget-label">
-                <span v-text="widgetConfig.description"></span>
-            </div>
-            
-            <div class="widget-time">
-                <input type="time" 
-                       class="form-control widget-input"
-                       :class="{ 'widget-readonly': widgetConfig.readonly }"
-                       :disabled="widgetConfig.readonly"
-                       :tabindex="widgetConfig.readonly ? -1 : null"
-                       v-model="value"
-                       @input="onInput">
-            </div>
-            
-            <div v-if="widgetConfig.info" class="widget-info">
-                <span v-text="widgetConfig.info"></span>
+            <div class="md3-field" :class="{ filled: hasValue }">
+                <div class="md3-field-wrap"
+                     :class="{ floating: labelFloats, focused: isFocused, filled: hasValue, 'widget-readonly': widgetConfig.readonly }">
+                    <input type="time"
+                           class="form-control"
+                           :disabled="widgetConfig.readonly"
+                           :tabindex="widgetConfig.readonly ? -1 : null"
+                           v-model="value"
+                           @input="onInput"
+                           @focus="isFocused = true"
+                           @blur="isFocused = false">
+                    <label v-if="widgetConfig.description">{{ widgetConfig.description }}</label>
+                </div>
+                <div v-if="widgetConfig.sup_tex" class="md3-supporting">
+                    <span v-text="widgetConfig.sup_tex"></span>
+                </div>
             </div>
         </div>
     `,
     data() {
         return {
-            value: ''
+            value: '',
+            isFocused: false
         };
+    },
+    computed: {
+        hasValue() { return Boolean(this.value); },
+        labelFloats() {
+            return this.hasValue || this.isFocused;
+        }
     },
     methods: {
         onInput() {

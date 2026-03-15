@@ -91,7 +91,10 @@
                                              :style="section.collapsible ? 'cursor: pointer;' : ''">
                                             <h5 class="mb-0 d-flex align-items-center page-section-title">
                                                 <span class="page-section-arrow-slot">
-                                                    <i v-if="section.collapsible" class="fas fa-chevron-down collapse-icon"></i>
+                                                    <img v-if="section.collapsible"
+                                                         src="/templates/icons/arrow.svg"
+                                                         class="collapse-icon"
+                                                         alt="">
                                                 </span>
                                                 <span v-if="section.icon" class="page-item-icon">
                                                     <img v-if="!isFontIcon(section.icon)"

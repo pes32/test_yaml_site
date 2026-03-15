@@ -167,7 +167,10 @@ const ModalManager = {
                                              :data-bs-target="section.collapsible ? ('#' + getModalSectionCollapseId(sidx)) : null"
                                              :style="section.collapsible ? 'cursor: pointer;' : ''">
                                             <h6 class="mb-0 d-flex align-items-center">
-                                                <i v-if="section.collapsible" class="fas fa-chevron-down collapse-icon me-2"></i>
+                                                <img v-if="section.collapsible"
+                                                     src="/templates/icons/arrow.svg"
+                                                     class="collapse-icon me-2"
+                                                     alt="">
                                                 <span v-if="section.icon" class="page-item-icon">
                                                     <img v-if="!isFontIcon(section.icon)"
                                                          :src="getIconSrc(section.icon)"
