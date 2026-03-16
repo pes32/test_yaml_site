@@ -1,0 +1,132 @@
+reptoid_img:
+  widget: img
+  description: ""
+  sup_tex: "Автор. Секретное фото в цвете."
+  source: "templates/reptoid.webp"
+  width: 300
+
+reptoid_desc:
+  widget: text
+  description: "Личное дело"
+  rows: 12
+  width: 1150
+  readonly: true
+  default: |
+    1) ФИО: ████ ██████ ████████████
+    2) Дата рождения: ██.██.19██ г.
+    3) Место рождения: г. ███ква 
+    4) Образование: Музыкальная Алкогольная Империя (МАИ), 9 факультет, кафедра "Сопротивление материалов, динамика и прочность машин"
+    5) Специальность: ██████ - 'Прикладная механика'. Примечание: по специальности не работает и никогда не работал.
+    6) Прочие сведения:
+    - Душнила;
+    - Любит котиков и не любит людей;
+    - Пьёт пиво с водкой;
+    - Знает как сыграть 'коричневую' ноту на басу;
+    - С настоящим искусственным интеллектом (гос. структуры, банки и др. крупные корпорации) работает от 12 млн;
+    - Любит сначала думать, а потом делать. Несмотря на это, слепил этот 'портал'.
+
+figma_button_1:
+  widget: button
+  description: "Figma 1"
+  icon: "figma.svg"
+  url: "https://www.figma.com/design/bXOOMY2nbXvDawmZhEd0In/VCConfigurator?node-id=0-1&t=MDulMSDrma2PPGCZ-1"
+
+figma_button_2:
+  widget: button
+  description: "Figma 2"
+  icon: "figma.svg"
+  url: "https://www.figma.com/design/Tgld7guoqW5Uewej60Pfto/Untitled?node-id=0-1&t=ZlQaZDg0PEgX6IPF-1"
+
+draw_io_button:
+  widget: button
+  description: "Draw.io"
+  icon: "pdf_icon.svg"
+  source: "templates/files/mobile_old.drawio.pdf"
+
+doc_1_button:
+  widget: button
+  icon: "pdf_icon.svg"
+  description: "Атрибуты"
+  source: "templates/files/attrs.pdf"
+
+doc_2_button:
+  widget: button
+  icon: "pdf_icon.svg"
+  description: "Блок запросов"
+  source: "templates/files/select.pdf"
+
+doc_3_button:
+  widget: button
+  icon: "pdf_icon.svg"
+  description: "Словари"
+  source: "templates/files/voc.pdf"
+
+user_guide_1_button:
+  widget: button
+  icon: "pdf_icon.svg"
+  description: "РП на коленке"
+  source: "templates/files/atom_util.pdf"
+
+user_guide_2_button:
+  widget: button
+  description: "РП от 2019 года"
+  icon: "pdf_icon.svg"
+  url: "https://neurochat.pro/upload/user_files/doc/rukovodstvo_polzovatelya.pdf"
+
+step_1:
+  widget: button
+  description: "Шаг 1"
+  icon: "pdf_icon.svg"
+  source: "templates/files/step_1.pdf"
+
+step_2:
+  widget: button
+  description: "Шаг 2"
+  icon: "pdf_icon.svg"
+  source: "templates/files/step_2.pdf"
+
+step_2_5:
+  widget: button
+  description: "Шаг 2,5"
+  icon: "pdf_icon.svg"
+  source: "templates/files/step_2_5.pdf"
+
+database_1:
+  widget: button
+  description: "Скрипт БД"
+  icon: "postgres.svg"
+  source: "templates/files/db_vcstudio.sql"
+
+database_2:
+  widget: button
+  description: "Процедуры"
+  icon: "postgres.svg"
+  source: "templates/files/procedure.sql"
+
+database_3:
+  widget: button
+  description: "Триггеры"
+  icon: "postgres.svg"
+  source: "templates/files/settings_db.sql"
+
+database_4:
+  widget: button
+  description: "ERD full"
+  source: "templates/files/erd_full.svg"
+
+database_5:
+  widget: button
+  description: "ERD light"
+  source: "templates/files/erd_light.svg"
+
+old_workflow:
+  widget: button
+  description: "Старый воркфлоу"
+  icon: "pdf_icon.svg"
+  source: "templates/files/old_flow.pdf"
+
+release_notes:
+  widget: button
+  description: "Описание релиза"
+  icon: "pdf_icon.svg"
+  source: "templates/files/release_1_19.pdf"

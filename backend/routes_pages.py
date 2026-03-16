@@ -7,15 +7,26 @@ from typing import Any
 from flask import abort, render_template, request
 
 
+META_KEYS = frozenset({"url", "title", "description"})
+
+
 def register_page_routes(app, config_service):
     """Регистрирует стабильные page routes поверх live snapshot."""
 
     def _public_page_config(page_config: dict[str, Any]) -> dict[str, Any]:
-        return {
+        result = {
             key: value
             for key, value in page_config.items()
             if key != "attrs"
         }
+        # Явный порядок меню в gui — порядок в файле не теряется при сериализации
+        gui = (page_config.get("gui") or {})
+        if gui:
+            result["guiMenuKeys"] = [
+                k for k in gui.keys()
+                if k not in META_KEYS
+            ]
+        return result
 
     def _render_page(page_config: dict[str, Any]):
         return render_template(

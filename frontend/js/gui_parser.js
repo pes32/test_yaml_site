@@ -322,15 +322,22 @@
         };
     }
 
+    var ROOT_CONTENT_TYPES = new Set(['row', 'rows', 'widgets', 'box', 'collapse', 'icon', 'tab', 'columns', 'button']);
+
     function parsePageGui(rawConfig) {
         const gui = rawConfig && rawConfig.gui ? rawConfig.gui : (rawConfig || {});
         const menus = [];
         const modals = {};
+        const rootItems = [];
 
-        Object.entries(gui).forEach(([key, value]) => {
-            if (META_KEYS.has(key)) {
-                return;
-            }
+        // Порядок: явный guiMenuKeys с бэкенда, иначе Object.entries (зависит от сериализатора)
+        const keysToProcess = Array.isArray(rawConfig && rawConfig.guiMenuKeys)
+            ? rawConfig.guiMenuKeys.filter(function (k) { return gui[k] !== undefined; })
+            : Object.keys(gui).filter(function (k) { return !META_KEYS.has(k); });
+
+        keysToProcess.forEach(function (key) {
+            const value = gui[key];
+            if (value === undefined) return;
 
             const parsed = parseDynamicKey(key);
             if (parsed.type === 'menu') {
@@ -338,12 +345,29 @@
                 return;
             }
 
+            if (ROOT_CONTENT_TYPES.has(parsed.type)) {
+                rootItems.push({ key: key, value: value });
+                return;
+            }
+
             modals[parsed.type] = normalizeModal(parsed.type, parsed.name, value);
         });
 
+        var rootContentOnly = false;
+        if (menus.length === 0 && rootItems.length > 0) {
+            var rootContentItems = rootItems.map(function (item) {
+                var obj = {};
+                obj[item.key] = item.value;
+                return obj;
+            });
+            menus.push(normalizeMenu('', rootContentItems));
+            rootContentOnly = true;
+        }
+
         return {
             menus: menus,
-            modals: modals
+            modals: modals,
+            rootContentOnly: rootContentOnly
         };
     }
 

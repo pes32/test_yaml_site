@@ -161,6 +161,30 @@ body {
     height: 24px;
 }
 
+/* Иконка в меню: по умолчанию такая же «тусклая», как подпись */
+.menu-card:not(.active) .page-item-icon img {
+    opacity: 0.6;
+    filter: grayscale(1);
+}
+
+/* Для активного пункта меню и при ховере иконка полностью «подсвечена» */
+.menu-card.active .page-item-icon img,
+.menu-card:hover .page-item-icon img {
+    opacity: 1;
+    filter: none;
+}
+
+/* Иконки в табах: неактивный — тусклый, активный/ховер — насыщенный */
+.page-tabs .nav-link:not(.active) .page-item-icon img {
+    opacity: 0.6;
+    filter: grayscale(1);
+}
+.page-tabs .nav-link.active .page-item-icon img,
+.page-tabs .nav-link:hover .page-item-icon img {
+    opacity: 1;
+    filter: none;
+}
+
 .menu-card .page-item-icon i,
 .page-tabs .page-item-icon i,
 .page-section-header .page-item-icon i {
@@ -257,6 +281,10 @@ body {
     padding: 20px;
     box-sizing: border-box;
 }
+/* Меню без вкладок: контент (в т.ч. box/collapse) начинается в 20px от меню */
+.page-tab-content:not(.page-tab-content--with-tabs) {
+    padding-left: 0;
+}
 
 .page-section + .page-section {
     margin-top: 20px;
@@ -296,10 +324,41 @@ body {
     box-sizing: border-box;
 }
 
+/* Обычный текст секций (строки из gui.yaml) — основной цвет интерфейса */
+.page-section-text {
+    color: #474747;
+}
+
 /* box без заголовка: полная рамка и скругление */
 .page-section-card:not(:has(.page-section-header)) .page-section-body {
     border-top: 5px solid #F2F6FE;
     border-radius: 15px;
+}
+
+/* Секции без заголовка (просто row) — без рамки, 20px между элементами */
+.page-section--bare .page-section-card,
+.page-section--bare .page-section-card .page-section-body {
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+}
+/* Меню без вкладок: bare-секции уже у левого края (padding-left: 0) */
+.page-tab-content:not(.page-tab-content--with-tabs) .page-section--bare .page-section-body {
+    margin-left: 0;
+    padding: 0 !important;
+}
+/* Секции внутри вкладки: выравнивание по левому краю box/collapse (одна линия) */
+.page-tab-content--with-tabs .page-section--bare .page-section-body {
+    margin-left: 0;
+    padding: 0 !important;
+}
+.page-section--bare .page-section-body {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+.page-section--bare .page-section-body .row {
+    margin-bottom: 0 !important;
 }
 
 .page-section-title {
@@ -425,6 +484,7 @@ body {
 .md3-textarea-wrap {
     width: 100%;
     min-width: 0;
+    overflow: visible;
 }
 
 .md3-field-wrap textarea {
@@ -451,7 +511,7 @@ body {
     color: #707579;
 }
 
-/* Label: пусто — #707579, заполнено — #474747; вверху (floating) — 12px; выше подсветки фокуса */
+/* Label: общие стили для str, int, float, text, list, date, time, datetime */
 .md3-field-wrap label {
     position: absolute;
     z-index: 1;
@@ -471,21 +531,13 @@ body {
     color: #474747;
 }
 
-.md3-field-wrap.floating label {
-    top: 0;
-    font-size: 12px;
-    transform: translateY(-50%);
-    transform-origin: left top;
-    background: var(--md3-bg);
-    padding: 0 4px;
-    margin-left: -4px;
-}
-
-/* List, date, time, datetime: маска/плейсхолдер по центру — label всегда сверху */
+/* Label сверху (floating): str, int, float, text, list, date, time, datetime — 12px, фон */
+.md3-field-wrap.floating label,
 .md3-dropdown-wrap label,
 .md3-datetime-wrap label,
 .md3-field-wrap:has(input[type="date"]):not(.md3-datetime-wrap) label,
-.md3-field-wrap:has(input[type="time"]):not(.md3-datetime-wrap) label {
+.md3-field-wrap:has(input[type="time"]):not(.md3-datetime-wrap) label,
+.md3-field-wrap:has(textarea).floating label {
     top: 0;
     font-size: 12px;
     transform: translateY(-50%);
@@ -495,14 +547,15 @@ body {
     margin-left: -4px;
 }
 
+.md3-field-wrap:has(textarea) {
+    align-items: flex-start;
+    overflow: visible;
+}
+
+/* textarea: label выше поля, когда не floating (отличие от однострочных) */
 .md3-field-wrap:has(textarea) label {
     top: 18px;
     transform: none;
-}
-
-.md3-field-wrap:has(textarea).floating label {
-    top: 0;
-    transform: translateY(-50%) scale(0.75);
 }
 
 /* sup_tex: пусто — #707579, заполнено — #474747; 12px */
@@ -901,6 +954,25 @@ html {
     margin-top: 0.25rem;
 }
 
+/* Виджет изображения (img) */
+.widget-img {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+.widget-img-description {
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+.widget-img-element {
+    display: block;
+    border-radius: 0.25rem;
+}
+.widget-img-sup {
+    font-size: 0.8125rem;
+    color: #6c757d;
+}
+
 /* Стили для readonly полей */
 .widget-readonly {
     color: #6c757d;
@@ -967,17 +1039,40 @@ html {
     max-width: 320px;
 }
 
+.row .col-auto .widget-container.widget-explicit-width .md3-field,
+.widget-container.widget-explicit-width .md3-field {
+    max-width: none;
+}
+
 .row .col-auto .widget-container .widget-label,
 .row .col-auto .widget-container .md3-field-wrap label {
     white-space: nowrap;
 }
 
-.row .col-auto .widget-container .form-control,
 .row .col-auto .widget-container .md3-field-wrap input,
 .row .col-auto .widget-container .widget-dropdown .dropdown-toggle {
     width: auto !important;
     display: inline-block;
     max-width: 320px;
+}
+
+/* textarea (виджет text): своя ширина из width, разрешён resize */
+.widget-container:has(textarea) .md3-field,
+.widget-container:has(textarea) .md3-textarea-wrap {
+    max-width: none;
+}
+
+/* width из YAML: рамка (md3-field-wrap) подстраивается под textarea в обе стороны */
+.widget-container.widget-explicit-width:has(textarea) .md3-field-wrap {
+    width: fit-content;
+}
+.widget-container.widget-explicit-width:has(textarea) .md3-textarea-wrap {
+    width: fit-content;
+}
+
+/* Переопределяем лимит 320px для textarea в row (иначе граница не тянется за полем) */
+.row .col-auto .widget-container:has(textarea) .md3-field {
+    max-width: none;
 }
 
 /* Компактное размещение datetime в строках */
@@ -1082,7 +1177,16 @@ html {
 .modal-body {
     padding: 1rem;
     overflow-y: auto;
-    flex: 1;
+}
+
+/* Диалог подтверждения: шире на 50px */
+#confirmModal .modal-dialog {
+    max-width: 550px;
+}
+
+/* Текст диалога подтверждения: \n отображается как перенос строки */
+#confirmModalBody {
+    white-space: pre-line;
 }
 
 .modal-footer {

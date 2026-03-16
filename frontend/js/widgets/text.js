@@ -18,6 +18,7 @@ const TextWidget = {
             :has-supporting="!!widgetConfig.sup_tex">
             <div class="md3-textarea-wrap">
                 <textarea class="form-control"
+                         :style="textareaStyle"
                          :disabled="widgetConfig.readonly"
                          :tabindex="widgetConfig.readonly ? -1 : null"
                          :rows="widgetConfig.rows || 3"
@@ -37,7 +38,15 @@ const TextWidget = {
     },
     computed: {
         hasValue() { return Boolean(this.value); },
-        labelFloats() { return this.hasValue || this.isFocused; }
+        labelFloats() { return this.hasValue || this.isFocused; },
+        textareaStyle() {
+            const w = this.widgetConfig && this.widgetConfig.width;
+            if (w == null || w === '') return {};
+            const widthVal = typeof w === 'number' ? `${w}px` : String(w);
+            return {
+                width: widthVal
+            };
+        }
     },
     methods: {
         onInput() { this.emitInput(this.value); },

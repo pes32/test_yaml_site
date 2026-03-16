@@ -89,19 +89,26 @@ const ButtonWidget = {
         },
 
         onButtonClick() {
-            // Проверяем, есть ли URL для перехода
+            // Если есть диалог — показываем его; действие (url/command) выполнится при нажатии accept
+            if (this.widgetConfig.dialog) {
+                this.showConfirmDialog();
+                return;
+            }
+            // source — открыть файл (PDF и т.д.) в новой вкладке
+            if (this.widgetConfig.source) {
+                const src = String(this.widgetConfig.source).trim();
+                const href = /^https?:\/\//i.test(src) || src.startsWith('/') ? src : '/' + src;
+                window.open(href, '_blank', 'noopener,noreferrer');
+                return;
+            }
+            // url — перейти по ссылке в текущей вкладке
             if (this.widgetConfig.url) {
                 window.location.href = this.widgetConfig.url;
                 return;
             }
-            
-            // Проверяем, нужен ли диалог подтверждения
-            if (this.widgetConfig.dialog) {
-                this.showConfirmDialog();
-            } else if (this.widgetConfig.command) {
+            if (this.widgetConfig.command) {
                 this.executeCommand();
             }
-            // Если нет ни url, ни dialog, ни command - кнопка просто ничего не делает
         },
         
         showConfirmDialog() {
@@ -109,17 +116,26 @@ const ButtonWidget = {
             const title = document.getElementById('confirmModalTitle');
             const body = document.getElementById('confirmModalBody');
             const acceptBtn = document.getElementById('confirmModalAccept');
-            
-            title.textContent = this.widgetConfig.dialog.title || 'Подтверждение';
-            body.textContent = this.widgetConfig.dialog.text || 'Вы уверены?';
-            
-            // Обработчик для кнопки подтверждения
+            const cancelBtn = document.getElementById('confirmModalCancel');
+            const d = this.widgetConfig.dialog || {};
+
+            title.textContent = d.title || 'Подтверждение';
+            body.textContent = d.text || 'Вы уверены?';
+
+            acceptBtn.textContent = d.accept || 'Подтвердить';
+            cancelBtn.textContent = d.cancel || 'Отмена';
+
+            // Обработчик для кнопки подтверждения — выполняем действие (url или command)
             const handleAccept = () => {
-                this.executeCommand();
                 modal.hide();
                 acceptBtn.removeEventListener('click', handleAccept);
+                if (this.widgetConfig.url) {
+                    window.location.href = this.widgetConfig.url;
+                } else if (this.widgetConfig.command) {
+                    this.executeCommand();
+                }
             };
-            
+
             acceptBtn.addEventListener('click', handleAccept);
             modal.show();
         },

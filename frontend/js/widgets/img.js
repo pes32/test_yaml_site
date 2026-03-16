@@ -1,0 +1,53 @@
+// Виджет для отображения изображений (img)
+
+const ImgWidget = {
+    props: {
+        widgetConfig: { type: Object, required: true },
+        widgetName: { type: String, required: true }
+    },
+    template: `
+        <div class="widget-container widget-img">
+            <div v-if="widgetConfig.description" class="widget-img-description">
+                <span v-text="widgetConfig.description"></span>
+            </div>
+            <img v-if="imageSrc"
+                 :src="imageSrc"
+                 :alt="widgetConfig.description || ''"
+                 :style="imgStyle"
+                 class="widget-img-element"
+                 @error="onImageError">
+            <div v-if="widgetConfig.sup_tex" class="widget-img-sup">
+                <span v-text="widgetConfig.sup_tex"></span>
+            </div>
+        </div>
+    `,
+    data() {
+        return { loadError: false };
+    },
+    computed: {
+        imageSrc() {
+            if (this.loadError || !this.widgetConfig.source) return null;
+            const src = String(this.widgetConfig.source).trim();
+            if (/^https?:\/\//i.test(src)) return src;
+            if (src.startsWith('/')) return src;
+            return '/' + src;
+        },
+        imgStyle() {
+            const w = this.widgetConfig.width;
+            if (w == null || w === '') return {};
+            const widthVal = typeof w === 'number' ? `${w}px` : String(w);
+            return { width: widthVal, maxWidth: '100%', height: 'auto' };
+        }
+    },
+    methods: {
+        onImageError() {
+            this.loadError = true;
+        },
+        setValue() {},
+        getValue() { return null; }
+    }
+};
+
+if (typeof window !== 'undefined') {
+    window.ImgWidget = ImgWidget;
+}

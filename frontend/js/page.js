@@ -13,7 +13,8 @@ const app = createApp({
             activeMenuIndex: 0,
             activeTabIndex: 0,
             loading: true,
-            error: null
+            error: null,
+            rootContentOnly: false
         };
     },
 
@@ -113,12 +114,12 @@ const app = createApp({
         },
 
         parseGuiConfig() {
-            const gui = this.pageConfig.gui || this.pageConfig;
             const parsed = window.GuiParser
-                ? window.GuiParser.parsePageGui(gui)
+                ? window.GuiParser.parsePageGui(this.pageConfig)
                 : { menus: [], modals: {} };
 
             this.menus = parsed.menus || [];
+            this.rootContentOnly = Boolean(parsed.rootContentOnly);
 
             if (window.pageData) {
                 window.pageData.parsedGui = parsed;

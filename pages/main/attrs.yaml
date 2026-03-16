@@ -1,4 +1,11 @@
-demo_button:
+system_button:
   widget: button
-  description: "Посмотреть виджеты"
-  url: "/demo"
+  description: "Смотреть систему"
+  url: "/system_demo"
+  sup_tex: "Тык-тык"
+
+author_button:
+  widget: button
+  description: "Обзор Создателя"
+  url: "/about_author"
+  sup_tex: "Ловите рептилойда!"

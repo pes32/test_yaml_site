@@ -36,7 +36,7 @@
         <!-- Основной контент -->
         <div class="container-fluid mt-3">
             <div class="page-shell">
-                <aside v-if="menus.length" class="page-sidebar">
+                <aside v-if="menus.length && !rootContentOnly" class="page-sidebar">
                     <div class="menu-list page-menu-rail">
                         <button type="button"
                                 class="menu-card"
@@ -79,9 +79,9 @@
                             </li>
                         </ul>
 
-                        <div class="tab-content page-tab-content" id="mainTabContent">
+                        <div class="tab-content page-tab-content" :class="{ 'page-tab-content--with-tabs': activeTabs.length > 1 }" id="mainTabContent">
                             <div class="tab-pane active show">
-                                <div v-for="(section, sidx) in activeSections" :key="sidx" class="page-section">
+                                <div v-for="(section, sidx) in activeSections" :key="sidx" class="page-section" :class="{ 'page-section--bare': !section.showHeader }">
                                     <div class="card page-section-card">
                                         <div v-if="section.showHeader"
                                              class="card-header page-section-header"
@@ -112,7 +112,7 @@
                                             <div class="card-body page-section-body">
                                                 <div v-for="(row, rowIndex) in section.rows" :key="rowIndex" class="row mb-2">
                                                     <div v-if="typeof row === 'string'" class="col-12">
-                                                        <span class="text-muted" v-text="row"></span>
+                                                        <span class="page-section-text" v-text="row"></span>
                                                     </div>
                                                     <div v-else-if="row.widgets && Array.isArray(row.widgets)" class="col-12">
                                                         <div class="row">
@@ -150,7 +150,7 @@
                     </div>
 
                     <div v-else class="alert alert-warning">
-                        В `gui.yaml` не найдено ни одного меню.
+                        Нет контента для отображения. Добавьте menu или row/box/collapse на верхнем уровне gui.yaml.
                     </div>
                 </main>
             </div>
@@ -169,7 +169,7 @@
                     Вы уверены, что хотите выполнить это действие?
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-secondary" id="confirmModalCancel" data-bs-dismiss="modal">Отмена</button>
                     <button type="button" class="btn btn-primary" id="confirmModalAccept">Подтвердить</button>
                 </div>
             </div>
@@ -198,6 +198,7 @@
     <script src="{{ url_for('static', filename='js/widgets/text.js') }}?v={{ ASSETS_VERSION }}"></script>
     <script src="{{ url_for('static', filename='js/widgets/table.js') }}?v={{ ASSETS_VERSION }}"></script>
     <script src="{{ url_for('static', filename='js/widgets/button.js') }}?v={{ ASSETS_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/widgets/img.js') }}?v={{ ASSETS_VERSION }}"></script>
     <script src="{{ url_for('static', filename='js/gui_parser.js') }}?v={{ ASSETS_VERSION }}"></script>
     <script src="{{ url_for('static', filename='js/widgets/modal.js') }}?v={{ ASSETS_VERSION }}"></script>
     <script src="{{ url_for('static', filename='js/widgets/factory.js') }}?v={{ ASSETS_VERSION }}"></script>

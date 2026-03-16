@@ -34,15 +34,16 @@ CONFIG_SERVICE = ConfigService(ROOT_DIR)
 CONFIG = CONFIG_SERVICE.get_snapshot()
 
 # ---- Регистрация маршрутов ----
+# Статические маршруты (/templates/*, favicon и т.д.) — до catch-all страниц
+from .routes_static import register_static_routes
 from .routes_pages import register_page_routes
 from .routes_api import register_api_routes
 from .routes_debug import register_debug_routes
-from .routes_static import register_static_routes
 
+register_static_routes(app)
 register_page_routes(app, CONFIG_SERVICE)
 register_api_routes(app, CONFIG_SERVICE, LOG_FILE_PATH)
 register_debug_routes(app, CONFIG, LOG_FILE_PATH)
-register_static_routes(app)
 
 # Упрощённый экспорт
 __all__ = ["app", "CONFIG", "CONFIG_SERVICE", "LOG_FILE_PATH"]

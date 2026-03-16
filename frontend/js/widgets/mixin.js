@@ -5,7 +5,9 @@ const widgetMixin = {
         containerStyle() {
             const w = this.widgetConfig.width;
             if (w == null) return {};
-            return { width: typeof w === 'number' ? w + 'px' : String(w) };
+            const widthVal = typeof w === 'number' ? w + 'px' : String(w);
+            // min-width — начальный размер; контейнер может расти и сжиматься вместе с textarea
+            return { minWidth: widthVal };
         }
     },
     methods: {

@@ -37,3 +37,4 @@ logs/
 # Config (если есть секретные данные)
 # config.yaml
 # secrets.yaml
+templates/files/

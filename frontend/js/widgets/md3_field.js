@@ -13,6 +13,10 @@ const Md3Field = {
     },
     emits: ['focusin', 'focusout', 'containerFocusout'],
     computed: {
+        hasExplicitWidth() {
+            const w = this.widgetConfig && this.widgetConfig.width;
+            return w != null && w !== '';
+        },
         wrapClass() {
             return {
                 ...this.wrapExtra,
@@ -24,7 +28,7 @@ const Md3Field = {
         }
     },
     template: `
-        <div class="widget-container" :style="containerStyle" @focusout="$emit('containerFocusout', $event)">
+        <div class="widget-container" :class="{ 'widget-explicit-width': hasExplicitWidth }" :style="containerStyle" @focusout="$emit('containerFocusout', $event)">
             <div class="md3-field" :class="{ filled: hasValue }">
                 <div class="md3-field-wrap"
                      :class="wrapClass"

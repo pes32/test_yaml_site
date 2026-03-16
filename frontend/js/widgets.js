@@ -288,7 +288,7 @@ const ModalManager = {
 
             if (!window.pageData.parsedGui) {
                 const pageConfig = window.pageData.pageConfig;
-                window.pageData.parsedGui = window.GuiParser.parsePageGui(pageConfig.gui || pageConfig);
+                window.pageData.parsedGui = window.GuiParser.parsePageGui(pageConfig || {});
             }
 
             return window.pageData.parsedGui;

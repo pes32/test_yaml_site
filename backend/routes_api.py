@@ -8,6 +8,7 @@ from typing import Any
 from flask import jsonify, make_response, request
 
 logger = logging.getLogger(__name__)
+META_KEYS = frozenset({"url", "title", "description"})
 
 
 def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG001
@@ -23,11 +24,18 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
         return resp
 
     def _public_page_config(page_config: dict[str, Any]) -> dict[str, Any]:
-        return {
+        result = {
             key: value
             for key, value in page_config.items()
             if key != "attrs"
         }
+        gui = (page_config.get("gui") or {})
+        if gui:
+            result["guiMenuKeys"] = [
+                k for k in gui.keys()
+                if k not in META_KEYS
+            ]
+        return result
 
     @app.route("/api/config")
     def api_get_config():

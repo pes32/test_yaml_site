@@ -13,6 +13,7 @@ def register_static_routes(app):
 
     # Каталог icons расположен внутри общей папки templates
     icons_dir = os.path.join(app.template_folder, "icons")
+    templates_dir = app.template_folder
 
     @app.route("/templates/icons/<path:filename>")
     def serve_icon(filename):  # noqa: D401 (simple function)
@@ -22,6 +23,15 @@ def register_static_routes(app):
         except Exception as exc:  # pragma: no cover
             logger.error("Ошибка при загрузке иконки %s: %s", filename, exc)
             return f"Ошибка загрузки иконки: {exc}", 500
+
+    @app.route("/templates/<path:filename>")
+    def serve_template_file(filename):  # noqa: D401
+        """Отдаёт файлы (изображения и пр.) из каталога templates."""
+        try:
+            return send_from_directory(templates_dir, filename)
+        except Exception as exc:  # pragma: no cover
+            logger.error("Ошибка при загрузке файла %s: %s", filename, exc)
+            return f"Ошибка загрузки: {exc}", 500
 
     # favicon в корне — переброс к файлу во frontend
     @app.route("/favicon.ico")

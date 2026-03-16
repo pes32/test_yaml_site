@@ -1,0 +1,24 @@
+url: "/about_author"
+
+box "Карточка рептилойда":
+  - row: reptoid_img, reptoid_desc
+  - "Несмотря на то, что вся программа написанна на нейронках, автор призывает использовать мозг."
+
+collapse "Материалы автора":
+  - "Макеты интерфейсов:"
+  - row: figma_button_1, figma_button_2, draw_io_button
+
+  - "Эталон документации:"
+  - row: step_1, step_2, step_2_5
+
+  - "Лаконичная документация:"
+  - row: doc_1_button, doc_2_button, doc_3_button
+
+  - "Руководства пользователя:"
+  - row: user_guide_1_button, user_guide_2_button
+
+  - "База данных:"
+  - row: database_1, database_2, database_3, database_4, database_5
+
+  - "Прочее:"
+  - row: old_workflow, release_notes
