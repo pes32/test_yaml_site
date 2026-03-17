@@ -18,7 +18,7 @@ function createIpLikeWidget(maskTemplate, validateFn, maxDigits) {
                 :label-floats="labelFloats"
                 :is-focused="isFocused"
                 :wrap-extra="{ error: !!error }"
-                :has-supporting="!!(widgetConfig.sup_tex || error)">
+                :has-supporting="!!(widgetConfig.sup_text || error)">
                 <input type="text"
                        class="form-control widget-ip"
                        :disabled="widgetConfig.readonly"
@@ -31,7 +31,7 @@ function createIpLikeWidget(maskTemplate, validateFn, maxDigits) {
                        @focus="isFocused = true">
                 <template #supporting>
                     <span v-if="error" class="md3-error" v-text="error"></span>
-                    <span v-else v-text="widgetConfig.sup_tex"></span>
+                    <span v-else v-text="widgetConfig.sup_text"></span>
                 </template>
             </md3-field>
         `,

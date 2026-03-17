@@ -35,7 +35,7 @@ const Md3Field = {
                      @focusin="$emit('focusin', $event)"
                      @focusout="$emit('focusout', $event)">
                     <slot></slot>
-                    <label v-if="widgetConfig.description">{{ widgetConfig.description }}</label>
+                    <label v-if="widgetConfig.label">{{ widgetConfig.label }}</label>
                 </div>
                 <div v-if="hasSupporting" class="md3-supporting">
                     <slot name="supporting"></slot>

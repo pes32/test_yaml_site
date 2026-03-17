@@ -1,13 +1,13 @@
 reptoid_img:
   widget: img
-  description: ""
-  sup_tex: "Автор. Секретное фото в цвете."
+  label: ""
+  sup_text: "Автор. Секретное фото в цвете."
   source: "templates/reptoid.webp"
   width: 300
 
 reptoid_desc:
   widget: text
-  description: "Личное дело"
+  label: "Личное дело"
   rows: 12
   width: 1150
   readonly: true
@@ -19,114 +19,159 @@ reptoid_desc:
     5) Специальность: ██████ - 'Прикладная механика'. Примечание: по специальности не работает и никогда не работал.
     6) Прочие сведения:
     - Душнила;
-    - Любит котиков и не любит людей;
-    - Пьёт пиво с водкой;
-    - Знает как сыграть 'коричневую' ноту на басу;
-    - С настоящим искусственным интеллектом (гос. структуры, банки и др. крупные корпорации) работает от 12 млн;
-    - Любит сначала думать, а потом делать. Несмотря на это, слепил этот 'портал'.
+    - С настоящим искусственным интеллектом (гос. структуры, банки и др. крупные корпорации) работает за дорого;
+    - Предпочитает сначала думать, а потом делать. Несмотря на это, слепил этот 'портал';
+    - Может взять коричневую ноту на басу;
+    - Пьёт водку с пивом;
+    - Любит котиков;
 
 figma_button_1:
   widget: button
-  description: "Figma 1"
+  label: "Figma 1"
   icon: "figma.svg"
+  width: 190
   url: "https://www.figma.com/design/bXOOMY2nbXvDawmZhEd0In/VCConfigurator?node-id=0-1&t=MDulMSDrma2PPGCZ-1"
 
 figma_button_2:
   widget: button
-  description: "Figma 2"
+  label: "Figma 2"
   icon: "figma.svg"
+  width: 190
   url: "https://www.figma.com/design/Tgld7guoqW5Uewej60Pfto/Untitled?node-id=0-1&t=ZlQaZDg0PEgX6IPF-1"
 
 draw_io_button:
   widget: button
-  description: "Draw.io"
+  label: "Draw.io"
   icon: "pdf_icon.svg"
+  width: 190
   source: "templates/files/mobile_old.drawio.pdf"
 
 doc_1_button:
   widget: button
   icon: "pdf_icon.svg"
-  description: "Атрибуты"
+  label: "Атрибуты"
+  width: 190
   source: "templates/files/attrs.pdf"
 
 doc_2_button:
   widget: button
   icon: "pdf_icon.svg"
-  description: "Блок запросов"
+  label: "Блок запросов"
+  width: 190
   source: "templates/files/select.pdf"
 
 doc_3_button:
   widget: button
   icon: "pdf_icon.svg"
-  description: "Словари"
+  label: "Словари"
+  width: 190
   source: "templates/files/voc.pdf"
 
 user_guide_1_button:
   widget: button
   icon: "pdf_icon.svg"
-  description: "РП на коленке"
+  label: "РП на коленке"
+  width: 190
   source: "templates/files/atom_util.pdf"
 
 user_guide_2_button:
   widget: button
-  description: "РП от 2019 года"
+  label: "РП от 2019 года"
   icon: "pdf_icon.svg"
+  width: 190
   url: "https://neurochat.pro/upload/user_files/doc/rukovodstvo_polzovatelya.pdf"
 
 step_1:
   widget: button
-  description: "Шаг 1"
+  label: "Шаг 1"
   icon: "pdf_icon.svg"
+  width: 190
   source: "templates/files/step_1.pdf"
 
 step_2:
   widget: button
-  description: "Шаг 2"
+  label: "Шаг 2"
   icon: "pdf_icon.svg"
+  width: 190
   source: "templates/files/step_2.pdf"
 
 step_2_5:
   widget: button
-  description: "Шаг 2,5"
+  label: "Шаг 2,5"
   icon: "pdf_icon.svg"
+  width: 190
   source: "templates/files/step_2_5.pdf"
 
 database_1:
   widget: button
-  description: "Скрипт БД"
+  label: "Скрипт БД"
   icon: "postgres.svg"
+  width: 190
   source: "templates/files/db_vcstudio.sql"
 
 database_2:
   widget: button
-  description: "Процедуры"
+  label: "Процедуры"
   icon: "postgres.svg"
+  width: 190
   source: "templates/files/procedure.sql"
 
 database_3:
   widget: button
-  description: "Триггеры"
+  label: "Триггеры"
   icon: "postgres.svg"
+  width: 190
   source: "templates/files/settings_db.sql"
 
 database_4:
   widget: button
-  description: "ERD full"
+  label: "ERD full"
+  width: 190
   source: "templates/files/erd_full.svg"
 
 database_5:
   widget: button
-  description: "ERD light"
+  label: "ERD light"
+  width: 190
   source: "templates/files/erd_light.svg"
 
 old_workflow:
   widget: button
-  description: "Старый воркфлоу"
+  label: "Старый воркфлоу"
   icon: "pdf_icon.svg"
+  width: 190
   source: "templates/files/old_flow.pdf"
 
 release_notes:
   widget: button
-  description: "Описание релиза"
+  label: "Описание релиза"
   icon: "pdf_icon.svg"
+  width: 190
   source: "templates/files/release_1_19.pdf"
+
+drive2_button:
+  widget: button
+  label: "Drive2"
+  icon: "drive2.png"
+  width: 190
+  url: "https://www.drive2.ru/l/703220425286486413/"
+
+youtube_button:
+  widget: button
+  label: "Обзор Бнв"
+  icon: "youtube.png"
+  width: 190
+  url: "https://www.youtube.com/watch?v=isUCUoMP3ms"
+
+ai_present_button:
+  widget: button
+  label: "Презентация"
+  icon: "pdf_icon.svg"
+  width: 190
+  source: "templates/files/ai_present.pdf"
+
+ai_text_button:
+  widget: button
+  label: "Заметки к презе"
+  width: 190
+  source: "templates/files/ai_text.rtf"

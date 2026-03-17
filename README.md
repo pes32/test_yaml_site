@@ -114,13 +114,13 @@ test_site/
 ### Параметры виджета button
 
 Типы кнопок:
-- **icon-only** — только иконка: `icon`, `hint` (подсказка), без `description`; при необходимости `width` для размера кнопки
-- **icon+text** — иконка и текст: `icon`, `description`
-- **text-only** — только текст: `description`
+- **icon-only** — только иконка: `icon`, `hint` (подсказка), без `label`; при необходимости `width` для размера кнопки
+- **icon+text** — иконка и текст: `icon`, `label`
+- **text-only** — только текст: `label`
 
-- **description** — текст кнопки (для icon+text и text-only)
+- **label** — текст кнопки (для icon+text и text-only)
 - **hint** — подсказка при наведении (для icon-only)
-- **sup_tex** — дополнительный текст под виджетом
+- **sup_text** — дополнительный текст под виджетом
 - **command** — команда (в т.ч. `NAME -ui` для модалки)
 - **url** — URL для перехода (приоритет над command)
 - **dialog** — диалог подтверждения

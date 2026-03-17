@@ -3,6 +3,11 @@
 const { createApp } = Vue;
 
 const app = createApp({
+    provide() {
+        return {
+            getConfirmModal: () => this.$refs.confirmModal
+        };
+    },
     data() {
         return {
             pageConfig: null,
@@ -14,7 +19,9 @@ const app = createApp({
             activeTabIndex: 0,
             loading: true,
             error: null,
-            rootContentOnly: false
+            rootContentOnly: false,
+            collapsedSections: {},
+            collapsingSectionId: null
         };
     },
 
@@ -348,13 +355,26 @@ const app = createApp({
         getWidgetConfig(widgetName) {
             return this.widgets[widgetName] || {
                 widget: 'str',
-                description: widgetName
+                label: widgetName
             };
         },
 
         getSectionCollapseId(sectionIndex) {
             const tabPart = this.activeTabs.length ? this.activeTabIndex : 'content';
             return `page-section-${this.activeMenuIndex}-${tabPart}-${sectionIndex}`;
+        },
+
+        isSectionCollapsed(sectionIndex) {
+            return Boolean(this.collapsedSections[this.getSectionCollapseId(sectionIndex)]);
+        },
+
+        toggleSectionCollapse(sectionIndex) {
+            const id = this.getSectionCollapseId(sectionIndex);
+            this.collapsingSectionId = id;
+            this.collapsedSections = { ...this.collapsedSections, [id]: !this.collapsedSections[id] };
+            setTimeout(() => {
+                this.collapsingSectionId = null;
+            }, 350);
         },
 
         isFontIcon(icon) {
@@ -414,10 +434,8 @@ const app = createApp({
             const alertType = type || 'info';
             const alertDiv = document.createElement('div');
             alertDiv.className = `alert alert-${alertType} alert-dismissible fade show`;
-            alertDiv.innerHTML = `
-                ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            `;
+            alertDiv.innerHTML = `${message}<button type="button" class="btn-close" aria-label="Закрыть"></button>`;
+            alertDiv.querySelector('.btn-close').addEventListener('click', () => alertDiv.remove());
 
             const container = document.querySelector('.page-content-column')
                 || document.querySelector('.container-fluid');
@@ -438,4 +456,5 @@ const app = createApp({
 app.component('widget-renderer', WidgetRenderer);
 app.component('modal-manager', ModalManager);
 app.component('modal-buttons', ModalButtons);
+app.component('confirm-modal', ConfirmModal);
 app.mount('#app');

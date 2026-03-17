@@ -1,6 +1,7 @@
 // Виджет для кнопок (button)
 
 const ButtonWidget = {
+    inject: { getConfirmModal: { from: 'getConfirmModal', default: () => null } },
     props: {
         widgetConfig: {
             type: Object,
@@ -31,12 +32,12 @@ const ButtonWidget = {
                 <i v-else-if="widgetConfig.icon && widgetConfig.icon.startsWith('fas')" 
                    :class="widgetConfig.icon"></i>
                 <!-- Текст: при icon+text или text-only -->
-                <span v-if="widgetConfig.description" 
-                      v-text="widgetConfig.description"></span>
+                <span v-if="widgetConfig.label" 
+                      v-text="widgetConfig.label"></span>
             </button>
             
-            <div v-if="widgetConfig.sup_tex" class="widget-info">
-                <span v-text="widgetConfig.sup_tex"></span>
+            <div v-if="widgetConfig.sup_text" class="widget-info">
+                <span v-text="widgetConfig.sup_text"></span>
             </div>
         </div>
     `,
@@ -47,11 +48,11 @@ const ButtonWidget = {
     },
     computed: {
         isIconOnly() {
-            return Boolean(this.widgetConfig.icon && !this.widgetConfig.description);
+            return Boolean(this.widgetConfig.icon && !this.widgetConfig.label);
         },
         buttonTitle() {
             if (this.isIconOnly && this.widgetConfig.hint) return this.widgetConfig.hint;
-            if (this.widgetConfig.description) return this.widgetConfig.description;
+            if (this.widgetConfig.label) return this.widgetConfig.label;
             return 'Кнопка';
         },
         iconStyle() {
@@ -65,14 +66,23 @@ const ButtonWidget = {
             };
         },
         buttonStyle() {
-            // Кнопка только с иконкой: высота 40px, ширина из width или 40 (квадрат)
+            const w = this.widgetConfig.width || this.widgetConfig.size;
             if (this.isIconOnly) {
-                const w = this.widgetConfig.width || this.widgetConfig.size || 40;
+                const widthVal = w || 40;
                 const pad = Math.max(0, Math.floor((40 - 24) / 2));
                 return {
-                    width: `${w}px`,
-                    minWidth: `${w}px`,
+                    width: `${widthVal}px`,
+                    minWidth: `${widthVal}px`,
                     padding: `${pad}px`
+                };
+            }
+            // Кнопка с текстом и иконкой: width задаёт ширину
+            if (w != null && w !== '') {
+                const widthVal = typeof w === 'number' ? `${w}px` : String(w);
+                return {
+                    width: widthVal,
+                    justifyContent: 'flex-start',
+                    textAlign: 'left'
                 };
             }
             return {};
@@ -112,32 +122,25 @@ const ButtonWidget = {
         },
         
         showConfirmDialog() {
-            const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
-            const title = document.getElementById('confirmModalTitle');
-            const body = document.getElementById('confirmModalBody');
-            const acceptBtn = document.getElementById('confirmModalAccept');
-            const cancelBtn = document.getElementById('confirmModalCancel');
+            const getModal = this.getConfirmModal;
+            if (!getModal) return;
+            const modal = getModal();
+            if (!modal) return;
+
             const d = this.widgetConfig.dialog || {};
-
-            title.textContent = d.title || 'Подтверждение';
-            body.textContent = d.text || 'Вы уверены?';
-
-            acceptBtn.textContent = d.accept || 'Подтвердить';
-            cancelBtn.textContent = d.cancel || 'Отмена';
-
-            // Обработчик для кнопки подтверждения — выполняем действие (url или command)
-            const handleAccept = () => {
-                modal.hide();
-                acceptBtn.removeEventListener('click', handleAccept);
+            modal._acceptHandler = () => {
                 if (this.widgetConfig.url) {
                     window.location.href = this.widgetConfig.url;
                 } else if (this.widgetConfig.command) {
                     this.executeCommand();
                 }
             };
-
-            acceptBtn.addEventListener('click', handleAccept);
-            modal.show();
+            modal.open({
+                title: d.title || 'Подтверждение',
+                text: d.text || 'Вы уверены?',
+                accept: d.accept || 'Подтвердить',
+                cancel: d.cancel || 'Отмена'
+            });
         },
         
         executeCommand() {

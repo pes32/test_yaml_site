@@ -49,7 +49,6 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
             {
                 "name": name,
                 "title": cfg.get("title", name),
-                "description": cfg.get("description", ""),
                 "url": cfg.get("url", f"/page/{name}"),
             }
             for name, cfg in snapshot["pages"].items()

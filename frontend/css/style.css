@@ -491,8 +491,9 @@ body {
     flex: 0 0 auto;
     width: 100%;
     min-width: 80px;
-    min-height: 80px;
-    padding: 16px 16px 8px;
+    min-height: 2.5em;
+    padding: 8px 16px 8px 16px;
+    line-height: 24px;
     border: none;
     background: transparent;
     font-size: 16px;
@@ -523,7 +524,8 @@ body {
     font-weight: 400;
     color: #707579;
     pointer-events: none;
-    transition: transform 0.2s, font-size 0.2s, color 0.2s;
+    transition: transform 0.2s ease, font-size 0.2s ease, color 0.2s ease, top 0.2s ease;
+    will-change: transform;
 }
 
 .md3-field-wrap.filled label,
@@ -547,18 +549,13 @@ body {
     margin-left: -4px;
 }
 
+
 .md3-field-wrap:has(textarea) {
-    align-items: flex-start;
+    align-items: center;
     overflow: visible;
 }
 
-/* textarea: label выше поля, когда не floating (отличие от однострочных) */
-.md3-field-wrap:has(textarea) label {
-    top: 18px;
-    transform: none;
-}
-
-/* sup_tex: пусто — #707579, заполнено — #474747; 12px */
+/* sup_text: пусто — #707579, заполнено — #474747; 12px */
 .md3-supporting {
     font-size: 12px;
     font-weight: 400;
@@ -599,7 +596,8 @@ body {
     background: var(--md3-bg);
 }
 
-.md3-field-wrap.widget-readonly .md3-supporting {
+/* sup_text серый при readonly */
+.md3-field:has(.md3-field-wrap.widget-readonly) .md3-supporting {
     color: #707579;
 }
 
@@ -992,6 +990,56 @@ html {
     transform: rotate(-90deg);
 }
 
+/* Анимация разворачивания/сворачивания блока (grid на wrapper — граница поднимается плавно) */
+.page-section-card .collapse,
+.card .collapse {
+    display: block;
+    overflow: hidden;
+}
+
+.collapse-inner {
+    display: grid;
+    grid-template-rows: 1fr;
+}
+
+.collapse-inner.collapse-animating {
+    transition: grid-template-rows 0.35s ease-out;
+}
+
+.page-section-card .collapse:not(.show) .collapse-inner,
+.card .collapse:not(.show) .collapse-inner {
+    grid-template-rows: 0fr;
+}
+
+.collapse-inner > * {
+    overflow: hidden;
+    min-height: 0;
+}
+
+/* Дочерние элементы должны сжиматься (flex/grid min-height: auto по умолчанию) */
+.collapse-inner .row,
+.collapse-inner .card-body,
+.collapse-inner .page-section-body {
+    min-height: 0;
+}
+
+/* Плавное «схлопывание» padding и border вместе с grid — только при явном сворачивании */
+.collapse-inner.collapse-animating .page-section-body,
+.collapse-inner.collapse-animating .card-body {
+    transition: padding 0.35s ease-out, border-width 0.35s ease-out;
+}
+
+.page-section-card .collapse:not(.show) .collapse-inner .page-section-body,
+.card .collapse:not(.show) .collapse-inner .page-section-body,
+.page-section-card .collapse:not(.show) .collapse-inner .card-body,
+.card .collapse:not(.show) .collapse-inner .card-body {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    border-left-width: 0 !important;
+    border-right-width: 0 !important;
+    border-bottom-width: 0 !important;
+}
+
 /* Отступ стрелки в заголовке секции */
 .card-header .collapse-icon {
     margin-right: 0;
@@ -1056,13 +1104,19 @@ html {
     max-width: 320px;
 }
 
+/* width из YAML: str, int, float, list, ip — input заполняет контейнер */
+.row .col-auto .widget-container.widget-explicit-width .md3-field-wrap input,
+.row .col-auto .widget-container.widget-explicit-width .widget-dropdown .dropdown-toggle {
+    width: 100% !important;
+}
+
 /* textarea (виджет text): своя ширина из width, разрешён resize */
 .widget-container:has(textarea) .md3-field,
 .widget-container:has(textarea) .md3-textarea-wrap {
     max-width: none;
 }
 
-/* width из YAML: рамка (md3-field-wrap) подстраивается под textarea в обе стороны */
+/* width из YAML: рамка и wrap подстраиваются под textarea (fit-content для resize) */
 .widget-container.widget-explicit-width:has(textarea) .md3-field-wrap {
     width: fit-content;
 }
@@ -1179,13 +1233,12 @@ html {
     overflow-y: auto;
 }
 
-/* Диалог подтверждения: шире на 50px */
-#confirmModal .modal-dialog {
+/* Диалог подтверждения (Vue ConfirmModal) */
+.confirm-modal-content {
     max-width: 550px;
 }
 
-/* Текст диалога подтверждения: \n отображается как перенос строки */
-#confirmModalBody {
+.confirm-modal-content .modal-body {
     white-space: pre-line;
 }
 

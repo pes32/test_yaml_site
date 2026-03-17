@@ -1,5 +1,5 @@
 (function () {
-    const META_KEYS = new Set(['url', 'title', 'description']);
+    const META_KEYS = new Set(['url', 'title']);
 
     function parseDynamicKey(rawKey) {
         const key = String(rawKey || '').trim();

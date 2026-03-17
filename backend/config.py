@@ -137,7 +137,6 @@ def load_page_config(page_path: str, page_name: str) -> Dict[str, Any]:
         "name": page_name,
         "url": url,
         "title": gui.get("title", page_name),
-        "description": gui.get("description", ""),
         "gui": gui,
         "attrs": attrs,
     }

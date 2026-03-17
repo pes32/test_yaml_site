@@ -92,7 +92,7 @@ const ModalButtons = {
             // Создаем стандартную конфигурацию для кнопки закрытия
             return {
                 widget: 'button',
-                description: 'Закрыть',
+                label: 'Закрыть',
                 command: 'CLOSE_MODAL'
             };
         },
@@ -111,7 +111,9 @@ const ModalManager = {
         return {
             showModal: false,
             modalConfig: null,
-            activeTabIndex: 0
+            activeTabIndex: 0,
+            collapsedModalSections: {},
+            collapsingModalSectionId: null
         };
     },
     mounted() {
@@ -163,8 +165,8 @@ const ModalManager = {
                                     <div class="card">
                                         <div v-if="section.showHeader"
                                              class="card-header"
-                                             :data-bs-toggle="section.collapsible ? 'collapse' : null"
-                                             :data-bs-target="section.collapsible ? ('#' + getModalSectionCollapseId(sidx)) : null"
+                                             :class="{ collapsed: section.collapsible && isModalSectionCollapsed(sidx) }"
+                                             @click="section.collapsible ? toggleModalSectionCollapse(sidx) : null"
                                              :style="section.collapsible ? 'cursor: pointer;' : ''">
                                             <h6 class="mb-0 d-flex align-items-center">
                                                 <img v-if="section.collapsible"
@@ -182,8 +184,9 @@ const ModalManager = {
                                             </h6>
                                         </div>
 
-                                        <div :class="section.collapsible ? 'collapse show' : ''"
+                                        <div :class="section.collapsible ? ('collapse ' + (isModalSectionCollapsed(sidx) ? '' : 'show')) : ''"
                                              :id="section.collapsible ? getModalSectionCollapseId(sidx) : null">
+                                            <div class="collapse-inner" :class="{ 'collapse-animating': section.collapsible && collapsingModalSectionId === getModalSectionCollapseId(sidx) }">
                                             <div class="card-body">
                                                 <div v-for="(row, rowIndex) in section.rows" :key="rowIndex" class="row mb-2">
                                                     <div v-if="typeof row === 'string'" class="col-12">
@@ -216,6 +219,7 @@ const ModalManager = {
                                                         </div>
                                                     </div>
                                                 </div>
+                                            </div>
                                             </div>
                                         </div>
                                     </div>
@@ -281,6 +285,24 @@ const ModalManager = {
             this.activeTabIndex = index;
         },
 
+        getModalSectionCollapseId(sectionIndex) {
+            const tabPart = this.modalTabs.length ? this.activeTabIndex : 'content';
+            return `modal-section-${tabPart}-${sectionIndex}`;
+        },
+
+        isModalSectionCollapsed(sectionIndex) {
+            return Boolean(this.collapsedModalSections[this.getModalSectionCollapseId(sectionIndex)]);
+        },
+
+        toggleModalSectionCollapse(sectionIndex) {
+            const id = this.getModalSectionCollapseId(sectionIndex);
+            this.collapsingModalSectionId = id;
+            this.collapsedModalSections = { ...this.collapsedModalSections, [id]: !this.collapsedModalSections[id] };
+            setTimeout(() => {
+                this.collapsingModalSectionId = null;
+            }, 350);
+        },
+
         getParsedGui() {
             if (!window.pageData || !window.pageData.pageConfig || !window.GuiParser) {
                 return { menus: [], modals: {} };
@@ -328,12 +350,12 @@ const ModalManager = {
             if (window.pageData && window.pageData.allAttrs) {
                 return window.pageData.allAttrs[widgetName] || {
                     widget: 'str',
-                    description: widgetName
+                    label: widgetName
                 };
                 }
             return {
                 widget: 'str',
-                description: widgetName
+                label: widgetName
             };
         },
         

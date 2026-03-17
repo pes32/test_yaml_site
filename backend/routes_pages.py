@@ -7,7 +7,7 @@ from typing import Any
 from flask import abort, render_template, request
 
 
-META_KEYS = frozenset({"url", "title", "description"})
+META_KEYS = frozenset({"url", "title"})
 
 
 def register_page_routes(app, config_service):

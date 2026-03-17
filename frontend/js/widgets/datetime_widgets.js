@@ -15,7 +15,7 @@ const DateTimeWidget = {
             :label-floats="labelFloats"
             :is-focused="isFocused"
             :wrap-extra="{ 'md3-datetime-wrap': true }"
-            :has-supporting="!!widgetConfig.sup_tex">
+            :has-supporting="!!widgetConfig.sup_text">
             <div class="widget-datetime">
                 <input type="date"
                        class="form-control"
@@ -35,7 +35,7 @@ const DateTimeWidget = {
                        @blur="isFocused = false">
             </div>
             <template #supporting>
-                <span v-text="widgetConfig.sup_tex"></span>
+                <span v-text="widgetConfig.sup_text"></span>
             </template>
         </md3-field>
     `,
@@ -97,7 +97,7 @@ const DateWidget = {
             :label-floats="labelFloats"
             :is-focused="isFocused"
             :wrap-extra="{}"
-            :has-supporting="!!widgetConfig.sup_tex">
+            :has-supporting="!!widgetConfig.sup_text">
             <input type="date"
                    class="form-control"
                    :disabled="widgetConfig.readonly"
@@ -107,7 +107,7 @@ const DateWidget = {
                    @focus="isFocused = true"
                    @blur="isFocused = false">
             <template #supporting>
-                <span v-text="widgetConfig.sup_tex"></span>
+                <span v-text="widgetConfig.sup_text"></span>
             </template>
         </md3-field>
     `,
@@ -147,7 +147,7 @@ const TimeWidget = {
             :label-floats="labelFloats"
             :is-focused="isFocused"
             :wrap-extra="{}"
-            :has-supporting="!!widgetConfig.sup_tex">
+            :has-supporting="!!widgetConfig.sup_text">
             <input type="time"
                    class="form-control"
                    :disabled="widgetConfig.readonly"
@@ -157,7 +157,7 @@ const TimeWidget = {
                    @focus="isFocused = true"
                    @blur="isFocused = false">
             <template #supporting>
-                <span v-text="widgetConfig.sup_tex"></span>
+                <span v-text="widgetConfig.sup_text"></span>
             </template>
         </md3-field>
     `,

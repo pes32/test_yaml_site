@@ -1,11 +1,11 @@
 system_button:
   widget: button
-  description: "Смотреть систему"
-  url: "/system_demo"
-  sup_tex: "Тык-тык"
+  label: "Смотреть систему"
+  url: "/ui_demo"
+  sup_text: "Тык-тык"
 
 author_button:
   widget: button
-  description: "Обзор Создателя"
+  label: "Обзор Создателя"
   url: "/about_author"
-  sup_tex: "Ловите рептилойда!"
+  sup_text: "Ловите рептилойда!"

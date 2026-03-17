@@ -15,24 +15,21 @@ const ListWidget = {
             :label-floats="labelFloats"
             :is-focused="isDropdownOpen"
             :wrap-extra="{ 'md3-dropdown-wrap': true }"
-            :has-supporting="!!widgetConfig.sup_tex"
-            @focusin="isDropdownOpen = true"
+            :has-supporting="!!widgetConfig.sup_text"
             @focusout="onListFocusOut"
             @container-focusout="onFocusOut">
             <div class="dropdown widget-dropdown" ref="dropdownRoot">
                 <button class="btn md3-dropdown-toggle dropdown-toggle"
                         type="button"
-                        data-bs-toggle="dropdown"
-                        :data-bs-auto-close="widgetConfig.multiselect ? 'outside' : true"
-                        data-bs-container="body"
-                        aria-expanded="false"
+                        :aria-expanded="isDropdownOpen"
                         ref="dropdownToggle"
+                        @click.prevent="toggleDropdown"
                         :disabled="widgetConfig.readonly"
                         :tabindex="widgetConfig.readonly ? -1 : null"
                         :title="getDisplayValue()">
                     <span v-text="getDisplayValue()"></span>
                 </button>
-                <ul class="dropdown-menu widget-dd-menu" @keydown.tab="onTab">
+                <ul class="dropdown-menu widget-dd-menu" :class="{ show: isDropdownOpen }" @keydown.tab="onTab">
                     <li v-for="item in listSource" :key="item">
                         <a class="dropdown-item"
                            href="#"
@@ -45,7 +42,7 @@ const ListWidget = {
                 </ul>
             </div>
             <template #supporting>
-                <span v-text="widgetConfig.sup_tex"></span>
+                <span v-text="widgetConfig.sup_text"></span>
             </template>
         </md3-field>
     `,
@@ -115,17 +112,39 @@ const ListWidget = {
             if (this.widgetConfig.multiselect) {
                 return (Array.isArray(this.value) && this.value.length > 0)
                     ? this.value.join(', ')
-                    : 'Выберите элементы';
+                    : (this.isDropdownOpen && this.widgetConfig.placeholder ? this.widgetConfig.placeholder : 'Выберите элементы');
             }
-            return this.value || 'Выберите элемент';
+            return this.value || (this.isDropdownOpen && this.widgetConfig.placeholder ? this.widgetConfig.placeholder : 'Выберите элемент');
+        },
+        toggleDropdown() {
+            if (this.widgetConfig.readonly) return;
+            this.isDropdownOpen = !this.isDropdownOpen;
+            if (this.isDropdownOpen) {
+                this.$nextTick(() => this.addClickOutsideListener());
+            } else {
+                this.removeClickOutsideListener();
+            }
         },
         closeDropdown() {
-            const toggle = this.$refs.dropdownToggle;
-            if (toggle) {
-                const dropdown = bootstrap.Dropdown.getOrCreateInstance(toggle, {
-                    autoClose: this.widgetConfig.multiselect ? 'outside' : true
-                });
-                dropdown.hide();
+            if (this.isDropdownOpen) {
+                this.isDropdownOpen = false;
+                this.removeClickOutsideListener();
+            }
+        },
+        addClickOutsideListener() {
+            this.removeClickOutsideListener();
+            this._clickOutside = (e) => {
+                const root = this.$refs.dropdownRoot;
+                if (root && !root.contains(e.target)) {
+                    this.closeDropdown();
+                }
+            };
+            setTimeout(() => document.addEventListener('click', this._clickOutside), 0);
+        },
+        removeClickOutsideListener() {
+            if (this._clickOutside) {
+                document.removeEventListener('click', this._clickOutside);
+                this._clickOutside = null;
             }
         },
         onTab() {
@@ -143,7 +162,7 @@ const ListWidget = {
             setTimeout(() => {
                 const root = this.$refs.dropdownRoot;
                 if (!root || root.contains(document.activeElement)) return;
-                this.isDropdownOpen = false;
+                this.closeDropdown();
             }, 0);
         },
         setValue(value) { this.value = value; },

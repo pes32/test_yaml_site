@@ -7,17 +7,17 @@ const ImgWidget = {
     },
     template: `
         <div class="widget-container widget-img">
-            <div v-if="widgetConfig.description" class="widget-img-description">
-                <span v-text="widgetConfig.description"></span>
+            <div v-if="widgetConfig.label" class="widget-img-description">
+                <span v-text="widgetConfig.label"></span>
             </div>
             <img v-if="imageSrc"
                  :src="imageSrc"
-                 :alt="widgetConfig.description || ''"
+                 :alt="widgetConfig.label || ''"
                  :style="imgStyle"
                  class="widget-img-element"
                  @error="onImageError">
-            <div v-if="widgetConfig.sup_tex" class="widget-img-sup">
-                <span v-text="widgetConfig.sup_tex"></span>
+            <div v-if="widgetConfig.sup_text" class="widget-img-sup">
+                <span v-text="widgetConfig.sup_text"></span>
             </div>
         </div>
     `,

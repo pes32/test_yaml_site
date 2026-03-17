@@ -5,6 +5,10 @@ const { createApp } = Vue;
 const debugApp = createApp({
     data() {
         return {
+            activeDebugTab: 0,
+            restSubTab: 0,
+            sqlSubTab: 0,
+            pythonSubTab: 0,
             // API tab
             backendStructure: null,
             modules: [],
@@ -50,6 +54,12 @@ const debugApp = createApp({
         }
     },
     methods: {
+        setDebugTab(index) {
+            this.activeDebugTab = index;
+        },
+        setRestSubTab(i) { this.restSubTab = i; },
+        setSqlSubTab(i) { this.sqlSubTab = i; },
+        setPythonSubTab(i) { this.pythonSubTab = i; },
         async loadBackendStructure() {
             try {
                 const res = await fetch('/api/debug/structure');

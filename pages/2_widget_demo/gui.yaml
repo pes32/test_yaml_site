@@ -1,7 +1,6 @@
 # Синтаксис gui.yaml (краткая шпаргалка)
 # url: "/"
-# title: "Название страницы"
-# description: "Описание страницы"
+# title: "Заголовок страницы" - Виден на вкладке браузера и в заголовке страницы
 # menu "Название меню":
 #   - icon: "icon.svg"
 #   - tab "Название вкладки":
@@ -22,7 +21,9 @@
 
 # GUI для главной страницы - демонстрация всех виджетов
 
-url: "/demo"
+title: "Виджеты"
+
+url: "/widget_demo"
 
 menu "Строковые виджеты":
   - icon: "test.svg"
@@ -32,16 +33,20 @@ menu "Строковые виджеты":
 
     - collapse "Строковые виджеты":
       - icon: "test.svg"
-      - row: demo_string, demo_text
+      - row: str_1, str_2, str_3, str_4
+      - row: text_1, text_2, text_3, text_4
 
     - box "Числовые виджеты (статичный блок)":
       - icon: "test.svg"
       - row: demo_int, demo_float
 
     - box:
-        - "Это примеры для readonly"
-        - row: demo_readonly
-        - row: demo_int_readonly, demo_float_readonly
+      - "Это просто текст и кнопка в box без рамки"
+      - row: demo_readonly
+
+    - "Это примеры для readonly без рамки"
+    - row: demo_readonly
+    - row: demo_int_readonly, demo_float_readonly
 
     - collapse "Списки":
       - row: demo_list, demo_multiselect

@@ -14,8 +14,8 @@ const ModalWidget = {
     emits: ['execute'],
     template: `
         <div class="widget-container">
-            <div v-if="widgetConfig.description" class="widget-label">
-                <span v-text="widgetConfig.description"></span>
+            <div v-if="widgetConfig.label" class="widget-label">
+                <span v-text="widgetConfig.label"></span>
             </div>
 
             <button
@@ -29,7 +29,7 @@ const ModalWidget = {
                          @error="onIconError">
                     <i v-else :class="widgetConfig.icon"></i>
                 </span>
-                <span v-text="widgetConfig.description || 'Открыть'"></span>
+                <span v-text="widgetConfig.label || 'Открыть'"></span>
             </button>
         </div>
     `,

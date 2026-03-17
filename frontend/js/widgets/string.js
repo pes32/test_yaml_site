@@ -14,10 +14,11 @@ const StringWidget = {
             :has-value="hasValue"
             :label-floats="labelFloats"
             :is-focused="isFocused"
-            :wrap-extra="{ error: false }"
-            :has-supporting="!!widgetConfig.sup_tex">
+            :wrap-extra="{ error: !!regexError }"
+            :has-supporting="!!(widgetConfig.sup_text || regexError)">
             <input type="text"
                    class="form-control"
+                   :placeholder="showPlaceholder ? widgetConfig.placeholder : ''"
                    :disabled="widgetConfig.readonly"
                    :tabindex="widgetConfig.readonly ? -1 : null"
                    v-model="value"
@@ -26,19 +27,39 @@ const StringWidget = {
                    @focus="isFocused = true"
                    @blur="isFocused = false">
             <template #supporting>
-                <span v-text="widgetConfig.sup_tex"></span>
+                <span v-if="regexError" class="md3-error" v-text="regexError"></span>
+                <span v-else v-text="widgetConfig.sup_text"></span>
             </template>
         </md3-field>
     `,
     data() {
-        return { value: '', isFocused: false };
+        return { value: '', regexError: '', isFocused: false };
     },
     computed: {
         hasValue() { return Boolean(this.value); },
-        labelFloats() { return this.hasValue || this.isFocused; }
+        labelFloats() { return this.hasValue || this.isFocused; },
+        showPlaceholder() { return !this.hasValue && this.isFocused && this.widgetConfig.placeholder; }
     },
     methods: {
-        onInput() { this.emitInput(this.value); },
+        validateRegex() {
+            const regex = this.widgetConfig.regex;
+            if (!regex || this.widgetConfig.readonly) {
+                this.regexError = '';
+                return;
+            }
+            try {
+                const re = typeof regex === 'string' ? new RegExp(regex) : regex;
+                this.regexError = (this.value !== '' && !re.test(this.value))
+                    ? (this.widgetConfig.err_text || 'Неверный формат')
+                    : '';
+            } catch {
+                this.regexError = '';
+            }
+        },
+        onInput() {
+            this.validateRegex();
+            this.emitInput(this.value);
+        },
         setValue(value) { this.value = value; },
         getValue() { return this.value; }
     },
@@ -46,6 +67,7 @@ const StringWidget = {
         if (this.widgetConfig.default !== undefined) {
             this.value = this.widgetConfig.default;
         }
+        this.validateRegex();
     }
 };
 

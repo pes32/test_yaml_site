@@ -13,6 +13,8 @@
     <div id="app">
         <!-- Глобальный модальный менеджер -->
         <modal-manager ref="modalManager"></modal-manager>
+        <!-- Диалог подтверждения -->
+        <confirm-modal ref="confirmModal"></confirm-modal>
         
         <!-- Навигация -->
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
@@ -85,9 +87,9 @@
                                     <div class="card page-section-card">
                                         <div v-if="section.showHeader"
                                              class="card-header page-section-header"
+                                             :class="{ collapsed: section.collapsible && isSectionCollapsed(sidx) }"
                                              :id="'heading-' + activeMenuIndex + '-' + sidx"
-                                             :data-bs-toggle="section.collapsible ? 'collapse' : null"
-                                             :data-bs-target="section.collapsible ? ('#' + getSectionCollapseId(sidx)) : null"
+                                             @click="section.collapsible ? toggleSectionCollapse(sidx) : null"
                                              :style="section.collapsible ? 'cursor: pointer;' : ''">
                                             <h5 class="mb-0 d-flex align-items-center page-section-title">
                                                 <span class="page-section-arrow-slot">
@@ -107,8 +109,9 @@
                                             </h5>
                                         </div>
 
-                                        <div :class="section.collapsible ? 'collapse show' : ''"
+                                        <div :class="section.collapsible ? ('collapse ' + (isSectionCollapsed(sidx) ? '' : 'show')) : ''"
                                              :id="section.collapsible ? getSectionCollapseId(sidx) : null">
+                                            <div class="collapse-inner" :class="{ 'collapse-animating': section.collapsible && collapsingSectionId === getSectionCollapseId(sidx) }">
                                             <div class="card-body page-section-body">
                                                 <div v-for="(row, rowIndex) in section.rows" :key="rowIndex" class="row mb-2">
                                                     <div v-if="typeof row === 'string'" class="col-12">
@@ -142,6 +145,7 @@
                                                     </div>
                                                 </div>
                                             </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -157,26 +161,6 @@
         </div>
     </div>
 
-    <!-- Модальные окна -->
-    <div class="modal fade" id="confirmModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="confirmModalTitle">Подтверждение</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body" id="confirmModalBody">
-                    Вы уверены, что хотите выполнить это действие?
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" id="confirmModalCancel" data-bs-dismiss="modal">Отмена</button>
-                    <button type="button" class="btn btn-primary" id="confirmModalAccept">Подтвердить</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script src="{{ url_for('static', filename='js/vendor/bootstrap.bundle.min.js') }}?v={{ ASSETS_VERSION }}"></script>
     <script src="{{ url_for('static', filename='js/vendor/vue.global.js') }}?v={{ ASSETS_VERSION }}"></script>
     <!-- Передаем данные страницы без смешивания Jinja и JS -->
     <script id="page-data" type="application/json">
@@ -201,6 +185,7 @@
     <script src="{{ url_for('static', filename='js/widgets/img.js') }}?v={{ ASSETS_VERSION }}"></script>
     <script src="{{ url_for('static', filename='js/gui_parser.js') }}?v={{ ASSETS_VERSION }}"></script>
     <script src="{{ url_for('static', filename='js/widgets/modal.js') }}?v={{ ASSETS_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/widgets/confirm_modal.js') }}?v={{ ASSETS_VERSION }}"></script>
     <script src="{{ url_for('static', filename='js/widgets/factory.js') }}?v={{ ASSETS_VERSION }}"></script>
     <script src="{{ url_for('static', filename='js/widgets.js') }}?v={{ ASSETS_VERSION }}"></script>
     <script src="{{ url_for('static', filename='js/page.js') }}?v={{ ASSETS_VERSION }}"></script>

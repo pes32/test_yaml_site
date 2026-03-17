@@ -38,31 +38,30 @@
         </nav>
 
         <div class="container-fluid mt-3">
-            <!-- Вкладки дебаг-панели -->
+            <!-- Вкладки дебаг-панели (Vue) -->
             <ul class="nav nav-tabs" id="debugTabs" role="tablist">
-                <!-- Страницы — первая и активная -->
                 <li class="nav-item">
-                    <a class="nav-link active" id="pages-tab" data-bs-toggle="tab" href="#pages" role="tab">
+                    <a class="nav-link" :class="{ active: activeDebugTab === 0 }" href="#" role="tab" @click.prevent="setDebugTab(0)">
                         <i class="fas fa-sitemap"></i> Страницы
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" id="api-tab" data-bs-toggle="tab" href="#api" role="tab">
+                    <a class="nav-link" :class="{ active: activeDebugTab === 1 }" href="#" role="tab" @click.prevent="setDebugTab(1)">
                         <i class="fas fa-cogs"></i> API
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" id="log-tab" data-bs-toggle="tab" href="#log" role="tab">
+                    <a class="nav-link" :class="{ active: activeDebugTab === 2 }" href="#" role="tab" @click.prevent="setDebugTab(2)">
                         <i class="fas fa-list"></i> Log
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" id="rest-tab" data-bs-toggle="tab" href="#rest" role="tab">
+                    <a class="nav-link" :class="{ active: activeDebugTab === 3 }" href="#" role="tab" @click.prevent="setDebugTab(3)">
                         <i class="fas fa-globe"></i> REST
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" id="sql-tab" data-bs-toggle="tab" href="#sql" role="tab">
+                    <a class="nav-link" :class="{ active: activeDebugTab === 4 }" href="#" role="tab" @click.prevent="setDebugTab(4)">
                         <i class="fas fa-database"></i> SQL
                     </a>
                 </li>
@@ -70,8 +69,8 @@
 
             <!-- Содержимое вкладок -->
             <div class="tab-content mt-3" id="debugTabContent">
-                <!-- Вкладка Страницы (первая и активная) -->
-                <div class="tab-pane fade show active" id="pages" role="tabpanel">
+                <!-- Вкладка Страницы -->
+                <div class="tab-pane fade" :class="{ active: activeDebugTab === 0, show: activeDebugTab === 0 }" id="pages" role="tabpanel">
                     <div class="card">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h5>Список страниц</h5>
@@ -93,7 +92,7 @@
                 </div>
 
                 <!-- Вкладка API -->
-                <div class="tab-pane fade" id="api" role="tabpanel">
+                <div class="tab-pane fade" :class="{ active: activeDebugTab === 1, show: activeDebugTab === 1 }" id="api" role="tabpanel">
                     <div class="card">
                         <div class="card-header">
                             <h5>Структура Backend API</h5>
@@ -105,7 +104,7 @@
                 </div>
 
                 <!-- Вкладка Log -->
-                <div class="tab-pane fade" id="log" role="tabpanel">
+                <div class="tab-pane fade" :class="{ active: activeDebugTab === 2, show: activeDebugTab === 2 }" id="log" role="tabpanel">
                     <div class="card">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h5>Логи системы</h5>
@@ -134,7 +133,7 @@
                 </div>
 
                 <!-- Вкладка REST -->
-                <div class="tab-pane fade" id="rest" role="tabpanel">
+                <div class="tab-pane fade" :class="{ active: activeDebugTab === 3, show: activeDebugTab === 3 }" id="rest" role="tabpanel">
                     <div class="card">
                         <div class="card-header">
                             <h5>REST API Тестер</h5>
@@ -180,17 +179,17 @@
                                         <label class="form-label">Ответ:</label>
                                         <ul class="nav nav-tabs" role="tablist">
                                             <li class="nav-item">
-                                                <a class="nav-link active" data-bs-toggle="tab" href="#restRaw">Raw</a>
+                                                <a class="nav-link" :class="{ active: restSubTab === 0 }" href="#" @click.prevent="setRestSubTab(0)">Raw</a>
                                             </li>
                                             <li class="nav-item">
-                                                <a class="nav-link" data-bs-toggle="tab" href="#restTable">Table</a>
+                                                <a class="nav-link" :class="{ active: restSubTab === 1 }" href="#" @click.prevent="setRestSubTab(1)">Table</a>
                                             </li>
                                         </ul>
                                         <div class="tab-content">
-                                            <div class="tab-pane fade show active" id="restRaw">
+                                            <div class="tab-pane fade" :class="{ active: restSubTab === 0, show: restSubTab === 0 }">
                                                 <pre class="mt-2" v-text="restResponse"></pre>
                                             </div>
-                                            <div class="tab-pane fade" id="restTable">
+                                            <div class="tab-pane fade" :class="{ active: restSubTab === 1, show: restSubTab === 1 }">
                                                 <div class="mt-2" v-html="restResponseTable"></div>
                                             </div>
                                         </div>
@@ -202,7 +201,7 @@
                 </div>
 
                 <!-- Вкладка SQL -->
-                <div class="tab-pane fade" id="sql" role="tabpanel">
+                <div class="tab-pane fade" :class="{ active: activeDebugTab === 4, show: activeDebugTab === 4 }" id="sql" role="tabpanel">
                     <div class="card">
                         <div class="card-header">
                             <h5>SQL Выполнение</h5>
@@ -232,17 +231,17 @@
                                         <label class="form-label">Результат:</label>
                                         <ul class="nav nav-tabs" role="tablist">
                                             <li class="nav-item">
-                                                <a class="nav-link active" data-bs-toggle="tab" href="#sqlRaw">Raw</a>
+                                                <a class="nav-link" :class="{ active: sqlSubTab === 0 }" href="#" @click.prevent="setSqlSubTab(0)">Raw</a>
                                             </li>
                                             <li class="nav-item">
-                                                <a class="nav-link" data-bs-toggle="tab" href="#sqlTable">Table</a>
+                                                <a class="nav-link" :class="{ active: sqlSubTab === 1 }" href="#" @click.prevent="setSqlSubTab(1)">Table</a>
                                             </li>
                                         </ul>
                                         <div class="tab-content">
-                                            <div class="tab-pane fade show active" id="sqlRaw">
+                                            <div class="tab-pane fade" :class="{ active: sqlSubTab === 0, show: sqlSubTab === 0 }">
                                                 <pre class="mt-2" v-text="sqlResult"></pre>
                                             </div>
-                                            <div class="tab-pane fade" id="sqlTable">
+                                            <div class="tab-pane fade" :class="{ active: sqlSubTab === 1, show: sqlSubTab === 1 }">
                                                 <div class="mt-2" v-html="sqlResultTable"></div>
                                             </div>
                                         </div>
@@ -275,17 +274,17 @@
                                         <label class="form-label">Результат:</label>
                                         <ul class="nav nav-tabs" role="tablist">
                                             <li class="nav-item">
-                                                <a class="nav-link active" data-bs-toggle="tab" href="#pythonRaw">Raw</a>
+                                                <a class="nav-link" :class="{ active: pythonSubTab === 0 }" href="#" @click.prevent="setPythonSubTab(0)">Raw</a>
                                             </li>
                                             <li class="nav-item">
-                                                <a class="nav-link" data-bs-toggle="tab" href="#pythonTable">Table</a>
+                                                <a class="nav-link" :class="{ active: pythonSubTab === 1 }" href="#" @click.prevent="setPythonSubTab(1)">Table</a>
                                             </li>
                                         </ul>
                                         <div class="tab-content">
-                                            <div class="tab-pane fade show active" id="pythonRaw">
+                                            <div class="tab-pane fade" :class="{ active: pythonSubTab === 0, show: pythonSubTab === 0 }">
                                                 <pre class="mt-2" v-text="pythonResult"></pre>
                                             </div>
-                                            <div class="tab-pane fade" id="pythonTable">
+                                            <div class="tab-pane fade" :class="{ active: pythonSubTab === 1, show: pythonSubTab === 1 }">
                                                 <div class="mt-2" v-html="pythonResultTable"></div>
                                             </div>
                                         </div>
@@ -318,7 +317,6 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/vendor/bootstrap.bundle.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/vendor/vue.global.js') }}"></script>
     <script src="{{ url_for('static', filename='js/debug.js') }}"></script>
 </body>

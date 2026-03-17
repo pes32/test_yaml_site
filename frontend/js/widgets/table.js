@@ -14,8 +14,8 @@ const TableWidget = {
     emits: ['input'],
     template: `
         <div class="widget-container">
-            <div v-if="widgetConfig.description" class="widget-label">
-                <span v-text="widgetConfig.description"></span>
+            <div v-if="widgetConfig.label" class="widget-label">
+                <span v-text="widgetConfig.label"></span>
             </div>
             
             <div class="widget-table-container">
@@ -92,8 +92,8 @@ const TableWidget = {
                 </table>
             </div>
             
-            <div v-if="widgetConfig.sup_tex" class="widget-info">
-                <span v-text="widgetConfig.sup_tex"></span>
+            <div v-if="widgetConfig.sup_text" class="widget-info">
+                <span v-text="widgetConfig.sup_text"></span>
             </div>
             
             <!-- Контекстное меню для таблицы -->
@@ -382,7 +382,7 @@ const TableWidget = {
 
         // Конфигурация для реюза виджета как ячейки
         cellWidgetConfig() {
-            return { description: '', readonly: false };
+            return { label: '', readonly: false };
         },
         cellListConfig(rowIndex, cellIndex, column) {
             const currentVal = this.safeCell(this.tableData[rowIndex] || [], cellIndex);

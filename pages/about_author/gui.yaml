@@ -1,3 +1,5 @@
+title: "Ловите рептилойда!"
+
 url: "/about_author"
 
 box "Карточка рептилойда":
@@ -14,11 +16,17 @@ collapse "Материалы автора":
   - "Лаконичная документация:"
   - row: doc_1_button, doc_2_button, doc_3_button
 
-  - "Руководства пользователя:"
-  - row: user_guide_1_button, user_guide_2_button
-
   - "База данных:"
   - row: database_1, database_2, database_3, database_4, database_5
 
-  - "Прочее:"
-  - row: old_workflow, release_notes
+  - "Руководства пользователя:"
+  - row: user_guide_1_button, user_guide_2_button
+
+  - "Прочее рабочее:"
+  - row: old_workflow, release_notes, 
+  
+  - "Прочее из жизни рептилойда:"
+  - row: drive2_button, youtube_button
+
+  - "Презентация по ИИ от мая 2025 года:"
+  - row: ai_present_button, ai_text_button
