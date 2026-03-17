@@ -1,7 +1,7 @@
-/* Основные стили для LowCode System */
 
 :root {
     --app-navbar-height: 44px;
+    --font-mono: 'JetBrains Mono', monospace;
 }
 
 /* Утилита: широкий контент (таблицы, карточки) */
@@ -20,6 +20,18 @@
     overflow-x: visible;
     width: max-content;
     min-width: 100%;
+}
+
+body,
+button,
+input,
+textarea,
+select {
+    font-family: 'JetBrains Mono', monospace !important;
+}
+
+button, .btn, .widget-button {
+    font-weight: 700 !important;
 }
 
 body {
@@ -94,6 +106,7 @@ body {
     border-color: transparent;
     box-shadow: none;
     color: #474747;
+    font-weight: 600;
 }
 
 .page-content-column {
@@ -114,6 +127,10 @@ body {
 
 .menu-card.active .menu-card-icon-shell {
     background-color: #d4e3fb;
+}
+
+.menu-card.active .menu-card-label {
+    font-weight: 700;
 }
 
 .menu-card-label {
@@ -264,6 +281,7 @@ body {
     border: none;
     background: transparent;
     color: #474747;
+    font-weight: 700;
 }
 
 .page-tabs .nav-link.active::after,
@@ -329,6 +347,16 @@ body {
     color: #474747;
 }
 
+/* Увеличиваем расстояние между рядами (текст, виджеты) в box/collapse */
+.page-section-body .row.mb-2 {
+    margin-bottom: 1rem !important;
+}
+
+/* Текстовые строки между собой — компактно */
+.page-section-body .row.mb-2:has(.page-section-text):not(:has(+ .row.mb-2 .col-auto)) {
+    margin-bottom: 0.35rem !important;
+}
+
 /* box без заголовка: полная рамка и скругление */
 .page-section-card:not(:has(.page-section-header)) .page-section-body {
     border-top: 5px solid #F2F6FE;
@@ -341,6 +369,7 @@ body {
     border: none !important;
     box-shadow: none !important;
     background: transparent !important;
+    border-radius: 0 !important;
 }
 /* Меню без вкладок: bare-секции уже у левого края (padding-left: 0) */
 .page-tab-content:not(.page-tab-content--with-tabs) .page-section--bare .page-section-body {
@@ -670,7 +699,7 @@ body {
     border-color: #d4e3fb;
     color: #474747;
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 600;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -920,7 +949,7 @@ html {
 
 /* Стили для IP адресов */
 .widget-ip {
-    font-family: monospace;
+    font-family: var(--font-mono) !important;
     letter-spacing: 0.1em;
 }
 
@@ -1000,6 +1029,7 @@ html {
 .collapse-inner {
     display: grid;
     grid-template-rows: 1fr;
+    align-items: start; /* контент закреплён сверху — сворачивается только вверх */
 }
 
 .collapse-inner.collapse-animating {
@@ -1023,10 +1053,11 @@ html {
     min-height: 0;
 }
 
-/* Плавное «схлопывание» padding и border вместе с grid — только при явном сворачивании */
+/* Плавное «схлопывание» padding и border вместе с grid — только вертикальные свойства (без сдвига влево) */
 .collapse-inner.collapse-animating .page-section-body,
 .collapse-inner.collapse-animating .card-body {
-    transition: padding 0.35s ease-out, border-width 0.35s ease-out;
+    transition: padding-top 0.35s ease-out, padding-bottom 0.35s ease-out,
+                border-top-width 0.35s ease-out, border-bottom-width 0.35s ease-out;
 }
 
 .page-section-card .collapse:not(.show) .collapse-inner .page-section-body,
@@ -1035,8 +1066,7 @@ html {
 .card .collapse:not(.show) .collapse-inner .card-body {
     padding-top: 0 !important;
     padding-bottom: 0 !important;
-    border-left-width: 0 !important;
-    border-right-width: 0 !important;
+    /* border-left/right не убираем — иначе контент смещается влево при анимации */
     border-bottom-width: 0 !important;
 }
 
@@ -1167,11 +1197,6 @@ html {
     object-fit: contain;
 }
 
-.widget-button i[class*="fas"] {
-    font-size: 24px;
-    flex-shrink: 0;
-}
-
 /* Кнопка только с иконкой — квадратная */
 .widget-button.icon-only {
     width: 40px;
@@ -1225,7 +1250,7 @@ html {
 .modal-title {
     margin: 0;
     font-size: 1.25rem;
-    font-weight: 500;
+    font-weight: 400;
 }
 
 .modal-body {
@@ -1235,7 +1260,7 @@ html {
 
 /* Диалог подтверждения (Vue ConfirmModal) */
 .confirm-modal-content {
-    max-width: 550px;
+    max-width: 600px;
 }
 
 .confirm-modal-content .modal-body {

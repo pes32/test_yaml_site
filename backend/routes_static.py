@@ -38,3 +38,12 @@ def register_static_routes(app):
     def favicon():  # noqa: D401
         return send_from_directory(app.static_folder, "favicon.ico", mimetype="image/x-icon")
 
+    # webfonts — шрифты с явным MIME-типом (важно для @font-face)
+    webfonts_dir = os.path.join(app.static_folder, "webfonts")
+
+    @app.route("/webfonts/<path:filename>")
+    def serve_webfont(filename):  # noqa: D401
+        ext = os.path.splitext(filename)[1].lower()
+        mime = {".ttf": "font/ttf", ".woff": "font/woff", ".woff2": "font/woff2"}.get(ext)
+        return send_from_directory(webfonts_dir, filename, mimetype=mime)
+

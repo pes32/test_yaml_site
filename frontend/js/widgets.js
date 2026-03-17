@@ -57,9 +57,140 @@ const WidgetRenderer = {
 };
 
 // Регистрируем компонент глобально
-if (typeof window !== 'undefined') {
-    window.WidgetRenderer = WidgetRenderer;
-} 
+window.WidgetRenderer = WidgetRenderer;
+
+// Компонент иконки (SVG или FontAwesome)
+const ItemIcon = {
+    props: { icon: { type: String, default: '' } },
+    template: `
+        <span v-if="icon" class="page-item-icon">
+            <img v-if="!$isFontIcon(icon)" :src="$getIconSrc(icon)" alt="" @error="$onIconError">
+            <i v-else :class="icon"></i>
+        </span>
+    `
+};
+window.ItemIcon = ItemIcon;
+
+// Общий компонент рендеринга рядов секции (текст, row, columns)
+const ContentRows = {
+    props: {
+        rows: { type: Array, required: true },
+        getWidgetConfig: { type: Function, required: true },
+        textClass: { type: String, default: 'page-section-text' }
+    },
+    emits: ['execute'],
+    template: `
+        <template v-for="(row, rowIndex) in rows" :key="rowIndex">
+            <div class="row mb-2">
+                <div v-if="typeof row === 'string'" class="col-12">
+                    <span :class="textClass" v-text="row"></span>
+                </div>
+                <div v-else-if="row.widgets && Array.isArray(row.widgets)" class="col-12">
+                    <div class="row">
+                        <div v-for="(item, itemIndex) in row.widgets" :key="itemIndex" class="col-auto">
+                            <widget-renderer
+                                :widget-config="getWidgetConfig(item)"
+                                :widget-name="item"
+                                @execute="$emit('execute', $event)">
+                            </widget-renderer>
+                        </div>
+                    </div>
+                </div>
+                <div v-else-if="row.columns && typeof row.columns === 'object'" class="col-12">
+                    <div class="row">
+                        <div v-for="(column, colIndex) in row.columns"
+                             :key="colIndex"
+                             :class="'col-md-' + (12 / Object.keys(row.columns).length)">
+                            <div v-for="(item, itemIndex) in column.widgets" :key="itemIndex" class="mb-2">
+                                <widget-renderer
+                                    :widget-config="getWidgetConfig(item)"
+                                    :widget-name="item"
+                                    @execute="$emit('execute', $event)">
+                                </widget-renderer>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+    `
+};
+
+window.ContentRows = ContentRows;
+
+// Карточка секции (заголовок + collapse + content). Одинакова для страницы и модалки.
+const SectionCard = {
+    props: {
+        section: { type: Object, required: true },
+        sectionIndex: { type: Number, required: true },
+        collapseId: { type: String, default: '' },
+        isCollapsed: { type: Boolean, default: false },
+        isAnimating: { type: Boolean, default: false },
+        onToggle: { type: Function, default: null },
+        getWidgetConfig: { type: Function, required: true },
+        onExecute: { type: Function, required: true },
+        variant: { type: String, default: 'page' },
+        headerId: { type: String, default: '' }
+    },
+    template: `
+        <div :class="wrapperClass">
+            <div :class="cardClass">
+                <div v-if="section.showHeader"
+                     class="card-header"
+                     :class="headerClass"
+                     :id="headerId || undefined"
+                     @click="section.collapsible && onToggle ? onToggle() : null"
+                     :style="section.collapsible ? 'cursor: pointer;' : ''">
+                    <component :is="titleTag" class="mb-0 d-flex align-items-center" :class="titleClass">
+                        <span v-if="section.collapsible" :class="arrowSlotClass">
+                            <img src="/templates/icons/arrow.svg" class="collapse-icon" :class="collapseIconExtra" alt="">
+                        </span>
+                        <item-icon v-if="section.icon" :icon="section.icon"></item-icon>
+                        <span v-text="section.name"></span>
+                    </component>
+                </div>
+                <div :class="section.collapsible ? ('collapse ' + (isCollapsed ? '' : 'show')) : ''"
+                     :id="section.collapsible ? collapseId : null">
+                    <div class="collapse-inner" :class="{ 'collapse-animating': section.collapsible && isAnimating }">
+                        <div :class="bodyClass">
+                            <content-rows
+                                :rows="section.rows"
+                                :get-widget-config="getWidgetConfig"
+                                :text-class="contentTextClass"
+                                @execute="onExecute">
+                            </content-rows>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `,
+    computed: {
+        wrapperClass() {
+            if (this.variant === 'modal') return 'mb-3';
+            return { 'page-section': true, 'page-section--bare': !this.section.showHeader };
+        },
+        cardClass() {
+            return this.variant === 'page' ? 'card page-section-card' : 'card';
+        },
+        headerClass() {
+            const base = { collapsed: this.section.collapsible && this.isCollapsed };
+            if (this.variant === 'page') base['page-section-header'] = true;
+            return base;
+        },
+        titleTag() { return this.variant === 'page' ? 'h5' : 'h6'; },
+        titleClass() { return this.variant === 'page' ? 'page-section-title' : ''; },
+        arrowSlotClass() { return this.variant === 'page' ? 'page-section-arrow-slot' : ''; },
+        collapseIconExtra() { return this.variant === 'modal' ? 'me-2' : ''; },
+        bodyClass() {
+            return this.variant === 'page' ? 'card-body page-section-body' : 'card-body';
+        },
+        contentTextClass() {
+            return this.variant === 'modal' ? 'text-muted' : 'page-section-text';
+        }
+    }
+};
+window.SectionCard = SectionCard;
 
 // Компонент для кнопок модального окна
 const ModalButtons = {
@@ -117,23 +248,14 @@ const ModalManager = {
         };
     },
     mounted() {
-        // Делаем менеджер доступным глобально на случай, если ref недоступен
-        if (typeof window !== 'undefined') {
-            window.modalManager = this;
-        }
+        window.modalManager = this;
     },
     template: `
         <div v-if="showModal" class="modal-overlay" @click="closeModal">
             <div class="modal-content" @click.stop>
                 <div class="modal-header">
                     <div class="d-flex align-items-center gap-2">
-                        <span v-if="modalConfig && modalConfig.icon" class="page-item-icon">
-                            <img v-if="!isFontIcon(modalConfig.icon)"
-                                 :src="getIconSrc(modalConfig.icon)"
-                                 alt=""
-                                 @error="onIconError">
-                            <i v-else :class="modalConfig.icon"></i>
-                        </span>
+                        <item-icon v-if="modalConfig && modalConfig.icon" :icon="modalConfig.icon"></item-icon>
                         <h5 class="modal-title" v-text="modalTitle"></h5>
                     </div>
                     <button type="button" class="btn-close" @click="closeModal"></button>
@@ -147,13 +269,7 @@ const ModalManager = {
                                    :class="{ active: index === activeTabIndex }" 
                                    @click.prevent="setActiveTab(index)"
                                    href="#">
-                                    <span v-if="tab.icon" class="page-item-icon">
-                                        <img v-if="!isFontIcon(tab.icon)"
-                                             :src="getIconSrc(tab.icon)"
-                                             alt=""
-                                             @error="onIconError">
-                                        <i v-else :class="tab.icon"></i>
-                                    </span>
+                                    <item-icon v-if="tab.icon" :icon="tab.icon"></item-icon>
                                     <span v-text="tab.name || ('Вкладка ' + (index + 1))"></span>
                                 </a>
                             </li>
@@ -161,69 +277,19 @@ const ModalManager = {
                         
                         <div class="tab-content">
                             <div class="tab-pane active">
-                                <div v-for="(section, sidx) in activeSections" :key="sidx" class="mb-3">
-                                    <div class="card">
-                                        <div v-if="section.showHeader"
-                                             class="card-header"
-                                             :class="{ collapsed: section.collapsible && isModalSectionCollapsed(sidx) }"
-                                             @click="section.collapsible ? toggleModalSectionCollapse(sidx) : null"
-                                             :style="section.collapsible ? 'cursor: pointer;' : ''">
-                                            <h6 class="mb-0 d-flex align-items-center">
-                                                <img v-if="section.collapsible"
-                                                     src="/templates/icons/arrow.svg"
-                                                     class="collapse-icon me-2"
-                                                     alt="">
-                                                <span v-if="section.icon" class="page-item-icon">
-                                                    <img v-if="!isFontIcon(section.icon)"
-                                                         :src="getIconSrc(section.icon)"
-                                                         alt=""
-                                                         @error="onIconError">
-                                                    <i v-else :class="section.icon"></i>
-                                                </span>
-                                                <span v-text="section.name"></span>
-                                            </h6>
-                                        </div>
-
-                                        <div :class="section.collapsible ? ('collapse ' + (isModalSectionCollapsed(sidx) ? '' : 'show')) : ''"
-                                             :id="section.collapsible ? getModalSectionCollapseId(sidx) : null">
-                                            <div class="collapse-inner" :class="{ 'collapse-animating': section.collapsible && collapsingModalSectionId === getModalSectionCollapseId(sidx) }">
-                                            <div class="card-body">
-                                                <div v-for="(row, rowIndex) in section.rows" :key="rowIndex" class="row mb-2">
-                                                    <div v-if="typeof row === 'string'" class="col-12">
-                                                        <span class="text-muted" v-text="row"></span>
-                                                    </div>
-                                                    <div v-else-if="row.widgets && Array.isArray(row.widgets)" class="col-12">
-                                                        <div class="row">
-                                                            <div v-for="(item, itemIndex) in row.widgets" :key="itemIndex" class="col-auto">
-                                                                <widget-renderer 
-                                                                    :widget-config="getWidgetConfig(item)"
-                                                                    :widget-name="item"
-                                                                    @execute="onWidgetExecute">
-                                                                </widget-renderer>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div v-else-if="row.columns && typeof row.columns === 'object'" class="col-12">
-                                                        <div class="row">
-                                                            <div v-for="(column, colIndex) in row.columns"
-                                                                 :key="colIndex"
-                                                                 :class="'col-md-' + (12 / Object.keys(row.columns).length)">
-                                                                <div v-for="(item, itemIndex) in column.widgets" :key="itemIndex" class="mb-2">
-                                                                    <widget-renderer
-                                                                        :widget-config="getWidgetConfig(item)"
-                                                                        :widget-name="item"
-                                                                        @execute="onWidgetExecute">
-                                                                    </widget-renderer>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                <section-card
+                                    v-for="(section, sidx) in activeSections"
+                                    :key="sidx"
+                                    :section="section"
+                                    :section-index="sidx"
+                                    :collapse-id="getModalSectionCollapseId(sidx)"
+                                    :is-collapsed="isModalSectionCollapsed(sidx)"
+                                    :is-animating="collapsingModalSectionId === getModalSectionCollapseId(sidx)"
+                                    :on-toggle="() => toggleModalSectionCollapse(sidx)"
+                                    :get-widget-config="getWidgetConfig"
+                                    :on-execute="onWidgetExecute"
+                                    variant="modal">
+                                </section-card>
                             </div>
                         </div>
                     </div>
@@ -251,17 +317,9 @@ const ModalManager = {
             return this.modalConfig.tabs;
         },
         activeSections() {
-            if (!this.modalConfig) {
-                return [];
-            }
-
-            if (this.modalTabs.length) {
-                const safeIndex = Math.max(0, Math.min(this.activeTabIndex, this.modalTabs.length - 1));
-                const activeTab = this.modalTabs[safeIndex];
-                return activeTab && Array.isArray(activeTab.content) ? activeTab.content : [];
-            }
-
-            return Array.isArray(this.modalConfig.content) ? this.modalConfig.content : [];
+            return window.GuiParser
+                ? window.GuiParser.getActiveSections(this.modalConfig, this.activeTabIndex, this.modalTabs)
+                : [];
         }
     },
     methods: {
@@ -298,9 +356,10 @@ const ModalManager = {
             const id = this.getModalSectionCollapseId(sectionIndex);
             this.collapsingModalSectionId = id;
             this.collapsedModalSections = { ...this.collapsedModalSections, [id]: !this.collapsedModalSections[id] };
+            const ms = window.GuiParser?.COLLAPSE_ANIM_MS ?? 350;
             setTimeout(() => {
                 this.collapsingModalSectionId = null;
-            }, 350);
+            }, ms);
         },
 
         getParsedGui() {
@@ -402,30 +461,8 @@ const ModalManager = {
             return `modal-section-${tabPart}-${sectionIndex}`;
         },
 
-        isFontIcon(icon) {
-            return window.GuiParser ? window.GuiParser.isFontIcon(icon) : false;
-        },
-
-        getIconSrc(icon) {
-            return window.GuiParser ? window.GuiParser.getIconSrc(icon) : null;
-        },
-
-        onIconError(event) {
-            const img = event && event.target;
-            if (!img) {
-                return;
-            }
-
-            img.style.display = 'none';
-            if (img.parentElement) {
-                img.parentElement.style.display = 'none';
-            }
-        }
     }
 };
 
-// Регистрируем глобально
-if (typeof window !== 'undefined') {
-    window.ModalManager = ModalManager;
-    window.ModalButtons = ModalButtons;
-} 
+window.ModalManager = ModalManager;
+window.ModalButtons = ModalButtons; 

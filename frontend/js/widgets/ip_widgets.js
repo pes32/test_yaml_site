@@ -291,8 +291,5 @@ const CIDR_MAX_DIGITS = 14; // 12 + 2
 const IpWidget = createIpLikeWidget(IP_MASK_TEMPLATE, validateIPv4, IP_MAX_DIGITS);
 const IpMaskWidget = createIpLikeWidget(IP_CIDR_TEMPLATE, validateIPv4Cidr, CIDR_MAX_DIGITS);
 
-// Экспорт в глобал
-if (typeof window !== 'undefined') {
-    window.IpWidget = IpWidget;
-    window.IpMaskWidget = IpMaskWidget;
-}
+window.IpWidget = IpWidget;
+window.IpMaskWidget = IpMaskWidget;

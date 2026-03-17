@@ -48,6 +48,4 @@ const ImgWidget = {
     }
 };
 
-if (typeof window !== 'undefined') {
-    window.ImgWidget = ImgWidget;
-}
+window.ImgWidget = ImgWidget;

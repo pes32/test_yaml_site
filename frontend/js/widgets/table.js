@@ -102,13 +102,13 @@ const TableWidget = {
                  :style="{ left: contextMenuX + 'px', top: contextMenuY + 'px' }"
                  @click.stop>
                 <div class="context-menu-item" @click="addRowAbove">
-                    <i class="fas fa-plus"></i> Добавить строку выше
+                    <span aria-hidden="true">+</span> Добавить строку выше
                 </div>
                 <div class="context-menu-item" @click="addRowBelow">
-                    <i class="fas fa-plus"></i> Добавить строку ниже
+                    <span aria-hidden="true">+</span> Добавить строку ниже
                 </div>
                 <div class="context-menu-item" @click="deleteRow" v-if="tableData.length > 1">
-                    <i class="fas fa-trash"></i> Удалить строку
+                    <span aria-hidden="true">×</span> Удалить строку
                 </div>
             </div>
         </div>
@@ -123,8 +123,8 @@ const TableWidget = {
             contextMenuX: 0,
             contextMenuY: 0,
             selectedRowIndex: -1,
-            ipCellWidget: (typeof window !== 'undefined' && window.IpWidget && typeof Vue !== 'undefined') ? Vue.markRaw(window.IpWidget) : null,
-            listCellWidget: (typeof window !== 'undefined' && window.ListWidget && typeof Vue !== 'undefined') ? Vue.markRaw(window.ListWidget) : null
+            ipCellWidget: (window.IpWidget && typeof Vue !== 'undefined') ? Vue.markRaw(window.IpWidget) : null,
+            listCellWidget: (window.ListWidget && typeof Vue !== 'undefined') ? Vue.markRaw(window.ListWidget) : null
         };
     },
     computed: {
@@ -330,7 +330,7 @@ const TableWidget = {
             
             // Возвращаем сам объект компонента, если он есть в window,
             // иначе имя (на случай, если его зарегистрировали через app.component)
-            const compObj = (typeof window !== 'undefined') ? window[component] : undefined;
+            const compObj = window[component];
             return compObj || component;
         },
 
@@ -348,7 +348,7 @@ const TableWidget = {
                 str: 'StringInput'
             };
             const compName = nameMap[type] || 'StringInput';
-            const exists = typeof window !== 'undefined' && typeof window[compName] !== 'undefined';
+            const exists = typeof window[compName] !== 'undefined';
             return exists;
         },
 
@@ -709,7 +709,4 @@ const TableWidget = {
     }
 };
 
-// Регистрируем виджет глобально
-if (typeof window !== 'undefined') {
-    window.TableWidget = TableWidget;
-}
+window.TableWidget = TableWidget;

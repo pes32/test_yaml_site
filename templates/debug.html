@@ -5,14 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Debug Panel - YAML System</title>
     <link href="{{ url_for('static', filename='css/vendor/bootstrap.min.css') }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/vendor/font-awesome.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/fonts.css') }}" rel="stylesheet">
     <style>
         .debug-content {
             height: 70vh;
             overflow-y: auto;
         }
         .log-entry {
-            font-family: monospace;
+            font-family: 'JetBrains Mono', monospace !important;
             font-size: 0.9em;
             padding: 2px 0;
         }
@@ -27,11 +27,11 @@
         <nav class="navbar navbar-dark bg-dark">
             <div class="container-fluid">
                 <span class="navbar-brand">
-                    <i class="fas fa-bug"></i> Debug Panel
+                    <span aria-hidden="true">🐛</span> Debug Panel
                 </span>
                 <span class="navbar-text">
                     <a href="/" class="text-light text-decoration-none">
-                        <i class="fas fa-arrow-left"></i> Вернуться к приложению
+                        <span aria-hidden="true">←</span> Вернуться к приложению
                     </a>
                 </span>
             </div>
@@ -42,27 +42,27 @@
             <ul class="nav nav-tabs" id="debugTabs" role="tablist">
                 <li class="nav-item">
                     <a class="nav-link" :class="{ active: activeDebugTab === 0 }" href="#" role="tab" @click.prevent="setDebugTab(0)">
-                        <i class="fas fa-sitemap"></i> Страницы
+                        <span aria-hidden="true">⊞</span> Страницы
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" :class="{ active: activeDebugTab === 1 }" href="#" role="tab" @click.prevent="setDebugTab(1)">
-                        <i class="fas fa-cogs"></i> API
+                        <span aria-hidden="true">⚙</span> API
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" :class="{ active: activeDebugTab === 2 }" href="#" role="tab" @click.prevent="setDebugTab(2)">
-                        <i class="fas fa-list"></i> Log
+                        <span aria-hidden="true">☰</span> Log
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" :class="{ active: activeDebugTab === 3 }" href="#" role="tab" @click.prevent="setDebugTab(3)">
-                        <i class="fas fa-globe"></i> REST
+                        <span aria-hidden="true">🌐</span> REST
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" :class="{ active: activeDebugTab === 4 }" href="#" role="tab" @click.prevent="setDebugTab(4)">
-                        <i class="fas fa-database"></i> SQL
+                        <span aria-hidden="true">▤</span> SQL
                     </a>
                 </li>
             </ul>
@@ -115,7 +115,7 @@
                                     Обновлено: <span v-text="logsLastUpdated"></span>
                                 </span>
                                 <button class="btn btn-sm btn-primary" type="button" :disabled="logsLoading" @click="refreshLogs">
-                                    <i class="fas fa-sync-alt"></i> Обновить
+                                    <span aria-hidden="true">↻</span> Обновить
                                 </button>
                             </div>
                         </div>
@@ -159,7 +159,7 @@
                                         <textarea class="form-control" v-model="restBody" rows="4" placeholder="JSON данные"></textarea>
                                     </div>
                                     <button class="btn btn-primary" @click="sendRestRequest">
-                                        <i class="fas fa-paper-plane"></i> Отправить
+                                        <span aria-hidden="true">→</span> Отправить
                                     </button>
 
                                     <!-- Список доступных запросов -->
@@ -213,7 +213,7 @@
                         <label class="form-label">Подключение к базе данных:</label>
                         <div class="mb-2">
                             <button class="btn btn-sm btn-outline-info" @click="testDbConnection">
-                                <i class="fas fa-database"></i> Тест подключения
+                                <span aria-hidden="true">▤</span> Тест подключения
                             </button>
                             <div class="mt-2" v-if="dbConnectionStatus" v-html="dbConnectionStatus"></div>
                         </div>
@@ -223,7 +223,7 @@
                         <textarea class="form-control" v-model="sqlQuery" rows="6" placeholder="SELECT * FROM projects"></textarea>
                     </div>
                     <button class="btn btn-primary" @click="executeSql" :disabled="!sqlQuery.trim()">
-                        <i class="fas fa-play"></i> Выполнить
+                        <span aria-hidden="true">▶</span> Выполнить
                     </button>
                 </div>
                                 <div class="col-md-6">
@@ -246,68 +246,6 @@
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Вкладка Python -->
-                <div class="tab-pane fade" id="python" role="tabpanel">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5>Python Выполнение</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label class="form-label">Python Код:</label>
-                                        <textarea class="form-control" v-model="pythonCode" rows="6" placeholder="print('Hello World')"></textarea>
-                                    </div>
-                                    <button class="btn btn-primary" @click="executePython">
-                                        <i class="fas fa-play"></i> Выполнить
-                                    </button>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label class="form-label">Результат:</label>
-                                        <ul class="nav nav-tabs" role="tablist">
-                                            <li class="nav-item">
-                                                <a class="nav-link" :class="{ active: pythonSubTab === 0 }" href="#" @click.prevent="setPythonSubTab(0)">Raw</a>
-                                            </li>
-                                            <li class="nav-item">
-                                                <a class="nav-link" :class="{ active: pythonSubTab === 1 }" href="#" @click.prevent="setPythonSubTab(1)">Table</a>
-                                            </li>
-                                        </ul>
-                                        <div class="tab-content">
-                                            <div class="tab-pane fade" :class="{ active: pythonSubTab === 0, show: pythonSubTab === 0 }">
-                                                <pre class="mt-2" v-text="pythonResult"></pre>
-                                            </div>
-                                            <div class="tab-pane fade" :class="{ active: pythonSubTab === 1, show: pythonSubTab === 1 }">
-                                                <div class="mt-2" v-html="pythonResultTable"></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Вкладка API Log -->
-                <div class="tab-pane fade" id="apilog" role="tabpanel">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5>API Лог</h5>
-                        </div>
-                        <div class="card-body debug-content">
-                            <div id="apiLogContent">
-                                <div v-for="log in apiLogs" :key="log.id" class="log-entry">
-                                    <span class="text-muted" v-text="log.timestamp"></span>
-                                    <span class="badge bg-info ms-2" v-text="log.method"></span>
-                                    <span class="ms-2" v-text="log.endpoint"></span>
-                                    <span class="text-muted ms-2">(<span v-text="log.duration"></span>ms)</span>
                                 </div>
                             </div>
                         </div>

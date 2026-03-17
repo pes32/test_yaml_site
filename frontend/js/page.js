@@ -39,17 +39,9 @@ const app = createApp({
         },
 
         activeSections() {
-            if (!this.activeMenu) {
-                return [];
-            }
-
-            if (this.activeTabs.length) {
-                const safeIndex = Math.max(0, Math.min(this.activeTabIndex, this.activeTabs.length - 1));
-                const activeTab = this.activeTabs[safeIndex];
-                return activeTab && Array.isArray(activeTab.content) ? activeTab.content : [];
-            }
-
-            return Array.isArray(this.activeMenu.content) ? this.activeMenu.content : [];
+            return window.GuiParser
+                ? window.GuiParser.getActiveSections(this.activeMenu, this.activeTabIndex, this.activeTabs)
+                : [];
         }
     },
 
@@ -372,29 +364,10 @@ const app = createApp({
             const id = this.getSectionCollapseId(sectionIndex);
             this.collapsingSectionId = id;
             this.collapsedSections = { ...this.collapsedSections, [id]: !this.collapsedSections[id] };
+            const ms = window.GuiParser?.COLLAPSE_ANIM_MS ?? 350;
             setTimeout(() => {
                 this.collapsingSectionId = null;
-            }, 350);
-        },
-
-        isFontIcon(icon) {
-            return window.GuiParser ? window.GuiParser.isFontIcon(icon) : false;
-        },
-
-        getIconSrc(icon) {
-            return window.GuiParser ? window.GuiParser.getIconSrc(icon) : null;
-        },
-
-        onIconError(event) {
-            const img = event && event.target;
-            if (!img) {
-                return;
-            }
-
-            img.style.display = 'none';
-            if (img.parentElement) {
-                img.parentElement.style.display = 'none';
-            }
+            }, ms);
         },
 
         async executeCommand(commandData) {
@@ -453,7 +426,14 @@ const app = createApp({
     }
 });
 
+app.config.globalProperties.$isFontIcon = (icon) => window.GuiParser?.isFontIcon(icon) ?? false;
+app.config.globalProperties.$getIconSrc = (icon) => window.GuiParser?.getIconSrc(icon) ?? null;
+app.config.globalProperties.$onIconError = (e) => window.GuiParser?.onIconError(e);
+
 app.component('widget-renderer', WidgetRenderer);
+app.component('item-icon', ItemIcon);
+app.component('section-card', SectionCard);
+app.component('content-rows', ContentRows);
 app.component('modal-manager', ModalManager);
 app.component('modal-buttons', ModalButtons);
 app.component('confirm-modal', ConfirmModal);

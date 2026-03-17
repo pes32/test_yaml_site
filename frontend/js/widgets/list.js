@@ -184,6 +184,4 @@ const ListWidget = {
     }
 };
 
-if (typeof window !== 'undefined') {
-    window.ListWidget = ListWidget;
-}
+window.ListWidget = ListWidget;

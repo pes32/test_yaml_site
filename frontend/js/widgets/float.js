@@ -14,8 +14,8 @@ const FloatWidget = {
             :has-value="hasValue"
             :label-floats="labelFloats"
             :is-focused="isFocused"
-            :wrap-extra="{ error: !!(regexError || floatError) }"
-            :has-supporting="!!(widgetConfig.sup_text || regexError || floatError)">
+            :wrap-extra="{ error: !!fieldError }"
+            :has-supporting="!!(widgetConfig.sup_text || fieldError)">
             <input type="text"
                    class="form-control"
                    :placeholder="showPlaceholder ? widgetConfig.placeholder : ''"
@@ -26,7 +26,7 @@ const FloatWidget = {
                    @focus="isFocused = true"
                    @blur="isFocused = false">
             <template #supporting>
-                <span v-if="regexError || floatError" class="md3-error" v-text="regexError || floatError"></span>
+                <span v-if="fieldError" class="md3-error" v-text="fieldError"></span>
                 <span v-else v-text="widgetConfig.sup_text"></span>
             </template>
         </md3-field>
@@ -40,21 +40,6 @@ const FloatWidget = {
         showPlaceholder() { return !this.hasValue && this.isFocused && this.widgetConfig.placeholder; }
     },
     methods: {
-        validateRegex() {
-            const regex = this.widgetConfig.regex;
-            if (!regex || this.widgetConfig.readonly) {
-                this.regexError = '';
-                return;
-            }
-            try {
-                const re = typeof regex === 'string' ? new RegExp(regex) : regex;
-                this.regexError = (this.value !== '' && !re.test(this.value))
-                    ? (this.widgetConfig.err_text || 'Неверный формат')
-                    : '';
-            } catch {
-                this.regexError = '';
-            }
-        },
         onFloatInput() {
             let input = this.value.replace(/,/g, '.').replace(/[^0-9.-]/g, '');
             if (input.startsWith('-')) {
@@ -91,6 +76,4 @@ const FloatWidget = {
     }
 };
 
-if (typeof window !== 'undefined') {
-    window.FloatWidget = FloatWidget;
-}
+window.FloatWidget = FloatWidget;

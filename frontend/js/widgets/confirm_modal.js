@@ -42,6 +42,4 @@ const ConfirmModal = {
     }
 };
 
-if (typeof window !== 'undefined') {
-    window.ConfirmModal = ConfirmModal;
-}
+window.ConfirmModal = ConfirmModal;

@@ -182,8 +182,6 @@ const TimeWidget = {
     }
 };
 
-if (typeof window !== 'undefined') {
-    window.DateTimeWidget = DateTimeWidget;
-    window.DateWidget = DateWidget;
-    window.TimeWidget = TimeWidget;
-}
+window.DateTimeWidget = DateTimeWidget;
+window.DateWidget = DateWidget;
+window.TimeWidget = TimeWidget;

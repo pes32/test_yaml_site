@@ -8,7 +8,6 @@ const debugApp = createApp({
             activeDebugTab: 0,
             restSubTab: 0,
             sqlSubTab: 0,
-            pythonSubTab: 0,
             // API tab
             backendStructure: null,
             modules: [],
@@ -29,13 +28,7 @@ const debugApp = createApp({
             sqlQuery: 'SELECT * FROM projects',
             sqlResult: '',
             sqlResultTable: '',
-            dbConnectionStatus: '',
-            // Python
-            pythonCode: "print('Hello World')",
-            pythonResult: '',
-            pythonResultTable: '',
-            // API log (mock)
-            apiLogs: []
+            dbConnectionStatus: ''
         };
     },
     async mounted() {
@@ -59,7 +52,6 @@ const debugApp = createApp({
         },
         setRestSubTab(i) { this.restSubTab = i; },
         setSqlSubTab(i) { this.sqlSubTab = i; },
-        setPythonSubTab(i) { this.pythonSubTab = i; },
         async loadBackendStructure() {
             try {
                 const res = await fetch('/api/debug/structure');
@@ -68,7 +60,7 @@ const debugApp = createApp({
                     const el = document.getElementById('apiStructure');
                     if (el) {
                         const tree = this.buildAsciiTree(this.backendStructure);
-                        el.innerHTML = `<pre style="font-family: monospace; font-size: 0.85rem;">${tree}</pre>`;
+                        el.innerHTML = `<pre style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;">${tree}</pre>`;
                     }
                 }
             } catch (e) { /* noop */ }
@@ -191,11 +183,6 @@ const debugApp = createApp({
                 this.sqlResult = `SQL Query: ${this.sqlQuery}\n\nОшибка сети: ${error.message}`;
                 this.sqlResultTable = `<div class="alert alert-danger"><strong>Ошибка сети:</strong><br>${error.message}</div>`;
             }
-        },
-        async executePython() {
-            const output = `Python Code:\n${this.pythonCode}\n\nOutput:\nHello World\n\nExecution time: 0.001s`;
-            this.pythonResult = output;
-            this.pythonResultTable = `<div class="bg-light p-3 rounded"><strong>Output:</strong><br>Hello World<br><br><strong>Execution time:</strong> 0.001s</div>`;
         },
         selectRest(r) {
             this.restUrl = r.rule;

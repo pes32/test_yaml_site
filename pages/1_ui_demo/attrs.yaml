@@ -30,7 +30,7 @@ test_widget:
   widget: text
   label: ""
   width: 1300
-  rows: 25
+  rows: 26
   readonly: true
   default: |
     Текущий портал - моё видение на создание систем. Учётная это система или какая-либо иная - не важно.

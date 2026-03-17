@@ -22,14 +22,14 @@ const ButtonWidget = {
                     @click="onButtonClick"
                     :title="buttonTitle">
                 <!-- SVG иконка -->
-                <img v-if="widgetConfig.icon && !widgetConfig.icon.startsWith('fas')" 
-                     :src="'/templates/icons/' + widgetConfig.icon"
+                <img v-if="widgetConfig.icon && !$isFontIcon(widgetConfig.icon)" 
+                     :src="$getIconSrc(widgetConfig.icon)"
                      :style="iconStyle"
                      alt=""
-                     @error="onIconError"
+                     @error="$onIconError"
                      class="button-icon">
                 <!-- FontAwesome иконка -->
-                <i v-else-if="widgetConfig.icon && widgetConfig.icon.startsWith('fas')" 
+                <i v-else-if="widgetConfig.icon && $isFontIcon(widgetConfig.icon)" 
                    :class="widgetConfig.icon"></i>
                 <!-- Текст: при icon+text или text-only -->
                 <span v-if="widgetConfig.label" 
@@ -56,7 +56,7 @@ const ButtonWidget = {
             return 'Кнопка';
         },
         iconStyle() {
-            if (!this.widgetConfig.icon || this.widgetConfig.icon.startsWith('fas')) {
+            if (!this.widgetConfig.icon || (window.GuiParser && window.GuiParser.isFontIcon(this.widgetConfig.icon))) {
                 return {};
             }
             const size = this.widgetConfig.iconSize || this.widgetConfig.size || 24;
@@ -89,15 +89,6 @@ const ButtonWidget = {
         }
     },
     methods: {
-        onIconError(event) {
-            const img = event && event.target;
-            if (!img) {
-                return;
-            }
-
-            img.style.display = 'none';
-        },
-
         onButtonClick() {
             // Если есть диалог — показываем его; действие (url/command) выполнится при нажатии accept
             if (this.widgetConfig.dialog) {
@@ -208,6 +199,4 @@ const ButtonWidget = {
 };
 
 // Регистрируем виджет глобально
-if (typeof window !== 'undefined') {
-    window.ButtonWidget = ButtonWidget;
-}
+window.ButtonWidget = ButtonWidget;

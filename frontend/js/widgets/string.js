@@ -14,8 +14,8 @@ const StringWidget = {
             :has-value="hasValue"
             :label-floats="labelFloats"
             :is-focused="isFocused"
-            :wrap-extra="{ error: !!regexError }"
-            :has-supporting="!!(widgetConfig.sup_text || regexError)">
+            :wrap-extra="{ error: !!fieldError }"
+            :has-supporting="!!(widgetConfig.sup_text || fieldError)">
             <input type="text"
                    class="form-control"
                    :placeholder="showPlaceholder ? widgetConfig.placeholder : ''"
@@ -27,7 +27,7 @@ const StringWidget = {
                    @focus="isFocused = true"
                    @blur="isFocused = false">
             <template #supporting>
-                <span v-if="regexError" class="md3-error" v-text="regexError"></span>
+                <span v-if="fieldError" class="md3-error" v-text="fieldError"></span>
                 <span v-else v-text="widgetConfig.sup_text"></span>
             </template>
         </md3-field>
@@ -41,21 +41,6 @@ const StringWidget = {
         showPlaceholder() { return !this.hasValue && this.isFocused && this.widgetConfig.placeholder; }
     },
     methods: {
-        validateRegex() {
-            const regex = this.widgetConfig.regex;
-            if (!regex || this.widgetConfig.readonly) {
-                this.regexError = '';
-                return;
-            }
-            try {
-                const re = typeof regex === 'string' ? new RegExp(regex) : regex;
-                this.regexError = (this.value !== '' && !re.test(this.value))
-                    ? (this.widgetConfig.err_text || 'Неверный формат')
-                    : '';
-            } catch {
-                this.regexError = '';
-            }
-        },
         onInput() {
             this.validateRegex();
             this.emitInput(this.value);
@@ -71,6 +56,4 @@ const StringWidget = {
     }
 };
 
-if (typeof window !== 'undefined') {
-    window.StringWidget = StringWidget;
-}
+window.StringWidget = StringWidget;

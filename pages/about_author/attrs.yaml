@@ -8,7 +8,7 @@ reptoid_img:
 reptoid_desc:
   widget: text
   label: "Личное дело"
-  rows: 12
+  rows: 13
   width: 1150
   readonly: true
   default: |
@@ -29,149 +29,149 @@ figma_button_1:
   widget: button
   label: "Figma 1"
   icon: "figma.svg"
-  width: 190
+  width: 200
   url: "https://www.figma.com/design/bXOOMY2nbXvDawmZhEd0In/VCConfigurator?node-id=0-1&t=MDulMSDrma2PPGCZ-1"
 
 figma_button_2:
   widget: button
   label: "Figma 2"
   icon: "figma.svg"
-  width: 190
+  width: 200
   url: "https://www.figma.com/design/Tgld7guoqW5Uewej60Pfto/Untitled?node-id=0-1&t=ZlQaZDg0PEgX6IPF-1"
 
 draw_io_button:
   widget: button
   label: "Draw.io"
   icon: "pdf_icon.svg"
-  width: 190
+  width: 200
   source: "templates/files/mobile_old.drawio.pdf"
 
 doc_1_button:
   widget: button
   icon: "pdf_icon.svg"
   label: "Атрибуты"
-  width: 190
+  width: 200
   source: "templates/files/attrs.pdf"
 
 doc_2_button:
   widget: button
   icon: "pdf_icon.svg"
   label: "Блок запросов"
-  width: 190
+  width: 200
   source: "templates/files/select.pdf"
 
 doc_3_button:
   widget: button
   icon: "pdf_icon.svg"
   label: "Словари"
-  width: 190
+  width: 200
   source: "templates/files/voc.pdf"
 
 user_guide_1_button:
   widget: button
   icon: "pdf_icon.svg"
   label: "РП на коленке"
-  width: 190
+  width: 200
   source: "templates/files/atom_util.pdf"
 
 user_guide_2_button:
   widget: button
   label: "РП от 2019 года"
   icon: "pdf_icon.svg"
-  width: 190
+  width: 200
   url: "https://neurochat.pro/upload/user_files/doc/rukovodstvo_polzovatelya.pdf"
 
 step_1:
   widget: button
   label: "Шаг 1"
   icon: "pdf_icon.svg"
-  width: 190
+  width: 200
   source: "templates/files/step_1.pdf"
 
 step_2:
   widget: button
   label: "Шаг 2"
   icon: "pdf_icon.svg"
-  width: 190
+  width: 200
   source: "templates/files/step_2.pdf"
 
 step_2_5:
   widget: button
   label: "Шаг 2,5"
   icon: "pdf_icon.svg"
-  width: 190
+  width: 200
   source: "templates/files/step_2_5.pdf"
 
 database_1:
   widget: button
   label: "Скрипт БД"
   icon: "postgres.svg"
-  width: 190
+  width: 200
   source: "templates/files/db_vcstudio.sql"
 
 database_2:
   widget: button
   label: "Процедуры"
   icon: "postgres.svg"
-  width: 190
+  width: 200
   source: "templates/files/procedure.sql"
 
 database_3:
   widget: button
   label: "Триггеры"
   icon: "postgres.svg"
-  width: 190
+  width: 200
   source: "templates/files/settings_db.sql"
 
 database_4:
   widget: button
   label: "ERD full"
-  width: 190
+  width: 200
   source: "templates/files/erd_full.svg"
 
 database_5:
   widget: button
   label: "ERD light"
-  width: 190
+  width: 200
   source: "templates/files/erd_light.svg"
 
 old_workflow:
   widget: button
   label: "Старый воркфлоу"
   icon: "pdf_icon.svg"
-  width: 190
+  width: 200
   source: "templates/files/old_flow.pdf"
 
 release_notes:
   widget: button
   label: "Описание релиза"
   icon: "pdf_icon.svg"
-  width: 190
+  width: 200
   source: "templates/files/release_1_19.pdf"
 
 drive2_button:
   widget: button
   label: "Drive2"
   icon: "drive2.png"
-  width: 190
+  width: 200
   url: "https://www.drive2.ru/l/703220425286486413/"
 
 youtube_button:
   widget: button
   label: "Обзор Бнв"
   icon: "youtube.png"
-  width: 190
+  width: 200
   url: "https://www.youtube.com/watch?v=isUCUoMP3ms"
 
 ai_present_button:
   widget: button
   label: "Презентация"
   icon: "pdf_icon.svg"
-  width: 190
+  width: 200
   source: "templates/files/ai_present.pdf"
 
 ai_text_button:
   widget: button
   label: "Заметки к презе"
-  width: 190
+  width: 200
   source: "templates/files/ai_text.rtf"

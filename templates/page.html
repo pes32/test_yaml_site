@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>YAML System - {{ page_config.title if page_config.title else (page_config.name if page_config.name else 'main') }}</title>
     <link href="{{ url_for('static', filename='css/vendor/bootstrap.min.css') }}?v={{ ASSETS_VERSION }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/vendor/font-awesome.min.css') }}?v={{ ASSETS_VERSION }}" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link href="{{ url_for('static', filename='css/fonts.css') }}?v={{ ASSETS_VERSION }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/style.css') }}?v={{ ASSETS_VERSION }}" rel="stylesheet">
 </head>
 <body>
@@ -20,16 +20,16 @@
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
             <div class="container-fluid">
                 <a class="navbar-brand" href="/">
-                    <i class="fas fa-code"></i> YAML System
+                    <span aria-hidden="true">&lt;/&gt;</span> YAML System
                 </a>
                 <div class="navbar-nav me-auto">
                     <span class="navbar-text">
-                        <i class="fas fa-file-alt"></i> {{ page_config.title if page_config.title else (page_config.name if page_config.name else 'main') }}
+                        <span aria-hidden="true">📄</span> {{ page_config.title if page_config.title else (page_config.name if page_config.name else 'main') }}
                     </span>
                 </div>
                 <div class="navbar-nav">
                     <a class="nav-link" href="/debug" target="_blank">
-                        <i class="fas fa-bug"></i> Debug
+                        <span aria-hidden="true">🐛</span> Debug
                     </a>
                 </div>
             </div>
@@ -47,13 +47,7 @@
                                 :key="index"
                                 @click="onMenuClick(index)">
                             <span class="menu-card-icon-shell">
-                                <span v-if="menu.icon" class="page-item-icon">
-                                    <img v-if="!isFontIcon(menu.icon)"
-                                         :src="getIconSrc(menu.icon)"
-                                         alt=""
-                                         @error="onIconError">
-                                    <i v-else :class="menu.icon"></i>
-                                </span>
+                                <item-icon v-if="menu.icon" :icon="menu.icon"></item-icon>
                             </span>
                             <span class="menu-card-label" v-text="menu.name || ('Меню ' + (index + 1))"></span>
                         </button>
@@ -69,13 +63,7 @@
                                    href="#"
                                    role="tab"
                                    @click.prevent="onTabClick(index)">
-                                    <span v-if="tab.icon" class="page-item-icon">
-                                        <img v-if="!isFontIcon(tab.icon)"
-                                             :src="getIconSrc(tab.icon)"
-                                             alt=""
-                                             @error="onIconError">
-                                        <i v-else :class="tab.icon"></i>
-                                    </span>
+                                    <item-icon v-if="tab.icon" :icon="tab.icon"></item-icon>
                                     <span class="page-tab-label" v-text="tab.name || ('Вкладка ' + (index + 1))"></span>
                                 </a>
                             </li>
@@ -83,72 +71,20 @@
 
                         <div class="tab-content page-tab-content" :class="{ 'page-tab-content--with-tabs': activeTabs.length > 1 }" id="mainTabContent">
                             <div class="tab-pane active show">
-                                <div v-for="(section, sidx) in activeSections" :key="sidx" class="page-section" :class="{ 'page-section--bare': !section.showHeader }">
-                                    <div class="card page-section-card">
-                                        <div v-if="section.showHeader"
-                                             class="card-header page-section-header"
-                                             :class="{ collapsed: section.collapsible && isSectionCollapsed(sidx) }"
-                                             :id="'heading-' + activeMenuIndex + '-' + sidx"
-                                             @click="section.collapsible ? toggleSectionCollapse(sidx) : null"
-                                             :style="section.collapsible ? 'cursor: pointer;' : ''">
-                                            <h5 class="mb-0 d-flex align-items-center page-section-title">
-                                                <span class="page-section-arrow-slot">
-                                                    <img v-if="section.collapsible"
-                                                         src="/templates/icons/arrow.svg"
-                                                         class="collapse-icon"
-                                                         alt="">
-                                                </span>
-                                                <span v-if="section.icon" class="page-item-icon">
-                                                    <img v-if="!isFontIcon(section.icon)"
-                                                         :src="getIconSrc(section.icon)"
-                                                         alt=""
-                                                         @error="onIconError">
-                                                    <i v-else :class="section.icon"></i>
-                                                </span>
-                                                <span v-text="section.name"></span>
-                                            </h5>
-                                        </div>
-
-                                        <div :class="section.collapsible ? ('collapse ' + (isSectionCollapsed(sidx) ? '' : 'show')) : ''"
-                                             :id="section.collapsible ? getSectionCollapseId(sidx) : null">
-                                            <div class="collapse-inner" :class="{ 'collapse-animating': section.collapsible && collapsingSectionId === getSectionCollapseId(sidx) }">
-                                            <div class="card-body page-section-body">
-                                                <div v-for="(row, rowIndex) in section.rows" :key="rowIndex" class="row mb-2">
-                                                    <div v-if="typeof row === 'string'" class="col-12">
-                                                        <span class="page-section-text" v-text="row"></span>
-                                                    </div>
-                                                    <div v-else-if="row.widgets && Array.isArray(row.widgets)" class="col-12">
-                                                        <div class="row">
-                                                            <div v-for="(item, itemIndex) in row.widgets" :key="itemIndex" class="col-auto">
-                                                                <widget-renderer
-                                                                    :widget-config="getWidgetConfig(item)"
-                                                                    :widget-name="item"
-                                                                    @execute="executeCommand">
-                                                                </widget-renderer>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div v-else-if="row.columns && typeof row.columns === 'object'" class="col-12">
-                                                        <div class="row">
-                                                            <div v-for="(column, colIndex) in row.columns"
-                                                                 :key="colIndex"
-                                                                 :class="'col-md-' + (12 / Object.keys(row.columns).length)">
-                                                                <div v-for="(item, itemIndex) in column.widgets" :key="itemIndex" class="mb-2">
-                                                                    <widget-renderer
-                                                                        :widget-config="getWidgetConfig(item)"
-                                                                        :widget-name="item"
-                                                                        @execute="executeCommand">
-                                                                    </widget-renderer>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                <section-card
+                                    v-for="(section, sidx) in activeSections"
+                                    :key="sidx"
+                                    :section="section"
+                                    :section-index="sidx"
+                                    :collapse-id="getSectionCollapseId(sidx)"
+                                    :is-collapsed="isSectionCollapsed(sidx)"
+                                    :is-animating="collapsingSectionId === getSectionCollapseId(sidx)"
+                                    :on-toggle="() => toggleSectionCollapse(sidx)"
+                                    :get-widget-config="getWidgetConfig"
+                                    :on-execute="executeCommand"
+                                    variant="page"
+                                    :header-id="'heading-' + activeMenuIndex + '-' + sidx">
+                                </section-card>
                             </div>
                         </div>
                     </div>

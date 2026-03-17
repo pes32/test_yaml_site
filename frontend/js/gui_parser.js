@@ -1,5 +1,6 @@
 (function () {
     const META_KEYS = new Set(['url', 'title']);
+    const COLLAPSE_ANIM_MS = 350;
 
     function parseDynamicKey(rawKey) {
         const key = String(rawKey || '').trim();
@@ -487,6 +488,27 @@
         return '/templates/icons/' + iconName;
     }
 
+    function onIconError(event) {
+        const img = event && event.target;
+        if (!img) return;
+        img.style.display = 'none';
+        if (img.parentElement) {
+            img.parentElement.style.display = 'none';
+        }
+    }
+
+    /** Возвращает активные секции из меню/модалки (по вкладке или напрямую). */
+    function getActiveSections(menuOrModal, tabIndex, tabs) {
+        if (!menuOrModal) return [];
+        const tabArray = Array.isArray(tabs) ? tabs : [];
+        if (tabArray.length) {
+            const safeIndex = Math.max(0, Math.min(tabIndex, tabArray.length - 1));
+            const activeTab = tabArray[safeIndex];
+            return activeTab && Array.isArray(activeTab.content) ? activeTab.content : [];
+        }
+        return Array.isArray(menuOrModal.content) ? menuOrModal.content : [];
+    }
+
     window.GuiParser = {
         parseDynamicKey: parseDynamicKey,
         parsePageGui: parsePageGui,
@@ -495,6 +517,9 @@
         collectWidgetNamesFromMenu: collectWidgetNamesFromMenu,
         collectWidgetNamesFromModal: collectWidgetNamesFromModal,
         isFontIcon: isFontIcon,
-        getIconSrc: getIconSrc
+        getIconSrc: getIconSrc,
+        onIconError: onIconError,
+        getActiveSections: getActiveSections,
+        COLLAPSE_ANIM_MS
     };
 })();

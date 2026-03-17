@@ -45,6 +45,4 @@ const Md3Field = {
     `
 };
 
-if (typeof window !== 'undefined') {
-    window.Md3Field = Md3Field;
-}
+window.Md3Field = Md3Field;
