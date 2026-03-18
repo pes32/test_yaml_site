@@ -6,7 +6,7 @@ const ImgWidget = {
         widgetName: { type: String, required: true }
     },
     template: `
-        <div class="widget-container widget-img">
+        <div class="widget-container widget-img u-wide">
             <div v-if="widgetConfig.label" class="widget-img-description">
                 <span v-text="widgetConfig.label"></span>
             </div>

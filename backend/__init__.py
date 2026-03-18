@@ -41,9 +41,9 @@ from .routes_api import register_api_routes
 from .routes_debug import register_debug_routes
 
 register_static_routes(app)
+register_debug_routes(app, CONFIG_SERVICE, LOG_FILE_PATH)  # до catch-all страниц
 register_page_routes(app, CONFIG_SERVICE)
 register_api_routes(app, CONFIG_SERVICE, LOG_FILE_PATH)
-register_debug_routes(app, CONFIG, LOG_FILE_PATH)
 
 # Упрощённый экспорт
 __all__ = ["app", "CONFIG", "CONFIG_SERVICE", "LOG_FILE_PATH"]

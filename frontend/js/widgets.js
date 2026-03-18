@@ -63,7 +63,7 @@ window.WidgetRenderer = WidgetRenderer;
 const ItemIcon = {
     props: { icon: { type: String, default: '' } },
     template: `
-        <span v-if="icon" class="page-item-icon">
+        <span v-if="icon" class="page-item-icon inline-flex-center">
             <img v-if="!$isFontIcon(icon)" :src="$getIconSrc(icon)" alt="" @error="$onIconError">
             <i v-else :class="icon"></i>
         </span>
@@ -79,9 +79,16 @@ const ContentRows = {
         textClass: { type: String, default: 'page-section-text' }
     },
     emits: ['execute'],
+    methods: {
+        nextRowHasWidgets(rowIndex) {
+            const next = this.rows[rowIndex + 1];
+            return next && typeof next === 'object' && next.widgets && Array.isArray(next.widgets);
+        }
+    },
     template: `
         <template v-for="(row, rowIndex) in rows" :key="rowIndex">
-            <div class="row mb-2">
+            <div class="row row--section"
+                 :class="{ 'row--text': typeof row === 'string', 'row--before-widgets': nextRowHasWidgets(rowIndex) }">
                 <div v-if="typeof row === 'string'" class="col-12">
                     <span :class="textClass" v-text="row"></span>
                 </div>
@@ -142,8 +149,8 @@ const SectionCard = {
                      @click="section.collapsible && onToggle ? onToggle() : null"
                      :style="section.collapsible ? 'cursor: pointer;' : ''">
                     <component :is="titleTag" class="mb-0 d-flex align-items-center" :class="titleClass">
-                        <span v-if="section.collapsible" :class="arrowSlotClass">
-                            <img src="/templates/icons/arrow.svg" class="collapse-icon" :class="collapseIconExtra" alt="">
+                        <span v-if="section.showHeader" :class="arrowSlotClass">
+                            <img v-if="section.collapsible" src="/templates/icons/arrow.svg" class="collapse-icon" :class="collapseIconExtra" alt="">
                         </span>
                         <item-icon v-if="section.icon" :icon="section.icon"></item-icon>
                         <span v-text="section.name"></span>
@@ -171,7 +178,7 @@ const SectionCard = {
             return { 'page-section': true, 'page-section--bare': !this.section.showHeader };
         },
         cardClass() {
-            return this.variant === 'page' ? 'card page-section-card' : 'card';
+            return this.variant === 'page' ? 'card page-section-card u-wide' : 'card u-wide';
         },
         headerClass() {
             const base = { collapsed: this.section.collapsible && this.isCollapsed };
@@ -180,10 +187,10 @@ const SectionCard = {
         },
         titleTag() { return this.variant === 'page' ? 'h5' : 'h6'; },
         titleClass() { return this.variant === 'page' ? 'page-section-title' : ''; },
-        arrowSlotClass() { return this.variant === 'page' ? 'page-section-arrow-slot' : ''; },
+        arrowSlotClass() { return this.variant === 'page' ? 'page-section-arrow-slot inline-flex-center' : 'inline-flex-center'; },
         collapseIconExtra() { return this.variant === 'modal' ? 'me-2' : ''; },
         bodyClass() {
-            return this.variant === 'page' ? 'card-body page-section-body' : 'card-body';
+            return this.variant === 'page' ? 'card-body page-section-body u-wide' : 'card-body u-wide';
         },
         contentTextClass() {
             return this.variant === 'modal' ? 'text-muted' : 'page-section-text';
@@ -251,8 +258,8 @@ const ModalManager = {
         window.modalManager = this;
     },
     template: `
-        <div v-if="showModal" class="modal-overlay" @click="closeModal">
-            <div class="modal-content" @click.stop>
+        <div v-if="showModal" class="modal-overlay flex-center" @click="closeModal">
+            <div class="modal-content w-100" @click.stop>
                 <div class="modal-header">
                     <div class="d-flex align-items-center gap-2">
                         <item-icon v-if="modalConfig && modalConfig.icon" :icon="modalConfig.icon"></item-icon>
@@ -275,8 +282,8 @@ const ModalManager = {
                             </li>
                         </ul>
                         
-                        <div class="tab-content">
-                            <div class="tab-pane active">
+                        <div class="tab-content u-wide">
+                            <div class="tab-pane active u-wide">
                                 <section-card
                                     v-for="(section, sidx) in activeSections"
                                     :key="sidx"

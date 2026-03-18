@@ -1,0 +1,43 @@
+/* utilities.css — .d-flex, .gap-2, .mb-2 и др. (в конце — побеждают по каскаду) */
+
+/* Утилита: блоки подстраиваются под экран — min 500px, max 100% */
+.u-wide {
+    width: 100%;
+    min-width: min(500px, 100%);
+    max-width: 100%;
+}
+
+/* width control */
+.w-100 { width: 100%; }
+.w-auto { width: auto; }
+.min-w-0 { min-width: 0; }
+.max-w-none { max-width: none; }
+
+.d-flex { display: flex; }
+.d-inline-flex { display: inline-flex; }
+.flex-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.inline-flex-center {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.align-items-center { align-items: center; }
+.justify-content-between { justify-content: space-between; }
+.justify-content-end { justify-content: flex-end; }
+.gap-2 { gap: 0.5rem; }
+.gap-3 { gap: 1rem; }
+.mb-0 { margin-bottom: 0; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-3 { margin-bottom: 1rem; }
+.mt-2 { margin-top: 0.5rem; }
+.mt-3 { margin-top: 1rem; }
+.ms-2 { margin-left: 0.5rem; }
+.me-2 { margin-right: 0.5rem; }
+.me-auto { margin-right: auto; }
+.text-muted { color: #6c757d; }
+.text-danger { color: #dc3545; }
+.text-decoration-none { text-decoration: none; }

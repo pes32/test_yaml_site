@@ -46,20 +46,20 @@ const TableWidget = {
                                                @input="onCellWidgetPayload(rowIndex, cellIndex, $event)"/>
                                     <input v-else-if="column.type==='datetime'"
                                            type="datetime-local"
-                                           class="cell-input"
+                                           class="cell-input w-100"
                                            :value="safeCell(row, cellIndex)"
                                            @input="onCellInput(rowIndex, cellIndex, $event)"
                                            @blur="onCellFormat(rowIndex, cellIndex, column)"
                                            @keydown="onCellKeydown(rowIndex, cellIndex, $event)"/>
                                     <input v-else-if="column.type==='date'"
                                            type="date"
-                                           class="cell-input"
+                                           class="cell-input w-100"
                                            :value="safeCell(row, cellIndex)"
                                            @input="onCellInput(rowIndex, cellIndex, $event)"
                                            @keydown="onCellKeydown(rowIndex, cellIndex, $event)"/>
                                     <input v-else-if="column.type==='time'"
                                            type="time"
-                                           class="cell-input"
+                                           class="cell-input w-100"
                                            :value="safeCell(row, cellIndex)"
                                            @input="onCellInput(rowIndex, cellIndex, $event)"
                                            @keydown="onCellKeydown(rowIndex, cellIndex, $event)"/>
@@ -70,14 +70,14 @@ const TableWidget = {
                                                @input="onCellWidgetPayload(rowIndex, cellIndex, $event)"/>
                                     <input v-else-if="column.type==='ip'"
                                            type="text"
-                                           class="cell-input"
+                                           class="cell-input w-100"
                                            :value="safeCell(row, cellIndex)"
                                            @input="onIpInput(rowIndex, cellIndex, $event)"
                                            @keydown="onCellKeydown(rowIndex, cellIndex, $event)"
                                            placeholder="xxx.xxx.xxx.xxx"/>
                                     <input v-else
                                         type="text"
-                                           class="cell-input"
+                                           class="cell-input w-100"
                                         :value="safeCell(row, cellIndex)"
                                         @input="onCellInput(rowIndex, cellIndex, $event)"
                                            @blur="onCellFormat(rowIndex, cellIndex, column)"
@@ -189,7 +189,7 @@ const TableWidget = {
             if (!this._measureCtx) {
                 const canvas = document.createElement('canvas');
                 this._measureCtx = canvas.getContext('2d');
-                // Приблизительно соответствуем шрифту заголовка таблицы Bootstrap
+                // Приблизительно соответствуем шрифту заголовка таблицы
                 this._measureCtx.font = '500 16px system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", \"Liberation Sans\", sans-serif';
             }
             return this._measureCtx;

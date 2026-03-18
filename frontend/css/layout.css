@@ -1,0 +1,437 @@
+/* layout.css — page-shell, tabs, sections, menu */
+
+.page-shell {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--page-gap);
+    padding: var(--page-gap);
+    box-sizing: border-box;
+}
+
+.page-sidebar {
+    position: relative;
+    top: auto;
+    flex: 0 0 auto;
+    width: auto;
+    align-self: flex-start;
+}
+
+.menu-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.page-menu-rail {
+    align-items: center;
+    gap: var(--page-gap);
+    width: 104px;
+    padding: var(--page-gap) 12px var(--page-gap);
+    border-radius: var(--radius-section);
+    background-color: var(--color-bg-soft);
+    box-sizing: border-box;
+}
+
+.menu-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 4px;
+    width: 80px;
+    min-height: 56px;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--color-text-muted);
+    text-align: center;
+    transition: color 0.15s ease-in-out;
+}
+
+.menu-card:hover,
+.menu-card.active {
+    background: transparent;
+    border-color: transparent;
+}
+.menu-card:hover { color: var(--color-text-main); }
+.menu-card.active {
+    box-shadow: none;
+    color: var(--color-text-main);
+    font-weight: 600;
+}
+
+.page-content-column {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: visible;
+}
+/* Цепочка min-width: 0 — чтобы широкие таблицы не растягивали layout, а скроллились */
+.page-content-column > div,
+.page-tab-content,
+.page-tab-content > .tab-pane {
+    min-width: 0;
+}
+
+.menu-card-icon-shell {
+    width: 56px;
+    height: 32px;
+    border-radius: var(--radius-lg);
+    background: transparent;
+    transition: background-color 0.15s ease-in-out;
+}
+
+.menu-card.active .menu-card-icon-shell {
+    background-color: var(--color-accent-soft);
+}
+
+.menu-card.active .menu-card-label {
+    font-weight: 700;
+}
+
+.menu-card:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+.menu-card-label {
+    display: block;
+    width: 100%;
+    color: inherit;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    line-height: var(--lh-sm);
+    white-space: normal;
+    word-break: break-word;
+}
+
+.page-item-icon {
+    flex: 0 0 auto;
+    width: 1rem;
+    height: 1rem;
+}
+
+.page-item-icon img {
+    width: 1rem;
+    height: 1rem;
+    object-fit: contain;
+}
+
+.page-item-icon i {
+    font-size: var(--text-md);
+}
+
+.menu-card .page-item-icon,
+.page-tabs .page-item-icon,
+.page-section-header .page-item-icon {
+    width: 24px;
+    height: 24px;
+    color: inherit;
+}
+
+.menu-card .page-item-icon img,
+.page-tabs .page-item-icon img,
+.page-section-header .page-item-icon img {
+    width: 24px;
+    height: 24px;
+}
+
+/* Иконки в меню и табах: неактивный — тусклый, активный/ховер — насыщенный */
+.menu-card:not(.active) .page-item-icon img,
+.page-tabs .nav-link:not(.active) .page-item-icon img {
+    opacity: 0.6;
+    filter: grayscale(1);
+}
+.menu-card.active .page-item-icon img,
+.menu-card:hover .page-item-icon img,
+.page-tabs .nav-link.active .page-item-icon img,
+.page-tabs .nav-link:hover .page-item-icon img {
+    opacity: 1;
+    filter: none;
+}
+
+.menu-card .page-item-icon i,
+.page-tabs .page-item-icon i,
+.page-section-header .page-item-icon i {
+    font-size: var(--text-xl);
+}
+
+.page-tabs {
+    margin: 0;
+    display: flex;
+    align-items: flex-end;
+    gap: 0;
+    width: fit-content;
+    min-width: 0;
+    max-width: calc(100vw - 164px);
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-section) var(--radius-section) 0 0;
+    background-color: var(--color-bg-soft);
+    box-sizing: border-box;
+    flex-wrap: nowrap;
+}
+
+.page-tabs--focused {
+    overflow-y: visible;
+    position: relative;
+    z-index: 2;
+}
+
+.page-tabs .nav-item {
+    margin: 0;
+    flex: 0 0 auto;
+}
+
+.page-tabs .nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+    height: 52px;
+    padding: 16px;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: var(--color-text-muted);
+    font-size: var(--text-lg);
+    font-weight: 500;
+    line-height: var(--text-lg);
+    overflow: hidden;
+    box-sizing: border-box;
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+.page-tabs .nav-link::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 5px;
+    background: transparent;
+}
+
+.page-tabs .nav-item:first-child .nav-link {
+    border-top-left-radius: var(--radius-section);
+}
+
+.page-tabs .nav-item:last-child .nav-link {
+    border-top-right-radius: var(--radius-section);
+}
+
+.page-tabs .nav-link:hover,
+.page-tabs .nav-link:focus {
+    border-color: transparent;
+    background: transparent;
+    color: var(--color-text-main);
+}
+
+.page-tabs .nav-link:focus-visible {
+    outline: none;
+    overflow: visible;
+}
+
+.page-tabs .nav-link:focus-visible::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    box-shadow: inset 0 0 0 2px var(--color-primary);
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.page-tabs .nav-link.active,
+.page-tabs .nav-link.active:hover,
+.page-tabs .nav-link.active:focus {
+    border: none;
+    background: transparent;
+    color: var(--color-text-main);
+    font-weight: 700;
+}
+
+.page-tabs .nav-link.active::after,
+.page-tabs .nav-link.active:hover::after,
+.page-tabs .nav-link.active:focus::after {
+    background: var(--color-accent-soft);
+}
+
+.page-tab-label {
+    color: inherit;
+    white-space: nowrap;
+}
+
+.page-tab-content {
+    padding: 0 var(--page-gap) var(--page-gap);
+    box-sizing: border-box;
+}
+.page-tab-content--with-tabs {
+    padding-top: var(--page-gap);
+}
+.page-tab-content > .tab-pane {
+    margin: 0;
+}
+.page-tab-content:not(.page-tab-content--with-tabs) {
+    padding-left: 0;
+}
+
+.page-section + .page-section {
+    margin-top: var(--page-gap);
+}
+
+.card.page-section-card {
+    border-radius: var(--radius-lg);
+    border: none;
+    box-shadow: none;
+    background: transparent;
+    min-width: 0; /* позволяет секции сжиматься, overflow даст скролл при широкой таблице */
+}
+
+.card-header.page-section-header {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    width: 100%;
+    margin: 0;
+    padding: 10px 15px;
+    border: none;
+    border-bottom: none;
+    border-radius: var(--radius-section) var(--radius-section) 0 0;
+    background-color: var(--color-bg-soft);
+    box-sizing: border-box;
+    box-shadow: none;
+    overflow: hidden;
+}
+
+.page-section-body {
+    padding: 20px;
+    border-left: 5px solid var(--color-bg-soft);
+    border-right: 5px solid var(--color-bg-soft);
+    border-bottom: 5px solid var(--color-bg-soft);
+    border-top: none;
+    border-radius: 0 0 var(--radius-section) var(--radius-section);
+    background-color: var(--color-bg);
+    box-sizing: border-box;
+    min-width: 0;
+    overflow-x: auto;
+}
+
+/* Обычный текст секций (строки из gui.yaml) — основной цвет интерфейса */
+.page-section-text {
+    color: var(--color-text-main);
+}
+
+/* Расстояние между рядами: текст компактно, перед виджетами — больше */
+.page-section-body .row--section {
+    margin-bottom: 1rem;
+}
+.page-section-body .row--text {
+    margin-bottom: 0.35rem;
+}
+.page-section-body .row--text.row--before-widgets {
+    margin-bottom: 1rem;
+}
+
+/* box без заголовка: полная рамка и скругление */
+.page-section--bare .page-section-card .page-section-body {
+    border-top: 5px solid var(--color-bg-soft);
+    border-radius: var(--radius-section);
+}
+
+/* Секции без заголовка (просто row) — без рамки, 20px между элементами */
+.page-section--bare .page-section-card,
+.page-section--bare .page-section-card .page-section-body {
+    border: none;
+    box-shadow: none;
+    background: transparent;
+    border-radius: 0;
+}
+/* Меню без вкладок: bare-секции уже у левого края (padding-left: 0) */
+.page-tab-content:not(.page-tab-content--with-tabs) .page-section--bare .page-section-body {
+    margin-left: 0;
+    padding: 0;
+}
+/* Секции внутри вкладки: выравнивание по левому краю box/collapse (одна линия) */
+.page-tab-content--with-tabs .page-section--bare .page-section-body {
+    margin-left: 0;
+    padding: 0;
+}
+.page-section--bare .page-section-body {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+.page-section--bare .page-section-body .row--section {
+    margin-bottom: 0;
+}
+
+.page-section-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 24px;
+    color: var(--color-text-main);
+    font-size: var(--text-lg);
+    font-weight: 600;
+    line-height: var(--lh-md);
+}
+
+.page-section-title > span:last-child {
+    color: inherit;
+}
+
+.page-section-arrow-slot {
+    width: 20px;
+    flex: 0 0 20px;
+}
+
+/* === Layout: container, html === */
+/* Основной контейнер — не выходит за ширину экрана */
+.container-fluid {
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+}
+
+/* Отступ для основного контента под фиксированной навигацией */
+.container-fluid.mt-3 {
+    margin-top: 0;
+}
+
+html {
+    overflow-x: auto;
+    width: 100%;
+    max-width: 100%;
+}
+
+/* Вкладки модалок остаются в пределах экрана */
+.nav-tabs:not(.page-tabs) {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+/* Debug: список страниц YAML — путь кликабельный */
+.pages-list {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: var(--text-md);
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+.pages-line {
+    margin-bottom: 0.25em;
+}
+.pages-url {
+    color: var(--color-primary);
+    text-decoration: none;
+}
+.pages-url:hover {
+    text-decoration: underline;
+}

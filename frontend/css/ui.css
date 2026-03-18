@@ -1,0 +1,236 @@
+/* ui.css — btn, card, nav, dropdown, form-control, table, collapse */
+
+/* === Buttons === */
+.btn {
+    display: inline-block;
+    padding: 0.375rem 0.75rem;
+    font-size: var(--text-md);
+    line-height: 1.5;
+    text-align: center;
+    text-decoration: none;
+    vertical-align: middle;
+    cursor: pointer;
+    border: 1px solid transparent;
+    border-radius: 0.25rem;
+    background-color: transparent;
+}
+.btn:disabled { opacity: 0.65; cursor: not-allowed; }
+.btn-primary {
+    color: var(--color-bg);
+    background-color: var(--focus-color);
+    border-color: var(--focus-color);
+}
+.btn-primary:hover:not(:disabled) {
+    filter: brightness(0.9);
+}
+.btn-secondary {
+    color: var(--color-bg);
+    background-color: var(--color-btn-secondary);
+    border-color: var(--color-btn-secondary);
+}
+.btn-secondary:hover:not(:disabled) {
+    background-color: var(--color-btn-secondary-hover);
+    border-color: var(--color-btn-secondary-hover);
+}
+.btn-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5em;
+    height: 1.5em;
+    padding: 0;
+    font-size: 1.25em;
+    line-height: 1;
+    color: var(--color-text);
+    background: transparent;
+    border: 0;
+    border-radius: 0.25rem;
+    opacity: 0.5;
+    cursor: pointer;
+}
+.btn-close::before { content: "×"; }
+.btn-close:hover { opacity: 0.75; }
+
+.fade { transition: opacity 0.15s linear; }
+.fade:not(.show) { opacity: 0; }
+.show { opacity: 1; }
+
+/* === Grid === */
+.row {
+    display: flex;
+    flex-wrap: wrap;
+    margin-right: -0.75rem;
+    margin-left: -0.75rem;
+}
+.row .row {
+    flex-wrap: nowrap;
+}
+.row > * {
+    flex-shrink: 0;
+    width: 100%;
+    max-width: 100%;
+    padding-right: 0.75rem;
+    padding-left: 0.75rem;
+}
+.col-12 { flex: 0 0 auto; width: 100%; }
+.col-auto { flex: 0 0 auto; width: auto; }
+.col-md-3 { flex: 0 0 auto; width: 25%; }
+.col-md-4 { flex: 0 0 auto; width: 33.333333%; }
+.col-md-6 { flex: 0 0 auto; width: 50%; }
+@media (max-width: 767.98px) {
+    .col-md-3, .col-md-4, .col-md-6 { width: 100%; }
+}
+
+/* === Page header === */
+.page-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: var(--z-navbar);
+    height: var(--app-navbar-height);
+    padding: 0 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: var(--color-navbar-bg);
+}
+.page-header-brand {
+    font-size: var(--text-lg);
+    font-weight: bold;
+    text-decoration: none;
+    color: var(--color-navbar-text);
+}
+.page-header-brand:hover { color: var(--color-bg); }
+.page-header-link {
+    font-size: var(--text-md);
+    text-decoration: none;
+    color: var(--color-navbar-text);
+}
+.page-header-link:hover { color: var(--color-bg); }
+
+/* === Nav / Tabs (для вкладок меню и модалок) === */
+.nav {
+    display: flex;
+    flex-wrap: wrap;
+    padding-left: 0;
+    margin-bottom: 0;
+    list-style: none;
+}
+.nav-tabs { border-bottom: 1px solid var(--color-border); }
+.nav-item { margin-bottom: -1px; }
+.nav-link {
+    display: block;
+    padding: 0.5rem 1rem;
+    text-decoration: none;
+    color: var(--color-primary);
+    background: none;
+    border: 1px solid transparent;
+    border-top-left-radius: 0.25rem;
+    border-top-right-radius: 0.25rem;
+}
+.nav-link:hover { border-color: var(--color-border-light) var(--color-border-light) var(--color-border); color: var(--color-primary-hover); }
+.nav-link.active {
+    color: var(--color-text-secondary);
+    background-color: var(--color-bg);
+    border-color: var(--color-border) var(--color-border) var(--color-bg);
+}
+.tab-content > .tab-pane { display: none; }
+.tab-content > .tab-pane.active { display: block; }
+.tab-content > .tab-pane.show { display: block; }
+
+/* === Card === */
+.card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    word-wrap: break-word;
+    box-shadow: 0 0.125rem 0.25rem var(--color-shadow-sm);
+    border: 1px solid var(--color-shadow-border);
+}
+.card-header {
+    padding: 0.5rem 1rem;
+    margin-bottom: 0;
+    background-color: var(--color-bg-muted);
+    border-bottom: 1px solid var(--color-shadow-border);
+    transition: background-color calc(var(--anim-ms) * 1ms);
+}
+.card-header h5 {
+    margin: 0;
+    color: var(--color-text-secondary);
+}
+.card-body { flex: 1 1 auto; padding: 1rem; }
+
+/* === Form === */
+.form-control {
+    display: block;
+    width: 100%;
+    padding: 0.375rem 0.75rem;
+    font-size: var(--text-md);
+    line-height: 1.5;
+    color: var(--color-text-dark);
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border-input);
+    border-radius: 0.25rem;
+}
+.form-control:focus {
+    outline: 0;
+    border-color: var(--focus-color);
+    box-shadow: var(--focus-shadow);
+}
+
+/* === Table === */
+.table {
+    width: 100%;
+    margin-bottom: 1rem;
+    border-collapse: collapse;
+}
+.table th, .table td {
+    padding: 0.75rem;
+    vertical-align: top;
+    border-top: 1px solid var(--color-border);
+}
+.table thead th {
+    vertical-align: bottom;
+    border-bottom: 2px solid var(--color-border);
+}
+.table-striped tbody tr:nth-of-type(odd) { background-color: var(--color-bg-stripe); }
+
+/* === Dropdown === */
+.dropdown { position: relative; }
+.dropdown-menu {
+    position: absolute;
+    z-index: var(--z-dropdown);
+    display: none;
+    min-width: 10rem;
+    padding: 0.5rem 0;
+    margin: 0.125rem 0 0;
+    font-size: var(--text-md);
+    color: var(--color-text-dark);
+    text-align: left;
+    list-style: none;
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-shadow);
+    border-radius: 0.25rem;
+}
+.dropdown-menu.show { display: block; }
+.dropdown-item {
+    display: block;
+    width: 100%;
+    padding: 0.25rem 1rem;
+    clear: both;
+    font-weight: 400;
+    color: var(--color-text-dark);
+    text-align: inherit;
+    text-decoration: none;
+    white-space: nowrap;
+    background-color: transparent;
+    border: 0;
+}
+.dropdown-item:hover { background-color: var(--color-border-light); }
+.dropdown-item.active { color: var(--color-bg); background-color: var(--color-primary); }
+
+/* === Collapse (только display) === */
+.collapse { display: none; }
+.collapse.show { display: block; }

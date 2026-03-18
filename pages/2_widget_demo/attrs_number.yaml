@@ -26,12 +26,30 @@
 
 # === ЧИСЛОВЫЕ ВИДЖЕТЫ ===
 
-# Целое число
-demo_int:
+int_1:
   widget: int
-  label: "Целое число (int)"
-  sup_text: "Виджет для ввода целых чисел с валидацией"
+  label: "1) Целое число"
+
+int_2:
+  widget: int
+  label: "2) Длинное целое число"
+  sup_text: "с подсказкой, regex и плейсхолдером"
+  err_text: "Введите число 42"
+  regex: "^42$"
+  width: 350
+  placeholder: "Введите число 42"
+
+int_3:
+  widget: int
+  label: "3) Заполненное число"
   default: 42
+
+int_4:
+  widget: int
+  label: "4) readonly и default"
+  default: 123456789
+  readonly: true
+  sup_text: "Это поле нельзя изменить"
 
 # Число с плавающей точкой
 demo_float:

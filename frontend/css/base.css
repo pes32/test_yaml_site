@@ -1,0 +1,93 @@
+/* base.css — reset + tokens + body base */
+
+/* === Reset (минимальный) === */
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; line-height: 1.5; -webkit-text-size-adjust: 100%; }
+
+/* === Design tokens === */
+:root {
+    --app-navbar-height: 44px;
+    --page-gap: 20px;
+    --font-mono: 'JetBrains Mono', monospace;
+    --anim-ms: 300;
+    --focus-color: #86b7fe;
+    --focus-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    --widget-dropdown-w: 300px;
+
+    --color-text-main: #474747;
+    --color-text-muted: #707579;
+    --color-text: #000;
+    --color-text-secondary: #495057;
+    --color-bg: #fff;
+    --color-bg-soft: #F2F6FE;
+    --color-bg-muted: #f8f9fa;
+    --color-accent-soft: #d4e3fb;
+    --color-accent-hover: #bfd6f9;
+
+    --color-btn-secondary: #6c757d;
+    --color-btn-secondary-hover: #5c636a;
+    --color-muted: #6c757d;
+
+    --color-danger: #dc3545;
+    --color-danger-shadow: rgba(220, 53, 69, 0.25);
+    --color-error: #F36058;
+
+    --color-border: #dee2e6;
+    --color-border-input: #ced4da;
+    --color-dropdown-hover: #e7f1ff;
+    --color-dropdown-active: #cfe2ff;
+    --color-table-hover: #dfe6f0;
+
+    --color-overlay: rgba(0, 0, 0, 0.5);
+    --color-shadow: rgba(0, 0, 0, 0.15);
+    --color-shadow-sm: rgba(0, 0, 0, 0.075);
+    --color-shadow-border: rgba(0, 0, 0, 0.125);
+    --color-bg-stripe: rgba(0, 0, 0, 0.05);
+    --color-icon-only-hover: rgba(212, 227, 251, 0.5);
+
+    --color-navbar-bg: #212529;
+    --color-navbar-text: rgba(255, 255, 255, 0.9);
+    --color-primary: #0d6efd;
+    --color-primary-hover: #0a58ca;
+    --color-text-dark: #212529;
+    --color-border-light: #e9ecef;
+
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-section: 15px;
+
+    --z-navbar: 1000;
+    --z-dropdown: 1100;
+    --z-modal: 1200;
+    --z-overlay: 1300;
+
+    --text-sm: 12px;
+    --text-base: 14px;
+    --text-md: 16px;
+    --text-lg: 20px;
+    --text-xl: 24px;
+
+    --lh-sm: 16px;
+    --lh-md: 24px;
+    --lh-lg: 32px;
+}
+
+body,
+button,
+input,
+textarea,
+select {
+    font-family: var(--font-mono);
+}
+
+button, .btn, .widget-button {
+    font-weight: 700;
+}
+
+body {
+    background-color: var(--color-bg);
+    overflow-x: auto;
+    padding-top: var(--app-navbar-height);
+    width: 100%;
+    min-width: 100%;
+}

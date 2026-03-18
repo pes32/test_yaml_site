@@ -18,8 +18,8 @@ const ListWidget = {
             :has-supporting="!!widgetConfig.sup_text"
             @focusout="onListFocusOut"
             @container-focusout="onFocusOut">
-            <div class="dropdown widget-dropdown" ref="dropdownRoot">
-                <button class="btn md3-dropdown-toggle dropdown-toggle"
+            <div class="dropdown widget-dropdown w-100 min-w-0 max-w-none" ref="dropdownRoot">
+                <button class="btn md3-dropdown-toggle dropdown-toggle w-100 min-w-0 max-w-none"
                         type="button"
                         :aria-expanded="isDropdownOpen"
                         ref="dropdownToggle"

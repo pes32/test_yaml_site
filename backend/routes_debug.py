@@ -1,155 +1,61 @@
 # backend/routes_debug.py
+"""Debug-панель: /debug и /api/debug/*."""
+
 from __future__ import annotations
 
 import os
-import sys
-import platform
-import re
-from datetime import datetime
-from typing import Dict, Any
-from flask import jsonify, make_response, render_template, send_from_directory, request
-import logging
 
-logger = logging.getLogger(__name__)
+from flask import jsonify, render_template
 
 
-def register_debug_routes(app, CONFIG: Dict[str, Any], LOG_FILE_PATH: str):
-    """Регистрирует debug-панель и связанные /api/debug/* маршруты."""
+def register_debug_routes(app, config_service, log_file_path: str):
+    """Регистрирует debug-панель и API."""
 
-    # -------- UI --------
     @app.route("/debug")
     def debug_panel():
         return render_template("debug.html")
 
-    # -------- API: /api/debug/structure --------
     @app.route("/api/debug/structure")
     def api_debug_structure():
-        """Возвращает **только** список файлов проекта (yaml / py / js)."""
-        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-
-        yaml_files: list[str] = []
-        py_files: list[str] = []
-        js_files: list[str] = []
-
-        for root, dirs, files in os.walk(project_root):
-            # Пропускаем виртуальное окружение, VCS и скрытые каталоги
-            dirs[:] = [d for d in dirs if not d.startswith('.') and d not in {'.venv', '.git', '__pycache__'}]
-            for fname in files:
-                path_rel = os.path.relpath(os.path.join(root, fname), project_root)
-                if fname.endswith((".yaml", ".yml")):
-                    yaml_files.append(path_rel)
-                elif fname.endswith(".py"):
-                    py_files.append(path_rel)
-                elif fname.endswith(".js"):
-                    js_files.append(path_rel)
-
-        payload = {
-            "yaml": sorted(yaml_files),
-            "python": sorted(py_files),
-            "js": sorted(js_files),
-        }
-        return jsonify(payload)
-
-    # -------- API: /api/debug/modules --------
-    @app.route("/api/debug/modules")
-    def api_loaded_modules():
-        try:
-            modules = sorted(sys.modules.keys())
-            return jsonify({"count": len(modules), "modules": modules})
-        except Exception as e:  # pragma: no cover
-            return jsonify({"error": str(e)}), 500
-
-    # -------- API: /api/debug/logs --------
-    @app.route("/api/debug/logs")
-    def api_get_logs():
-        log_file = LOG_FILE_PATH
-        parsed_logs = []
-        try:
-            if os.path.exists(log_file):
-                with open(log_file, "r", encoding="utf-8", errors="ignore") as fh:
-                    lines = fh.readlines()[-300:]
-                pattern = re.compile(r"^(?P<ts>[^ ]+ [^ ]+)\s+(?P<level>[A-Z]+)\s+(?P<logger>[^:]+):\s+(?P<msg>.*)$")
-                for line in lines:
-                    m = pattern.match(line.rstrip("\n"))
-                    if m:
-                        parsed_logs.append({
-                            "timestamp": m["ts"],
-                            "level": m["level"],
-                            "message": m["msg"],
-                        })
-                    else:
-                        parsed_logs.append({"timestamp": "", "level": "INFO", "message": line})
-            else:
-                parsed_logs.append({
-                    "timestamp": datetime.now().isoformat(),
-                    "level": "INFO",
-                    "message": "Файл лога ещё не создан. Он появится при первом лог-сообщении.",
+        """Структура API приложения — все зарегистрированные маршруты."""
+        routes = []
+        for rule in app.url_map.iter_rules():
+            if rule.endpoint and rule.endpoint != "static":
+                routes.append({
+                    "rule": str(rule.rule),
+                    "methods": sorted(m for m in (rule.methods or set()) if m not in {"HEAD", "OPTIONS"}),
+                    "endpoint": rule.endpoint,
                 })
-        except Exception as e:  # pragma: no cover
-            parsed_logs = [{"timestamp": datetime.now().isoformat(), "level": "ERROR", "message": str(e)}]
-        response = make_response(jsonify({"logs": parsed_logs, "path": log_file}))
-        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
-        return response
+        routes.sort(key=lambda r: r["rule"])
+        return jsonify({"routes": routes})
 
-    # -------- API: /api/debug/routes --------
-    @app.route("/api/debug/routes")
-    def api_list_routes():
-        include_debug = request.args.get("include_debug") == "1"
-        collected: dict[str, set[str]] = {}
-        for r in app.url_map.iter_rules():
-            rule = str(r)
-            if not rule.startswith("/api/"):
-                continue  # интересуют только API
-            if not include_debug and rule.startswith("/api/debug"):
-                continue  # исключаем debug-api (если не запросили явно)
-            methods = {m for m in (r.methods or []) if m not in {"HEAD", "OPTIONS"}}
-            collected.setdefault(rule, set()).update(methods)
-
-        routes = [
-            {"rule": k, "methods": sorted(v)}
-            for k, v in collected.items()
-        ]
-        routes_sorted = sorted(routes, key=lambda x: x["rule"])
-        return jsonify(routes_sorted)
-
-    # -------- API: /api/debug/sql --------
-    @app.route("/api/debug/sql/test", methods=["GET"])
-    def api_sql_test_connection():
-        """Тестирует подключение к базе данных."""
+    @app.route("/api/debug/logs")
+    def api_debug_logs():
+        """Последние 1000 строк лога."""
+        path = log_file_path or os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs", "app.log")
         try:
-            from .database import db_manager
-            result = db_manager.test_connection()
-            return jsonify(result)
-        except Exception as e:
-            logger.error("Ошибка при тестировании подключения к БД: %s", e)
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                lines = f.readlines()
+            last_1000 = lines[-1000:] if len(lines) > 1000 else lines
             return jsonify({
-                "success": False,
-                "error": f"Ошибка при тестировании подключения: {str(e)}"
-            }), 500
+                "lines": last_1000,
+                "total": len(lines),
+            })
+        except FileNotFoundError:
+            return jsonify({"lines": [], "total": 0, "error": "Файл лога не найден"})
+        except Exception as e:
+            return jsonify({"lines": [], "total": 0, "error": str(e)}), 500
 
-    @app.route("/api/debug/sql/execute", methods=["POST"])
-    def api_sql_execute():
-        """Выполняет SQL запрос."""
-        try:
-            data = request.get_json(silent=True) or {}
-            query = data.get("query", "").strip()
-            
-            if not query:
-                return jsonify({
-                    "success": False,
-                    "error": "Не указан SQL запрос"
-                }), 400
-            
-            from .database import db_manager
-            result = db_manager.execute_query(query)
-            
-            return jsonify(result)
-            
-        except Exception as e:
-            logger.error("Ошибка при выполнении SQL запроса: %s", e)
-            return jsonify({
-                "success": False,
-                "error": f"Ошибка сервера: {str(e)}"
-            }), 500
+    @app.route("/api/debug/pages")
+    def api_debug_pages():
+        """Информация о зарегистрированных страницах (YAML)."""
+        snapshot = config_service.get_snapshot()
+        pages = []
+        for name, cfg in snapshot.get("pages", {}).items():
+            pages.append({
+                "name": name,
+                "title": cfg.get("title", name),
+                "url": cfg.get("url", f"/page/{name}"),
+            })
+        pages.sort(key=lambda p: p["name"])
+        return jsonify({"pages": pages})

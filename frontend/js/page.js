@@ -21,7 +21,8 @@ const app = createApp({
             error: null,
             rootContentOnly: false,
             collapsedSections: {},
-            collapsingSectionId: null
+            collapsingSectionId: null,
+            tabsFocused: false
         };
     },
 
@@ -401,6 +402,11 @@ const app = createApp({
                 console.error('Ошибка выполнения команды:', error);
                 this.showNotification('Ошибка выполнения команды', 'danger');
             }
+        },
+
+        onTabsFocusOut(e) {
+            if (!this.$refs.pageTabs || this.$refs.pageTabs.contains(e.relatedTarget)) return;
+            this.tabsFocused = false;
         },
 
         showNotification(message, type) {

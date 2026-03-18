@@ -1,6 +1,7 @@
 (function () {
     const META_KEYS = new Set(['url', 'title']);
-    const COLLAPSE_ANIM_MS = 350;
+    const raw = getComputedStyle(document.documentElement).getPropertyValue('--anim-ms');
+    const COLLAPSE_ANIM_MS = raw ? parseInt(String(raw).trim(), 10) : 350;
 
     function parseDynamicKey(rawKey) {
         const key = String(rawKey || '').trim();

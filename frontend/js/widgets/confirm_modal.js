@@ -1,4 +1,4 @@
-// Vue-компонент диалога подтверждения (замена Bootstrap Modal)
+// Vue-компонент диалога подтверждения
 
 const ConfirmModal = {
     data() {
@@ -9,7 +9,7 @@ const ConfirmModal = {
         };
     },
     template: `
-        <div v-if="show" class="modal-overlay confirm-modal-overlay" @click.self="cancel">
+        <div v-if="show" class="modal-overlay confirm-modal-overlay flex-center" @click.self="cancel">
             <div class="modal-content confirm-modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" v-text="config?.title || 'Подтверждение'"></h5>

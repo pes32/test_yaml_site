@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>YAML System - {{ page_config.title if page_config.title else (page_config.name if page_config.name else 'main') }}</title>
-    <link href="{{ url_for('static', filename='css/vendor/bootstrap.min.css') }}?v={{ ASSETS_VERSION }}" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <link href="{{ url_for('static', filename='css/fonts.css') }}?v={{ ASSETS_VERSION }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/style.css') }}?v={{ ASSETS_VERSION }}" rel="stylesheet">
@@ -17,27 +16,14 @@
         <confirm-modal ref="confirmModal"></confirm-modal>
         
         <!-- Навигация -->
-        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-            <div class="container-fluid">
-                <a class="navbar-brand" href="/">
-                    <span aria-hidden="true">&lt;/&gt;</span> YAML System
-                </a>
-                <div class="navbar-nav me-auto">
-                    <span class="navbar-text">
-                        <span aria-hidden="true">📄</span> {{ page_config.title if page_config.title else (page_config.name if page_config.name else 'main') }}
-                    </span>
-                </div>
-                <div class="navbar-nav">
-                    <a class="nav-link" href="/debug" target="_blank">
-                        <span aria-hidden="true">🐛</span> Debug
-                    </a>
-                </div>
-            </div>
-        </nav>
+        <header class="page-header">
+            <a class="page-header-brand" href="/">YAML System</a>
+            <a class="page-header-link" href="/debug" target="_blank">Debug</a>
+        </header>
 
         <!-- Основной контент -->
         <div class="container-fluid mt-3">
-            <div class="page-shell">
+            <div class="page-shell u-wide">
                 <aside v-if="menus.length && !rootContentOnly" class="page-sidebar">
                     <div class="menu-list page-menu-rail">
                         <button type="button"
@@ -46,7 +32,7 @@
                                 v-for="(menu, index) in menus"
                                 :key="index"
                                 @click="onMenuClick(index)">
-                            <span class="menu-card-icon-shell">
+                            <span class="menu-card-icon-shell inline-flex-center">
                                 <item-icon v-if="menu.icon" :icon="menu.icon"></item-icon>
                             </span>
                             <span class="menu-card-label" v-text="menu.name || ('Меню ' + (index + 1))"></span>
@@ -54,9 +40,9 @@
                     </div>
                 </aside>
 
-                <main class="page-content-column">
+                <main class="page-content-column u-wide">
                     <div v-if="activeMenu">
-                        <ul v-if="activeTabs.length > 1" class="nav nav-tabs page-tabs" id="mainTabs" role="tablist">
+                        <ul v-if="activeTabs.length > 1" ref="pageTabs" class="nav nav-tabs page-tabs" :class="{ 'page-tabs--focused': tabsFocused }" id="mainTabs" role="tablist" @focusin="tabsFocused = true" @focusout="onTabsFocusOut">
                             <li class="nav-item" v-for="(tab, index) in activeTabs" :key="index">
                                 <a class="nav-link"
                                    :class="{ active: index === activeTabIndex }"
@@ -69,11 +55,11 @@
                             </li>
                         </ul>
 
-                        <div class="tab-content page-tab-content" :class="{ 'page-tab-content--with-tabs': activeTabs.length > 1 }" id="mainTabContent">
-                            <div class="tab-pane active show">
+                        <div class="tab-content page-tab-content u-wide" :class="{ 'page-tab-content--with-tabs': activeTabs.length > 1 }" id="mainTabContent">
+                            <div class="tab-pane active show u-wide">
                                 <section-card
                                     v-for="(section, sidx) in activeSections"
-                                    :key="sidx"
+                                    :key="getSectionCollapseId(sidx)"
                                     :section="section"
                                     :section-index="sidx"
                                     :collapse-id="getSectionCollapseId(sidx)"
@@ -89,7 +75,7 @@
                         </div>
                     </div>
 
-                    <div v-else class="alert alert-warning">
+                    <div v-else class="page-msg page-msg--empty">
                         Нет контента для отображения. Добавьте menu или row/box/collapse на верхнем уровне gui.yaml.
                     </div>
                 </main>
@@ -120,7 +106,6 @@
     <script src="{{ url_for('static', filename='js/widgets/button.js') }}?v={{ ASSETS_VERSION }}"></script>
     <script src="{{ url_for('static', filename='js/widgets/img.js') }}?v={{ ASSETS_VERSION }}"></script>
     <script src="{{ url_for('static', filename='js/gui_parser.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets/modal.js') }}?v={{ ASSETS_VERSION }}"></script>
     <script src="{{ url_for('static', filename='js/widgets/confirm_modal.js') }}?v={{ ASSETS_VERSION }}"></script>
     <script src="{{ url_for('static', filename='js/widgets/factory.js') }}?v={{ ASSETS_VERSION }}"></script>
     <script src="{{ url_for('static', filename='js/widgets.js') }}?v={{ ASSETS_VERSION }}"></script>

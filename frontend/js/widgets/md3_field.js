@@ -9,7 +9,9 @@ const Md3Field = {
         labelFloats: { type: Boolean, default: false },
         isFocused: { type: Boolean, default: false },
         wrapExtra: { type: Object, default: () => ({}) },
-        hasSupporting: { type: Boolean, default: false }
+        hasSupporting: { type: Boolean, default: false },
+        wrapVariant: { type: String, default: '' },   /* 'date' | 'time' | 'textarea' | 'datetime' */
+        containerModifier: { type: String, default: '' }  /* 'textarea' */
     },
     emits: ['focusin', 'focusout', 'containerFocusout'],
     computed: {
@@ -17,21 +19,35 @@ const Md3Field = {
             const w = this.widgetConfig && this.widgetConfig.width;
             return w != null && w !== '';
         },
+        dataState() {
+            const s = [];
+            if (this.hasValue) s.push('filled');
+            if (this.isFocused) s.push('focused');
+            if (this.wrapExtra.error) s.push('error');
+            if (this.labelFloats) s.push('floating');
+            if (this.widgetConfig.readonly) s.push('readonly');
+            return s.length ? s.join(' ') : undefined;
+        },
         wrapClass() {
+            const { error, ...rest } = this.wrapExtra;
             return {
-                ...this.wrapExtra,
-                floating: this.labelFloats,
-                focused: this.isFocused,
-                filled: this.hasValue,
-                'widget-readonly': this.widgetConfig.readonly
+                ...rest,
+                [`md3-field-wrap--${this.wrapVariant}`]: this.wrapVariant
+            };
+        },
+        containerClass() {
+            return {
+                'widget-explicit-width': this.hasExplicitWidth,
+                [`widget-container--${this.containerModifier}`]: this.containerModifier
             };
         }
     },
     template: `
-        <div class="widget-container" :class="{ 'widget-explicit-width': hasExplicitWidth }" :style="containerStyle" @focusout="$emit('containerFocusout', $event)">
-            <div class="md3-field" :class="{ filled: hasValue }">
+        <div class="widget-container u-wide" :class="containerClass" :style="containerStyle" @focusout="$emit('containerFocusout', $event)">
+            <div class="md3-field" :class="{ filled: hasValue, 'md3-field--readonly': widgetConfig.readonly }">
                 <div class="md3-field-wrap"
                      :class="wrapClass"
+                     :data-state="dataState"
                      @focusin="$emit('focusin', $event)"
                      @focusout="$emit('focusout', $event)">
                     <slot></slot>

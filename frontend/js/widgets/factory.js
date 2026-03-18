@@ -20,7 +20,6 @@ class WidgetFactory {
         this.register('text', TextWidget);
         this.register('table', TableWidget);
         this.register('button', ButtonWidget);
-        this.register('modal', ModalWidget);
         this.register('img', ImgWidget);
     }
     
