@@ -24,6 +24,7 @@ function createIpLikeWidget(maskTemplate, validateFn, maxDigits) {
                        :disabled="widgetConfig.readonly"
                        :tabindex="widgetConfig.readonly ? -1 : null"
                        :maxlength="maxLength"
+                       :placeholder="showPlaceholder ? widgetConfig.placeholder : ''"
                        v-model="inputValue"
                        @input="onInputHandler"
                        @keydown="onKeyDown"
@@ -48,6 +49,9 @@ function createIpLikeWidget(maskTemplate, validateFn, maxDigits) {
             hasValue() { return Boolean(this.inputValue); },
             labelFloats() {
                 return this.hasValue || this.isFocused;
+            },
+            showPlaceholder() {
+                return !this.hasValue && this.isFocused && this.widgetConfig.placeholder;
             },
             maxLength() {
                 // Макс длина визуальной строки: для IP 15 (xxx.xxx.xxx.xxx), для CIDR 18
@@ -85,7 +89,7 @@ function createIpLikeWidget(maskTemplate, validateFn, maxDigits) {
                     // то при Backspace удаляем символ из предыдущего октета
                     if (currentPos > 0) {
                         const charAtCursor = currentValue[currentPos - 1];
-                        if (charAtCursor === '.' || charAtCursor === '/') {
+                        if (charAtCursor === '.' || charAtCursor === ',' || charAtCursor === ' ') {
                             // Удаляем разделитель и последний символ из предыдущего октета
                             const newValue = currentValue.slice(0, currentPos - 2) + currentValue.slice(currentPos);
                             this.inputValue = newValue;
@@ -101,16 +105,20 @@ function createIpLikeWidget(maskTemplate, validateFn, maxDigits) {
                     }
                 }
                 
-                // Обработка перехода на следующий октет при нажатии точки или слеша
-                if (e.key === '.' || e.key === '/') {
+                // Обработка перехода на следующий октет при нажатии точки, запятой, пробела или слеша
+                const octetSeparatorKeys = ['.', ',', ' '];
+                if (octetSeparatorKeys.includes(e.key) || e.key === '/') {
                     e.preventDefault();
-                    
+
                     const currentValue = e.target.value;
-                    const digits = this.digitsFromValue(currentValue);
-                    
-                    // Если нажали точку - переходим на следующий октет
-                    if (e.key === '.') {
-                        // Добавляем точку и переходим на следующую позицию
+
+                    // Точка, запятая, пробел — завершают октет (добавляем точку), но не более 3 точек, не сразу после точки и не когда пусто
+                    if (octetSeparatorKeys.includes(e.key)) {
+                        const ipPart = hasSlash ? currentValue.split('/')[0] : currentValue;
+                        const dotsCount = (ipPart.match(/\./g) || []).length;
+                        if (dotsCount >= 3 || ipPart.endsWith('.') || !this.digitsFromValue(ipPart).length) {
+                            return;
+                        }
                         const newValue = currentValue + '.';
                         this.inputValue = newValue;
                         this.$nextTick(() => {
@@ -118,9 +126,10 @@ function createIpLikeWidget(maskTemplate, validateFn, maxDigits) {
                             e.target.setSelectionRange(newPos, newPos);
                         });
                         this.emitValue();
+                        return;
                     }
-                    
-                    // Если нажали слеш - добавляем слеш (только для CIDR)
+
+                    // Слеш — добавляем слеш (только для CIDR/ip_mask)
                     if (e.key === '/' && hasSlash) {
                         const newValue = currentValue + '/';
                         this.inputValue = newValue;
@@ -166,14 +175,14 @@ function createIpLikeWidget(maskTemplate, validateFn, maxDigits) {
                             currentOctetLen = 0;
                             dotsCount += 1;
                         }
-                    } else if (ch === '.' && dotsCount < 3) {
-                        // Пользователь явно завершил октет точкой
+                    } else if ((ch === '.' || ch === ',' || ch === ' ') && dotsCount < 3) {
+                        // Пользователь завершил октет точкой, запятой или пробелом
                         if (currentOctetLen > 0) {
                             octetLengths.push(currentOctetLen);
                             currentOctetLen = 0;
                             dotsCount += 1;
                         }
-                        // если точка подряд или в начале — игнорируем
+                        // если разделитель подряд или в начале — игнорируем
                     }
                 }
                 
@@ -244,8 +253,18 @@ function createIpLikeWidget(maskTemplate, validateFn, maxDigits) {
             // Инициализация из default при наличии
             const def = this.widgetConfig.default;
             if (typeof def === 'string' && def.trim().length > 0) {
-                const digits = this.digitsFromValue(def).slice(0, maxDigits);
-                this.inputValue = this.formatFromDigits(digits);
+                let formatted = '';
+                if (hasSlash) {
+                    const [ipPart = '', maskPart = ''] = def.split('/');
+                    const ipDigits = this.digitsFromValue(ipPart).slice(0, 12);
+                    const maskDigits = this.digitsFromValue(maskPart).slice(0, 2);
+                    formatted = this.formatFromDigits(ipDigits);
+                    if (maskDigits) formatted += '/' + maskDigits;
+                } else {
+                    const digits = this.digitsFromValue(def).slice(0, maxDigits);
+                    formatted = this.formatFromDigits(digits);
+                }
+                this.inputValue = formatted;
                 this.lastInputLength = this.inputValue.length;
                 this.emitValue();
             }

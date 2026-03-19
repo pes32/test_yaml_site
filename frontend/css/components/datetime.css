@@ -1,0 +1,343 @@
+/* components/datetime.css — date, time, datetime (unified widget-dt) */
+
+.widget-dt label {
+    top: 0;
+    font-size: var(--text-sm);
+    transform: translateY(-50%);
+    transform-origin: left top;
+    background: var(--md3-bg, var(--color-bg));
+    padding: 0 var(--space-xs);
+    margin-left: calc(-1 * var(--space-xs));
+}
+
+.widget-dt-host {
+    position: relative;
+    min-width: 0;
+}
+
+.widget-dt-host--datetime {
+    width: auto;
+    min-width: 0;
+}
+
+.widget-dt-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: center;
+    min-height: var(--lh-lg);
+}
+
+.widget-dt-inner--datetime {
+    grid-template-columns: var(--widget-dt-date-segment-w) var(--widget-dt-time-segment-w);
+    column-gap: var(--space-2xs);
+}
+
+.widget-dt-segment {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--widget-dt-icon-slot-w);
+    align-items: center;
+    column-gap: var(--widget-dt-gap);
+    min-height: var(--lh-lg);
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.widget-dt-segment--single {
+    width: 100%;
+}
+
+.widget-dt-segment--date {
+    inline-size: var(--widget-dt-date-segment-w);
+}
+
+.widget-dt-segment--time {
+    inline-size: var(--widget-dt-time-segment-w);
+}
+
+.widget-dt-host--datetime .widget-dt-segment--time {
+    border-left: 1px solid var(--color-border-light);
+    padding-left: var(--space-2xs);
+}
+
+.widget-dt-input {
+    min-width: 0;
+    min-height: var(--lh-lg);
+    padding: 0 var(--zero) 0 var(--space-md);
+    border: none;
+    background: transparent;
+    color: var(--color-text-main);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+}
+
+.widget-dt-input--date {
+    min-width: var(--widget-dt-date-mask-w);
+    width: var(--widget-dt-date-mask-w);
+    padding-right: var(--zero);
+}
+
+.widget-dt-input--time {
+    min-width: var(--widget-dt-time-mask-w);
+    width: var(--widget-dt-time-mask-w);
+    padding-left: var(--space-xs);
+    padding-right: 0;
+    text-align: left;
+}
+
+.widget-dt-icon-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--widget-dt-icon-slot-w);
+    inline-size: var(--widget-dt-icon-slot-w);
+}
+
+.widget-dt-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 28px;
+    block-size: 28px;
+    border-radius: 50%;
+    color: var(--color-text-main);
+    cursor: pointer;
+    transition: background-color var(--transition-fast) ease, color var(--transition-fast) ease;
+}
+
+.widget-dt-icon:hover {
+    background: var(--color-accent-soft);
+    color: var(--color-text-dark);
+}
+
+.widget-dt-icon img {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+}
+
+.md3-field-wrap.is-readonly .widget-dt-icon {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.widget-dt-popover {
+    position: fixed;
+    z-index: var(--z-dropdown);
+    padding: 10px;
+    border: none;
+    border-radius: 16px;
+    background: var(--color-surface-soft);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+    overflow: auto;
+    overscroll-behavior: contain;
+}
+
+.widget-dt-popover--calendar {
+    width: min(var(--widget-dt-calendar-panel-w), calc(100vw - 24px));
+    min-height: 0;
+    padding: 16px;
+}
+
+.widget-dt-popover--time {
+    width: min(var(--widget-dt-time-panel-w), calc(100vw - 24px));
+    min-height: 0;
+    padding: 12px;
+    border-radius: 28px;
+}
+
+.widget-dt-panel-head {
+    display: grid;
+    gap: 2px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(29, 27, 32, 0.12);
+}
+
+.widget-dt-panel-label {
+    color: var(--color-text-muted);
+    font-size: 10px;
+    font-weight: var(--fw-semibold);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.widget-dt-panel-value {
+    color: #1D1B20;
+    font-size: 14px;
+    font-weight: var(--fw-semibold);
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+
+.widget-dt-popover-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+    margin-bottom: 6px;
+}
+
+.widget-dt-popover-title {
+    color: #1D1B20;
+    font-size: var(--text-sm);
+    font-weight: var(--fw-semibold);
+    text-transform: capitalize;
+}
+
+.widget-dt-nav {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 8px;
+    background: var(--color-bg);
+    color: #1D1B20;
+    cursor: pointer;
+    transition: background-color var(--transition-fast) ease, color var(--transition-fast) ease;
+}
+
+.widget-dt-nav:hover {
+    background: var(--color-accent-soft);
+    color: var(--color-text-dark);
+}
+
+.widget-dt-weekdays,
+.widget-dt-calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 40px);
+    gap: 8px;
+}
+
+.widget-dt-weekdays {
+    margin-bottom: 8px;
+    color: var(--color-text-muted);
+    font-size: 10px;
+    font-weight: var(--fw-semibold);
+    text-align: center;
+}
+
+.widget-dt-day {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    border: none;
+    border-radius: 20px;
+    background: transparent;
+    color: #1D1B20;
+    cursor: pointer;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    transition: background-color var(--transition-fast) ease, color var(--transition-fast) ease, box-shadow var(--transition-fast) ease;
+}
+
+.widget-dt-day:hover {
+    background: var(--color-accent-hover);
+}
+
+.widget-dt-day.is-outside {
+    color: var(--color-text-muted);
+    opacity: 0.5;
+}
+
+.widget-dt-day.is-today {
+    box-shadow: inset 0 0 0 1px var(--color-accent-soft);
+}
+
+.widget-dt-day.is-selected {
+    background: var(--color-accent-soft);
+    font-weight: var(--fw-semibold);
+}
+
+.widget-dt-time-preview {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    margin-bottom: 10px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.82);
+    color: #1D1B20;
+    font-size: 22px;
+    font-weight: var(--fw-semibold);
+    line-height: 1;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+}
+
+.widget-dt-time-editors {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: end;
+    gap: 6px;
+}
+
+.widget-dt-time-editor {
+    min-width: 0;
+}
+
+.widget-dt-time-caption {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--color-text-muted);
+    font-size: 9px;
+    font-weight: var(--fw-semibold);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: center;
+}
+
+.widget-dt-time-editor-input {
+    width: 100%;
+    min-height: 38px;
+    padding: 0 6px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.88);
+    color: #1D1B20;
+    font-size: 18px;
+    font-weight: var(--fw-semibold);
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.widget-dt-time-editor-input:focus {
+    border-color: var(--color-accent-soft);
+    box-shadow: 0 0 0 2px rgba(212, 227, 251, 0.65);
+}
+
+.widget-dt-time-separator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    align-self: end;
+    min-height: 38px;
+    color: #1D1B20;
+    font-size: 18px;
+    font-weight: var(--fw-semibold);
+}
+
+@media (max-width: 640px) {
+    .widget-dt-inner--datetime {
+        grid-template-columns: minmax(0, 1fr);
+        row-gap: var(--space-2xs);
+    }
+
+    .widget-dt-segment--date,
+    .widget-dt-segment--time {
+        inline-size: auto;
+    }
+
+    .widget-dt-host--datetime .widget-dt-segment--time {
+        border-left: none;
+        border-top: 1px solid var(--color-border-light);
+        padding-left: 0;
+        padding-top: var(--space-2xs);
+    }
+}

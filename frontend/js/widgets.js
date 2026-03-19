@@ -71,7 +71,7 @@ const ItemIcon = {
 };
 window.ItemIcon = ItemIcon;
 
-// Общий компонент рендеринга рядов секции (текст, row, columns)
+// Общий компонент рендеринга рядов секции (текст и row)
 const ContentRows = {
     props: {
         rows: { type: Array, required: true },
@@ -100,21 +100,6 @@ const ContentRows = {
                                 :widget-name="item"
                                 @execute="$emit('execute', $event)">
                             </widget-renderer>
-                        </div>
-                    </div>
-                </div>
-                <div v-else-if="row.columns && typeof row.columns === 'object'" class="col-12">
-                    <div class="row">
-                        <div v-for="(column, colIndex) in row.columns"
-                             :key="colIndex"
-                             :class="'col-md-' + (12 / Object.keys(row.columns).length)">
-                            <div v-for="(item, itemIndex) in column.widgets" :key="itemIndex" class="mb-2">
-                                <widget-renderer
-                                    :widget-config="getWidgetConfig(item)"
-                                    :widget-name="item"
-                                    @execute="$emit('execute', $event)">
-                                </widget-renderer>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -175,7 +160,11 @@ const SectionCard = {
     computed: {
         wrapperClass() {
             if (this.variant === 'modal') return 'mb-3';
-            return { 'page-section': true, 'page-section--bare': !this.section.showHeader };
+            return {
+                'page-section': true,
+                'page-section--bare': !this.section.showHeader,
+                'page-section--box': this.section.hasFrame
+            };
         },
         cardClass() {
             return this.variant === 'page' ? 'card page-section-card u-wide' : 'card u-wide';
@@ -265,7 +254,7 @@ const ModalManager = {
                         <item-icon v-if="modalConfig && modalConfig.icon" :icon="modalConfig.icon"></item-icon>
                         <h5 class="modal-title" v-text="modalTitle"></h5>
                     </div>
-                    <button type="button" class="btn-close" @click="closeModal"></button>
+                    <button type="button" class="ui-close-button" @click="closeModal" aria-label="Закрыть"></button>
                 </div>
                 
                 <div class="modal-body">

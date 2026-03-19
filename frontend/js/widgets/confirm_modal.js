@@ -13,12 +13,12 @@ const ConfirmModal = {
             <div class="modal-content confirm-modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" v-text="config?.title || 'Подтверждение'"></h5>
-                    <button type="button" class="btn-close" @click="cancel" aria-label="Закрыть"></button>
+                    <button type="button" class="ui-close-button" @click="cancel" aria-label="Закрыть"></button>
                 </div>
                 <div class="modal-body" v-text="config?.text || 'Вы уверены?'"></div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" @click="cancel" v-text="config?.cancel || 'Отмена'"></button>
-                    <button type="button" class="btn btn-primary" @click="accept" v-text="config?.accept || 'Подтвердить'"></button>
+                    <button type="button" class="widget-button confirm-modal-action confirm-modal-action--secondary" @click="cancel" v-text="config?.cancel || 'Отмена'"></button>
+                    <button type="button" class="widget-button confirm-modal-action" @click="accept" v-text="config?.accept || 'Подтвердить'"></button>
                 </div>
             </div>
         </div>

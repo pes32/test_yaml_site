@@ -45,25 +45,26 @@ menu "Строковые виджеты":
     - box "Числовые виджеты (статичный блок)":
       - icon: "test.svg"
       - row: int_1, int_2, int_3, int_4
-      - row: demo_float
+      - row: float_1, float_2, float_3, float_4
+
+    - box "Списки":
+      - "Списки бывают 3 видов: список с поиском (по умолчанию), выбор только из списка и c множественным выбором."
+      - "Развернуть список можно через: Enter или alt+down (win), opt+down (mac). Свернуть: также + esc."
+      - "Удалить значение можно через backspace или delete."
+      - row: list_1, list_2, list_3
+      - row: list_4, list_5
+      - "Для большого текста в списке автоматом выводится hint при наведении курсора."
+      - "Списки в readonly не показываю, но вы уже догадываетесь как они будут выглядеть."
 
     - box:
-      - "Это просто текст и кнопка в box без рамки"
-      - row: demo_readonly
-
-    - "Это примеры для readonly без рамки"
-    - row: demo_readonly
-    - row: demo_int_readonly, demo_float_readonly
-
-    - collapse "Списки":
-      - row: demo_list, demo_multiselect
-
-    - box "IP адреса":
-      - row: demo_ip, demo_ip_mask
-
-    - collapse "Дата и время":
-      - row: demo_datetime
-      - row: date_widget, time_widget
+      - "IP адреса. Кстати, это блок box без заголовка."
+      - "В качестве разделителя принимается: точка, запятая или пробел."
+      - row: ip_1, ip_2, ip_3, ip_4
+      - "Поля ip и im_mask с автоматической валидацией адреса. 'err_text' у них зашит в коде виджета."
+      
+    - "Дата и время. Для них этот рептилойд даже рамку зажал =("
+    - row: demo_datetime
+    - row: date_widget, time_widget
 
   - tab "Демонстрация кнопок":
     - icon: "test.svg"

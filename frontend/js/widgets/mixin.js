@@ -1,4 +1,4 @@
-// Общий миксин для полевых виджетов: containerStyle и единый формат emit
+// Общий миксин для полевых виджетов: валидация и единый формат emit
 
 const widgetMixin = {
     data() {
@@ -8,13 +8,6 @@ const widgetMixin = {
         };
     },
     computed: {
-        containerStyle() {
-            const w = this.widgetConfig.width;
-            if (w == null) return {};
-            const widthVal = typeof w === 'number' ? w + 'px' : String(w);
-            const isText = this.widgetConfig.widget === 'text';
-            return isText ? { minWidth: widthVal } : { width: widthVal };
-        },
         /** Собирает все ошибки поля (regex, int, float) для отображения. */
         fieldError() {
             return this.regexError || this.intError || this.floatError || '';

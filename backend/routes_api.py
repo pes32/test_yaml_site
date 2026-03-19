@@ -102,6 +102,7 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
                 "lastError": result["last_error"],
             })))
         except Exception as e:  # pragma: no cover
+            logger.exception("Ошибка при принудительном обновлении конфигурации")
             return _no_cache(make_response(jsonify({"success": False, "error": str(e)}), 500))
 
     @app.route("/api/execute", methods=["POST"])
@@ -109,6 +110,4 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
         # silent=True — не генерировать 400 при пустом/битом JSON
         data = request.get_json(silent=True) or {}
         command = data.get("command")
-        params = data.get("params", {})
-        logger.info("Выполнение команды: %s с параметрами: %s", command, params)
         return jsonify({"success": True, "command": command, "result": f"Команда {command} выполнена успешно"})

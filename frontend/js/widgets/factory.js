@@ -1,5 +1,21 @@
 // Фабрика виджетов для Vue.js
 
+const DEFAULT_WIDGET_REGISTRY = Object.freeze([
+    ['str', StringWidget],
+    ['int', IntWidget],
+    ['float', FloatWidget],
+    ['list', ListWidget],
+    ['ip', IpWidget],
+    ['ip_mask', IpMaskWidget],
+    ['datetime', DateTimeWidget],
+    ['date', DateWidget],
+    ['time', TimeWidget],
+    ['text', TextWidget],
+    ['table', TableWidget],
+    ['button', ButtonWidget],
+    ['img', ImgWidget]
+]);
+
 class WidgetFactory {
     constructor() {
         this.widgetTypes = new Map();
@@ -7,20 +23,10 @@ class WidgetFactory {
     }
     
     // Регистрация стандартных виджетов
-    registerDefaultWidgets() {
-        this.register('str', StringWidget);
-        this.register('int', IntWidget);
-        this.register('float', FloatWidget);
-        this.register('list', ListWidget);
-        this.register('ip', IpWidget);
-        this.register('ip_mask', IpMaskWidget);
-        this.register('datetime', DateTimeWidget);
-        this.register('date', DateWidget);
-        this.register('time', TimeWidget);
-        this.register('text', TextWidget);
-        this.register('table', TableWidget);
-        this.register('button', ButtonWidget);
-        this.register('img', ImgWidget);
+    registerDefaultWidgets(registry = DEFAULT_WIDGET_REGISTRY) {
+        registry.forEach(([type, component]) => {
+            this.register(type, component);
+        });
     }
     
     // Регистрация нового типа виджета

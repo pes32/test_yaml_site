@@ -1,0 +1,193 @@
+/* components/md3-field.css — MD3 Outlined Text Field */
+
+.md3-field {
+    --md3-outline: var(--color-text-muted);
+    --md3-outline-focus: var(--color-accent-soft);
+    --md3-outline-error: var(--color-error);
+    --md3-bg: var(--color-bg);
+    margin-bottom: var(--space-sm);
+    overflow: visible;
+}
+
+.md3-field-wrap {
+    position: relative;
+    min-height: var(--field-height);
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--color-text-muted);
+    border-radius: var(--radius-field);
+    background: var(--md3-bg);
+    outline: 2px solid transparent;
+    outline-offset: -2px;
+    transition: border-color calc(var(--anim-ms) * 1ms), outline-color calc(var(--anim-ms) * 1ms);
+}
+
+.md3-field-wrap.is-filled {
+    border-color: var(--color-text-main);
+}
+
+.md3-field-wrap.is-focused {
+    outline-color: var(--color-accent-soft);
+}
+
+.md3-field-wrap.is-focused.is-error {
+    outline-color: var(--md3-outline-error);
+}
+
+.md3-field-wrap.is-error {
+    border-color: var(--md3-outline-error);
+}
+
+.md3-field-wrap.is-focused input:focus,
+.md3-field-wrap.is-focused textarea:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+.md3-field-wrap input {
+    flex: 1;
+    width: 100%;
+    min-height: var(--lh-lg);
+    height: var(--lh-lg);
+    padding: 0 var(--space-md);
+    border: none;
+    background: transparent;
+    font-size: var(--text-md);
+    font-weight: var(--fw-regular);
+    line-height: var(--lh-lg);
+    color: var(--color-text-main);
+    outline: none;
+    box-sizing: border-box;
+}
+
+.md3-field-wrap--textarea .md3-textarea-wrap {
+    overflow: visible;
+    width: fit-content;
+    min-width: fit-content;
+    min-height: fit-content;
+}
+
+.md3-field-wrap textarea {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 80px;
+    min-height: 2.5em;
+    padding: var(--space-sm) var(--space-md);
+    line-height: var(--lh-md);
+    border: none;
+    background: transparent;
+    font-size: var(--text-md);
+    font-weight: var(--fw-regular);
+    color: var(--color-text-main);
+    outline: none;
+    box-sizing: border-box;
+    overflow: auto;
+    resize: both;
+    display: block;
+}
+
+.md3-field-wrap--textarea {
+    width: fit-content;
+    min-width: fit-content;
+    min-height: fit-content;
+}
+
+.md3-field-wrap input::placeholder,
+.md3-field-wrap textarea::placeholder {
+    color: var(--color-text-muted);
+}
+
+.md3-field-wrap label {
+    position: absolute;
+    z-index: 1;
+    left: var(--space-md);
+    top: 50%;
+    transform: translateY(-50%);
+    transform-origin: left top;
+    font-size: var(--text-md);
+    font-weight: var(--fw-regular);
+    color: var(--color-text-muted);
+    pointer-events: none;
+    transition: transform calc(var(--anim-ms) * 1ms) ease, font-size calc(var(--anim-ms) * 1ms) ease, color calc(var(--anim-ms) * 1ms) ease, top calc(var(--anim-ms) * 1ms) ease;
+    will-change: transform;
+}
+
+.md3-field-wrap.is-filled label,
+.md3-field-wrap.is-focused label {
+    color: var(--color-text-main);
+}
+
+.md3-field-wrap.is-error label {
+    color: var(--md3-outline-error);
+}
+
+.md3-field-wrap.is-floating label {
+    top: 0;
+    font-size: var(--text-sm);
+    transform: translateY(-50%);
+    transform-origin: left top;
+    background: var(--md3-bg);
+    padding: 0 var(--space-xs);
+    margin-left: calc(-1 * var(--space-xs));
+}
+
+.md3-field-wrap--textarea {
+    align-items: center;
+    overflow: visible;
+}
+
+.md3-supporting {
+    font-size: var(--text-sm);
+    font-weight: var(--fw-regular);
+    color: var(--color-text-muted);
+    padding: var(--space-xs) var(--space-md) 0 0;
+    min-height: 18px;
+    text-align: left;
+}
+
+.md3-field.filled .md3-supporting {
+    color: var(--color-text-main);
+}
+
+.md3-field.filled.md3-field--readonly .md3-supporting {
+    color: var(--color-text-muted);
+}
+
+.md3-error {
+    color: var(--md3-outline-error);
+    animation: md3-error-fade-in calc(var(--anim-ms) * 1ms) ease forwards;
+}
+
+@keyframes md3-error-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.md3-field-wrap.is-readonly {
+    border-color: var(--color-text-muted);
+    cursor: not-allowed;
+    background: transparent;
+}
+
+.md3-field-wrap.is-readonly input,
+.md3-field-wrap.is-readonly textarea {
+    color: var(--color-text-muted);
+    background: transparent;
+}
+
+.md3-field-wrap.is-readonly input::placeholder,
+.md3-field-wrap.is-readonly textarea::placeholder {
+    color: var(--color-text-muted);
+}
+
+.md3-field-wrap.is-readonly label {
+    color: var(--color-text-muted);
+    background: var(--md3-bg);
+}
+
+.md3-dropdown-wrap .widget-dropdown {
+    flex: 1;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+}

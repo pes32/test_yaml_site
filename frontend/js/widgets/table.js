@@ -44,25 +44,6 @@ const TableWidget = {
                                                :widget-config="cellListConfig(rowIndex, cellIndex, column)"
                                                :widget-name="cellWidgetName(rowIndex, cellIndex)"
                                                @input="onCellWidgetPayload(rowIndex, cellIndex, $event)"/>
-                                    <input v-else-if="column.type==='datetime'"
-                                           type="datetime-local"
-                                           class="cell-input w-100"
-                                           :value="safeCell(row, cellIndex)"
-                                           @input="onCellInput(rowIndex, cellIndex, $event)"
-                                           @blur="onCellFormat(rowIndex, cellIndex, column)"
-                                           @keydown="onCellKeydown(rowIndex, cellIndex, $event)"/>
-                                    <input v-else-if="column.type==='date'"
-                                           type="date"
-                                           class="cell-input w-100"
-                                           :value="safeCell(row, cellIndex)"
-                                           @input="onCellInput(rowIndex, cellIndex, $event)"
-                                           @keydown="onCellKeydown(rowIndex, cellIndex, $event)"/>
-                                    <input v-else-if="column.type==='time'"
-                                           type="time"
-                                           class="cell-input w-100"
-                                           :value="safeCell(row, cellIndex)"
-                                           @input="onCellInput(rowIndex, cellIndex, $event)"
-                                           @keydown="onCellKeydown(rowIndex, cellIndex, $event)"/>
                                     <component v-else-if="column.type==='ip' && ipCellWidget"
                                                :is="ipCellWidget"
                                                :widget-config="cellWidgetConfig()"
@@ -229,25 +210,6 @@ const TableWidget = {
 
             const addThousands = (s) => s.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
-            if (column.type === 'datetime') {
-                const d = new Date(value);
-                return isNaN(d.getTime()) ? asString : d.toLocaleString('ru-RU');
-            }
-
-            if (column.type === 'date') {
-                const d = new Date(value);
-                return isNaN(d.getTime()) ? asString : d.toLocaleDateString('ru-RU');
-            }
-
-            if (column.type === 'time') {
-                // Ожидаем формат HH:MM, допускаем HH:MM:SS
-                const m = String(value).match(/^([0-2]\d:[0-5]\d)(?::[0-5]\d)?$/);
-                if (m) return m[1];
-                const d = new Date(`1970-01-01T${value}`);
-                if (!isNaN(d.getTime())) return d.toTimeString().slice(0, 5);
-                return asString;
-            }
-
             if (column.type === 'list') return asString;
 
             // Числовые форматы (#, .p, e/f/d)
@@ -299,57 +261,6 @@ const TableWidget = {
             }
 
             return asString;
-        },
-
-        /**
-         * Получение компонента для ввода в зависимости от типа данных
-         */
-        getInputComponent(type) {
-            let component = null;
-            
-            switch (type) {
-                case 'datetime':
-                    component = 'DatetimeInput';
-                    break;
-                case 'int':
-                    component = 'IntInput';
-                    break;
-                case 'float':
-                    component = 'FloatInput';
-                    break;
-                case 'list':
-                    component = 'ListInput';
-                    break;
-                case 'ip':
-                    component = 'IpInput';
-                    break;
-                default:
-                    component = 'StringInput';
-                    break;
-            }
-            
-            // Возвращаем сам объект компонента, если он есть в window,
-            // иначе имя (на случай, если его зарегистрировали через app.component)
-            const compObj = window[component];
-            return compObj || component;
-        },
-
-        /**
-         * Проверка доступности компонента
-         */
-        isComponentAvailable(type) {
-            // Проверяем наличие глобального объекта компонента
-            const nameMap = {
-                datetime: 'DatetimeInput',
-                int: 'IntInput',
-                float: 'FloatInput',
-                list: 'ListInput',
-                ip: 'IpInput',
-                str: 'StringInput'
-            };
-            const compName = nameMap[type] || 'StringInput';
-            const exists = typeof window[compName] !== 'undefined';
-            return exists;
         },
 
         onInput() {
@@ -578,7 +489,7 @@ const TableWidget = {
                     const value = tok.substring(1);
                     if (/^\d+$/.test(value)) {
                         width = value + 'px';
-                    } else if (value === 'ip' || value === 'ip_mask' || value === 'datetime' || value === 'date' || value === 'time' || value === 'int' || value === 'float') {
+                    } else if (value === 'ip' || value === 'ip_mask' || value === 'int' || value === 'float') {
                         type = value;
                     } else {
                         source = value;
@@ -693,14 +604,6 @@ const TableWidget = {
 
             this.tableColumns = columns;
             this.headerRows = headerRows;
-        },
-
-        slugify(text) {
-            return String(text || '')
-                .toLowerCase()
-                .normalize('NFD').replace(/\p{Diacritic}/gu, '')
-                .replace(/[^a-z0-9]+/g, '-')
-                .replace(/(^-|-$)/g, '');
         }
     },
     

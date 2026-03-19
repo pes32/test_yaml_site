@@ -1,470 +1,15 @@
-/* widgets.css — md3, table, dropdown, modal, collapse-анимации */
+/* widgets.css — widget containers, validation, media, and row-level widget layout */
 
-/* Стили для виджетов */
 .widget-container {
-    margin-bottom: 1rem;
-}
-
-/* MD3 Outlined Text Field с floating label */
-.md3-field {
-    --md3-outline: var(--color-text-muted);
-    --md3-outline-focus: var(--color-accent-soft);
-    --md3-outline-error: var(--color-error);
-    --md3-bg: var(--color-bg);
-    margin-bottom: 0.5rem;
-    overflow: visible; /* floating label не обрезается сверху */
-}
-
-/* Высота 40px, скругление 4px, отступы 16px по бокам, 4px сверху/снизу */
-.md3-field-wrap {
-    position: relative;
-    min-height: 40px;
-    display: flex;
-    align-items: center;
-    border: 1px solid var(--color-text-muted);
-    border-radius: 4px;
-    background: var(--md3-bg);
-    transition: border-color calc(var(--anim-ms) * 1ms), border-width calc(var(--anim-ms) * 1ms);
-}
-
-/* Пусто и не в фокусе: рамка var(--color-text-muted) */
-.md3-field-wrap:not([data-state~="filled"]):not([data-state~="focused"]):not([data-state~="error"]) {
-    border-color: var(--color-text-muted);
-}
-
-/* В фокусе: заменяем 1px рамку на 3px внутрь, верхняя граница на месте исходной */
-.md3-field-wrap[data-state~="focused"] {
-    border-color: transparent;
-}
-
-/* ::after всегда присутствует, чтобы плавно появляться вместе с label */
-.md3-field-wrap::after {
-    content: "";
-    position: absolute;
-    inset: -1px;
-    z-index: 0;
-    border: 3px solid var(--color-accent-soft);
-    border-radius: 4px;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity calc(var(--anim-ms) * 1ms) ease, border-color calc(var(--anim-ms) * 1ms) ease;
-}
-
-.md3-field-wrap[data-state~="focused"]::after {
-    opacity: 1;
-}
-
-.md3-field-wrap[data-state~="focused"][data-state~="error"]::after {
-    border-color: var(--md3-outline-error);
-}
-
-/* Сбрасываем любые focus-стили у input внутри */
-.md3-field-wrap[data-state~="focused"] input:focus,
-.md3-field-wrap[data-state~="focused"] textarea:focus {
-    outline: none;
-    box-shadow: none;
-}
-
-/* Заполнено (не в фокусе): рамка var(--color-text-main) */
-.md3-field-wrap[data-state~="filled"]:not([data-state~="focused"]):not([data-state~="error"]) {
-    border-color: var(--color-text-main);
-}
-
-.md3-field-wrap[data-state~="error"] {
-    border-color: var(--md3-outline-error);
-}
-
-/* Высота контента 32px + отступы 4px сверху/снизу = 40px */
-.md3-field-wrap input {
-    flex: 1;
-    width: 100%;
-    min-height: 32px;
-    height: 32px;
-    padding: 0 16px;
-    border: none;
-    background: transparent;
-    font-size: var(--text-md);
-    font-weight: 400;
-    line-height: var(--lh-lg);
-    color: var(--color-text-main);
-    outline: none;
-    box-sizing: border-box;
-}
-
-.md3-textarea-wrap {
-    overflow: visible;
-}
-
-.md3-field-wrap textarea {
-    flex: 0 0 auto;
-    width: 100%;
-    min-width: 80px;
-    min-height: 2.5em;
-    padding: 8px 16px 8px 16px;
-    line-height: var(--lh-md);
-    border: none;
-    background: transparent;
-    font-size: var(--text-md);
-    font-weight: 400;
-    color: var(--color-text-main);
-    outline: none;
-    box-sizing: border-box;
-    overflow: auto;
-    resize: both;
-}
-
-.md3-field-wrap input::placeholder,
-.md3-field-wrap textarea::placeholder {
-    color: var(--color-text-muted);
-}
-
-/* Label: общие стили для str, int, float, text, list, date, time, datetime */
-.md3-field-wrap label {
-    position: absolute;
-    z-index: 1;
-    left: 16px;
-    top: 50%;
-    transform: translateY(-50%);
-    transform-origin: left top;
-    font-size: var(--text-md);
-    font-weight: 400;
-    color: var(--color-text-muted);
-    pointer-events: none;
-    transition: transform calc(var(--anim-ms) * 1ms) ease, font-size calc(var(--anim-ms) * 1ms) ease, color calc(var(--anim-ms) * 1ms) ease, top calc(var(--anim-ms) * 1ms) ease;
-    will-change: transform;
-}
-
-.md3-field-wrap[data-state~="filled"] label,
-.md3-field-wrap[data-state~="focused"] label {
-    color: var(--color-text-main);
-}
-
-.md3-field-wrap[data-state~="error"] label {
-    color: var(--md3-outline-error);
-}
-
-/* Label сверху (floating): str, int, float, text, list, date, time, datetime — 12px, фон */
-.md3-field-wrap[data-state~="floating"] label,
-.md3-dropdown-wrap label,
-.md3-datetime-wrap label,
-.md3-field-wrap--date label,
-.md3-field-wrap--time label {
-    top: 0;
-    font-size: var(--text-sm);
-    transform: translateY(-50%);
-    transform-origin: left top;
-    background: var(--md3-bg);
-    padding: 0 4px;
-    margin-left: -4px;
-}
-
-.md3-field-wrap--textarea {
-    align-items: center;
-    overflow: visible;
-}
-
-/* sup_text: пусто — var(--color-text-muted), заполнено — var(--color-text-main); 12px */
-.md3-supporting {
-    font-size: var(--text-sm);
-    font-weight: 400;
-    color: var(--color-text-muted);
-    padding: 4px 16px 0 0;
-    min-height: 18px;
-    text-align: left;
-}
-
-.md3-field.filled .md3-supporting {
-    color: var(--color-text-main);
-}
-
-.md3-error {
-    color: var(--md3-outline-error);
-    animation: md3-error-fade-in calc(var(--anim-ms) * 1ms) ease forwards;
-}
-
-@keyframes md3-error-fade-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-/* Readonly: весь текст и рамка var(--color-text-muted), фон как у обычных полей, label с обычным фоном */
-.md3-field-wrap[data-state~="readonly"] {
-    border-color: var(--color-text-muted);
-    cursor: not-allowed;
-    background: transparent;
-}
-
-.md3-field-wrap[data-state~="readonly"] input,
-.md3-field-wrap[data-state~="readonly"] textarea {
-    color: var(--color-text-muted);
-    background: transparent;
-}
-
-.md3-field-wrap[data-state~="readonly"] input::placeholder,
-.md3-field-wrap[data-state~="readonly"] textarea::placeholder {
-    color: var(--color-text-muted);
-}
-
-.md3-field-wrap[data-state~="readonly"] label {
-    color: var(--color-text-muted);
-    background: var(--md3-bg);
-}
-
-/* sup_text серый при readonly */
-.md3-field--readonly .md3-supporting {
-    color: var(--color-text-muted);
-}
-
-.md3-dropdown-wrap.widget-readonly .md3-dropdown-toggle {
-    color: var(--color-text-muted);
-    background: transparent;
-}
-
-/* List (dropdown) в MD3-обёртке */
-.md3-dropdown-wrap .md3-dropdown-toggle {
-    min-height: 32px;
-    padding: 4px 36px 4px 16px;
-    border: none;
-    background: transparent;
-    color: var(--color-text-main);
-    font-size: var(--text-md);
-    font-weight: 400;
-    text-align: left;
-    box-shadow: none;
-}
-
-/* Плейсхолдер списка (пустое значение) — серый до фокуса */
-.md3-dropdown-wrap:not(.filled):not(.focused) .md3-dropdown-toggle {
-    color: var(--color-text-muted);
-}
-
-.md3-dropdown-wrap .md3-dropdown-toggle::after {
-    position: absolute;
-    right: 16px;
-    top: 50%;
-    transform: translateY(-50%);
-}
-
-/* DateTime: два поля в одной обёртке */
-.md3-datetime-wrap .widget-datetime {
-    display: flex;
-    gap: 12px;
-    padding: 4px 16px;
-}
-
-.md3-datetime-wrap .widget-datetime input {
-    flex: 1;
-    min-height: 0;
-    padding: 0;
-    border: none;
-    background: transparent;
+    margin-bottom: var(--space-md);
 }
 
 .widget-label {
-    font-weight: 500;
+    font-weight: var(--fw-medium);
     color: var(--color-text-secondary);
-    margin-bottom: 0.5rem;
+    margin-bottom: var(--space-sm);
 }
 
-.widget-button {
-    height: 40px;
-    padding: 8px 16px;
-    border-radius: var(--radius-md);
-    background-color: var(--color-accent-soft);
-    border-color: var(--color-accent-soft);
-    color: var(--color-text-main);
-    font-size: var(--text-base);
-    font-weight: 600;
-    gap: 8px;
-    transition: all 0.15s ease-in-out;
-}
-
-.widget-button:hover {
-    background-color: var(--color-accent-hover);
-    border-color: var(--color-accent-hover);
-}
-
-.widget-button:disabled {
-    background-color: var(--color-muted);
-    border-color: var(--color-muted);
-    cursor: not-allowed;
-    color: var(--color-bg);
-}
-
-/* Стили для таблиц — широкие таблицы скроллятся внутри контейнера */
-.widget-table-container {
-    position: relative;
-    overflow-x: auto;
-    max-width: 100%;
-}
-
-.widget-table {
-    border-collapse: collapse;
-    table-layout: auto;
-    margin-top: 0.5rem;
-}
-
-.widget-table th,
-.widget-table td {
-    padding: 0.5rem;
-    border: 1px solid var(--color-border);
-    text-align: left;
-    white-space: normal;
-    position: relative;
-}
-
-/* Редактируемая таблица: инпуты должны быть визуально как обычный текст */
-.widget-table--editable .cell-input {
-    display: block;
-    padding: 0;
-    margin: 0;
-    border: none;
-    background: transparent;
-    box-shadow: none;
-    font: inherit;
-    line-height: inherit;
-    height: auto;
-    min-height: 0;
-    color: inherit;
-}
-.widget-table--editable .cell-input:focus {
-    outline: none;
-    box-shadow: none;
-}
-.widget-table--editable select.cell-input {
-    padding-right: 0;
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    background: transparent;
-}
-
-/* Встраивание сторонних виджетов в ячейку таблицы (IpWidget и др.) */
-.widget-table--editable .widget-container {
-    margin: 0; padding: 0; background: transparent; border: 0;
-}
-.widget-table--editable .widget-container .widget-label { display: none; }
-.widget-table--editable .widget-ip {
-    padding: 0;
-    margin: 0;
-    border: none;
-    border-radius: 0;
-    background: transparent;
-    box-shadow: none;
-    font: inherit;
-    line-height: inherit;
-    height: auto;
-    color: inherit;
-}
-.widget-table--editable .widget-ip:focus { outline: none; box-shadow: none; }
-.widget-table--editable .invalid-feedback { display: none; }
-
-.widget-table th {
-    background-color: var(--color-bg-muted);
-    font-weight: 600;
-}
-
-.widget-table tbody tr:nth-child(even) {
-    background-color: var(--color-bg);
-}
-
-.widget-table tbody tr:hover {
-    background-color: var(--color-table-hover);
-}
-
-/* Стили для выпадающих списков */
-.widget-dropdown {
-    width: var(--widget-dropdown-w);
-    min-width: var(--widget-dropdown-w);
-    max-width: var(--widget-dropdown-w);
-}
-
-.widget-dropdown .dropdown-toggle {
-    width: var(--widget-dropdown-w);
-    min-width: var(--widget-dropdown-w);
-    max-width: var(--widget-dropdown-w);
-    text-align: left;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--color-text);
-    position: relative;
-    padding: 0.375rem 2.5rem 0.375rem 0.75rem;
-    border: 1px solid var(--color-border-input);
-    border-radius: 0.375rem;
-    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
-    background-color: var(--color-bg);
-}
-
-.widget-dropdown .dropdown-toggle:focus {
-    outline: 0;
-    border-color: var(--focus-color);
-    box-shadow: var(--focus-shadow);
-}
-
-.widget-dropdown .dropdown-toggle:hover,
-.widget-dropdown .dropdown-toggle:active,
-.widget-dropdown .dropdown-toggle:focus,
-.widget-dropdown.show .dropdown-toggle {
-    background-color: var(--color-bg);
-    color: var(--color-text);
-}
-
-.widget-dropdown .dropdown-toggle::after {
-    position: absolute;
-    right: 0.75rem;
-    top: 50%;
-    transform: translateY(-50%);
-}
-
-.widget-dropdown .dropdown-menu {
-    width: var(--widget-dropdown-w);
-    min-width: var(--widget-dropdown-w);
-    max-width: var(--widget-dropdown-w);
-    max-height: 200px;
-    overflow-y: auto;
-}
-
-.widget-dropdown .dropdown-item {
-    width: var(--widget-dropdown-w);
-    min-width: var(--widget-dropdown-w);
-    max-width: var(--widget-dropdown-w);
-    color: var(--color-text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    cursor: pointer;
-    padding: 0.5rem 0.75rem;
-}
-
-.widget-dropdown .dropdown-item:hover,
-.widget-dropdown .dropdown-item:focus {
-    background-color: var(--color-dropdown-hover);
-    color: var(--color-text);
-}
-
-.widget-dropdown .dropdown-item.active,
-.widget-dropdown .dropdown-item.active:hover,
-.widget-dropdown .dropdown-item.active:focus,
-.widget-dropdown .dropdown-menu .dropdown-item.active,
-.widget-dropdown .dropdown-menu .dropdown-item.active:hover,
-.widget-dropdown .dropdown-menu .dropdown-item.active:focus {
-    background-color: var(--color-dropdown-active);
-    color: var(--color-text);
-}
-
-/* Стили для datetime */
-.widget-datetime {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-}
-
-.widget-datetime input {
-    flex: 1;
-}
-
-/* Стили для IP адресов */
 .widget-ip {
     font-family: var(--font-mono);
     letter-spacing: 0.1em;
@@ -476,135 +21,55 @@
     box-shadow: var(--focus-shadow);
 }
 
-/* Стили для валидации */
-.is-invalid {
-    border-color: var(--color-danger) !important;
-    box-shadow: 0 0 0 0.2rem var(--color-danger-shadow) !important;
-}
-
-.invalid-feedback {
-    display: block;
-    width: 100%;
-    margin-top: 0.25rem;
-    font-size: var(--text-base);
-    color: var(--color-danger);
-}
-
 .widget-info {
     font-size: var(--text-base);
     color: var(--color-muted);
-    margin-top: 0.25rem;
+    margin-top: var(--space-xs);
 }
 
-/* Виджет изображения (img) */
 .widget-img {
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
+    gap: var(--space-2xs);
 }
+
 .widget-img-description {
     font-size: var(--text-base);
     color: var(--color-muted);
 }
+
 .widget-img-element {
     display: block;
-    border-radius: 0.25rem;
+    border-radius: var(--radius-xs);
 }
+
 .widget-img-sup {
     font-size: var(--text-sm);
     color: var(--color-muted);
 }
 
-.widget-readonly {
-    color: var(--color-muted);
-    cursor: not-allowed;
-}
-
-/* Стили для сворачиваемых блоков */
-.collapse-icon {
-    transition: transform calc(var(--anim-ms) * 1ms);
-    flex: 0 0 auto;
-    width: 24px;
-    height: 24px;
-    object-fit: contain;
-}
-
-.collapsed .collapse-icon {
-    transform: rotate(-90deg);
-}
-
-/* Анимация разворачивания/сворачивания блока */
-.page-section-card .collapse,
-.card .collapse {
-    display: block;
-    overflow: hidden;
-}
-
-.collapse-inner {
-    display: grid;
-    grid-template-rows: 1fr;
-    align-items: start;
-}
-
-.collapse-inner.collapse-animating {
-    transition: grid-template-rows 0.35s ease-out;
-}
-
-.page-section-card .collapse:not(.show) .collapse-inner,
-.card .collapse:not(.show) .collapse-inner {
-    grid-template-rows: 0fr;
-}
-
-.collapse-inner > * {
-    overflow: hidden;
-    min-height: 0;
-}
-/* Широкие таблицы: body секции скроллится по горизонтали */
-.collapse-inner > .page-section-body,
-.collapse-inner > .card-body {
-    overflow-x: auto;
-    overflow-y: hidden;
-}
-
-.collapse-inner .row,
-.collapse-inner .card-body,
-.collapse-inner .page-section-body {
-    min-height: 0;
-}
-
-.collapse-inner.collapse-animating .page-section-body,
-.collapse-inner.collapse-animating .card-body {
-    transition: padding-top 0.35s ease-out, padding-bottom 0.35s ease-out,
-                border-top-width 0.35s ease-out, border-bottom-width 0.35s ease-out;
-}
-
-.page-section-card .collapse:not(.show) .collapse-inner .page-section-body,
-.card .collapse:not(.show) .collapse-inner .page-section-body,
-.page-section-card .collapse:not(.show) .collapse-inner .card-body,
-.card .collapse:not(.show) .collapse-inner .card-body {
-    padding-top: 0;
-    padding-bottom: 0;
-    border-bottom-width: 0;
-}
-
-.card-header .collapse-icon {
-    margin-right: 0;
-}
-
-/* Компактное размещение виджетов в одной строке */
+/* Row layout */
 .row .col-auto .widget-container {
     display: inline-block;
     width: auto;
     vertical-align: top;
-    margin-bottom: 0.5rem;
+    margin-bottom: var(--space-sm);
 }
 
 .row .col-auto .widget-container .md3-field {
-    max-width: 320px;
+    width: var(--widget-field-w);
+}
+
+.widget-container--datetime:not(.widget-explicit-width) .md3-field,
+.row .col-auto .widget-container--datetime .md3-field {
+    width: fit-content;
+    min-width: var(--widget-datetime-w);
 }
 
 .row .col-auto .widget-container.widget-explicit-width .md3-field,
 .widget-container.widget-explicit-width .md3-field {
+    width: 100%;
+    min-width: 0;
     max-width: none;
 }
 
@@ -614,14 +79,13 @@
 }
 
 .row .col-auto .widget-container .md3-field-wrap input,
-.row .col-auto .widget-container .widget-dropdown .dropdown-toggle {
-    width: auto;
-    display: inline-block;
-    max-width: 320px;
+.row .col-auto .widget-container .md3-dropdown-wrap .widget-dropdown {
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .row .col-auto .widget-container.widget-explicit-width .md3-field-wrap input,
-.row .col-auto .widget-container.widget-explicit-width .widget-dropdown .dropdown-toggle {
+.row .col-auto .widget-container.widget-explicit-width .widget-dropdown {
     width: 100%;
 }
 
@@ -630,28 +94,27 @@
     max-width: none;
 }
 
-.widget-container--textarea.widget-explicit-width .md3-field-wrap {
+.widget-container--textarea .md3-field {
     width: fit-content;
-}
-.widget-container--textarea.widget-explicit-width .md3-textarea-wrap {
-    width: fit-content;
+    min-width: 100%;
 }
 
 .row .col-auto .widget-container--textarea .md3-field {
-    max-width: none;
+    width: var(--widget-field-w);
 }
 
-.row .col-auto .widget-container .widget-datetime {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    width: auto;
+.row .col-auto .widget-container--textarea .md3-field-wrap--textarea,
+.row .col-auto .widget-container--textarea .md3-textarea-wrap {
+    width: 100%;
+    min-width: 100%;
 }
 
-.row .col-auto .widget-container .widget-datetime input[type="date"],
-.row .col-auto .widget-container .widget-datetime input[type="time"] {
-    flex: 0 0 auto;
-    width: 160px;
+.widget-container--textarea.widget-explicit-width .md3-field-wrap {
+    width: fit-content;
+}
+
+.widget-container--textarea.widget-explicit-width .md3-textarea-wrap {
+    width: fit-content;
 }
 
 .card-body .row > .col-auto {
@@ -664,143 +127,5 @@
 }
 
 .card-body .row .widget-container {
-    margin-bottom: 0;
-}
-
-/* Иконка в кнопке */
-.button-icon {
-    width: 24px;
-    height: 24px;
-    flex-shrink: 0;
-    object-fit: contain;
-}
-
-.widget-button.icon-only {
-    width: 40px;
-    min-width: 40px;
-    padding: 8px;
-    background-color: transparent;
-    border-color: transparent;
-}
-
-.widget-button.icon-only:hover:not(:disabled) {
-    background-color: var(--color-icon-only-hover);
-    border-color: transparent;
-}
-
-/* Модальные окна */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: var(--color-overlay);
-    z-index: var(--z-overlay);
-    padding: 1rem;
-}
-
-.modal-content {
-    background: var(--color-bg);
-    border-radius: 0.375rem;
-    box-shadow: 0 0.5rem 1rem var(--color-shadow);
-    max-width: 90vw;
-    max-height: 90vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1rem;
-    border-bottom: 1px solid var(--color-border);
-    background-color: var(--color-bg-muted);
-}
-
-.modal-title {
-    margin: 0;
-    font-size: var(--text-lg);
-    font-weight: 400;
-}
-
-.modal-body {
-    padding: 1rem;
-    overflow-y: auto;
-}
-
-.confirm-modal-content {
-    max-width: 600px;
-}
-
-.confirm-modal-content .modal-body {
-    white-space: pre-line;
-}
-
-.modal-footer {
-    padding: 0.3125rem 1rem;
-    border-top: 1px solid var(--color-border);
-    background-color: var(--color-bg-muted);
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.5rem;
-}
-
-/* Контекстное меню для таблиц */
-.context-menu {
-    position: fixed;
-    background: var(--color-bg);
-    border: 1px solid var(--color-border);
-    border-radius: 0.375rem;
-    box-shadow: 0 0.5rem 1rem var(--color-shadow);
-    z-index: 1060;
-    min-width: 200px;
-    padding: 0.5rem 0;
-}
-
-.context-menu-item {
-    padding: 0.5rem 1rem;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    transition: background-color 0.15s ease-in-out;
-}
-
-.context-menu-item:hover {
-    background-color: var(--color-bg-muted);
-}
-
-.context-menu-item i {
-    width: 1rem;
-    text-align: center;
-    color: var(--color-muted);
-}
-
-/* ListWidget внутри таблицы */
-.widget-table--editable .widget-dropdown .dropdown-toggle {
-    background: transparent;
-    border: none;
-    padding: 0 1.2rem 0 0;
-    width: 100%;
-    height: auto;
-    line-height: 1.2rem;
-}
-.widget-table--editable .widget-dropdown .dropdown-toggle:after {
-    position: absolute;
-    right: 0;
-}
-.widget-table--editable .widget-dropdown .dropdown-menu {
-    width: auto;
-    min-width: 160px;
-}
-
-.widget-dd-menu {
-    position: absolute;
-    z-index: var(--z-dropdown);
-}
-.dropdown-menu.widget-dd-menu.show {
-    display: block;
+    margin-bottom: var(--zero);
 }

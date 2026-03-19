@@ -38,7 +38,7 @@ def load_db_settings() -> Dict[str, Any]:
         logger.error("Ошибка парсинга db_settings.yaml: %s", e)
         raise
     except Exception as e:
-        logger.error("Ошибка загрузки настроек БД: %s", e)
+        logger.exception("Ошибка загрузки настроек БД: %s", e)
         raise
 
 
@@ -55,8 +55,6 @@ class DatabaseManager:
             "user": self.settings["user"],
             "password": self.settings["password"],
         }
-        logger.info("DatabaseManager инициализирован для БД %s@%s:%s", 
-                   self.settings["db_name"], self.settings["address"], self.settings["port"])
     
     @contextmanager
     def get_connection(self):
@@ -90,7 +88,7 @@ class DatabaseManager:
                         "port": self.settings["port"]
                     }
         except Exception as e:
-            logger.error("Ошибка тестирования подключения: %s", e)
+            logger.exception("Ошибка тестирования подключения: %s", e)
             return {
                 "success": False,
                 "error": str(e),
@@ -111,9 +109,6 @@ class DatabaseManager:
             
             with self.get_connection() as conn:
                 with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
-                    # Логируем запрос
-                    logger.info("Выполнение SQL: %s", query[:200] + "..." if len(query) > 200 else query)
-                    
                     cursor.execute(query)
                     
                     # Определяем тип запроса
@@ -176,7 +171,7 @@ class DatabaseManager:
             }
         except Exception as e:
             error_msg = str(e)
-            logger.error("Неожиданная ошибка при выполнении SQL: %s", error_msg)
+            logger.exception("Неожиданная ошибка при выполнении SQL: %s", error_msg)
             return {
                 "success": False,
                 "error": f"Неожиданная ошибка: {error_msg}",

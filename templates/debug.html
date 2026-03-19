@@ -48,7 +48,7 @@
                     <div class="card page-section-card">
                         <div class="card-header page-section-header d-flex justify-content-between align-items-center">
                             <h5>Лог (последние 1000 строк)</h5>
-                            <button type="button" class="btn widget-button inline-flex-center" @click="loadLogs" :disabled="logsLoading">Обновить</button>
+                            <button type="button" class="widget-button inline-flex-center" @click="loadLogs" :disabled="logsLoading">Обновить</button>
                         </div>
                         <div class="card-body" style="max-height:70vh;overflow-y:auto">
                             <pre v-if="logsLoading && !logLines.length" class="text-muted">Загрузка...</pre>

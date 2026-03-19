@@ -1,0 +1,138 @@
+/* components/dropdown.css — dropdown, list-combobox, dd-menu */
+
+.list-combobox-inner {
+    display: flex;
+    align-items: center;
+    position: relative;
+    width: 100%;
+    min-height: var(--lh-lg);
+    padding: var(--zero);
+}
+.list-combobox-input {
+    flex: 1;
+    min-width: 0;
+    min-height: var(--lh-lg);
+    height: var(--lh-lg);
+    padding: 0 var(--dropdown-arrow-space) 0 var(--space-md);
+    border: none;
+    background: transparent;
+    font-size: var(--text-md);
+    font-weight: var(--fw-regular);
+    line-height: var(--lh-lg);
+    color: var(--color-text-main);
+    outline: none;
+    box-sizing: border-box;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.list-combobox-arrow-wrap {
+    position: absolute;
+    right: 1px;
+    top: var(--inset-vertical);
+    bottom: var(--inset-vertical);
+    min-width: var(--dropdown-arrow-space);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(to right, transparent 0, var(--md3-bg, var(--color-bg)) 12px);
+    z-index: 0;
+    pointer-events: none;
+}
+.list-combobox-arrow-wrap > .list-combobox-arrow {
+    pointer-events: auto;
+}
+.list-combobox-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--color-text-main);
+}
+.list-combobox-arrow svg {
+    display: block;
+    transform: rotate(180deg);
+    transition: transform calc(var(--anim-ms) * 1ms) ease;
+}
+.list-combobox.dropdown.show .list-combobox-arrow svg {
+    transform: rotate(0deg);
+}
+
+.md3-dropdown-wrap .list-combobox-input,
+.md3-dropdown-wrap .list-combobox-arrow {
+    color: var(--color-text-muted);
+}
+.md3-dropdown-wrap.is-filled .list-combobox-input,
+.md3-dropdown-wrap.is-filled .list-combobox-arrow,
+.md3-dropdown-wrap.is-focused .list-combobox-input,
+.md3-dropdown-wrap.is-focused .list-combobox-arrow {
+    color: var(--color-text-main);
+}
+
+.list-combobox-arrow:hover {
+    color: var(--color-text-main);
+}
+.md3-dropdown-wrap.is-readonly .list-combobox-arrow {
+    cursor: not-allowed;
+    color: var(--color-text-muted);
+}
+
+.widget-dropdown {
+    width: var(--widget-dropdown-w);
+    min-width: var(--widget-dropdown-w);
+    max-width: var(--widget-dropdown-w);
+}
+
+.widget-dd-menu {
+    position: absolute;
+    z-index: var(--z-dropdown);
+}
+.dropdown-menu.widget-dd-menu {
+    display: block;
+}
+.dropdown-menu.widget-dd-menu:not(.show) {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    visibility: hidden;
+    transition: max-height calc(var(--anim-ms) * 1ms) ease, opacity calc(var(--anim-ms) * 1ms) ease, visibility calc(var(--anim-ms) * 1ms);
+}
+.dropdown-menu.widget-dd-menu.show {
+    max-height: var(--dropdown-max-height);
+    opacity: 1;
+    visibility: visible;
+    transition: max-height calc(var(--anim-ms) * 1ms) ease, opacity calc(var(--anim-ms) * 1ms) ease;
+}
+
+.widget-dd-menu--teleport {
+    overflow-y: hidden;
+}
+.widget-dd-menu--teleport.scrollable {
+    overflow-y: auto;
+}
+.widget-dd-menu--teleport .dropdown-item {
+    padding: var(--space-sm) var(--space-md);
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    outline: none;
+}
+.widget-dd-menu--teleport .dropdown-item:hover,
+.widget-dd-menu--teleport .dropdown-item:focus {
+    background-color: var(--color-dropdown-hover);
+}
+.widget-dd-menu--teleport .dropdown-item.active,
+.widget-dd-menu--teleport .dropdown-item.active:hover,
+.widget-dd-menu--teleport .dropdown-item.active:focus {
+    background-color: var(--color-dropdown-active);
+    color: var(--color-text-main);
+    outline: none;
+    border: none;
+    box-shadow: 0 -2px 0 0 var(--color-text-main), 0 2px 0 0 var(--color-text-main);
+}
+.widget-dd-menu--teleport .dropdown-item.dropdown-item--selected,
+.widget-dd-menu--teleport .dropdown-item.dropdown-item--selected:hover,
+.widget-dd-menu--teleport .dropdown-item.dropdown-item--selected:focus {
+    background-color: var(--color-dropdown-active);
+    color: var(--color-text-main);
+}

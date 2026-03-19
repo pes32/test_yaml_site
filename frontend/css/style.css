@@ -1,7 +1,15 @@
-/* style.css — главный файл (импорты) */
+/* style.css — порядок: tokens → base → layout/ui → components → widgets → utilities */
 
+@import "tokens.css";
 @import "base.css";
 @import "ui.css";
 @import "layout.css";
+@import "components/button.css";
+@import "components/collapse.css";
+@import "components/modal.css";
+@import "components/md3-field.css";
+@import "components/dropdown.css";
+@import "components/table.css";
+@import "components/datetime.css";
 @import "widgets.css";
 @import "utilities.css";

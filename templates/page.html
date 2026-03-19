@@ -75,7 +75,7 @@
                         </div>
                     </div>
 
-                    <div v-else class="page-msg page-msg--empty">
+                    <div v-else>
                         Нет контента для отображения. Добавьте menu или row/box/collapse на верхнем уровне gui.yaml.
                     </div>
                 </main>
@@ -90,7 +90,6 @@
     </script>
     <script>
         window.pageData = JSON.parse(document.getElementById('page-data').textContent);
-        console.log('Page data loaded:', window.pageData);
     </script>
     <!-- Загружаем виджеты: сначала миксин и базовая обёртка, затем виджеты -->
     <script src="{{ url_for('static', filename='js/widgets/mixin.js') }}?v={{ ASSETS_VERSION }}"></script>

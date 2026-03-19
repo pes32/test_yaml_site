@@ -1,0 +1,70 @@
+/* components/collapse.css — collapse affordances and open/close animation */
+
+.collapse-icon {
+    transition: transform calc(var(--anim-ms) * 1ms);
+    flex: 0 0 auto;
+    width: var(--icon-size);
+    height: var(--icon-size);
+    object-fit: contain;
+}
+
+.collapsed .collapse-icon {
+    transform: rotate(-90deg);
+}
+
+.page-section-card .collapse,
+.card .collapse {
+    display: block;
+    overflow: hidden;
+}
+
+.collapse-inner {
+    display: grid;
+    grid-template-rows: 1fr;
+    align-items: start;
+}
+
+.collapse-inner.collapse-animating {
+    transition: grid-template-rows 0.35s ease-out;
+}
+
+.page-section-card .collapse:not(.show) .collapse-inner,
+.card .collapse:not(.show) .collapse-inner {
+    grid-template-rows: 0fr;
+}
+
+.collapse-inner > * {
+    overflow: hidden;
+    min-height: var(--min-h-0);
+}
+
+.collapse-inner > .page-section-body,
+.collapse-inner > .card-body {
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.collapse-inner .row,
+.collapse-inner .card-body,
+.collapse-inner .page-section-body {
+    min-height: var(--min-h-0);
+}
+
+.collapse-inner.collapse-animating .page-section-body,
+.collapse-inner.collapse-animating .card-body {
+    transition: padding-top 0.35s ease-out, padding-bottom 0.35s ease-out,
+                border-top-width 0.35s ease-out, border-bottom-width 0.35s ease-out;
+}
+
+.page-section-card .collapse:not(.show) .collapse-inner .page-section-body,
+.card .collapse:not(.show) .collapse-inner .page-section-body,
+.page-section-card .collapse:not(.show) .collapse-inner .card-body,
+.card .collapse:not(.show) .collapse-inner .card-body {
+    padding-top: 0;
+    padding-bottom: 0;
+    border-bottom-width: 0;
+}
+
+.card-header .collapse-icon {
+    margin-right: 0;
+}

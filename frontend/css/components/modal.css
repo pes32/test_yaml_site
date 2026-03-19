@@ -1,0 +1,92 @@
+/* components/modal.css — modal shell and confirm modal theming */
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: var(--color-overlay);
+    z-index: var(--z-overlay);
+    padding: var(--space-md);
+}
+
+.modal-content {
+    --modal-header-bg: var(--color-bg-muted);
+    --modal-header-border: 1px solid var(--color-border);
+    --modal-footer-bg: var(--color-bg-muted);
+    --modal-footer-border: 1px solid var(--color-border);
+    --modal-footer-padding: var(--space-sm) var(--space-md);
+    background: var(--color-bg);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-card);
+    max-width: var(--modal-max-width);
+    max-height: var(--modal-max-height);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-md);
+    border-bottom: var(--modal-header-border);
+    background-color: var(--modal-header-bg);
+}
+
+.modal-title {
+    margin: 0;
+    font-size: var(--text-lg);
+    font-weight: var(--fw-regular);
+}
+
+.modal-body {
+    padding: var(--space-md);
+    overflow-y: auto;
+}
+
+.modal-footer {
+    padding: var(--modal-footer-padding);
+    border-top: var(--modal-footer-border);
+    background-color: var(--modal-footer-bg);
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-sm);
+}
+
+.confirm-modal-content {
+    --modal-header-bg: var(--color-bg-soft);
+    --modal-header-border: none;
+    --modal-footer-bg: var(--color-bg);
+    --modal-footer-border: none;
+    --modal-footer-padding: var(--space-md);
+    max-width: var(--confirm-modal-max-width);
+}
+
+.confirm-modal-content .modal-title {
+    font-weight: var(--fw-medium);
+    color: var(--color-text-main);
+    text-align: left;
+}
+
+.confirm-modal-content .modal-body {
+    white-space: pre-line;
+}
+
+.confirm-modal-content .modal-footer .confirm-modal-action {
+    min-height: var(--field-height);
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--radius-md);
+    font-size: var(--text-base);
+    font-weight: var(--fw-semibold);
+}
+
+.confirm-modal-content .modal-footer .confirm-modal-action--secondary {
+    background-color: var(--color-bg-muted);
+    border-color: var(--color-border);
+    color: var(--color-text-main);
+}
+
+.confirm-modal-content .modal-footer .confirm-modal-action--secondary:hover:not(:disabled) {
+    background-color: var(--color-border-light);
+    border-color: var(--color-border);
+}

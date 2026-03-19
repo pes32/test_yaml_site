@@ -1,0 +1,104 @@
+/* tokens.css — design tokens */
+
+:root {
+    --app-navbar-height: 44px;
+    --page-gap: 20px;
+    --space-xs: 4px;
+    --space-2xs: 6px;
+    --space-sm: 8px;
+    --space-md: 16px;
+    --space-lg: 12px;
+    --space-xl: 20px;
+    --dropdown-arrow-space: 40px;
+    --inset-vertical: 0;
+    --zero: 0;
+    --min-h-0: 0;
+
+    --widget-dropdown-w: 300px;
+    --widget-field-w: 250px;
+    --widget-dt-gap: 6px;
+    --widget-dt-icon-slot-w: 28px;
+    --widget-dt-date-mask-w: 132px;
+    --widget-dt-time-mask-w: 96px;
+    --widget-dt-date-segment-w: calc(var(--widget-dt-date-mask-w) + var(--widget-dt-gap) + var(--widget-dt-icon-slot-w));
+    --widget-dt-time-segment-w: calc(var(--widget-dt-time-mask-w) + var(--widget-dt-gap) + var(--widget-dt-icon-slot-w));
+    --widget-datetime-w: calc(var(--widget-dt-date-segment-w) + var(--widget-dt-time-segment-w) + var(--space-2xs));
+    --widget-dt-calendar-panel-w: 360px;
+    --widget-dt-time-panel-w: 264px;
+    --dropdown-max-height: 200px;
+    --menu-min-width: 200px;
+    --modal-max-width: 90vw;
+    --modal-max-height: 90vh;
+    --confirm-modal-max-width: 600px;
+    --section-frame-width: 5px;
+    --icon-size-sm: 16px;
+
+    --radius-sm: 6px;
+    --radius-field: 4px;
+    --radius-xs: 0.25rem;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-section: 15px;
+
+    --fw-regular: 400;
+    --fw-medium: 500;
+    --fw-semibold: 600;
+    --fw-bold: 700;
+    --font-mono: 'JetBrains Mono', monospace;
+    --anim-ms: 300;
+    --transition-fast: 0.15s;
+
+    --focus-color: #86b7fe;
+    --focus-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    --shadow-card: 0 0.5rem 1rem var(--color-shadow);
+
+    --color-text-main: #474747;
+    --color-text-muted: #707579;
+    --color-text: #000;
+    --color-text-secondary: #495057;
+    --color-bg: #fff;
+    --color-bg-soft: #F2F6FE;
+    --color-bg-muted: #f8f9fa;
+    --color-surface-soft: #F0F0F0;
+    --color-accent-soft: #d4e3fb;
+    --color-accent-hover: #bfd6f9;
+    --color-accent-warm: #FF9566;
+    --color-accent-warm-soft: #FFF6F2;
+    --color-muted: #6c757d;
+    --color-danger: #dc3545;
+    --color-danger-shadow: rgba(220, 53, 69, 0.25);
+    --color-error: #F36058;
+    --color-border: #dee2e6;
+    --color-border-input: #ced4da;
+    --color-dropdown-hover: #e7f1ff;
+    --color-dropdown-active: #cfe2ff;
+    --color-table-hover: #dfe6f0;
+    --color-overlay: rgba(0, 0, 0, 0.5);
+    --color-shadow: rgba(0, 0, 0, 0.15);
+    --color-shadow-sm: rgba(0, 0, 0, 0.075);
+    --color-shadow-border: rgba(0, 0, 0, 0.125);
+    --color-bg-stripe: rgba(0, 0, 0, 0.05);
+    --color-icon-only-hover: rgba(212, 227, 251, 0.5);
+    --color-navbar-bg: #212529;
+    --color-navbar-text: rgba(255, 255, 255, 0.9);
+    --color-primary: #0d6efd;
+    --color-text-dark: #212529;
+    --color-border-light: #e9ecef;
+
+    --z-navbar: 1000;
+    --z-dropdown: 1100;
+    --z-modal: 1200;
+    --z-overlay: 1300;
+
+    --text-sm: 12px;
+    --text-base: 14px;
+    --text-md: 16px;
+    --text-lg: 20px;
+    --text-xl: 24px;
+    --lh-sm: 16px;
+    --lh-md: 24px;
+    --lh-lg: 32px;
+
+    --icon-size: 24px;
+    --field-height: 40px;
+}

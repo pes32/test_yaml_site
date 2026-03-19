@@ -35,45 +35,6 @@
             .filter(Boolean);
     }
 
-    function normalizeColumns(value) {
-        if (!value) {
-            return null;
-        }
-
-        const columns = {};
-
-        if (Array.isArray(value)) {
-            value.forEach((column, index) => {
-                const widgets = splitNames(column);
-                if (widgets.length) {
-                    columns[index] = { widgets: widgets };
-                }
-            });
-            return Object.keys(columns).length ? columns : null;
-        }
-
-        if (typeof value !== 'object') {
-            return null;
-        }
-
-        Object.entries(value).forEach(([name, column]) => {
-            if (column && typeof column === 'object' && Array.isArray(column.widgets)) {
-                const widgets = splitNames(column.widgets);
-                if (widgets.length) {
-                    columns[name] = { widgets: widgets };
-                }
-                return;
-            }
-
-            const widgets = splitNames(column);
-            if (widgets.length) {
-                columns[name] = { widgets: widgets };
-            }
-        });
-
-        return Object.keys(columns).length ? columns : null;
-    }
-
     function normalizeRowEntry(entry) {
         if (entry === null || entry === undefined) {
             return [];
@@ -108,11 +69,6 @@
             return normalizeRows(rawValue);
         }
 
-        if (parsed.type === 'columns') {
-            const columns = normalizeColumns(rawValue);
-            return columns ? [{ columns: columns }] : [];
-        }
-
         return [];
     }
 
@@ -128,7 +84,7 @@
         return normalizeRowEntry({ row: value });
     }
 
-    function createSection(type, name) {
+    function createSection(type, name, options) {
         const sectionType = type === 'collapse' ? 'collapse' : 'box';
 
         return {
@@ -137,7 +93,8 @@
             icon: '',
             rows: [],
             collapsible: sectionType === 'collapse',
-            showHeader: Boolean(name)
+            showHeader: Boolean(name),
+            hasFrame: options && options.hasFrame !== undefined ? options.hasFrame : false
         };
     }
 
@@ -156,7 +113,7 @@
     }
 
     function normalizeSection(type, name, body) {
-        const section = createSection(type, name);
+        const section = createSection(type, name, { hasFrame: true });
 
         if (Array.isArray(body)) {
             body.forEach((item) => {
@@ -187,12 +144,6 @@
                     return;
                 }
 
-                if (parsed.type === 'columns') {
-                    const columns = normalizeColumns(rawValue);
-                    if (columns) {
-                        section.rows.push({ columns: columns });
-                    }
-                }
             });
 
             return section;
@@ -272,12 +223,6 @@
                 return;
             }
 
-            if (parsed.type === 'columns') {
-                const columns = normalizeColumns(rawValue);
-                if (columns) {
-                    looseSection.rows.push({ columns: columns });
-                }
-            }
         });
 
         flushLooseSection();
@@ -324,7 +269,7 @@
         };
     }
 
-    var ROOT_CONTENT_TYPES = new Set(['row', 'rows', 'widgets', 'box', 'collapse', 'icon', 'tab', 'columns', 'button']);
+    var ROOT_CONTENT_TYPES = new Set(['row', 'rows', 'widgets', 'box', 'collapse', 'icon', 'tab', 'button']);
 
     function parsePageGui(rawConfig) {
         const gui = rawConfig && rawConfig.gui ? rawConfig.gui : (rawConfig || {});
@@ -389,13 +334,6 @@
                 row.widgets.forEach((widgetName) => target.add(widgetName));
             }
 
-            if (row.columns && typeof row.columns === 'object') {
-                Object.values(row.columns).forEach((column) => {
-                    if (column && Array.isArray(column.widgets)) {
-                        column.widgets.forEach((widgetName) => target.add(widgetName));
-                    }
-                });
-            }
         });
 
         return target;

@@ -15,7 +15,7 @@ const ButtonWidget = {
     emits: ['execute'],
     template: `
         <div class="widget-container u-wide">
-            <button class="btn widget-button inline-flex-center"
+            <button class="widget-button inline-flex-center"
                     :class="{ 'icon-only': isIconOnly }"
                     :style="buttonStyle"
                     :disabled="widgetConfig.readonly"

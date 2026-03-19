@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
+import logging
 import os
 
 from flask import jsonify, render_template
+
+logger = logging.getLogger(__name__)
 
 
 def register_debug_routes(app, config_service, log_file_path: str):
@@ -44,6 +47,7 @@ def register_debug_routes(app, config_service, log_file_path: str):
         except FileNotFoundError:
             return jsonify({"lines": [], "total": 0, "error": "Файл лога не найден"})
         except Exception as e:
+            logger.exception("Ошибка чтения файла лога: %s", path)
             return jsonify({"lines": [], "total": 0, "error": str(e)}), 500
 
     @app.route("/api/debug/pages")

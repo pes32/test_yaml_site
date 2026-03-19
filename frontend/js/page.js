@@ -410,22 +410,32 @@ const app = createApp({
         },
 
         showNotification(message, type) {
-            const alertType = type || 'info';
-            const alertDiv = document.createElement('div');
-            alertDiv.className = `alert alert-${alertType} alert-dismissible fade show`;
-            alertDiv.innerHTML = `${message}<button type="button" class="btn-close" aria-label="Закрыть"></button>`;
-            alertDiv.querySelector('.btn-close').addEventListener('click', () => alertDiv.remove());
+            const noticeType = type || 'info';
+            const notice = document.createElement('div');
+            const messageNode = document.createElement('span');
+            const closeButton = document.createElement('button');
+
+            notice.className = `page-notice page-notice--${noticeType}`;
+            messageNode.className = 'page-notice__message';
+            messageNode.textContent = String(message || '');
+
+            closeButton.type = 'button';
+            closeButton.className = 'ui-close-button';
+            closeButton.setAttribute('aria-label', 'Закрыть');
+            closeButton.addEventListener('click', () => notice.remove());
+
+            notice.append(messageNode, closeButton);
 
             const container = document.querySelector('.page-content-column')
                 || document.querySelector('.container-fluid');
 
             if (container) {
-                container.insertBefore(alertDiv, container.firstChild);
+                container.insertBefore(notice, container.firstChild);
             }
 
             setTimeout(() => {
-                if (alertDiv.parentNode) {
-                    alertDiv.remove();
+                if (notice.parentNode) {
+                    notice.remove();
                 }
             }, 5000);
         }

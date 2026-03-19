@@ -1,0 +1,105 @@
+/* components/table.css — widget-table, context-menu */
+
+.widget-table-container {
+    position: relative;
+    overflow-x: auto;
+    max-width: 100%;
+}
+
+.widget-table {
+    border-collapse: collapse;
+    table-layout: auto;
+    margin-top: var(--space-sm);
+}
+
+.widget-table th,
+.widget-table td {
+    padding: var(--space-sm);
+    border: 1px solid var(--color-border);
+    text-align: left;
+    white-space: normal;
+    position: relative;
+}
+
+.widget-table--editable .cell-input {
+    display: block;
+    padding: var(--zero);
+    margin: var(--zero);
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    font: inherit;
+    line-height: inherit;
+    height: auto;
+    min-height: var(--min-h-0);
+    color: inherit;
+}
+.widget-table--editable .cell-input:focus {
+    outline: none;
+    box-shadow: none;
+}
+.widget-table--editable select.cell-input {
+    padding-right: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background: transparent;
+}
+
+.widget-table--editable .widget-container {
+    margin: var(--zero);
+    padding: var(--zero);
+    background: transparent;
+    border: var(--zero);
+}
+.widget-table--editable .widget-container .widget-label { display: none; }
+.widget-table--editable .widget-ip {
+    padding: var(--zero);
+    margin: var(--zero);
+    border: none;
+    border-radius: var(--zero);
+    background: transparent;
+    box-shadow: none;
+    font: inherit;
+    line-height: inherit;
+    height: auto;
+    color: inherit;
+}
+.widget-table--editable .widget-ip:focus { outline: none; box-shadow: none; }
+
+.widget-table th {
+    background-color: var(--color-bg-muted);
+    font-weight: var(--fw-semibold);
+}
+
+.widget-table tbody tr:nth-child(even) {
+    background-color: var(--color-bg);
+}
+
+.widget-table tbody tr:hover {
+    background-color: var(--color-table-hover);
+}
+
+.context-menu {
+    position: fixed;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-card);
+    z-index: 1060;
+    min-width: var(--menu-min-width);
+    padding: var(--space-sm) var(--zero);
+}
+
+.context-menu-item {
+    padding: var(--space-sm) var(--space-md);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    transition: background-color var(--transition-fast) ease-in-out;
+}
+
+.context-menu-item:hover {
+    background-color: var(--color-bg-muted);
+}

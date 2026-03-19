@@ -25,7 +25,7 @@
     align-items: center;
     gap: var(--page-gap);
     width: 104px;
-    padding: var(--page-gap) 12px var(--page-gap);
+    padding: var(--page-gap) var(--space-lg) var(--page-gap);
     border-radius: var(--radius-section);
     background-color: var(--color-bg-soft);
     box-sizing: border-box;
@@ -36,17 +36,17 @@
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
-    gap: 4px;
+    gap: var(--space-xs);
     width: 80px;
     min-height: 56px;
-    padding: 0;
+    padding: var(--zero);
     border: none;
-    border-radius: 0;
+    border-radius: var(--zero);
     background: transparent;
     box-shadow: none;
     color: var(--color-text-muted);
     text-align: center;
-    transition: color 0.15s ease-in-out;
+    transition: color var(--transition-fast) ease-in-out;
 }
 
 .menu-card:hover,
@@ -58,7 +58,7 @@
 .menu-card.active {
     box-shadow: none;
     color: var(--color-text-main);
-    font-weight: 600;
+    font-weight: var(--fw-semibold);
 }
 
 .page-content-column {
@@ -71,15 +71,15 @@
 .page-content-column > div,
 .page-tab-content,
 .page-tab-content > .tab-pane {
-    min-width: 0;
+    min-width: var(--zero);
 }
 
 .menu-card-icon-shell {
     width: 56px;
-    height: 32px;
+    height: var(--lh-lg);
     border-radius: var(--radius-lg);
     background: transparent;
-    transition: background-color 0.15s ease-in-out;
+    transition: background-color var(--transition-fast) ease-in-out;
 }
 
 .menu-card.active .menu-card-icon-shell {
@@ -87,7 +87,7 @@
 }
 
 .menu-card.active .menu-card-label {
-    font-weight: 700;
+    font-weight: var(--fw-bold);
 }
 
 .menu-card:focus-visible {
@@ -100,7 +100,7 @@
     width: 100%;
     color: inherit;
     font-size: var(--text-sm);
-    font-weight: 500;
+    font-weight: var(--fw-medium);
     line-height: var(--lh-sm);
     white-space: normal;
     word-break: break-word;
@@ -108,13 +108,13 @@
 
 .page-item-icon {
     flex: 0 0 auto;
-    width: 1rem;
-    height: 1rem;
+    width: var(--icon-size-sm);
+    height: var(--icon-size-sm);
 }
 
 .page-item-icon img {
-    width: 1rem;
-    height: 1rem;
+    width: var(--icon-size-sm);
+    height: var(--icon-size-sm);
     object-fit: contain;
 }
 
@@ -125,16 +125,16 @@
 .menu-card .page-item-icon,
 .page-tabs .page-item-icon,
 .page-section-header .page-item-icon {
-    width: 24px;
-    height: 24px;
+    width: var(--icon-size);
+    height: var(--icon-size);
     color: inherit;
 }
 
 .menu-card .page-item-icon img,
 .page-tabs .page-item-icon img,
 .page-section-header .page-item-icon img {
-    width: 24px;
-    height: 24px;
+    width: var(--icon-size);
+    height: var(--icon-size);
 }
 
 /* Иконки в меню и табах: неактивный — тусклый, активный/ховер — насыщенный */
@@ -158,7 +158,7 @@
 }
 
 .page-tabs {
-    margin: 0;
+    margin: var(--zero);
     display: flex;
     align-items: flex-end;
     gap: 0;
@@ -167,7 +167,7 @@
     max-width: calc(100vw - 164px);
     overflow-x: auto;
     overflow-y: hidden;
-    padding: 0;
+    padding: var(--zero);
     border: none;
     border-radius: var(--radius-section) var(--radius-section) 0 0;
     background-color: var(--color-bg-soft);
@@ -182,23 +182,23 @@
 }
 
 .page-tabs .nav-item {
-    margin: 0;
+    margin: var(--zero);
     flex: 0 0 auto;
 }
 
 .page-tabs .nav-link {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-sm);
     position: relative;
     height: 52px;
-    padding: 16px;
+    padding: var(--space-md);
     border: none;
     border-radius: 0;
     background: transparent;
     color: var(--color-text-muted);
     font-size: var(--text-lg);
-    font-weight: 500;
+    font-weight: var(--fw-medium);
     line-height: var(--text-lg);
     overflow: hidden;
     box-sizing: border-box;
@@ -212,7 +212,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    height: 5px;
+    height: var(--section-frame-width);
     background: transparent;
 }
 
@@ -249,10 +249,10 @@
 .page-tabs .nav-link.active,
 .page-tabs .nav-link.active:hover,
 .page-tabs .nav-link.active:focus {
-    border: none;
+    border: var(--zero);
     background: transparent;
     color: var(--color-text-main);
-    font-weight: 700;
+    font-weight: var(--fw-bold);
 }
 
 .page-tabs .nav-link.active::after,
@@ -295,10 +295,10 @@
 .card-header.page-section-header {
     display: flex;
     align-items: center;
-    min-height: 44px;
+    min-height: var(--field-height);
     width: 100%;
     margin: 0;
-    padding: 10px 15px;
+    padding: var(--space-sm) var(--space-md);
     border: none;
     border-bottom: none;
     border-radius: var(--radius-section) var(--radius-section) 0 0;
@@ -309,10 +309,10 @@
 }
 
 .page-section-body {
-    padding: 20px;
-    border-left: 5px solid var(--color-bg-soft);
-    border-right: 5px solid var(--color-bg-soft);
-    border-bottom: 5px solid var(--color-bg-soft);
+    padding: var(--page-gap);
+    border-left: var(--section-frame-width) solid var(--color-bg-soft);
+    border-right: var(--section-frame-width) solid var(--color-bg-soft);
+    border-bottom: var(--section-frame-width) solid var(--color-bg-soft);
     border-top: none;
     border-radius: 0 0 var(--radius-section) var(--radius-section);
     background-color: var(--color-bg);
@@ -328,57 +328,46 @@
 
 /* Расстояние между рядами: текст компактно, перед виджетами — больше */
 .page-section-body .row--section {
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-md);
 }
 .page-section-body .row--text {
     margin-bottom: 0.35rem;
 }
 .page-section-body .row--text.row--before-widgets {
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-md);
 }
 
-/* box без заголовка: полная рамка и скругление */
-.page-section--bare .page-section-card .page-section-body {
-    border-top: 5px solid var(--color-bg-soft);
+/* box без заголовка: такой же box, только без header — полная рамка и скругление */
+.page-section--bare.page-section--box .page-section-card .page-section-body {
+    border-top: var(--section-frame-width) solid var(--color-bg-soft);
     border-radius: var(--radius-section);
 }
 
-/* Секции без заголовка (просто row) — без рамки, 20px между элементами */
-.page-section--bare .page-section-card,
-.page-section--bare .page-section-card .page-section-body {
-    border: none;
-    box-shadow: none;
+/* просто текст/rows (не box) — без рамки */
+.page-section--bare:not(.page-section--box) .page-section-card .page-section-body {
+    border: var(--zero);
     background: transparent;
-    border-radius: 0;
-}
-/* Меню без вкладок: bare-секции уже у левого края (padding-left: 0) */
-.page-tab-content:not(.page-tab-content--with-tabs) .page-section--bare .page-section-body {
-    margin-left: 0;
-    padding: 0;
-}
-/* Секции внутри вкладки: выравнивание по левому краю box/collapse (одна линия) */
-.page-tab-content--with-tabs .page-section--bare .page-section-body {
-    margin-left: 0;
-    padding: 0;
+    box-shadow: none;
+    border-radius: var(--zero);
 }
 .page-section--bare .page-section-body {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: var(--page-gap);
 }
 .page-section--bare .page-section-body .row--section {
-    margin-bottom: 0;
+    margin-bottom: var(--zero);
 }
 
 .page-section-title {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-sm);
     width: 100%;
-    min-height: 24px;
+    min-height: var(--icon-size);
     color: var(--color-text-main);
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--fw-semibold);
     line-height: var(--lh-md);
 }
 
@@ -387,8 +376,8 @@
 }
 
 .page-section-arrow-slot {
-    width: 20px;
-    flex: 0 0 20px;
+    width: var(--page-gap);
+    flex: 0 0 var(--page-gap);
 }
 
 /* === Layout: container, html === */
@@ -396,12 +385,39 @@
 .container-fluid {
     width: 100%;
     max-width: 100%;
-    padding: 0;
+    padding: var(--zero);
 }
 
 /* Отступ для основного контента под фиксированной навигацией */
 .container-fluid.mt-3 {
-    margin-top: 0;
+    margin-top: var(--zero);
+}
+
+.page-notice {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
+    margin: 0 0 var(--page-gap);
+    padding: var(--space-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background-color: var(--color-bg-soft);
+    color: var(--color-text-main);
+}
+
+.page-notice--success {
+    border-color: var(--color-accent-soft);
+    background-color: var(--color-bg-soft);
+}
+
+.page-notice--danger {
+    border-color: rgba(243, 96, 88, 0.35);
+    background-color: rgba(243, 96, 88, 0.08);
+}
+
+.page-notice__message {
+    min-width: 0;
 }
 
 html {
