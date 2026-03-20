@@ -9,7 +9,7 @@
     padding: var(--zero);
     font-size: 1.25em;
     line-height: 1;
-    color: var(--color-text);
+    color: var(--color-text-main);
     background: transparent;
     border: 0;
     border-radius: var(--radius-sm);

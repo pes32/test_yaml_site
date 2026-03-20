@@ -16,7 +16,7 @@ const ButtonWidget = {
     template: `
         <div class="widget-container u-wide">
             <button class="widget-button inline-flex-center"
-                    :class="{ 'icon-only': isIconOnly }"
+                    :class="buttonClasses"
                     :style="buttonStyle"
                     :disabled="widgetConfig.readonly"
                     @click="onButtonClick"
@@ -50,6 +50,15 @@ const ButtonWidget = {
         isIconOnly() {
             return Boolean(this.widgetConfig.icon && !this.widgetConfig.label);
         },
+        hasBackground() {
+            return Boolean(this.widgetConfig.fon);
+        },
+        buttonClasses() {
+            return {
+                'icon-only': this.isIconOnly,
+                'icon-only--ghost': this.isIconOnly && !this.hasBackground
+            };
+        },
         buttonTitle() {
             if (this.isIconOnly && this.widgetConfig.hint) return this.widgetConfig.hint;
             if (this.widgetConfig.label) return this.widgetConfig.label;
@@ -59,7 +68,7 @@ const ButtonWidget = {
             if (!this.widgetConfig.icon || (window.GuiParser && window.GuiParser.isFontIcon(this.widgetConfig.icon))) {
                 return {};
             }
-            const size = this.widgetConfig.iconSize || this.widgetConfig.size || 24;
+            const size = this.widgetConfig.size || 24;
             return {
                 width: `${size}px`,
                 height: `${size}px`
@@ -159,24 +168,17 @@ const ButtonWidget = {
                 }
                 return;
             }
-            
-            const params = {};
-            
-            // Собираем параметры из output_attrs
-            if (this.widgetConfig.output_attrs) {
-                const attrs = Array.isArray(this.widgetConfig.output_attrs) 
-                    ? this.widgetConfig.output_attrs 
-                    : [this.widgetConfig.output_attrs];
-                
-                attrs.forEach(attr => {
-                    // Здесь нужно получить значение атрибута из родительского компонента
-                    params[attr] = `value_${attr}`;
-                });
-            }
-            
+
+            const outputAttrs = this.widgetConfig.output_attrs
+                ? (Array.isArray(this.widgetConfig.output_attrs)
+                    ? this.widgetConfig.output_attrs
+                    : [this.widgetConfig.output_attrs]
+                ).map((attr) => String(attr).trim()).filter(Boolean)
+                : [];
+
             this.$emit('execute', {
                 command: this.widgetConfig.command,
-                params: params,
+                outputAttrs: outputAttrs,
                 widget: this.widgetName
             });
         },

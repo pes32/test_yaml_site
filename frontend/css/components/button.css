@@ -8,8 +8,8 @@
     padding: var(--space-sm) var(--space-md);
     border: 1px solid transparent;
     border-radius: var(--radius-md);
-    background-color: var(--color-accent-soft);
-    border-color: var(--color-accent-soft);
+    background-color: var(--color-bg-soft);
+    border-color: var(--color-bg-soft);
     color: var(--color-text-main);
     font-size: var(--text-base);
     font-weight: var(--fw-semibold);
@@ -46,11 +46,14 @@
     width: var(--field-height);
     min-width: var(--field-height);
     padding: var(--space-sm);
+}
+
+.widget-button.icon-only--ghost {
     background-color: transparent;
     border-color: transparent;
 }
 
-.widget-button.icon-only:hover:not(:disabled) {
+.widget-button.icon-only--ghost:hover:not(:disabled) {
     background-color: var(--color-icon-only-hover);
     border-color: transparent;
 }

@@ -11,7 +11,7 @@
 <body>
     <div id="app">
         <!-- Глобальный модальный менеджер -->
-        <modal-manager ref="modalManager"></modal-manager>
+        <modal-manager ref="modalManager" @execute="executeCommand" @input="onWidgetInput"></modal-manager>
         <!-- Диалог подтверждения -->
         <confirm-modal ref="confirmModal"></confirm-modal>
         
@@ -64,8 +64,8 @@
                                     :section-index="sidx"
                                     :collapse-id="getSectionCollapseId(sidx)"
                                     :is-collapsed="isSectionCollapsed(sidx)"
-                                    :is-animating="collapsingSectionId === getSectionCollapseId(sidx)"
                                     :on-toggle="() => toggleSectionCollapse(sidx)"
+                                    :on-input="onWidgetInput"
                                     :get-widget-config="getWidgetConfig"
                                     :on-execute="executeCommand"
                                     variant="page"
@@ -80,6 +80,29 @@
                     </div>
                 </main>
             </div>
+        </div>
+
+        <div class="page-snackbar-host" aria-live="polite" aria-atomic="true">
+            <transition name="page-snackbar">
+                <div v-if="snackbar"
+                     :key="snackbar.id"
+                     class="page-snackbar"
+                     :class="`page-snackbar--${snackbar.type}`"
+                     role="status">
+                    <div class="page-snackbar__content">
+                        <div class="page-snackbar__message" v-text="snackbar.message"></div>
+                        <button type="button"
+                                class="ui-close-button page-snackbar__close"
+                                @click="closeNotification"
+                                aria-label="Закрыть"></button>
+                    </div>
+                    <div class="page-snackbar__timer">
+                        <span class="page-snackbar__timer-bar"
+                              :class="`page-snackbar__timer-bar--${snackbar.type}`"
+                              :style="{ animationDuration: snackbar.duration + 'ms' }"></span>
+                    </div>
+                </div>
+            </transition>
         </div>
     </div>
 

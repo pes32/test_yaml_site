@@ -14,6 +14,7 @@ const app = createApp({
             allAttrs: {},
             menus: [],
             widgets: {},
+            widgetValues: {},
             loadedAttrNames: [],
             activeMenuIndex: 0,
             activeTabIndex: 0,
@@ -21,8 +22,10 @@ const app = createApp({
             error: null,
             rootContentOnly: false,
             collapsedSections: {},
-            collapsingSectionId: null,
-            tabsFocused: false
+            tabsFocused: false,
+            snackbar: null,
+            snackbarHideTimerId: 0,
+            snackbarSeq: 0
         };
     },
 
@@ -71,6 +74,7 @@ const app = createApp({
 
     beforeUnmount() {
         window.removeEventListener('hashchange', this.onHashChange);
+        this.clearSnackbarTimer();
     },
 
     methods: {
@@ -220,6 +224,31 @@ const app = createApp({
 
         parseAttrsConfig() {
             this.widgets = this.allAttrs || {};
+            this.initializeWidgetValues(this.widgets);
+        },
+
+        initializeWidgetValues(attrsMap) {
+            if (!attrsMap || typeof attrsMap !== 'object') {
+                return;
+            }
+
+            const nextValues = { ...this.widgetValues };
+            let changed = false;
+
+            Object.entries(attrsMap).forEach(([name, config]) => {
+                if (name in nextValues) {
+                    return;
+                }
+
+                if (config && typeof config === 'object' && config.default !== undefined) {
+                    nextValues[name] = config.default;
+                    changed = true;
+                }
+            });
+
+            if (changed) {
+                this.widgetValues = nextValues;
+            }
         },
 
         getCurrentPageName() {
@@ -352,6 +381,41 @@ const app = createApp({
             };
         },
 
+        onWidgetInput(payload) {
+            if (!payload || !payload.name) {
+                return;
+            }
+
+            this.widgetValues = {
+                ...this.widgetValues,
+                [payload.name]: payload.value
+            };
+        },
+
+        getWidgetValue(widgetName) {
+            if (Object.prototype.hasOwnProperty.call(this.widgetValues, widgetName)) {
+                return this.widgetValues[widgetName];
+            }
+
+            const widgetConfig = this.getWidgetConfig(widgetName);
+            if (widgetConfig && widgetConfig.default !== undefined) {
+                return widgetConfig.default;
+            }
+
+            return null;
+        },
+
+        resolveCommandParams(commandData) {
+            const names = Array.isArray(commandData?.outputAttrs)
+                ? commandData.outputAttrs
+                : [];
+
+            return names.reduce((params, attrName) => {
+                params[attrName] = this.getWidgetValue(attrName);
+                return params;
+            }, {});
+        },
+
         getSectionCollapseId(sectionIndex) {
             const tabPart = this.activeTabs.length ? this.activeTabIndex : 'content';
             return `page-section-${this.activeMenuIndex}-${tabPart}-${sectionIndex}`;
@@ -363,12 +427,7 @@ const app = createApp({
 
         toggleSectionCollapse(sectionIndex) {
             const id = this.getSectionCollapseId(sectionIndex);
-            this.collapsingSectionId = id;
             this.collapsedSections = { ...this.collapsedSections, [id]: !this.collapsedSections[id] };
-            const ms = window.GuiParser?.COLLAPSE_ANIM_MS ?? 350;
-            setTimeout(() => {
-                this.collapsingSectionId = null;
-            }, ms);
         },
 
         async executeCommand(commandData) {
@@ -384,23 +443,26 @@ const app = createApp({
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         command: commandData.command,
-                        params: commandData.params
+                        params: this.resolveCommandParams(commandData),
+                        output_attrs: commandData.outputAttrs || [],
+                        widget: commandData.widget,
+                        page: this.getCurrentPageName()
                     })
                 });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                const result = await response.json().catch(() => ({}));
+                if (response.ok && result.success) {
+                    this.showNotification(result.message || 'Команда выполнена успешно', 'success');
+                    return;
                 }
 
-                const result = await response.json();
-                if (result.success) {
-                    this.showNotification('Команда выполнена успешно', 'success');
-                } else {
-                    this.showNotification('Ошибка выполнения команды', 'danger');
-                }
+                const errorMessage = result.message
+                    || result.error
+                    || `Команда "${commandData.command}" не выполнена`;
+                this.showNotification(errorMessage, 'danger');
             } catch (error) {
                 console.error('Ошибка выполнения команды:', error);
-                this.showNotification('Ошибка выполнения команды', 'danger');
+                this.showNotification('Не удалось связаться с бэкендом для выполнения команды', 'danger');
             }
         },
 
@@ -409,35 +471,34 @@ const app = createApp({
             this.tabsFocused = false;
         },
 
-        showNotification(message, type) {
-            const noticeType = type || 'info';
-            const notice = document.createElement('div');
-            const messageNode = document.createElement('span');
-            const closeButton = document.createElement('button');
-
-            notice.className = `page-notice page-notice--${noticeType}`;
-            messageNode.className = 'page-notice__message';
-            messageNode.textContent = String(message || '');
-
-            closeButton.type = 'button';
-            closeButton.className = 'ui-close-button';
-            closeButton.setAttribute('aria-label', 'Закрыть');
-            closeButton.addEventListener('click', () => notice.remove());
-
-            notice.append(messageNode, closeButton);
-
-            const container = document.querySelector('.page-content-column')
-                || document.querySelector('.container-fluid');
-
-            if (container) {
-                container.insertBefore(notice, container.firstChild);
+        clearSnackbarTimer() {
+            if (this.snackbarHideTimerId) {
+                clearTimeout(this.snackbarHideTimerId);
+                this.snackbarHideTimerId = 0;
             }
+        },
 
-            setTimeout(() => {
-                if (notice.parentNode) {
-                    notice.remove();
+        closeNotification() {
+            this.clearSnackbarTimer();
+            this.snackbar = null;
+        },
+
+        showNotification(message, type = 'info') {
+            const id = this.snackbarSeq + 1;
+            this.snackbarSeq = id;
+            this.clearSnackbarTimer();
+            this.snackbar = {
+                id,
+                type,
+                message: String(message || ''),
+                duration: 5000
+            };
+            this.snackbarHideTimerId = window.setTimeout(() => {
+                if (this.snackbar && this.snackbar.id === id) {
+                    this.snackbar = null;
                 }
-            }, 5000);
+                this.snackbarHideTimerId = 0;
+            }, this.snackbar.duration);
         }
     }
 });

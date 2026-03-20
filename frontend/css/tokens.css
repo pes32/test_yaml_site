@@ -54,19 +54,15 @@
 
     --color-text-main: #474747;
     --color-text-muted: #707579;
-    --color-text: #000;
     --color-text-secondary: #495057;
     --color-bg: #fff;
     --color-bg-soft: #F2F6FE;
     --color-bg-muted: #f8f9fa;
     --color-surface-soft: #F0F0F0;
     --color-accent-soft: #d4e3fb;
-    --color-accent-hover: #bfd6f9;
-    --color-accent-warm: #FF9566;
-    --color-accent-warm-soft: #FFF6F2;
+    --color-accent-hover: #D4E3FB;
     --color-muted: #6c757d;
-    --color-danger: #dc3545;
-    --color-danger-shadow: rgba(220, 53, 69, 0.25);
+    --color-danger: #F36058;
     --color-error: #F36058;
     --color-border: #dee2e6;
     --color-border-input: #ced4da;
@@ -89,6 +85,7 @@
     --z-dropdown: 1100;
     --z-modal: 1200;
     --z-overlay: 1300;
+    --z-snackbar: 1350;
 
     --text-sm: 12px;
     --text-base: 14px;

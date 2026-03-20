@@ -16,21 +16,18 @@
 .card .collapse {
     display: block;
     overflow: hidden;
+    height: auto;
+}
+
+.page-section-card .collapse.collapse-animating,
+.card .collapse.collapse-animating {
+    transition: height calc(var(--anim-ms) * 1ms) ease;
+    will-change: height;
 }
 
 .collapse-inner {
-    display: grid;
-    grid-template-rows: 1fr;
-    align-items: start;
-}
-
-.collapse-inner.collapse-animating {
-    transition: grid-template-rows 0.35s ease-out;
-}
-
-.page-section-card .collapse:not(.show) .collapse-inner,
-.card .collapse:not(.show) .collapse-inner {
-    grid-template-rows: 0fr;
+    display: block;
+    min-height: var(--min-h-0);
 }
 
 .collapse-inner > * {
@@ -48,21 +45,6 @@
 .collapse-inner .card-body,
 .collapse-inner .page-section-body {
     min-height: var(--min-h-0);
-}
-
-.collapse-inner.collapse-animating .page-section-body,
-.collapse-inner.collapse-animating .card-body {
-    transition: padding-top 0.35s ease-out, padding-bottom 0.35s ease-out,
-                border-top-width 0.35s ease-out, border-bottom-width 0.35s ease-out;
-}
-
-.page-section-card .collapse:not(.show) .collapse-inner .page-section-body,
-.card .collapse:not(.show) .collapse-inner .page-section-body,
-.page-section-card .collapse:not(.show) .collapse-inner .card-body,
-.card .collapse:not(.show) .collapse-inner .card-body {
-    padding-top: 0;
-    padding-bottom: 0;
-    border-bottom-width: 0;
 }
 
 .card-header .collapse-icon {

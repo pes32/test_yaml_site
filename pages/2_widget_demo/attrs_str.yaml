@@ -69,3 +69,9 @@ text_4:
   readonly: true
   sup_text: "Это поле нельзя изменить"
   rows: 4
+
+desc_1:
+  widget: str
+  label: "Пора переходить к кнопкам!"
+  readonly: true
+  width: 280

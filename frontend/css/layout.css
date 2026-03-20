@@ -351,11 +351,18 @@
     border-radius: var(--zero);
 }
 .page-section--bare .page-section-body {
-    display: flex;
-    flex-direction: column;
-    gap: var(--page-gap);
+    display: block;
 }
 .page-section--bare .page-section-body .row--section {
+    margin-bottom: var(--space-md);
+}
+.page-section--bare .page-section-body .row--text {
+    margin-bottom: 0.35rem;
+}
+.page-section--bare .page-section-body .row--text.row--before-widgets {
+    margin-bottom: var(--space-md);
+}
+.page-section--bare .page-section-body .row--section:last-child {
     margin-bottom: var(--zero);
 }
 

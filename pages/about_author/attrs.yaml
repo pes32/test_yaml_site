@@ -152,14 +152,14 @@ release_notes:
 drive2_button:
   widget: button
   label: "Drive2"
-  icon: "drive2.png"
+  icon: "drive2.svg"
   width: 200
   url: "https://www.drive2.ru/l/703220425286486413/"
 
 youtube_button:
   widget: button
   label: "Обзор Бнв"
-  icon: "youtube.png"
+  icon: "youtube.svg"
   width: 200
   url: "https://www.youtube.com/watch?v=isUCUoMP3ms"
 

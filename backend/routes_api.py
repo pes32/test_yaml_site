@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Callable
 
 from flask import jsonify, make_response, request
 
 logger = logging.getLogger(__name__)
 META_KEYS = frozenset({"url", "title", "description"})
+CommandHandler = Callable[[dict[str, Any]], Any]
+COMMAND_HANDLERS: dict[str, CommandHandler] = {}
 
 
 def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG001
@@ -109,5 +111,62 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
     def api_execute():
         # silent=True — не генерировать 400 при пустом/битом JSON
         data = request.get_json(silent=True) or {}
-        command = data.get("command")
-        return jsonify({"success": True, "command": command, "result": f"Команда {command} выполнена успешно"})
+        command = str(data.get("command") or "").strip()
+        if not command:
+            return _no_cache(make_response(jsonify({
+                "success": False,
+                "code": "command_required",
+                "error": "Не указана команда для выполнения",
+                "message": "Не указана команда для выполнения",
+            }), 400))
+
+        params = data.get("params") or {}
+        if not isinstance(params, dict):
+            return _no_cache(make_response(jsonify({
+                "success": False,
+                "code": "invalid_params",
+                "error": "Параметр params должен быть JSON-объектом",
+                "message": "Параметр params должен быть JSON-объектом",
+            }), 400))
+
+        handler = COMMAND_HANDLERS.get(command)
+        if handler is None:
+            return _no_cache(make_response(jsonify({
+                "success": False,
+                "code": "command_not_found",
+                "error": f"Команда '{command}' не зарегистрирована на бэкенде",
+                "message": f"Команда '{command}' не зарегистрирована на бэкенде",
+                "command": command,
+                "params": params,
+                "page": data.get("page"),
+                "widget": data.get("widget"),
+                "availableCommands": sorted(COMMAND_HANDLERS.keys()),
+            }), 404))
+
+        try:
+            result = handler({
+                "command": command,
+                "params": params,
+                "page": data.get("page"),
+                "widget": data.get("widget"),
+                "output_attrs": data.get("output_attrs") or [],
+            }) or {}
+        except Exception as exc:  # pragma: no cover
+            logger.exception("Ошибка выполнения backend-команды '%s'", command)
+            return _no_cache(make_response(jsonify({
+                "success": False,
+                "code": "command_failed",
+                "error": str(exc),
+                "message": f"Ошибка выполнения команды '{command}'",
+                "command": command,
+            }), 500))
+
+        return _no_cache(make_response(jsonify({
+            "success": True,
+            "command": command,
+            "params": params,
+            "page": data.get("page"),
+            "widget": data.get("widget"),
+            "message": result.get("message") or f"Команда '{command}' выполнена",
+            "data": result.get("data"),
+        })))

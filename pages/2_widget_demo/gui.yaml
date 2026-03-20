@@ -64,21 +64,54 @@ menu "Строковые виджеты":
       
     - "Дата и время. Для них этот рептилойд даже рамку зажал =("
     - row: demo_datetime
+    - "Виджет даты преобразует значение вне зависимости от ввода: с точкой, с запятой, слешами, с пробелами или без разделителя"
+    - "Можно ввести только день и будет добавлен текущий месяц и год."
+    - "Можно ввести день и месяц, год добавится сам. Подробно описано в yaml-файле"
     - row: date_widget, time_widget
-
+    - "#########################################"
+    - row: desc_1, button_0
+  
   - tab "Демонстрация кнопок":
-    - icon: "test.svg"
-    - collapse "Кнопки":
-      - icon: "test.svg"
-      - row: demo_button_command, demo_button_url
-      - row: demo_button_dialog
-      - row: button_icon_svg, button_null, button_with_icon
-      - row: popup_button
+    - collapse "Внешний вид кнопок":
+      - "Какие бывают кнопки визуально:"
+      - "1 - из иконки с фоном (текст указывается через hint);"
+      - "2 - из иконки без фона (наведи на неё курсор);"
+      - "3 - с текстом;"
+      - "4 - с текстом и картинкой;"
+      - row: button_1, button_2, button_3, button_4
+      - "Кнопку можно сделать ооочень большой:"
+      - row: button_5
+
+    - collapse "Функции кнопок":
+      - "Нажми их все"
+      - row: func_1, func_2, func_3, func_4
+
+    - collapse "Модальные окна":
+      - "Открытие какого-либо модального окна, обычно, осуществляется через кнопку. Последуем за общим стандартом."
+      - row: modal_button
+      - "Эта кнопка отличается тем, что ссылается на элемент ui. Вот её описание:"
+      - row: modal_str
+      - "А этот modal_gui -ui, в свою очередь, описывается в gui.yaml, потому что это элемент ui."
+      - "Его описание ничем не отличается от текущей разметки страницы."
 
 # Модальные окна
-popup_element_gui "Имя модального окна":
-  - row: popup_string, popup_int
-  - button: save_button_popup, CLOSE
+modal_gui "Имя модального окна":
+  - icon: "test.svg" # Опциональная иконка модального окна
+  - tab "Первый таб":
+    - icon: "test.svg"
+    - collapse "Строковые виджеты":
+      - row: str_1, str_2, str_3, str_4
+      - row: text_1, text_2, text_3, text_4
+  - tab "Второй таб":
+    - box "Числовые виджеты":
+      - row: int_1, int_2, int_3, int_4
+      - row: float_1, float_2, float_3, float_4
+  - tab "Третий таб":
+    - icon: "test.svg"
+    - box:
+      - row: list_1, list_2, list_3
+      - row: list_4, list_5
+  - button: modal_save_button, CLOSE
 
 menu "Таблицы":
   - icon: "test.svg"

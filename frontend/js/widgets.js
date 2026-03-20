@@ -78,7 +78,7 @@ const ContentRows = {
         getWidgetConfig: { type: Function, required: true },
         textClass: { type: String, default: 'page-section-text' }
     },
-    emits: ['execute'],
+    emits: ['execute', 'input'],
     methods: {
         nextRowHasWidgets(rowIndex) {
             const next = this.rows[rowIndex + 1];
@@ -98,6 +98,7 @@ const ContentRows = {
                             <widget-renderer
                                 :widget-config="getWidgetConfig(item)"
                                 :widget-name="item"
+                                @input="$emit('input', $event)"
                                 @execute="$emit('execute', $event)">
                             </widget-renderer>
                         </div>
@@ -117,12 +118,20 @@ const SectionCard = {
         sectionIndex: { type: Number, required: true },
         collapseId: { type: String, default: '' },
         isCollapsed: { type: Boolean, default: false },
-        isAnimating: { type: Boolean, default: false },
         onToggle: { type: Function, default: null },
+        onInput: { type: Function, default: null },
         getWidgetConfig: { type: Function, required: true },
         onExecute: { type: Function, required: true },
         variant: { type: String, default: 'page' },
         headerId: { type: String, default: '' }
+    },
+    data() {
+        return {
+            collapseAnimating: false,
+            collapseStyle: null,
+            collapseRafId: 0,
+            removeCollapseTransitionListener: null
+        };
     },
     template: `
         <div :class="wrapperClass">
@@ -132,7 +141,7 @@ const SectionCard = {
                      :class="headerClass"
                      :id="headerId || undefined"
                      @click="section.collapsible && onToggle ? onToggle() : null"
-                     :style="section.collapsible ? 'cursor: pointer;' : ''">
+                     :style="headerStyle">
                     <component :is="titleTag" class="mb-0 d-flex align-items-center" :class="titleClass">
                         <span v-if="section.showHeader" :class="arrowSlotClass">
                             <img v-if="section.collapsible" src="/templates/icons/arrow.svg" class="collapse-icon" :class="collapseIconExtra" alt="">
@@ -141,14 +150,17 @@ const SectionCard = {
                         <span v-text="section.name"></span>
                     </component>
                 </div>
-                <div :class="section.collapsible ? ('collapse ' + (isCollapsed ? '' : 'show')) : ''"
-                     :id="section.collapsible ? collapseId : null">
-                    <div class="collapse-inner" :class="{ 'collapse-animating': section.collapsible && isAnimating }">
+                <div :class="collapseClass"
+                     :id="section.collapsible ? collapseId : null"
+                     :style="collapseStyle"
+                     ref="collapseEl">
+                    <div class="collapse-inner" ref="collapseInner">
                         <div :class="bodyClass">
                             <content-rows
                                 :rows="section.rows"
                                 :get-widget-config="getWidgetConfig"
                                 :text-class="contentTextClass"
+                                @input="onInput ? onInput($event) : null"
                                 @execute="onExecute">
                             </content-rows>
                         </div>
@@ -158,6 +170,14 @@ const SectionCard = {
         </div>
     `,
     computed: {
+        collapseClass() {
+            if (!this.section.collapsible) return '';
+            return {
+                collapse: true,
+                show: !this.isCollapsed,
+                'collapse-animating': this.collapseAnimating
+            };
+        },
         wrapperClass() {
             if (this.variant === 'modal') return 'mb-3';
             return {
@@ -174,6 +194,9 @@ const SectionCard = {
             if (this.variant === 'page') base['page-section-header'] = true;
             return base;
         },
+        headerStyle() {
+            return this.section.collapsible ? { cursor: 'pointer' } : null;
+        },
         titleTag() { return this.variant === 'page' ? 'h5' : 'h6'; },
         titleClass() { return this.variant === 'page' ? 'page-section-title' : ''; },
         arrowSlotClass() { return this.variant === 'page' ? 'page-section-arrow-slot inline-flex-center' : 'inline-flex-center'; },
@@ -183,6 +206,96 @@ const SectionCard = {
         },
         contentTextClass() {
             return this.variant === 'modal' ? 'text-muted' : 'page-section-text';
+        }
+    },
+    watch: {
+        isCollapsed(next, prev) {
+            if (!this.section.collapsible || next === prev) {
+                return;
+            }
+
+            this.animateCollapse();
+        }
+    },
+    mounted() {
+        this.syncCollapseState();
+    },
+    beforeUnmount() {
+        this.stopCollapseAnimation();
+    },
+    methods: {
+        stopCollapseAnimation() {
+            if (this.collapseRafId) {
+                cancelAnimationFrame(this.collapseRafId);
+                this.collapseRafId = 0;
+            }
+
+            if (this.removeCollapseTransitionListener) {
+                this.removeCollapseTransitionListener();
+                this.removeCollapseTransitionListener = null;
+            }
+        },
+        syncCollapseState() {
+            if (!this.section.collapsible) {
+                return;
+            }
+
+            this.stopCollapseAnimation();
+            this.collapseAnimating = false;
+            this.collapseStyle = this.isCollapsed ? { height: '0px' } : { height: 'auto' };
+        },
+        animateCollapse() {
+            const collapseEl = this.$refs.collapseEl;
+            const collapseInner = this.$refs.collapseInner;
+
+            if (!collapseEl || !collapseInner) {
+                this.syncCollapseState();
+                return;
+            }
+
+            this.stopCollapseAnimation();
+
+            const startHeight = `${collapseEl.getBoundingClientRect().height}px`;
+            const endHeight = this.isCollapsed ? '0px' : `${collapseInner.scrollHeight}px`;
+
+            if (startHeight === endHeight) {
+                this.collapseAnimating = false;
+                this.collapseStyle = this.isCollapsed ? { height: '0px' } : { height: 'auto' };
+                return;
+            }
+
+            this.collapseAnimating = true;
+            this.collapseStyle = { height: startHeight };
+
+            const onTransitionEnd = (event) => {
+                if (event.target !== collapseEl || event.propertyName !== 'height') {
+                    return;
+                }
+
+                this.stopCollapseAnimation();
+                this.collapseAnimating = false;
+                this.collapseStyle = this.isCollapsed ? { height: '0px' } : { height: 'auto' };
+            };
+
+            collapseEl.addEventListener('transitionend', onTransitionEnd);
+            this.removeCollapseTransitionListener = () => {
+                collapseEl.removeEventListener('transitionend', onTransitionEnd);
+            };
+
+            this.$nextTick(() => {
+                const animatedEl = this.$refs.collapseEl;
+                if (!animatedEl) {
+                    return;
+                }
+
+                // Даём DOM применить стартовую высоту и класс анимации перед переходом к целевой высоте.
+                void animatedEl.offsetHeight;
+
+                this.collapseRafId = requestAnimationFrame(() => {
+                    this.collapseRafId = 0;
+                    this.collapseStyle = { height: endHeight };
+                });
+            });
         }
     }
 };
@@ -234,13 +347,13 @@ const ModalButtons = {
 
 // Глобальный менеджер модальных окон
 const ModalManager = {
+    emits: ['execute', 'input'],
     data() {
         return {
             showModal: false,
             modalConfig: null,
             activeTabIndex: 0,
-            collapsedModalSections: {},
-            collapsingModalSectionId: null
+            collapsedModalSections: {}
         };
     },
     mounted() {
@@ -280,8 +393,8 @@ const ModalManager = {
                                     :section-index="sidx"
                                     :collapse-id="getModalSectionCollapseId(sidx)"
                                     :is-collapsed="isModalSectionCollapsed(sidx)"
-                                    :is-animating="collapsingModalSectionId === getModalSectionCollapseId(sidx)"
                                     :on-toggle="() => toggleModalSectionCollapse(sidx)"
+                                    :on-input="onWidgetInput"
                                     :get-widget-config="getWidgetConfig"
                                     :on-execute="onWidgetExecute"
                                     variant="modal">
@@ -350,12 +463,7 @@ const ModalManager = {
 
         toggleModalSectionCollapse(sectionIndex) {
             const id = this.getModalSectionCollapseId(sectionIndex);
-            this.collapsingModalSectionId = id;
             this.collapsedModalSections = { ...this.collapsedModalSections, [id]: !this.collapsedModalSections[id] };
-            const ms = window.GuiParser?.COLLAPSE_ANIM_MS ?? 350;
-            setTimeout(() => {
-                this.collapsingModalSectionId = null;
-            }, ms);
         },
 
         getParsedGui() {
@@ -419,6 +527,10 @@ const ModalManager = {
             this.$emit('execute', data);
         },
 
+        onWidgetInput(data) {
+            this.$emit('input', data);
+        },
+
         collectModalWidgetNames() {
             if (!window.GuiParser || !this.modalConfig) {
                 return [];
@@ -447,6 +559,20 @@ const ModalManager = {
                 // merge
                 Object.assign(globalAttrs, data);
                 if (window.pageData) window.pageData.allAttrs = globalAttrs;
+                if (this.$root) {
+                    if (!this.$root.allAttrs) {
+                        this.$root.allAttrs = {};
+                    }
+                    if (!this.$root.widgets) {
+                        this.$root.widgets = {};
+                    }
+
+                    Object.assign(this.$root.allAttrs, data);
+                    Object.assign(this.$root.widgets, data);
+                }
+                if (this.$root && typeof this.$root.initializeWidgetValues === 'function') {
+                    this.$root.initializeWidgetValues(data);
+                }
             } catch (e) {
                 console.error("Не удалось подгрузить атрибуты для модального окна", e);
             }

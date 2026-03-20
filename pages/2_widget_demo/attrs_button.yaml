@@ -1,6 +1,5 @@
 # Атрибуты для главной страницы - демонстрация всех виджетов
 
-# Общая структура атрибута
 # <name_attr>:                                   # Имя атрибута (обязательно)
 #   widget: "тип_виджета"                        # Тип виджета (обязательно)
 #   label: "Описание"                      # Описание (обязательно. Не используется в кнопках-иконках)
@@ -23,49 +22,99 @@
 #     text: "Текст сообщения"
 #     accept: "Да"
 #     cancel: "Отмена"
+#   input_attrs: asd
+#   output__attrs: asd
 
-# === КНОПКИ ===
-# Типы кнопок:
-# - icon-only: icon + hint (подсказка), без label
-# - icon+text: icon + label
-# - text-only: label
+# === Визуальное описание кнопок ===
 
-# Кнопка с командой
-demo_button_command:
+button_1:
   widget: button
-  label: "Кнопка с командой (button + command)"
-  sup_text: "Кнопка, выполняющая команду"
+  icon: test.svg
+  fon: true
+  hint: "Кнопка c фоном и иконкой"
 
-# Кнопка с переходом
-demo_button_url:
+button_2:
   widget: button
-  label: "Кнопка с переходом (button + url)"
-  sup_text: "Кнопка для перехода на другую страницу"
-  url: "/page/page_2"
+  icon: test.svg
+  hint: "Кнопка без фона с иконкой"
 
-# Кнопка с диалогом
-demo_button_dialog:
+button_3:
   widget: button
-  label: "Кнопка с диалогом (button + dialog)"
-  sup_text: "Кнопка с подтверждением действия"
+  label: Кнопка
+
+button_4:
+  widget: button
+  label: Иконка + кнопка на 500px
+  icon: test.svg
+  width: 500
+  sup_text: "И текст снизу. На случай, если надо подписать кнопку"
+
+button_5:
+  widget: button
+  icon: test.svg
+  size: 100
+  fon: true
+  hint: "ОГРОМНАЯ КНОПКА"
+
+# === Функциональное описание кнопок ===
+
+func_1:
+  widget: button
+  label: "Команда"
+  command: test_command
+
+func_2:
+  widget: button
+  label: "Переход (url)"
+  url: "https://youtu.be/dQw4w9WgXcQ"
+
+func_3:
+  widget: button
+  label: "Диалог (url)"
   dialog:
-    title: "Подтверждение действия"
-    text: "Вы уверены, что хотите выполнить это действие?"
-    accept: "Да, выполнить"
+    title: "Понравился рикрол?"
+    text: "Хотите ещё?"
+    accept: "Конечно, хочу!"
+    cancel: "Нет, спасибо"
+  url: "https://youtu.be/dQw4w9WgXcQ"
+
+func_4:
+  widget: button
+  label: "Диалог (command)"
+  dialog:
+    title: "Заголовок"
+    text: "Очень длинный текст сообщения, которое нужно для подтверждения действия"
+    accept: "Да"
     cancel: "Отмена"
+  command: test_command
 
-# Кнопки-иконки
-button_icon_svg:
-  widget: button
-  hint: "Кнопка-иконка симметричная (button + icon). Текст читается через хинт"
-  icon: "test.svg"
-  # width: 34
+# === Модальные окна ===
 
-button_null:
+modal_button:
   widget: button
-  label: "Пустая кнопка"
+  label: "Модальное окно"
+  command: modal_gui -ui
 
-button_with_icon:
+modal_str:
+  widget: text
+  label: ""
+  rows: 4
+  width: 350
+  readonly: true
+  default: |
+    modal_button:
+      widget: button
+      label: "Модальное окно"
+      command: modal_gui -ui
+
+modal_save_button:
   widget: button
-  label: "Кнопка с иконкой"
-  icon: "test.svg"
+  label: "Сохранить"
+  command: save 
+
+# Кнопка для перехода к кнопкам
+
+button_0:
+  widget: button
+  label: Перейти
+  url: "/widget_demo#menu-0-tab-1"
