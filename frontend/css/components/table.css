@@ -240,10 +240,7 @@
     vertical-align: middle;
 }
 
-.widget-table-ctx__sort-asc {
-    transform: scaleY(-1);
-}
-
+.widget-table-ctx__sort-asc,
 .context-menu-item__img.widget-table-ctx__arrow-down {
     transform: scaleY(-1);
 }

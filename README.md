@@ -48,11 +48,14 @@ test_site/
 │           │   ├── table_core.js       # window.TableWidgetCore: DEBUG, log, dom.getCellFromEvent, заготовки модулей
 │           │   ├── table_jump.js       # Cmd/Ctrl+стрелки по блокам ячеек (как в Excel)
 │           │   ├── table_parse_attrs.js # разбор table_attrs → tableColumns, headerRows
-│           │   ├── table_utils.js      # clamp, cloneTableData
+│           │   ├── table_utils.js      # clamp, cloneTableData, safeCellValue, …
 │           │   ├── table_format.js     # форматирование чисел/отображение ячеек
 │           │   ├── table_sort.js       # сравнение ячеек для сортировки
+│           │   ├── table_clipboard.js  # TSV serialize/deserialize
+│           │   ├── table_context_menu.js
 │           │   ├── table_selection.js  # SelectionMethods → methods виджета
 │           │   ├── table_keyboard.js   # Keyboard.handleKeydown
+│           │   ├── table_widget_helpers.js # WidgetMeasure, WidgetUiCoords
 │           │   └── table_widget.js     # компонент Vue; registerTableWidget(factory)
 │           └── text.js
 ├── pages/                  # Страницы системы (YAML), URL = имя папки
@@ -130,7 +133,7 @@ test_site/
 - **time** — только время
 - **img** — изображение по URL или пути
 - **button** — кнопка (url, command, dialog, icon)
-- **table** — таблица данных: редактирование (по умолчанию), `readonly: true`, полосы строк `zebra` (по умолчанию вкл.), сортировка по заголовкам (по умолчанию вкл.; **`sort: false`** отключает), минимальное число строк при загрузке **`row: N`** (пустые строки дополняются при инициализации и `setValue`). Логика разнесена по `widgets/table/*` и объединена в **`window.TableWidgetCore`** (Utils, Jump, Format, Sort, Keyboard, SelectionMethods, `parseTableAttrs`, `dom`). Порядок скриптов в [templates/page.html](templates/page.html): **`table_core.js` → `table_jump.js` → `table_parse_attrs.js` → `table_utils.js` → `table_format.js` → `table_sort.js` → `table_selection.js` → `table_keyboard.js` → `table_widget.js`**. Отладочный лог таблицы: в консоли `TableWidgetCore.DEBUG = true`. Пример: [pages/2_widget_demo/attrs_table.yaml](pages/2_widget_demo/attrs_table.yaml).
+- **table** — таблица данных: редактирование (по умолчанию), `readonly: true`, полосы строк `zebra` (по умолчанию вкл.), сортировка по заголовкам (по умолчанию вкл.; **`sort: false`** отключает), минимальное число строк при загрузке **`row: N`** (пустые строки дополняются при инициализации и `setValue`). Логика разнесена по `widgets/table/*` и объединена в **`window.TableWidgetCore`** (в т.ч. Utils, Jump, Format, Sort, Clipboard, ContextMenu, Keyboard, SelectionMethods, `parseTableAttrs`, `dom`, `WidgetMeasure`, `WidgetUiCoords`). Порядок скриптов в [templates/page.html](templates/page.html): **`table_core.js` → `table_jump.js` → `table_parse_attrs.js` → `table_utils.js` → `table_format.js` → `table_sort.js` → `table_clipboard.js` → `table_context_menu.js` → `table_selection.js` → `table_keyboard.js` → `table_widget_helpers.js` → `table_widget.js`**. Отладочный лог таблицы: в консоли `TableWidgetCore.DEBUG = true`. Пример: [pages/2_widget_demo/attrs_table.yaml](pages/2_widget_demo/attrs_table.yaml).
 
 ### Параметры виджета button
 

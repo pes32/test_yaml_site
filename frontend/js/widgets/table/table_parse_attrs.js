@@ -6,6 +6,20 @@
 
     const Core = global.TableWidgetCore || (global.TableWidgetCore = {});
 
+    function computeAutoWidthLabel(vm, label) {
+        const M = Core.WidgetMeasure;
+        const tableEl =
+            typeof vm.getTableEl === 'function' ? vm.getTableEl() : null;
+        if (M && typeof M.computeAutoWidth === 'function') {
+            return M.computeAutoWidth(
+                label,
+                M.headerSortAffordancePx(vm.widgetConfig),
+                tableEl
+            );
+        }
+        return `${Math.min(500, String(label || '').length * 10 + 50)}px`;
+    }
+
     function parseTableAttrs(vm, tableAttrs) {
         if (!tableAttrs) {
             vm.tableColumns = [];
@@ -108,7 +122,7 @@
 
         columns.forEach(col => {
             if (!col.width && !tableHasExplicitWidth) {
-                col.width = vm.computeAutoWidth(col.label);
+                col.width = computeAutoWidthLabel(vm, col.label);
             }
         });
 
@@ -129,7 +143,7 @@
                     node.width = col && col.width ? col.width : undefined;
                 } else {
                     node.width =
-                        col && col.width ? col.width : vm.computeAutoWidth(node.label);
+                        col && col.width ? col.width : computeAutoWidthLabel(vm, node.label);
                 }
             } else if (node.type === 'group') {
                 node.children.forEach(assignWidths);

@@ -1,11 +1,5 @@
-// Виджет таблицы. Скрипты (порядок в page.html): table_core → … → table_sort →
-// table_clipboard → table_context_menu → table_selection → table_keyboard → table_widget.
-
-const _tableMeasureCanvas =
-    typeof document !== 'undefined' ? document.createElement('canvas') : null;
-const _tableMeasureCtx = _tableMeasureCanvas
-    ? _tableMeasureCanvas.getContext('2d')
-    : null;
+// Виджет таблицы. Скрипты (порядок в page.html): table_core → … → table_keyboard →
+// table_widget_helpers (WidgetMeasure, WidgetUiCoords) → table_widget.
 
 const TableWidget = {
     props: {
@@ -467,40 +461,35 @@ const TableWidget = {
          * две стрелки 10px + gap (--space-xs) + небольшой запас (см. .widget-table__sort-icons).
          */
         headerSortAffordancePx() {
-            return this.widgetConfig && this.widgetConfig.sort === false ? 0 : 26;
+            const M = window.TableWidgetCore && window.TableWidgetCore.WidgetMeasure;
+            return M && M.headerSortAffordancePx
+                ? M.headerSortAffordancePx(this.widgetConfig)
+                : this.widgetConfig && this.widgetConfig.sort === false
+                  ? 0
+                  : 26;
         },
 
         computeAutoWidth(label) {
-            const sortExtra = this.headerSortAffordancePx();
-            try {
-                if (!_tableMeasureCtx) {
-                    return `${Math.min(
-                        500,
-                        String(label || '').length * 10 + 24 + sortExtra
-                    )}px`;
-                }
-                const tableEl = this.getTableEl();
-                const th = tableEl && tableEl.querySelector('thead th');
-                _tableMeasureCtx.font = th
-                    ? getComputedStyle(th).font
-                    : '500 16px system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
-                const textWidth = Math.ceil(
-                    _tableMeasureCtx.measureText(String(label || '')).width
+            const M = window.TableWidgetCore && window.TableWidgetCore.WidgetMeasure;
+            if (M && M.computeAutoWidth) {
+                return M.computeAutoWidth(
+                    label,
+                    this.headerSortAffordancePx(),
+                    this.getTableEl()
                 );
-                const padding = 24;
-                const max = 500;
-                return `${Math.min(max, textWidth + padding + sortExtra)}px`;
-            } catch (e) {
-                return `${Math.min(
-                    500,
-                    (String(label || '').length * 10) + 24 + sortExtra
-                )}px`;
             }
+            const sortExtra = this.headerSortAffordancePx();
+            return `${Math.min(
+                500,
+                String(label || '').length * 10 + 24 + sortExtra
+            )}px`;
         },
         /**
          * Безопасно получить значение ячейки с учётом длины строки
          */
         safeCell(row, cellIndex) {
+            const U = window.TableWidgetCore && window.TableWidgetCore.Utils;
+            if (U && U.safeCellValue) return U.safeCellValue(row, cellIndex);
             if (!Array.isArray(row)) return '';
             return row[cellIndex] ?? '';
         },
@@ -1127,9 +1116,10 @@ const TableWidget = {
         },
 
         iconSrc(name) {
+            const U = window.TableWidgetCore && window.TableWidgetCore.WidgetUiCoords;
+            if (U && U.contextMenuIconSrc) return U.contextMenuIconSrc(name);
             const n = String(name || '').trim();
-            if (!n) return '';
-            return '/templates/icons/' + n;
+            return n ? '/templates/icons/' + n : '';
         },
         onCtxIconError(e) {
             const img = e && e.target;
@@ -1144,6 +1134,10 @@ const TableWidget = {
         },
 
         computePasteAnchorRect(rect) {
+            const U = window.TableWidgetCore && window.TableWidgetCore.WidgetUiCoords;
+            if (U && U.computePasteAnchorRect) {
+                return U.computePasteAnchorRect(rect, this.selFocus);
+            }
             const { r0, r1, c0, c1 } = rect;
             if (r0 === r1 && c0 === c1) {
                 return { r: this.selFocus.r, c: this.selFocus.c };
@@ -1152,7 +1146,8 @@ const TableWidget = {
         },
 
         cloneRect(rect) {
-            return { r0: rect.r0, r1: rect.r1, c0: rect.c0, c1: rect.c1 };
+            const U = window.TableWidgetCore && window.TableWidgetCore.WidgetUiCoords;
+            return U && U.cloneRect ? U.cloneRect(rect) : { r0: rect.r0, r1: rect.r1, c0: rect.c0, c1: rect.c1 };
         },
 
         /**
@@ -1194,6 +1189,8 @@ const TableWidget = {
         },
 
         clampMenuPosition(event) {
+            const U = window.TableWidgetCore && window.TableWidgetCore.WidgetUiCoords;
+            if (U && U.clampMenuPosition) return U.clampMenuPosition(event);
             const x = (event.clientX || 0) + (window.scrollX || 0);
             const y = (event.clientY || 0) + (window.scrollY || 0);
             const pad = 8;

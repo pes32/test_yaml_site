@@ -66,8 +66,14 @@
         return row.map((cell) => cloneCellValueDeep(cell));
     }
 
+    function safeCellValue(row, cellIndex) {
+        if (!Array.isArray(row)) return '';
+        return row[cellIndex] ?? '';
+    }
+
     Core.Utils.clamp = clamp;
     Core.Utils.cloneTableData = cloneTableData;
     Core.Utils.cloneCellValueDeep = cloneCellValueDeep;
     Core.Utils.cloneTableRowDeep = cloneTableRowDeep;
+    Core.Utils.safeCellValue = safeCellValue;
 })(typeof window !== 'undefined' ? window : this);
