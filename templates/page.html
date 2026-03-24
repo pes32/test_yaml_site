@@ -41,7 +41,7 @@
                 </aside>
 
                 <main class="page-content-column u-wide">
-                    <div v-if="activeMenu">
+                    <div v-if="activeMenu" class="page-main-stack">
                         <ul v-if="activeTabs.length > 1" ref="pageTabs" class="nav nav-tabs page-tabs" :class="{ 'page-tabs--focused': tabsFocused }" id="mainTabs" role="tablist" @focusin="tabsFocused = true" @focusout="onTabsFocusOut">
                             <li class="nav-item" v-for="(tab, index) in activeTabs" :key="index">
                                 <a class="nav-link"
@@ -68,14 +68,13 @@
                                     :on-input="onWidgetInput"
                                     :get-widget-config="getWidgetConfig"
                                     :on-execute="executeCommand"
-                                    variant="page"
                                     :header-id="'heading-' + activeMenuIndex + '-' + sidx">
                                 </section-card>
                             </div>
                         </div>
                     </div>
 
-                    <div v-else>
+                    <div v-else class="page-empty-placeholder">
                         Нет контента для отображения. Добавьте menu или row/box/collapse на верхнем уровне gui.yaml.
                     </div>
                 </main>
@@ -124,7 +123,17 @@
     <script src="{{ url_for('static', filename='js/widgets/ip_widgets.js') }}?v={{ ASSETS_VERSION }}"></script>
     <script src="{{ url_for('static', filename='js/widgets/datetime_widgets.js') }}?v={{ ASSETS_VERSION }}"></script>
     <script src="{{ url_for('static', filename='js/widgets/text.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets/table.js') }}?v={{ ASSETS_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/widgets/table/table_core.js') }}?v={{ ASSETS_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/widgets/table/table_jump.js') }}?v={{ ASSETS_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/widgets/table/table_parse_attrs.js') }}?v={{ ASSETS_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/widgets/table/table_utils.js') }}?v={{ ASSETS_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/widgets/table/table_format.js') }}?v={{ ASSETS_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/widgets/table/table_sort.js') }}?v={{ ASSETS_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/widgets/table/table_clipboard.js') }}?v={{ ASSETS_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/widgets/table/table_context_menu.js') }}?v={{ ASSETS_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/widgets/table/table_selection.js') }}?v={{ ASSETS_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/widgets/table/table_keyboard.js') }}?v={{ ASSETS_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/widgets/table/table_widget.js') }}?v={{ ASSETS_VERSION }}"></script>
     <script src="{{ url_for('static', filename='js/widgets/button.js') }}?v={{ ASSETS_VERSION }}"></script>
     <script src="{{ url_for('static', filename='js/widgets/img.js') }}?v={{ ASSETS_VERSION }}"></script>
     <script src="{{ url_for('static', filename='js/gui_parser.js') }}?v={{ ASSETS_VERSION }}"></script>

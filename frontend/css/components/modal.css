@@ -24,6 +24,25 @@
     overflow: hidden;
 }
 
+.gui-modal.modal-content {
+    --modal-header-bg: var(--color-bg-soft);
+    --modal-header-border: none;
+    --modal-footer-bg: var(--color-bg);
+    --modal-footer-border: none;
+    --modal-footer-padding: var(--space-md);
+    --gui-modal-max-w: 1800px;
+    --gui-modal-max-h: 900px;
+    width: min(100%, var(--gui-modal-max-w));
+    max-width: min(var(--gui-modal-max-w), 100%);
+    max-height: min(var(--gui-modal-max-h), calc(100vh - 2 * var(--space-md)));
+    max-height: min(var(--gui-modal-max-h), calc(100dvh - 2 * var(--space-md)));
+}
+
+.gui-modal .modal-header,
+.gui-modal .modal-footer {
+    flex-shrink: 0;
+}
+
 .modal-header {
     display: flex;
     align-items: center;
@@ -33,10 +52,24 @@
     background-color: var(--modal-header-bg);
 }
 
+/* Крестик из templates/icons/close.svg (GUI-модалка и диалог подтверждения) */
+.modal-header .ui-close-button {
+    width: var(--icon-size);
+    height: var(--icon-size);
+    min-width: var(--icon-size);
+    min-height: var(--icon-size);
+    font-size: 0;
+    line-height: 0;
+    background: transparent url("/templates/icons/close.svg") center / contain no-repeat;
+}
+
+.modal-header .ui-close-button::before {
+    content: none;
+    display: none;
+}
+
 .modal-title {
     margin: 0;
-    font-size: var(--text-lg);
-    font-weight: var(--fw-regular);
 }
 
 .modal-body {
@@ -49,8 +82,109 @@
     border-top: var(--modal-footer-border);
     background-color: var(--modal-footer-bg);
     display: flex;
+    flex-direction: row;
     justify-content: flex-end;
-    gap: var(--space-sm);
+    align-items: center;
+    gap: var(--page-gap);
+}
+
+/* Виджет-кнопки в подвале: без .u-wide (иначе width/min-width 100%/500px рвут ряд) */
+.modal-footer > .d-flex {
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    gap: var(--page-gap);
+}
+
+.modal-footer .widget-container {
+    margin-bottom: var(--zero);
+    flex: 0 0 auto;
+    width: auto;
+    min-width: var(--zero);
+    max-width: none;
+}
+
+.gui-modal .modal-body {
+    padding: var(--page-gap) 0 0;
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.gui-modal .gui-modal-body-inner {
+    flex: 1 1 0%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Строка табов не участвует в прокрутке и не сжимается (фон как у .page-tabs в layout.css) */
+.gui-modal .gui-modal-body-inner > .page-tabs {
+    flex: 0 0 auto;
+    position: relative;
+    z-index: 1;
+}
+
+/* Область контента вкладок забирает остаток высоты; скролл только внутри слоёв */
+.gui-modal .gui-modal-tab-pane-outer.page-tab-content {
+    flex: 1 1 0%;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/*
+ * Сетка с фиксированной высотой от flex-родителя (не от суммы контента всех слоёв),
+ * иначе скрытые вкладки раздувают ряд и табы «уезжают» вверх.
+ */
+.gui-modal .gui-modal-tab-stack {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    flex: 1 1 0%;
+    min-height: 0;
+    min-width: 0;
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+    align-self: stretch;
+}
+
+.gui-modal .gui-modal-tab-layer {
+    grid-area: 1 / 1;
+    align-self: stretch;
+    min-height: 0;
+    min-width: 0;
+    height: 100%;
+    max-height: 100%;
+    box-sizing: border-box;
+    overflow-x: auto;
+    overflow-y: auto;
+}
+
+.gui-modal .gui-modal-tab-layer:not(.gui-modal-tab-layer--active) {
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.gui-modal .gui-modal-tab-layer--active {
+    visibility: visible;
+    pointer-events: auto;
+    z-index: 1;
+}
+
+.gui-modal .gui-modal-tab-single {
+    flex: 1 1 0%;
+    min-height: 0;
+    min-width: 0;
+    height: 100%;
+    max-height: 100%;
+    overflow-x: auto;
+    overflow-y: auto;
 }
 
 .confirm-modal-content {
@@ -63,6 +197,7 @@
 }
 
 .confirm-modal-content .modal-title {
+    font-size: var(--text-lg);
     font-weight: var(--fw-medium);
     color: var(--color-text-main);
     text-align: left;

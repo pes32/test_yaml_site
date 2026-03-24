@@ -17,38 +17,53 @@ test_site/
 │   ├── config_service.py   # Live-updating snapshot по mtime
 │   ├── logging_setup.py    # Логирование в logs/app.log с ротацией
 │   ├── routes_api.py       # /api/* (config, pages, page/<name>, attrs, reload, execute)
+│   ├── routes_pages.py     # HTML-страницы приложения
 │   ├── routes_debug.py     # /debug и /api/debug/* (structure, modules, logs, routes)
 │   └── routes_static.py    # /templates/icons/* и /favicon.ico
-├── frontend/               # Фронтенд-ассеты (бывш. static/), раздаются по /frontend
+├── frontend/               # Фронтенд-ассеты, раздаются по /frontend (url_for('static', ...))
 │   ├── css/
-│   │   └── style.css       # Стили приложения
+│   │   ├── style.css       # Точка входа: @import tokens, base, ui, layout, components/*, widgets, utilities
+│   │   ├── tokens.css      # Дизайн-токены
+│   │   ├── fonts.css       # Подключение в page.html отдельно
+│   │   └── components/     # table.css, modal.css, dropdown.css, datetime.css, …
 │   └── js/
 │       ├── page.js         # Логика страниц, ленивые загрузки по вкладкам
 │       ├── debug.js        # Панель отладки (списки файлов/маршрутов, REST-тестер)
+│       ├── gui_parser.js   # Разбор GUI YAML во Vue-компоненты
 │       ├── widgets.js      # Рендерер виджетов + ModalManager
 │       └── widgets/        # Модульные виджеты
 │           ├── button.js
+│           ├── confirm_modal.js
 │           ├── datetime_widgets.js
 │           ├── factory.js
 │           ├── float.js
+│           ├── img.js
 │           ├── int.js
 │           ├── ip_widgets.js
 │           ├── list.js
+│           ├── mixin.js
+│           ├── md3_field.js
 │           ├── string.js
-│           ├── table.js
+│           ├── table/      # виджет table (общий namespace TableWidgetCore)
+│           │   ├── table_core.js       # window.TableWidgetCore: DEBUG, log, dom.getCellFromEvent, заготовки модулей
+│           │   ├── table_jump.js       # Cmd/Ctrl+стрелки по блокам ячеек (как в Excel)
+│           │   ├── table_parse_attrs.js # разбор table_attrs → tableColumns, headerRows
+│           │   ├── table_utils.js      # clamp, cloneTableData
+│           │   ├── table_format.js     # форматирование чисел/отображение ячеек
+│           │   ├── table_sort.js       # сравнение ячеек для сортировки
+│           │   ├── table_selection.js  # SelectionMethods → methods виджета
+│           │   ├── table_keyboard.js   # Keyboard.handleKeydown
+│           │   └── table_widget.js     # компонент Vue; registerTableWidget(factory)
 │           └── text.js
-├── pages/                  # Страницы системы (YAML)
-│   ├── demo/
-│   │   ├── attrs.yaml
-│   │   ├── attrs_acc.yaml
-│   │   └── gui.yaml
-│   └── main/
-│       ├── attrs.yaml
-│       └── gui.yaml
+├── pages/                  # Страницы системы (YAML), URL = имя папки
+│   ├── main/
+│   ├── 1_ui_demo/
+│   ├── 2_widget_demo/      # демо виджетов (attrs_table.yaml, modal_gui.yaml, …)
+│   └── about_author/
 ├── templates/              # HTML шаблоны
 │   ├── debug.html          # Панель отладки
-│   ├── page.html           # Шаблон страницы
-│   └── icons/              # SVG иконки для кнопок
+│   ├── page.html           # Шаблон страницы (порядок подключения скриптов, в т.ч. table/*)
+│   └── icons/              # SVG иконки для кнопок и UI
 ├── logs/
 │   └── app.log             # Лог приложения с ротацией
 ├── requirements.txt        # Python зависимости
@@ -83,7 +98,8 @@ test_site/
 Правила загрузки:
 
 - На одну страницу должен приходиться ровно один `gui.yaml` или `gui.yml`
-- Все остальные `*.yaml` / `*.yml` в папке страницы считаются attrs-фрагментами
+- Все остальные `*.yaml` / `*.yml` в папке страницы считаются attrs-фрагментами, **кроме** файлов **`modal_<id>.yaml`** (разметка модальных окон)
+- Модалки: файл `pages/<страница>/modal_<id>.yaml`, где `<id>` совпадает с префиксом команды кнопки до ` -ui` (пример: `modal_gui.yaml` → `command: modal_gui -ui`). Подгрузка при открытии: `GET /api/modal-gui`. Формат файла: **один ключ в стиле gui** (`любой_префикс "Заголовок окна":` и далее список), **или корень — список**, **или** `{ name?, icon?, content: [ ... ] }`. В основном `gui.yaml` модалку можно не дублировать (встроенный блок по-прежнему имеет приоритет в кэше, если есть).
 - Snapshot конфигурации обновляется автоматически по `mtime` YAML-файлов
 - Flask routes не перерегистрируются: URL страниц резолвятся через актуальный snapshot
 
@@ -92,13 +108,15 @@ test_site/
 ## Ленивые загрузки
 
 - Атрибуты загружаются в контексте текущей страницы и не смешиваются между страницами.
-- Страница `/demo` может дозагружать attrs для активного меню/вкладки и модальных окон, но запрос всегда ограничен текущей страницей.
+- Страница может дозагружать attrs для активного меню/вкладки и модальных окон, но запрос всегда ограничен текущей страницей.
 - Частичная выборка доступна через параметр `names`:
   ```
-  GET /api/attrs?page=demo&names=name1,name2,name3
+  GET /api/attrs?page=<имя_страницы>&names=name1,name2,name3
   ```
 
 ## Доступные виджеты
+
+Типы по умолчанию регистрируются в [frontend/js/widgets/factory.js](frontend/js/widgets/factory.js). Виджет **table** подключается отдельно вызовом `registerTableWidget(widgetFactory)` из [table_widget.js](frontend/js/widgets/table/table_widget.js) после создания фабрики.
 
 - **str** — строковое поле ввода
 - **int** — целочисленное поле с валидацией
@@ -108,13 +126,16 @@ test_site/
 - **ip** — поле для IP-адреса
 - **ip_mask** — поле для IP с маской подсети
 - **datetime** — выбор даты и времени
-- **table** — таблица данных (есть редактируемый режим)
+- **date** — только дата
+- **time** — только время
+- **img** — изображение по URL или пути
 - **button** — кнопка (url, command, dialog, icon)
+- **table** — таблица данных: редактирование (по умолчанию), `readonly: true`, полосы строк `zebra` (по умолчанию вкл.), сортировка по заголовкам (по умолчанию вкл.; **`sort: false`** отключает), минимальное число строк при загрузке **`row: N`** (пустые строки дополняются при инициализации и `setValue`). Логика разнесена по `widgets/table/*` и объединена в **`window.TableWidgetCore`** (Utils, Jump, Format, Sort, Keyboard, SelectionMethods, `parseTableAttrs`, `dom`). Порядок скриптов в [templates/page.html](templates/page.html): **`table_core.js` → `table_jump.js` → `table_parse_attrs.js` → `table_utils.js` → `table_format.js` → `table_sort.js` → `table_selection.js` → `table_keyboard.js` → `table_widget.js`**. Отладочный лог таблицы: в консоли `TableWidgetCore.DEBUG = true`. Пример: [pages/2_widget_demo/attrs_table.yaml](pages/2_widget_demo/attrs_table.yaml).
 
 ### Параметры виджета button
 
 Типы кнопок:
-- **icon-only** — только иконка: `icon`, `hint` (подсказка), без `label`; при необходимости `width` для размера кнопки
+- **icon-only** — только иконка: `icon`, `hint` (подсказка), без `label`; `size` задаёт иконку, внешний квадрат без `width` масштабируется пропорционально эталону 24px→40px; явный `width` — размер кнопки (бордер-бокс)
 - **icon+text** — иконка и текст: `icon`, `label`
 - **text-only** — только текст: `label`
 
@@ -126,8 +147,7 @@ test_site/
 - **dialog** — диалог подтверждения
 - **icon** — файл в `templates/icons/` или FontAwesome класс
 - **size** — размер иконки в px (по умолчанию 24)
-- **width** — для icon-only: размер кнопки в px (по умолчанию 40)
-- **readonly** — только для чтения
+- **width** — для icon-only: явный размер кнопки в px; если не задан, выводится от `size` с теми же пропорциями отступов, что у 24→40
 - **output_attrs** — атрибуты для передачи в команде
 
 ## API Endpoints
@@ -137,6 +157,7 @@ test_site/
 - `GET  /api/page/<name>` — конфигурация конкретной страницы
 - `GET  /api/attrs?page=<name>` — все attrs указанной страницы
 - `GET  /api/attrs?page=<name>&names=a,b,c` — выборка указанных attrs в рамках страницы
+- `GET  /api/modal-gui?page=<name>&id=<modal_id>` — ленивая загрузка YAML модалки (`modal_<id>.yaml` в папке страницы)
 - `POST /api/execute` — выполнение команд (тело JSON: `{ "command": "...", "params": {...} }`)
 - `POST /api/reload` — принудительная проверка YAML и обновление snapshot без мутаций Flask routes
 - `GET  /api/debug/structure` — список файлов проекта (yaml/py/js)
@@ -157,4 +178,4 @@ test_site/
 ## Примечания по разработке
 
 - Логи пишутся в `logs/app.log` с ротацией.
-- Статические файлы теперь в каталоге `frontend/`. В шаблонах используется `url_for('static', filename=...)` — Flask автоматически подставляет URL вида `/frontend/...`.
+- Статические файлы в каталоге `frontend/`. В шаблонах используется `url_for('static', filename=...)` — Flask отдаёт URL вида `/frontend/...`.

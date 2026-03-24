@@ -1,9 +1,9 @@
 # === ТАБЛИЦЫ ===
 
 # Таблица (статичная, только просмотр)
-demo_table:
+demo_table_1:
   widget: table
-  label: "Таблица (table) — справочная, только просмотр"
+  label: "Это справочная таблица:"
   sup_text: "Статичная таблица без редактирования"
   table_attrs: |
     name /Имя
@@ -13,14 +13,60 @@ demo_table:
   readonly: true
 
 # Таблица (редактируемая пользователем)
-demo_table_editable:
+demo_table_2:
   widget: table
-  label: "Таблица (table) — редактируемая"
+  label: "Таблица редактируемая:"
   sup_text: "Пользователь может изменять значения в ячейках"
+  width: 750px
+  table_attrs: |
+    param /Параметр (300px) :300
+    value_1 /Значение 1 (210px) :210
+    value_2 /Значение 2 (остаток)
+
+demo_table_3:
+  widget: table
+  label: "Справочная, без зебры:"
+  sup_text: "Статичная таблица без редактирования"
+  zebra: false
+  table_attrs: |
+    name /Имя
+    age /Возраст
+    city /Город
+  source: [["Иван", "25", "Москва"], ["Мария", "30", "СПб"], ["Петр", "35", "Казань"]]
+  readonly: true
+
+demo_table_4:
+  widget: table
+  label: "Таблица редактируемая, без зебры:"
+  zebra: false
+  sup_text: "Здесь задан вывод 3-х пустых строк"
+  row: 3
   table_attrs: |
     param /Параметр
-    value /Значение
-  source: demo_table_data
+    value_1 /Значение 1
+    value_2 /Значение 2
+
+demo_table_5:
+  widget: table
+  label: "Справочная, без сортировки:"
+  sup_text: "Статичная таблица без редактирования"
+  sort: false
+  table_attrs: |
+    name /Имя
+    age /Возраст
+    city /Город
+  source: [["Иван", "25", "Москва"], ["Мария", "30", "СПб"], ["Петр", "35", "Казань"]]
+  readonly: true
+
+demo_table_6:
+  widget: table
+  label: "Таблица редактируемая, без сортировки:"
+  sort: false
+  row: 3
+  table_attrs: |
+    param /Параметр
+    value_1 /Значение 1
+    value_2 /Значение 2
 
 # Журнал учёта
 journal_table:
@@ -59,8 +105,13 @@ form_table:
     mzua_gro /ЖРО №5
 
     mza /Суммарная №6
-    v_rao /Объём РАО :100 #,.3f №7
+    v_rao /Флоат РАО :100 #,.3f №7
+    v_rao /Эксп :100 #,.2e №7
     finance
     pack_type /Тип упаковки :80 :pack_types №8
     address /ip-адрес :ip
     op_date /Дата операции :datetime
+
+
+# Так, у нас в таблице могут быть разные виджеты: date, time, list. Я пока больше других не вижу. 
+# Скажи мне, как они у нас работают и какие виджеты у нас есть для таблицы вообще? 

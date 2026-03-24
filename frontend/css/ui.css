@@ -154,6 +154,7 @@
 .table thead th {
     vertical-align: bottom;
     border-bottom: 2px solid var(--color-border);
+    font-weight: var(--fw-semibold);
 }
 .table-striped tbody tr:nth-of-type(odd) { background-color: var(--color-bg-stripe); }
 

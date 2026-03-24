@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any, Callable
 
 from flask import jsonify, make_response, request
+
+from .config import ConfigLoadError, PAGES_DIR, load_modal_gui_payload
 
 logger = logging.getLogger(__name__)
 META_KEYS = frozenset({"url", "title", "description"})
@@ -37,6 +40,9 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
                 k for k in gui.keys()
                 if k not in META_KEYS
             ]
+        mids = page_config.get("modalGuiIds")
+        if mids:
+            result["modalGuiIds"] = mids
         return result
 
     @app.route("/api/config")
@@ -86,6 +92,31 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
             return _no_cache(make_response(jsonify(subset)))
 
         return _no_cache(make_response(jsonify(page_attrs)))
+
+    @app.route("/api/modal-gui")
+    def api_modal_gui():
+        """Ленивая загрузка разметки модалки из pages/<page>/modal_<id>.yaml."""
+        page_name = (request.args.get("page") or "").strip()
+        modal_id = (request.args.get("id") or "").strip()
+        if not page_name or not modal_id:
+            return _no_cache(make_response(jsonify({
+                "error": "Укажите query-параметры page и id",
+            }), 400))
+
+        page_config = config_service.get_page(page_name)
+        if not page_config:
+            return _no_cache(make_response(jsonify({"error": "Страница не найдена"}), 404))
+
+        page_path = os.path.join(PAGES_DIR, page_name)
+        try:
+            payload = load_modal_gui_payload(page_path, modal_id)
+        except ConfigLoadError as exc:
+            logger.info("modal-gui: %s", exc)
+            return _no_cache(make_response(jsonify({
+                "error": str(exc),
+            }), 404))
+
+        return _no_cache(make_response(jsonify(payload)))
 
     @app.route("/api/reload", methods=["POST"])
     def api_reload_config():

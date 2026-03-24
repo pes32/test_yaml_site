@@ -38,3 +38,6 @@ logs/
 # config.yaml
 # secrets.yaml
 templates/files/
+
+# Локальные файлы
+templates/mems/

@@ -11,7 +11,6 @@ const DEFAULT_WIDGET_REGISTRY = Object.freeze([
     ['date', DateWidget],
     ['time', TimeWidget],
     ['text', TextWidget],
-    ['table', TableWidget],
     ['button', ButtonWidget],
     ['img', ImgWidget]
 ]);
@@ -51,6 +50,10 @@ class WidgetFactory {
 
 // Создаем глобальный экземпляр фабрики
 const widgetFactory = new WidgetFactory();
+
+if (typeof window.registerTableWidget === 'function') {
+    window.registerTableWidget(widgetFactory);
+}
 
 // Экспорт для браузера
 window.WidgetFactory = WidgetFactory;

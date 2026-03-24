@@ -26,6 +26,9 @@ def register_page_routes(app, config_service):
                 k for k in gui.keys()
                 if k not in META_KEYS
             ]
+        mids = page_config.get("modalGuiIds")
+        if mids:
+            result["modalGuiIds"] = mids
         return result
 
     def _render_page(page_config: dict[str, Any]):

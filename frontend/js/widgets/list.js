@@ -18,7 +18,10 @@ const ListWidget = {
             :has-supporting="!!widgetConfig.sup_text"
             @focusout="onListFocusOut"
             @container-focusout="onFocusOut">
-            <div class="dropdown widget-dropdown list-combobox w-100 min-w-0 max-w-none" :class="{ show: isDropdownOpen }" ref="dropdownRoot">
+            <div class="dropdown widget-dropdown list-combobox w-100 min-w-0 max-w-none"
+                 :class="{ show: isDropdownOpen }"
+                 :data-dropdown-open="isDropdownOpen ? 'true' : undefined"
+                 ref="dropdownRoot">
                 <div class="list-combobox-inner" ref="dropdownToggle">
                     <input type="text"
                            class="list-combobox-input"
@@ -426,9 +429,28 @@ const ListWidget = {
                 this.inputValue = value != null ? String(value) : '';
             }
         },
-        getValue() { return this.value; }
+        getValue() { return this.value; },
+        applyValueFromConfig(val) {
+            if (this.widgetConfig.multiselect) {
+                const next = Array.isArray(val) ? val : val ? [val] : [];
+                this.value = [...next];
+                return;
+            }
+            let v = val;
+            if (Array.isArray(v)) v = v[0] || '';
+            if (v === null || v === undefined) v = '';
+            this.value = v;
+            this.inputValue = String(v);
+        }
     },
     watch: {
+        widgetConfig: {
+            deep: true,
+            handler(cfg) {
+                if (!cfg || !Object.prototype.hasOwnProperty.call(cfg, 'value')) return;
+                this.applyValueFromConfig(cfg.value);
+            }
+        },
         value: {
             handler(val) {
                 if (!this.widgetConfig.multiselect && this.inputValue !== val) {
@@ -444,8 +466,10 @@ const ListWidget = {
         }
     },
     mounted() {
-        if (this.widgetConfig.default !== undefined) {
-            this.value = this.widgetConfig.default;
+        if (Object.prototype.hasOwnProperty.call(this.widgetConfig, 'value')) {
+            this.applyValueFromConfig(this.widgetConfig.value);
+        } else if (this.widgetConfig.default !== undefined) {
+            this.applyValueFromConfig(this.widgetConfig.default);
         }
         if (this.widgetConfig.multiselect) {
             if (!Array.isArray(this.value)) this.value = [];

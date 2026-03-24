@@ -105,6 +105,7 @@
 
 .widget-dd-menu--teleport {
     overflow-y: hidden;
+    z-index: var(--z-portal-layer);
 }
 .widget-dd-menu--teleport.scrollable {
     overflow-y: auto;

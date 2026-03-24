@@ -18,7 +18,6 @@ const ButtonWidget = {
             <button class="widget-button inline-flex-center"
                     :class="buttonClasses"
                     :style="buttonStyle"
-                    :disabled="widgetConfig.readonly"
                     @click="onButtonClick"
                     :title="buttonTitle">
                 <!-- SVG иконка -->
@@ -68,7 +67,7 @@ const ButtonWidget = {
             if (!this.widgetConfig.icon || (window.GuiParser && window.GuiParser.isFontIcon(this.widgetConfig.icon))) {
                 return {};
             }
-            const size = this.widgetConfig.size || 24;
+            const size = Number(this.widgetConfig.size) || 24;
             return {
                 width: `${size}px`,
                 height: `${size}px`
@@ -77,11 +76,28 @@ const ButtonWidget = {
         buttonStyle() {
             const w = this.widgetConfig.width || this.widgetConfig.size;
             if (this.isIconOnly) {
-                const widthVal = w || 40;
-                const pad = Math.max(0, Math.floor((40 - 24) / 2));
+                const iconRef = 24;
+                const outerRef = 40;
+                const borderTotal = 2;
+                const padRef = (outerRef - borderTotal - iconRef) / 2;
+                const iconSize = Number(this.widgetConfig.size) || iconRef;
+                const widthRaw = this.widgetConfig.width;
+                const hasExplicitWidth = widthRaw != null && widthRaw !== '';
+                let widthVal;
+                let pad;
+                if (hasExplicitWidth) {
+                    const nw = Number(widthRaw);
+                    widthVal = Number.isFinite(nw) && nw > 0 ? nw : outerRef;
+                    pad = Math.max(0, Math.floor((widthVal - borderTotal - iconSize) / 2));
+                } else {
+                    pad = Math.max(0, Math.round((padRef * iconSize) / iconRef));
+                    widthVal = iconSize + borderTotal + 2 * pad;
+                }
                 return {
                     width: `${widthVal}px`,
                     minWidth: `${widthVal}px`,
+                    height: `${widthVal}px`,
+                    minHeight: `${widthVal}px`,
                     padding: `${pad}px`
                 };
             }

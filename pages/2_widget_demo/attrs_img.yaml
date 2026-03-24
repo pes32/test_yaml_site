@@ -1,0 +1,32 @@
+# Виджет списка (list)
+
+# <name_attr>:                # Имя атрибута (обязательно)
+#   widget: list              # Тип виджета: список
+#   label: "Текст"            # Подпись поля (обязательно)
+#   sup_text: "Текст"         # Информационное сообщение под полем
+#   placeholder: "Текст"      # Подсказка в пустом поле при фокусе
+#   default: "Значение"       # Значение по умолчанию (строка или массив для multiselect)
+#   readonly: true            # Только для чтения (по умолчанию false)
+#   source: ["а", "б", "в"]   # Источник данных для списка (обязательно для list)
+#   editable: false           # Только выбор, без ввода и поиска (по умолчанию true)
+#   multiselect: true         # Множественный выбор (по умолчанию false)
+#   width: 350                # Ширина поля в px
+
+# === ИЗОБРАЖЕНИЯ ===
+
+img_1:
+  widget: img
+  label: "Подпись сверху"
+  source: "templates/mems/mem_1.jpg"
+  width: 600
+
+img_2:
+  widget: img
+  source: "templates/mems/mem_2.png"
+  width: 600
+
+img_3:
+  widget: img
+  sup_text: "Подпись снизу"
+  source: "templates/mems/mem_3.jpg"
+  width: 600

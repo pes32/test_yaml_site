@@ -448,9 +448,23 @@
         return Array.isArray(menuOrModal.content) ? menuOrModal.content : [];
     }
 
+    /**
+     * Собирает модалку из ответа GET /api/modal-gui (поля name, icon, items).
+     */
+    function parseModalPayload(modalId, payload) {
+        const items = Array.isArray(payload && payload.items) ? payload.items : [];
+        const rawName = payload && payload.name != null ? String(payload.name).trim() : '';
+        const modal = normalizeModal(modalId, rawName || modalId, items);
+        if (payload && typeof payload.icon === 'string' && payload.icon.trim()) {
+            modal.icon = payload.icon.trim();
+        }
+        return modal;
+    }
+
     window.GuiParser = {
         parseDynamicKey: parseDynamicKey,
         parsePageGui: parsePageGui,
+        parseModalPayload: parseModalPayload,
         getMenuSections: getMenuSections,
         collectWidgetNamesFromSections: collectWidgetNamesFromSections,
         collectWidgetNamesFromMenu: collectWidgetNamesFromMenu,

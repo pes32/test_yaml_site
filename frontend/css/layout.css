@@ -1,11 +1,24 @@
 /* layout.css — page-shell, tabs, sections, menu */
 
+/* Высота рабочей области под фиксированным navbar + отступ mt-3; скролл только внутри контента вкладок */
+.container-fluid.mt-3 {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - var(--app-navbar-height) - var(--space-md));
+    max-height: calc(100dvh - var(--app-navbar-height) - var(--space-md));
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
 .page-shell {
     display: flex;
-    align-items: flex-start;
+    align-items: stretch;
     gap: var(--page-gap);
     padding: var(--page-gap);
     box-sizing: border-box;
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .page-sidebar {
@@ -62,16 +75,51 @@
 }
 
 .page-content-column {
-    flex: 1 1 auto;
+    flex: 1 1 0%;
     min-width: 0;
-    overflow-x: auto;
-    overflow-y: visible;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
-/* Цепочка min-width: 0 — чтобы широкие таблицы не растягивали layout, а скроллились */
+
+/* Колонка контента: табы и меню слева не в общем скролле документа */
+.page-main-stack {
+    flex: 1 1 0%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.page-empty-placeholder {
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow: auto;
+}
+
+/* Цепочка min-width: 0 — широкие таблицы скроллятся внутри .page-tab-content */
+.page-content-column > .page-main-stack,
 .page-content-column > div,
 .page-tab-content,
 .page-tab-content > .tab-pane {
     min-width: var(--zero);
+}
+
+/* Табы страницы и debug: фиксированы сверху колонки, горизонтальный скролл только у длинного списка вкладок */
+.page-main-stack > .page-tabs,
+.page-content-column > .page-tabs {
+    flex: 0 0 auto;
+    position: relative;
+    z-index: 1;
+}
+
+.page-main-stack > .page-tab-content,
+.page-content-column > .page-tab-content {
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow-x: auto;
+    overflow-y: auto;
 }
 
 .menu-card-icon-shell {
@@ -124,7 +172,8 @@
 
 .menu-card .page-item-icon,
 .page-tabs .page-item-icon,
-.page-section-header .page-item-icon {
+.page-section-header .page-item-icon,
+.modal-header .page-item-icon {
     width: var(--icon-size);
     height: var(--icon-size);
     color: inherit;
@@ -132,7 +181,8 @@
 
 .menu-card .page-item-icon img,
 .page-tabs .page-item-icon img,
-.page-section-header .page-item-icon img {
+.page-section-header .page-item-icon img,
+.modal-header .page-item-icon img {
     width: var(--icon-size);
     height: var(--icon-size);
 }
@@ -153,7 +203,8 @@
 
 .menu-card .page-item-icon i,
 .page-tabs .page-item-icon i,
-.page-section-header .page-item-icon i {
+.page-section-header .page-item-icon i,
+.modal-header .page-item-icon i {
     font-size: var(--text-xl);
 }
 
@@ -278,6 +329,12 @@
 }
 .page-tab-content:not(.page-tab-content--with-tabs) {
     padding-left: 0;
+}
+
+/* Табы GUI-модалки: как на странице, плюс отступ слева от края окна */
+.gui-modal .modal-body .page-tabs {
+    margin-left: var(--page-gap);
+    max-width: calc(100% - var(--page-gap));
 }
 
 .page-section + .page-section {

@@ -6,10 +6,22 @@
     max-width: 100%;
 }
 
+/* Zebra: нечётные строки — полоса (как .table-striped в ui.css); чётные — базовый фон. */
 .widget-table {
+    width: 100%;
     border-collapse: collapse;
     table-layout: auto;
     margin-top: var(--space-sm);
+}
+
+/* Без width в YAML: не сужать таблицу уже min-ширин столбцов (col-auto + inline-block). */
+.widget-table:not(.widget-table--explicit-width) {
+    min-width: max-content;
+}
+
+/* С width в YAML: ширина и table-layout задаются inline — не тянуть min-width по содержимому. */
+.widget-table.widget-table--explicit-width {
+    min-width: 0;
 }
 
 .widget-table th,
@@ -37,6 +49,10 @@
 .widget-table--editable .cell-input:focus {
     outline: none;
     box-shadow: none;
+}
+
+.widget-table--editable .cell-input.cell-input--view {
+    pointer-events: none;
 }
 .widget-table--editable select.cell-input {
     padding-right: 0;
@@ -67,12 +83,111 @@
 }
 .widget-table--editable .widget-ip:focus { outline: none; box-shadow: none; }
 
-.widget-table th {
-    background-color: var(--color-bg-muted);
-    font-weight: var(--fw-semibold);
+/* Контур выделения задаётся inline (cellSelectionOutlineStyle) — единый стиль для 1 ячейки, блока и строки целиком. */
+
+.widget-table--editable tbody td.widget-table__td-focusable:focus {
+    outline: none;
 }
 
-.widget-table tbody tr:nth-child(even) {
+/* Якорь мультивыделения — пунктир внутри ячейки (не заменяет boxShadow контура). */
+.widget-table--editable tbody td.widget-table__cell--sel-anchor::after {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border: 1px dashed var(--focus-color);
+    border-radius: var(--radius-sm, 2px);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.widget-table--editable .cell-editor-wrap--inactive {
+    pointer-events: none;
+    user-select: none;
+}
+
+.widget-table th {
+    background-color: var(--color-bg-muted);
+    color: var(--color-text-main);
+}
+
+/* Заголовок: вся область кликабельна для сортировки */
+.widget-table__th-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-xs, 6px);
+    min-width: 0;
+    cursor: pointer;
+    border-radius: var(--radius-sm, 2px);
+    margin: calc(var(--space-sm, 8px) * -1);
+    padding: var(--space-sm, 8px);
+}
+
+.widget-table__th-inner:focus {
+    outline: none;
+}
+
+.widget-table__th-inner:focus-visible {
+    outline: 2px solid var(--focus-color, #0d6efd);
+    outline-offset: 2px;
+}
+
+.widget-table__th-inner:hover .widget-table__sort-icons:not(.widget-table__sort-icons--active) {
+    color: #a8a8a8;
+}
+
+.widget-table__th-text {
+    min-width: 0;
+    text-align: left;
+}
+
+.widget-table__sort-icons {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    flex-shrink: 0;
+    padding: 1px 0;
+    line-height: 0;
+    color: #c0c0c0;
+    pointer-events: none;
+}
+
+/* Активная сортировка — цвет как у текста заголовка */
+.widget-table__sort-icons--active {
+    color: inherit;
+}
+
+.widget-table__sort-svg {
+    display: block;
+    flex-shrink: 0;
+}
+
+.widget-table__sort-svg--up {
+    transform: rotate(180deg);
+}
+
+/* Подсказка направления: вторая стрелка чуть бледнее */
+.widget-table__sort-icons--asc .widget-table__sort-svg--down {
+    opacity: 0.35;
+}
+
+.widget-table__sort-icons--desc .widget-table__sort-svg--up {
+    opacity: 0.35;
+}
+
+.widget-table tbody tr:nth-of-type(odd) {
+    background-color: var(--color-bg-stripe);
+}
+
+.widget-table tbody tr:nth-of-type(even) {
+    background-color: var(--color-bg);
+}
+
+/* zebra: false — без чередования фона строк */
+.widget-table--no-zebra tbody tr:nth-of-type(odd),
+.widget-table--no-zebra tbody tr:nth-of-type(even) {
     background-color: var(--color-bg);
 }
 
@@ -97,9 +212,61 @@
     display: flex;
     align-items: center;
     gap: var(--space-sm);
+    user-select: none;
     transition: background-color var(--transition-fast) ease-in-out;
 }
 
-.context-menu-item:hover {
+.context-menu-item:hover:not(.context-menu-item--disabled) {
     background-color: var(--color-bg-muted);
+}
+
+.context-menu-sep {
+    border: none;
+    border-top: 1px solid var(--color-border);
+    margin: var(--space-xs) var(--zero);
+}
+
+.context-menu-item__icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    width: 1.25rem;
+    justify-content: center;
+}
+
+.context-menu-item__img {
+    width: 1rem;
+    height: 1rem;
+    object-fit: contain;
+    vertical-align: middle;
+}
+
+.widget-table-ctx__sort-asc {
+    transform: scaleY(-1);
+}
+
+.context-menu-item__img.widget-table-ctx__arrow-down {
+    transform: scaleY(-1);
+}
+
+.context-menu-item__label {
+    flex: 1;
+    min-width: 0;
+}
+
+.context-menu-item__kbd {
+    flex-shrink: 0;
+    margin-left: var(--space-md);
+    font-size: 0.75rem;
+    color: var(--color-text-muted, #6c757d);
+    font-variant-numeric: tabular-nums;
+}
+
+.context-menu-item--disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+    pointer-events: none;
+}
+
+.context-menu-item--disabled:hover {
+    background-color: transparent;
 }

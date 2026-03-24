@@ -1,7 +1,7 @@
 // Общая логика для IP и IP/CIDR: placeholder как маска (серым),
 // ввод — только цифры, авто-разделители, без 'x' в самом значении
 
-function createIpLikeWidget(maskTemplate, validateFn, maxDigits) {
+function createIpLikeWidget(maskTemplate, validateFn, maxDigits, clampLastOctet = false) {
     const hasSlash = maskTemplate.includes('/');
     return {
         components: { Md3Field: window.Md3Field },
@@ -218,6 +218,19 @@ function createIpLikeWidget(maskTemplate, validateFn, maxDigits) {
                 }
                 // Хвост текущего (незавершённого) октета
                 formattedIp += ipDigitsAll.slice(pos);
+
+                // Только ip (не ip_mask): в 4-м октете условие dotsCount < 3 не срабатывает — без обрезки набирается >3 цифр
+                if (clampLastOctet && formattedIp) {
+                    const parts = formattedIp.split('.');
+                    if (parts.length > 0) {
+                        const li = parts.length - 1;
+                        const digitsOnly = parts[li].replace(/\D/g, '');
+                        if (digitsOnly.length > 3) {
+                            parts[li] = digitsOnly.slice(0, 3);
+                            formattedIp = parts.join('.');
+                        }
+                    }
+                }
                 
                 // Собираем финальное значение, включая маску, если есть
                 let finalValue = formattedIp;
@@ -307,7 +320,7 @@ const IP_MAX_DIGITS = 12; // 4*3
 const CIDR_MAX_DIGITS = 14; // 12 + 2
 
 // Компоненты
-const IpWidget = createIpLikeWidget(IP_MASK_TEMPLATE, validateIPv4, IP_MAX_DIGITS);
+const IpWidget = createIpLikeWidget(IP_MASK_TEMPLATE, validateIPv4, IP_MAX_DIGITS, true);
 const IpMaskWidget = createIpLikeWidget(IP_CIDR_TEMPLATE, validateIPv4Cidr, CIDR_MAX_DIGITS);
 
 window.IpWidget = IpWidget;

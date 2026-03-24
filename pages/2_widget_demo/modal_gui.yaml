@@ -1,0 +1,28 @@
+# id = имя файла без .yaml → modal_gui.yaml → кнопка command: modal_gui -ui
+
+modal_name "Имя модального окна":
+  - icon: "test.svg"
+  - tab "Первый таб":
+    - icon: "test.svg"
+    - collapse "Строковые виджеты 1":
+      - row: str_1, str_2, str_3, str_4
+      - row: text_1, text_2, text_3, text_4
+    - collapse "Строковые виджеты 2":
+      - row: str_1, str_2, str_3, str_4
+      - row: text_1, text_2, text_3, text_4
+    - collapse "Строковые виджеты 3":
+      - row: str_1, str_2, str_3, str_4
+      - row: text_1, text_2, text_3, text_4
+    - collapse "Строковые виджеты 4":
+      - row: str_1, str_2, str_3, str_4
+      - row: text_1, text_2, text_3, text_4
+  - tab "Второй таб":
+    - box "Числовые виджеты":
+      - row: int_1, int_2, int_3, int_4
+      - row: float_1, float_2, float_3, float_4
+  - tab "Третий таб":
+    - icon: "test.svg"
+    - box:
+      - row: list_1, list_2, list_3
+      - row: list_4, list_5
+  - button: modal_save_button, CLOSE

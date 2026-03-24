@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from typing import Any, Dict
 
 import yaml
@@ -124,12 +125,129 @@ def merge_attrs_files(attr_files: list[str], page_name: str) -> Dict[str, Any]:
     return merged
 
 
+MODAL_GUI_ID_RE = re.compile(r"^modal_[a-zA-Z][a-zA-Z0-9_]*$")
+# Ключ корня как в gui.yaml: modal_gui "Заголовок" (тип и имя в одной строке ключа)
+MODAL_FILE_ROOT_KEY_RE = re.compile(r"^(.+?)(?:\s+\"([^\"]*)\")?\s*$")
+
+
+def parse_gui_style_key(raw_key: str) -> tuple[str, str]:
+    """Разбор ключа вида ``modal_gui "Название"`` → (тип, название). Без кавычек name пустой."""
+    key = str(raw_key or "").strip()
+    match = MODAL_FILE_ROOT_KEY_RE.match(key)
+    if not match:
+        return key, ""
+    typ = (match.group(1) or "").strip()
+    quoted = match.group(2)
+    name = quoted if quoted is not None else ""
+    return typ, name
+
+
+def load_yaml_root(filepath: str) -> Any:
+    """Загружает YAML-файл; допускает корень-словарь или корень-список (для modal_*.yaml)."""
+    try:
+        with open(filepath, "r", encoding="utf-8") as handle:
+            return yaml.safe_load(handle)
+    except yaml.YAMLError as exc:
+        raise ConfigLoadError(f"Ошибка парсинга YAML {filepath}: {exc}") from exc
+    except FileNotFoundError as exc:
+        raise ConfigLoadError(f"YAML-файл не найден: {filepath}") from exc
+    except OSError as exc:
+        raise ConfigLoadError(f"Ошибка чтения {filepath}: {exc}") from exc
+
+
+def list_modal_gui_ids(page_path: str) -> list[str]:
+    """Имена модалок по файлам modal_<id>.yaml в каталоге страницы."""
+    if not os.path.isdir(page_path):
+        return []
+
+    ids: list[str] = []
+    for name in sorted(os.listdir(page_path)):
+        if name.endswith(".yaml"):
+            stem = name[: -5]
+        elif name.endswith(".yml"):
+            stem = name[: -4]
+        else:
+            continue
+        if stem.startswith("modal_") and MODAL_GUI_ID_RE.fullmatch(stem):
+            ids.append(stem)
+    return ids
+
+
+def load_modal_gui_payload(page_path: str, modal_id: str) -> Dict[str, Any]:
+    """
+    Читает modal_<id>.yaml для ленивой загрузки модалки.
+
+    Допустимые корни:
+    - список — тело модалки (заголовок окна = modal_id);
+    - один ключ в стиле gui: ``modal_xxx "Заголовок":`` + список (как в gui.yaml);
+    - объект с полями name/title, icon, content или items (список).
+    """
+    if not MODAL_GUI_ID_RE.fullmatch(modal_id):
+        raise ConfigLoadError(f"Недопустимый идентификатор модалки: {modal_id!r}")
+
+    filename = f"{modal_id}.yaml"
+    filepath = os.path.join(page_path, filename)
+    if not os.path.isfile(filepath):
+        yml = os.path.join(page_path, f"{modal_id}.yml")
+        if os.path.isfile(yml):
+            filepath = yml
+        else:
+            raise ConfigLoadError(f"Файл модалки не найден: {filename}")
+
+    raw = load_yaml_root(filepath)
+
+    if isinstance(raw, list):
+        return {"name": modal_id, "icon": None, "items": raw}
+
+    if isinstance(raw, dict):
+        # Ровно один ключ «type "Name"»: значение — список (как фрагмент gui.yaml)
+        if len(raw) == 1:
+            only_key, only_val = next(iter(raw.items()))
+            if isinstance(only_val, list):
+                _prefix, display_name = parse_gui_style_key(str(only_key))
+                title = display_name.strip() if display_name.strip() else modal_id
+                return {"name": title, "icon": None, "items": only_val}
+
+        items = raw.get("content")
+        if items is None:
+            items = raw.get("items")
+        if not isinstance(items, list):
+            raise ConfigLoadError(
+                f"{filepath}: ожидается список в корне, один ключ gui-стиля со списком, "
+                f"или объект с ключом content/items (список)"
+            )
+        name = raw.get("name") or raw.get("title") or modal_id
+        icon = raw.get("icon")
+        return {
+            "name": str(name).strip() if name is not None else modal_id,
+            "icon": icon if isinstance(icon, str) else None,
+            "items": items,
+        }
+
+    raise ConfigLoadError(f"{filepath}: корень YAML должен быть списком или объектом")
+
+
+def is_modal_gui_filename(filename: str) -> bool:
+    """modal_<id>.yaml — разметка модалки, не фрагмент attrs."""
+    if filename.endswith(".yaml"):
+        stem = filename[: -5]
+    elif filename.endswith(".yml"):
+        stem = filename[: -4]
+    else:
+        return False
+    return bool(MODAL_GUI_ID_RE.fullmatch(stem))
+
+
 def load_page_config(page_path: str, page_name: str) -> Dict[str, Any]:
     """Загружает одну страницу из GUI-файла и attrs-фрагментов."""
     yaml_files = list_yaml_files(page_path)
     gui_file = find_gui_file(yaml_files, page_name)
     gui = load_yaml_dict(gui_file)
-    attr_files = [path for path in yaml_files if path != gui_file]
+    attr_files = [
+        path
+        for path in yaml_files
+        if path != gui_file and not is_modal_gui_filename(os.path.basename(path))
+    ]
     attrs = merge_attrs_files(attr_files, page_name)
     url = normalize_page_url(gui.get("url"), page_name)
 
@@ -139,6 +257,7 @@ def load_page_config(page_path: str, page_name: str) -> Dict[str, Any]:
         "title": gui.get("title", page_name),
         "gui": gui,
         "attrs": attrs,
+        "modalGuiIds": list_modal_gui_ids(page_path),
     }
 
     return page_config

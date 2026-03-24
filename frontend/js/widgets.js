@@ -122,7 +122,6 @@ const SectionCard = {
         onInput: { type: Function, default: null },
         getWidgetConfig: { type: Function, required: true },
         onExecute: { type: Function, required: true },
-        variant: { type: String, default: 'page' },
         headerId: { type: String, default: '' }
     },
     data() {
@@ -144,7 +143,7 @@ const SectionCard = {
                      :style="headerStyle">
                     <component :is="titleTag" class="mb-0 d-flex align-items-center" :class="titleClass">
                         <span v-if="section.showHeader" :class="arrowSlotClass">
-                            <img v-if="section.collapsible" src="/templates/icons/arrow.svg" class="collapse-icon" :class="collapseIconExtra" alt="">
+                            <img v-if="section.collapsible" src="/templates/icons/arrow.svg" class="collapse-icon" alt="">
                         </span>
                         <item-icon v-if="section.icon" :icon="section.icon"></item-icon>
                         <span v-text="section.name"></span>
@@ -179,7 +178,6 @@ const SectionCard = {
             };
         },
         wrapperClass() {
-            if (this.variant === 'modal') return 'mb-3';
             return {
                 'page-section': true,
                 'page-section--bare': !this.section.showHeader,
@@ -187,25 +185,31 @@ const SectionCard = {
             };
         },
         cardClass() {
-            return this.variant === 'page' ? 'card page-section-card u-wide' : 'card u-wide';
+            return 'card page-section-card u-wide';
         },
         headerClass() {
-            const base = { collapsed: this.section.collapsible && this.isCollapsed };
-            if (this.variant === 'page') base['page-section-header'] = true;
-            return base;
+            return {
+                collapsed: this.section.collapsible && this.isCollapsed,
+                'page-section-header': true
+            };
         },
         headerStyle() {
             return this.section.collapsible ? { cursor: 'pointer' } : null;
         },
-        titleTag() { return this.variant === 'page' ? 'h5' : 'h6'; },
-        titleClass() { return this.variant === 'page' ? 'page-section-title' : ''; },
-        arrowSlotClass() { return this.variant === 'page' ? 'page-section-arrow-slot inline-flex-center' : 'inline-flex-center'; },
-        collapseIconExtra() { return this.variant === 'modal' ? 'me-2' : ''; },
+        titleTag() {
+            return 'h5';
+        },
+        titleClass() {
+            return 'page-section-title';
+        },
+        arrowSlotClass() {
+            return 'page-section-arrow-slot inline-flex-center';
+        },
         bodyClass() {
-            return this.variant === 'page' ? 'card-body page-section-body u-wide' : 'card-body u-wide';
+            return 'card-body page-section-body u-wide';
         },
         contentTextClass() {
-            return this.variant === 'modal' ? 'text-muted' : 'page-section-text';
+            return 'page-section-text';
         }
     },
     watch: {
@@ -309,20 +313,22 @@ const ModalButtons = {
             required: true
         }
     },
-    emits: ['close'],
+    emits: ['close', 'execute'],
     template: `
-        <div class="d-flex gap-2 justify-content-end">
+        <div class="d-flex gap-2 justify-content-end w-100">
             <template v-for="buttonName in buttons" :key="buttonName">
                 <!-- Кнопка CLOSE - используем стандартный виджет кнопки -->
                 <widget-renderer v-if="buttonName === 'CLOSE'"
                     :widget-config="getCloseButtonConfig()"
-                    :widget-name="'CLOSE'">
+                    :widget-name="'CLOSE'"
+                    @execute="$emit('execute', $event)">
                 </widget-renderer>
                 
                 <!-- Обычная кнопка из attrs -->
                 <widget-renderer v-else
                     :widget-config="getWidgetConfig(buttonName)"
-                    :widget-name="buttonName">
+                    :widget-name="buttonName"
+                    @execute="$emit('execute', $event)">
                 </widget-renderer>
             </template>
         </div>
@@ -361,43 +367,63 @@ const ModalManager = {
     },
     template: `
         <div v-if="showModal" class="modal-overlay flex-center" @click="closeModal">
-            <div class="modal-content w-100" @click.stop>
+            <div class="modal-content w-100 gui-modal" @click.stop>
                 <div class="modal-header">
                     <div class="d-flex align-items-center gap-2">
                         <item-icon v-if="modalConfig && modalConfig.icon" :icon="modalConfig.icon"></item-icon>
-                        <h5 class="modal-title" v-text="modalTitle"></h5>
+                        <h5 class="modal-title page-section-title" v-text="modalTitle"></h5>
                     </div>
                     <button type="button" class="ui-close-button" @click="closeModal" aria-label="Закрыть"></button>
                 </div>
                 
                 <div class="modal-body">
-                    <div v-if="modalConfig">
-                        <ul v-if="modalTabs.length > 1" class="nav nav-tabs mb-3">
+                    <div v-if="modalConfig" class="gui-modal-body-inner">
+                        <ul v-if="modalTabs.length > 1" class="nav nav-tabs page-tabs" role="tablist">
                             <li class="nav-item" v-for="(tab, index) in modalTabs" :key="index">
                                 <a class="nav-link" 
                                    :class="{ active: index === activeTabIndex }" 
                                    @click.prevent="setActiveTab(index)"
-                                   href="#">
+                                   href="#"
+                                   role="tab">
                                     <item-icon v-if="tab.icon" :icon="tab.icon"></item-icon>
-                                    <span v-text="tab.name || ('Вкладка ' + (index + 1))"></span>
+                                    <span class="page-tab-label" v-text="tab.name || ('Вкладка ' + (index + 1))"></span>
                                 </a>
                             </li>
                         </ul>
                         
-                        <div class="tab-content u-wide">
-                            <div class="tab-pane active u-wide">
+                        <div class="tab-content page-tab-content gui-modal-tab-pane-outer u-wide"
+                             :class="{ 'page-tab-content--with-tabs': modalTabs.length > 1 }">
+                            <div v-if="modalTabs.length > 1" class="gui-modal-tab-stack">
+                                <div v-for="(tab, tidx) in modalTabs"
+                                     :key="'mtab-' + tidx"
+                                     class="gui-modal-tab-layer"
+                                     :class="{ 'gui-modal-tab-layer--active': tidx === activeTabIndex }">
+                                    <section-card
+                                        v-for="(section, sidx) in sectionsForTab(tidx)"
+                                        :key="'mt-' + tidx + '-' + sidx"
+                                        :section="section"
+                                        :section-index="sidx"
+                                        :collapse-id="getModalSectionCollapseId(tidx, sidx)"
+                                        :is-collapsed="isModalSectionCollapsed(tidx, sidx)"
+                                        :on-toggle="() => toggleModalSectionCollapse(tidx, sidx)"
+                                        :on-input="onWidgetInput"
+                                        :get-widget-config="getWidgetConfig"
+                                        :on-execute="onWidgetExecute">
+                                    </section-card>
+                                </div>
+                            </div>
+                            <div v-else class="tab-pane active show u-wide gui-modal-tab-single">
                                 <section-card
-                                    v-for="(section, sidx) in activeSections"
+                                    v-for="(section, sidx) in sectionsForTab(0)"
                                     :key="sidx"
                                     :section="section"
                                     :section-index="sidx"
-                                    :collapse-id="getModalSectionCollapseId(sidx)"
-                                    :is-collapsed="isModalSectionCollapsed(sidx)"
-                                    :on-toggle="() => toggleModalSectionCollapse(sidx)"
+                                    :collapse-id="getModalSectionCollapseId(0, sidx)"
+                                    :is-collapsed="isModalSectionCollapsed(0, sidx)"
+                                    :on-toggle="() => toggleModalSectionCollapse(0, sidx)"
                                     :on-input="onWidgetInput"
                                     :get-widget-config="getWidgetConfig"
-                                    :on-execute="onWidgetExecute"
-                                    variant="modal">
+                                    :on-execute="onWidgetExecute">
                                 </section-card>
                             </div>
                         </div>
@@ -407,7 +433,8 @@ const ModalManager = {
                 <div v-if="modalConfig && modalConfig.buttons && modalConfig.buttons.length" class="modal-footer">
                     <modal-buttons 
                         :buttons="modalConfig.buttons"
-                        @close="closeModal">
+                        @close="closeModal"
+                        @execute="onWidgetExecute">
                     </modal-buttons>
                 </div>
             </div>
@@ -424,19 +451,60 @@ const ModalManager = {
             }
 
             return this.modalConfig.tabs;
-        },
-        activeSections() {
-            return window.GuiParser
-                ? window.GuiParser.getActiveSections(this.modalConfig, this.activeTabIndex, this.modalTabs)
-                : [];
         }
     },
     methods: {
+        sectionsForTab(tabIndex) {
+            if (!window.GuiParser || !this.modalConfig) {
+                return [];
+            }
+            return window.GuiParser.getActiveSections(this.modalConfig, tabIndex, this.modalTabs);
+        },
+
         async openModal(modalName) {
+            await this.ensureModalGuiLoaded(modalName);
             this.loadModalConfig(modalName);
-            // лениво подгружаем атрибуты (ждём завершения)
             await this.ensureModalAttrsLoaded();
             this.showModal = true;
+        },
+
+        async ensureModalGuiLoaded(modalName) {
+            const parsedGui = this.getParsedGui();
+            if (parsedGui.modals && parsedGui.modals[modalName]) {
+                return;
+            }
+
+            const pageName = (
+                (this.$root && typeof this.$root.getCurrentPageName === 'function' && this.$root.getCurrentPageName())
+                || (window.pageData && window.pageData.pageConfig && window.pageData.pageConfig.name)
+                || ''
+            ).trim();
+
+            if (!pageName || !window.GuiParser || typeof window.GuiParser.parseModalPayload !== 'function') {
+                return;
+            }
+
+            try {
+                const resp = await fetch(
+                    `/api/modal-gui?page=${encodeURIComponent(pageName)}&id=${encodeURIComponent(modalName)}`
+                );
+                if (!resp.ok) {
+                    console.warn('modal-gui: не удалось загрузить', modalName, resp.status);
+                    return;
+                }
+                const payload = await resp.json();
+                if (payload.error) {
+                    console.warn('modal-gui:', payload.error);
+                    return;
+                }
+                const modal = window.GuiParser.parseModalPayload(modalName, payload);
+                if (!parsedGui.modals) {
+                    parsedGui.modals = {};
+                }
+                parsedGui.modals[modalName] = modal;
+            } catch (e) {
+                console.error('modal-gui', e);
+            }
         },
         
         closeModal() {
@@ -452,17 +520,20 @@ const ModalManager = {
             this.activeTabIndex = index;
         },
 
-        getModalSectionCollapseId(sectionIndex) {
-            const tabPart = this.modalTabs.length ? this.activeTabIndex : 'content';
-            return `modal-section-${tabPart}-${sectionIndex}`;
+        getModalSectionCollapseId(tabIndex, sectionIndex) {
+            if (!this.modalTabs.length) {
+                return `modal-section-content-${sectionIndex}`;
+            }
+            const idx = this.modalTabs.length === 1 ? 0 : tabIndex;
+            return `modal-section-${idx}-${sectionIndex}`;
         },
 
-        isModalSectionCollapsed(sectionIndex) {
-            return Boolean(this.collapsedModalSections[this.getModalSectionCollapseId(sectionIndex)]);
+        isModalSectionCollapsed(tabIndex, sectionIndex) {
+            return Boolean(this.collapsedModalSections[this.getModalSectionCollapseId(tabIndex, sectionIndex)]);
         },
 
-        toggleModalSectionCollapse(sectionIndex) {
-            const id = this.getModalSectionCollapseId(sectionIndex);
+        toggleModalSectionCollapse(tabIndex, sectionIndex) {
+            const id = this.getModalSectionCollapseId(tabIndex, sectionIndex);
             this.collapsedModalSections = { ...this.collapsedModalSections, [id]: !this.collapsedModalSections[id] };
         },
 
@@ -576,12 +647,7 @@ const ModalManager = {
             } catch (e) {
                 console.error("Не удалось подгрузить атрибуты для модального окна", e);
             }
-        },
-
-        getModalSectionCollapseId(sectionIndex) {
-            const tabPart = this.modalTabs.length ? this.activeTabIndex : 'content';
-            return `modal-section-${tabPart}-${sectionIndex}`;
-        },
+        }
 
     }
 };
