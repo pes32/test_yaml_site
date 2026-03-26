@@ -1,8 +1,11 @@
 // Виджет для списков (list)
 
+import Md3Field from './md3_field.js';
+import widgetMixin from './mixin.js';
+
 const ListWidget = {
-    components: { Md3Field: window.Md3Field },
-    mixins: [window.widgetMixin],
+    components: { Md3Field },
+    mixins: [widgetMixin],
     props: {
         widgetConfig: { type: Object, required: true },
         widgetName: { type: String, required: true }
@@ -21,10 +24,13 @@ const ListWidget = {
             <div class="dropdown widget-dropdown list-combobox w-100 min-w-0 max-w-none"
                  :class="{ show: isDropdownOpen }"
                  :data-dropdown-open="isDropdownOpen ? 'true' : undefined"
+                 v-bind="tableCellRootAttrs"
+                 @focusout="tableCellMode && onFocusOut()"
                  ref="dropdownRoot">
                 <div class="list-combobox-inner" ref="dropdownToggle">
                     <input type="text"
                            class="list-combobox-input"
+                           data-table-editor-target="true"
                            :value="inputDisplayValue"
                            @input="onInputChange"
                            @focus="onInputFocus"
@@ -35,9 +41,11 @@ const ListWidget = {
                            :disabled="widgetConfig.readonly"
                            :tabindex="widgetConfig.readonly ? -1 : null"
                            :title="inputDisplayValue"
-                           :aria-expanded="isDropdownOpen">
-                    <span class="list-combobox-arrow-wrap">
-                        <span class="list-combobox-arrow"
+                           :aria-expanded="isDropdownOpen"
+                           @focusout="tableCellMode && onListFocusOut()">
+                        <span class="list-combobox-arrow-wrap">
+                            <span class="list-combobox-arrow"
+                              data-table-action-trigger="list"
                               role="button"
                               tabindex="-1"
                               aria-label="Развернуть список"
@@ -182,6 +190,20 @@ const ListWidget = {
                 this.toggleDropdown();
                 return;
             }
+            if (e.key === 'Tab') {
+                const tabHandler =
+                    this.widgetConfig &&
+                    this.widgetConfig.table_cell_tab_handler;
+                if (
+                    this.tableCellMode &&
+                    typeof tabHandler === 'function'
+                ) {
+                    e.preventDefault();
+                    this.closeDropdown();
+                    tabHandler(!!e.shiftKey);
+                    return;
+                }
+            }
             if (this.isDropdownOpen && this.filteredList.length > 0) {
                 if (e.key === 'ArrowDown') {
                     e.preventDefault();
@@ -258,6 +280,18 @@ const ListWidget = {
                 return;
             }
             if (e.key === 'Tab') {
+                const tabHandler =
+                    this.widgetConfig &&
+                    this.widgetConfig.table_cell_tab_handler;
+                if (
+                    this.tableCellMode &&
+                    typeof tabHandler === 'function'
+                ) {
+                    e.preventDefault();
+                    this.closeDropdown();
+                    tabHandler(!!e.shiftKey);
+                    return;
+                }
                 this.closeDropdown();
             }
             if (this.widgetConfig.multiselect && (e.key === 'Backspace' || e.key === 'Delete')) {
@@ -377,9 +411,18 @@ const ListWidget = {
                     this.closeDropdown();
                 }
             };
-            setTimeout(() => document.addEventListener('click', this._clickOutside), 0);
+            this._clickOutsideTimerId = window.setTimeout(() => {
+                this._clickOutsideTimerId = 0;
+                if (this._clickOutside) {
+                    document.addEventListener('click', this._clickOutside);
+                }
+            }, 0);
         },
         removeClickOutsideListener() {
+            if (this._clickOutsideTimerId) {
+                clearTimeout(this._clickOutsideTimerId);
+                this._clickOutsideTimerId = 0;
+            }
             if (this._clickOutside) {
                 document.removeEventListener('click', this._clickOutside);
                 this._clickOutside = null;
@@ -481,7 +524,13 @@ const ListWidget = {
             }
             this.inputValue = this.value != null ? String(this.value) : '';
         }
+    },
+    beforeUnmount() {
+        this.closeDropdown();
+        this.removeClickOutsideListener();
+        this.removeScrollListener();
     }
 };
 
-window.ListWidget = ListWidget;
+export { ListWidget };
+export default ListWidget;

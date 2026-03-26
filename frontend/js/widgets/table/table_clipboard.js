@@ -1,10 +1,9 @@
 /**
  * TSV clipboard: serialize selection / deserialize paste. Без Vue.
  */
-(function (global) {
-    'use strict';
+import tableEngine from './table_core.js';
 
-    const Core = global.TableWidgetCore || (global.TableWidgetCore = {});
+const Core = tableEngine;
 
     /**
      * CRLF → \n, затем убрать ровно один завершающий \n у всего текста.
@@ -58,9 +57,15 @@
                 .map((s) => s.trim())
                 .filter(Boolean);
         }
-        const t = col && (col.type === 'int' || col.type === 'float');
+        const t =
+            col &&
+            (col.type === 'int' ||
+                col.type === 'float' ||
+                col.type === 'line_number');
         if (t && String(raw).trim() !== '' && !Number.isNaN(Number(raw))) {
-            return col.type === 'int' ? parseInt(raw, 10) : Number(raw);
+            return col.type === 'int' || col.type === 'line_number'
+                ? parseInt(raw, 10)
+                : Number(raw);
         }
         return raw;
     }
@@ -80,10 +85,10 @@
         for (let li = 0; li < lines.length; li++) {
             const parts = lines[li].split('\t');
             const row = [];
-            const width = nCols > 0 ? nCols : parts.length;
+            const width = parts.length;
             for (let c = 0; c < width; c++) {
                 const raw = parts[c] != null ? parts[c] : '';
-                if (nCols > 0) {
+                if (nCols > 0 && c < nCols) {
                     row.push(parsePastedCell(raw, c, tableColumns, listMultiFn));
                 } else {
                     row.push(raw);
@@ -95,19 +100,27 @@
     }
 
     /**
-     * @param {Array<Array<*>>} tableData
+     * @param {Array} tableData
      * @param {object[]} tableColumns
      * @param {{ r0: number, r1: number, c0: number, c1: number }} rect
      * @param {(colIdx: number) => boolean} listMultiFn
+     * @param {(displayRow: number) => *} [getRowAtDisplayIndex] — строка по индексу тела (плоский или view)
      */
-    function serializeSelectionToTsv(tableData, tableColumns, rect, listMultiFn) {
+    function serializeSelectionToTsv(tableData, tableColumns, rect, listMultiFn, getRowAtDisplayIndex) {
+        const U = Core.Utils;
+        const getCells = U && U.getRowCells;
         const { r0, r1, c0, c1 } = rect;
         const lines = [];
+        const pickRow =
+            typeof getRowAtDisplayIndex === 'function'
+                ? getRowAtDisplayIndex
+                : (rr) => tableData[rr];
         for (let r = r0; r <= r1; r++) {
-            const row = Array.isArray(tableData[r]) ? tableData[r] : [];
+            const row = pickRow(r);
+            const rawCells = getCells ? getCells(row) : Array.isArray(row) ? row : [];
             const cells = [];
             for (let c = c0; c <= c1; c++) {
-                cells.push(cellToTsvString(row[c], tableColumns[c], listMultiFn, c));
+                cells.push(cellToTsvString(rawCells[c], tableColumns[c], listMultiFn, c));
             }
             lines.push(cells.join('\t'));
         }
@@ -121,4 +134,13 @@
         deserializeTsvToMatrix,
         serializeSelectionToTsv
     };
-})(typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : this);
+
+export {
+    cellToTsvString,
+    deserializeTsvToMatrix,
+    normalizeTsvInput,
+    sanitizeForTsvCell,
+    serializeSelectionToTsv
+};
+
+export default Core.Clipboard;

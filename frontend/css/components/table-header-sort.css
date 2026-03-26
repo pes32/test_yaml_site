@@ -1,0 +1,73 @@
+/* components/table-header-sort.css — table header, sticky-header visuals, sorting affordances */
+
+.widget-table th {
+    background-color: var(--color-bg-muted);
+    color: var(--color-text-main);
+}
+
+/* Заголовок: вся область кликабельна для сортировки */
+.widget-table__th-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--table-cell-display-gap);
+    min-width: 0;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    margin: calc(var(--table-cell-padding-y) * -1) calc(var(--table-cell-padding-x) * -1);
+    padding: var(--table-cell-padding-y) var(--table-cell-padding-x);
+}
+
+.widget-table__th-inner:focus {
+    outline: none;
+}
+
+.widget-table__th-inner:focus-visible {
+    outline: var(--table-focus-ring-width) solid var(--table-focus-ring-color);
+    outline-offset: var(--table-focus-ring-offset);
+}
+
+.widget-table__th-inner:hover .widget-table__sort-icons:not(.widget-table__sort-icons--active) {
+    color: var(--table-sort-icon-color-hover);
+}
+
+.widget-table__th-text {
+    min-width: 0;
+    text-align: left;
+}
+
+.widget-table__sort-icons {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    flex-shrink: 0;
+    padding: 1px 0;
+    line-height: 0;
+    color: var(--table-sort-icon-color);
+    pointer-events: none;
+}
+
+/* Активная сортировка — цвет как у текста заголовка */
+.widget-table__sort-icons--active {
+    color: inherit;
+}
+
+.widget-table__sort-svg {
+    display: block;
+    flex-shrink: 0;
+}
+
+.widget-table__sort-svg--up {
+    transform: rotate(180deg);
+}
+
+/* Подсказка направления: вторая стрелка чуть бледнее */
+.widget-table__sort-icons--asc .widget-table__sort-svg--down {
+    opacity: var(--table-sort-icon-muted-opacity);
+}
+
+.widget-table__sort-icons--desc .widget-table__sort-svg--up {
+    opacity: var(--table-sort-icon-muted-opacity);
+}

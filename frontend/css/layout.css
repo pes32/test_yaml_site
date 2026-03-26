@@ -106,16 +106,27 @@
     min-width: var(--zero);
 }
 
-/* Табы страницы и debug: фиксированы сверху колонки, горизонтальный скролл только у длинного списка вкладок */
+/*
+ * Табы страницы и debug: сверху колонки, без участия в вертикальном скролле контента.
+ * z-index: табы ниже области вкладки (0 < 1), иначе position:sticky у таблиц оказывается «под» полосой табов.
+ * При фокусе в табах — page-tabs--focused поднимаем выше контента (кольца фокуса, выпадающие элементы).
+ */
 .page-main-stack > .page-tabs,
 .page-content-column > .page-tabs {
     flex: 0 0 auto;
     position: relative;
-    z-index: 1;
+    z-index: var(--z-base);
 }
 
+/*
+ * Scroll ownership contract for wide/sticky tables:
+ * both vertical and horizontal scrolling belong to .page-tab-content,
+ * while .widget-table-wrapper must stay a non-scroll container.
+ */
 .page-main-stack > .page-tab-content,
 .page-content-column > .page-tab-content {
+    position: relative;
+    z-index: var(--z-raised);
     flex: 1 1 0%;
     min-height: 0;
     overflow-x: auto;
@@ -229,7 +240,7 @@
 .page-tabs--focused {
     overflow-y: visible;
     position: relative;
-    z-index: 2;
+    z-index: var(--z-tabs-focus);
 }
 
 .page-tabs .nav-item {
@@ -317,16 +328,26 @@
     white-space: nowrap;
 }
 
+/* Липкие thead таблиц: top = var(--widget-table-sticky-top) в table.css; без табов — 0. */
 .page-tab-content {
+    --widget-table-sticky-top: 0px;
     padding: 0 var(--page-gap) var(--page-gap);
     box-sizing: border-box;
 }
+
+/*
+ * С табами: контент остаётся с padding-top, но липкий thead прилипает вплотную под полосой табов.
+ * Не использовать margin у tab-pane/stack вместо padding: лишний сдвиг всего контента без выигрыша для sticky.
+ */
 .page-tab-content--with-tabs {
+    --widget-table-sticky-top: 0px;
     padding-top: var(--page-gap);
 }
+
 .page-tab-content > .tab-pane {
     margin: 0;
 }
+
 .page-tab-content:not(.page-tab-content--with-tabs) {
     padding-left: 0;
 }
@@ -365,6 +386,7 @@
     overflow: hidden;
 }
 
+/* Без overflow-x: иначе ломается position:sticky у thead — горизонтальный скролл у .widget-table-wrapper */
 .page-section-body {
     padding: var(--page-gap);
     border-left: var(--section-frame-width) solid var(--color-bg-soft);
@@ -375,7 +397,7 @@
     background-color: var(--color-bg);
     box-sizing: border-box;
     min-width: 0;
-    overflow-x: auto;
+    overflow-x: visible;
 }
 
 /* Обычный текст секций (строки из gui.yaml) — основной цвет интерфейса */

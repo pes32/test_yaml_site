@@ -1,139 +1,410 @@
 // Страница с виджетами LowCode System
 
-const { createApp } = Vue;
+import { createApp } from 'vue';
+import { getIconSrc, isFontIcon, onIconError } from './gui_parser.js';
+import { normalizePageResponse } from './runtime/api_client.js';
+import { ensureAttrsLoaded as ensureAttrsLoadedFlow, fetchActiveViewAttrs as fetchActiveViewAttrsFlow } from './runtime/attrs_loader.js';
+import readPageBootstrap from './runtime/bootstrap.js';
+import {
+    FRONTEND_ERROR_SCOPES,
+    normalizeFrontendError,
+    presentFrontendError
+} from './runtime/error_model.js';
+import { executeCommand as executeCommandFlow } from './runtime/execute_flow.js';
+import {
+    closeModal as closeModalRuntime,
+    createEmptyModalRuntimeState,
+    getModalSectionCollapseId,
+    isModalSectionCollapsed,
+    openModal as openModalRuntime,
+    setActiveModalTab,
+    toggleModalSectionCollapse
+} from './runtime/modal_runtime_service.js';
+import {
+    applyPagePayload as applyPagePayloadFlow,
+    loadPageConfig as loadPageConfigFlow,
+    parseConfiguration as parseConfigurationFlow
+} from './runtime/page_bootstrap_flow.js';
+import {
+    getActiveMenu,
+    getActiveSections,
+    getActiveTabs,
+    getCurrentPageName as selectCurrentPageName,
+    getMenus,
+    getParsedGuiState,
+    getRootContentOnly,
+    getWidgetConfig as selectWidgetConfig,
+    getWidgetValue as selectWidgetValue
+} from './runtime/page_selectors.js';
+import PageSessionStore from './runtime/page_session_store.js';
+import PageRuntimeStore from './runtime/page_store.js';
+import { ConfirmModal } from './widgets/confirm_modal.js';
+import ModalManager from './widgets/modal_manager.js';
+import {
+    ContentRows,
+    ItemIcon,
+    ModalButtons,
+    SectionCard,
+    WidgetRenderer
+} from './widgets.js';
+import { DiagnosticsPanel, ErrorPanel } from './widgets/feedback.js';
 
 const app = createApp({
     provide() {
         return {
-            getConfirmModal: () => this.$refs.confirmModal
+            getConfirmModal: () => this.$refs.confirmModal,
+            openUiModal: (modalName) => this.modalRuntimeController
+                ? this.modalRuntimeController.openModal(modalName)
+                : Promise.resolve(null),
+            closeUiModal: () => {
+                if (this.modalRuntimeController) {
+                    this.modalRuntimeController.closeModal();
+                }
+            },
+            getWidgetConfigByName: (widgetName) => this.getWidgetConfig(widgetName),
+            getModalRuntimeState: () => this.modalRuntimeState,
+            getModalRuntimeController: () => this.modalRuntimeController,
+            getCurrentPageNameFromRuntime: () => this.getCurrentPageName(),
+            getAllAttrsMap: () => this.allAttrs,
+            showAppNotification: (message, type) => this.showNotification(message, type),
+            reportAppError: (error, options) => this.reportError(error, options),
+            handleRecoverableAppError: (error, options) => this.handleRecoverableError(error, options)
         };
     },
+
     data() {
         return {
-            pageConfig: null,
-            allAttrs: {},
-            menus: [],
-            widgets: {},
-            widgetValues: {},
-            loadedAttrNames: [],
-            activeMenuIndex: 0,
-            activeTabIndex: 0,
-            loading: true,
-            error: null,
-            rootContentOnly: false,
-            collapsedSections: {},
-            tabsFocused: false,
-            snackbar: null,
-            snackbarHideTimerId: 0,
-            snackbarSeq: 0
+            configState: PageRuntimeStore.createEmptyStore(),
+            sessionState: PageSessionStore.createEmptyStore(),
+            modalRuntimeState: createEmptyModalRuntimeState(),
+            modalRuntimeController: null,
+            uiState: {
+                activeMenuIndex: 0,
+                activeTabIndex: 0,
+                collapsedSections: {},
+                viewScrollTopById: {},
+                tabsFocused: false,
+                snackbar: null,
+                snackbarHideTimerId: 0,
+                snackbarSeq: 0,
+                hashListenerBound: false
+            },
+            asyncState: {
+                loading: true,
+                pageError: null,
+                errors: []
+            }
+        };
+    },
+
+    created() {
+        this.modalRuntimeController = {
+            closeModal: () => closeModalRuntime(this.modalRuntimeState),
+            getModalSectionCollapseId: (tabIndex, sectionIndex) =>
+                getModalSectionCollapseId(this.modalRuntimeState, tabIndex, sectionIndex),
+            isModalSectionCollapsed: (tabIndex, sectionIndex) =>
+                isModalSectionCollapsed(this.modalRuntimeState, tabIndex, sectionIndex),
+            openModal: (modalName) => openModalRuntime(this, this.modalRuntimeState, modalName),
+            setActiveTab: (index) => setActiveModalTab(this.modalRuntimeState, index),
+            toggleModalSectionCollapse: (tabIndex, sectionIndex) =>
+                toggleModalSectionCollapse(this.modalRuntimeState, tabIndex, sectionIndex)
         };
     },
 
     computed: {
+        pageConfig() {
+            return this.configState.pageConfig;
+        },
+
+        allAttrs() {
+            return this.configState.attrsByName || {};
+        },
+
+        snapshotVersion() {
+            return this.configState.snapshotVersion || '';
+        },
+
+        diagnostics() {
+            return Array.isArray(this.configState.diagnostics)
+                ? this.configState.diagnostics
+                : [];
+        },
+
+        widgetValues() {
+            return this.sessionState.widgetValues || {};
+        },
+
+        loadedAttrNames() {
+            return Array.isArray(this.sessionState.loadedAttrNames)
+                ? this.sessionState.loadedAttrNames
+                : [];
+        },
+
+        loadedModalIds() {
+            return Array.isArray(this.sessionState.loadedModalIds)
+                ? this.sessionState.loadedModalIds
+                : [];
+        },
+
+        parsedGui() {
+            return getParsedGuiState(this.sessionState);
+        },
+
+        menus() {
+            return getMenus(this.sessionState);
+        },
+
+        rootContentOnly() {
+            return getRootContentOnly(this.sessionState);
+        },
+
+        activeMenuIndex: {
+            get() {
+                return Number(this.uiState.activeMenuIndex) || 0;
+            },
+            set(value) {
+                this.uiState.activeMenuIndex = Number(value) || 0;
+            }
+        },
+
+        activeTabIndex: {
+            get() {
+                return Number(this.uiState.activeTabIndex) || 0;
+            },
+            set(value) {
+                this.uiState.activeTabIndex = Number(value) || 0;
+            }
+        },
+
+        loading: {
+            get() {
+                return Boolean(this.asyncState.loading);
+            },
+            set(value) {
+                this.asyncState.loading = Boolean(value);
+            }
+        },
+
+        pageError: {
+            get() {
+                return this.asyncState.pageError;
+            },
+            set(value) {
+                this.asyncState.pageError = value || null;
+            }
+        },
+
+        appErrors: {
+            get() {
+                return Array.isArray(this.asyncState.errors)
+                    ? this.asyncState.errors
+                    : [];
+            },
+            set(value) {
+                this.asyncState.errors = Array.isArray(value) ? value : [];
+            }
+        },
+
+        collapsedSections: {
+            get() {
+                return this.uiState.collapsedSections;
+            },
+            set(value) {
+                this.uiState.collapsedSections = value && typeof value === 'object' ? value : {};
+            }
+        },
+
+        viewScrollTopById: {
+            get() {
+                return this.uiState.viewScrollTopById;
+            },
+            set(value) {
+                this.uiState.viewScrollTopById = value && typeof value === 'object' ? value : {};
+            }
+        },
+
+        tabsFocused: {
+            get() {
+                return Boolean(this.uiState.tabsFocused);
+            },
+            set(value) {
+                this.uiState.tabsFocused = Boolean(value);
+            }
+        },
+
+        snackbar: {
+            get() {
+                return this.uiState.snackbar;
+            },
+            set(value) {
+                this.uiState.snackbar = value;
+            }
+        },
+
+        snackbarHideTimerId: {
+            get() {
+                return Number(this.uiState.snackbarHideTimerId) || 0;
+            },
+            set(value) {
+                this.uiState.snackbarHideTimerId = Number(value) || 0;
+            }
+        },
+
+        snackbarSeq: {
+            get() {
+                return Number(this.uiState.snackbarSeq) || 0;
+            },
+            set(value) {
+                this.uiState.snackbarSeq = Number(value) || 0;
+            }
+        },
+
         activeMenu() {
-            return this.menus[this.activeMenuIndex] || null;
+            return getActiveMenu(this.sessionState, this.activeMenuIndex);
         },
 
         activeTabs() {
-            if (!this.activeMenu || !Array.isArray(this.activeMenu.tabs)) {
-                return [];
-            }
-
-            return this.activeMenu.tabs;
+            return getActiveTabs(this.activeMenu);
         },
 
         activeSections() {
-            return window.GuiParser
-                ? window.GuiParser.getActiveSections(this.activeMenu, this.activeTabIndex, this.activeTabs)
-                : [];
+            return getActiveSections(this.activeMenu, this.activeTabIndex, this.activeTabs);
+        },
+
+        blockingPageError() {
+            if (!this.pageError) {
+                return null;
+            }
+            return this.pageError.recoverable ? null : this.pageError;
         }
     },
 
     async mounted() {
+        if ('scrollRestoration' in history) {
+            history.scrollRestoration = 'manual';
+        }
+
         try {
-            if (window.pageData) {
-                this.pageConfig = window.pageData.pageConfig;
-                this.allAttrs = window.pageData.allAttrs || {};
-                this.loadedAttrNames = Object.keys(this.allAttrs);
-                this.parseConfiguration();
-                this.$nextTick(() => {
-                    this.setActiveViewFromHash();
-                    this.fetchActiveViewAttrs();
-                    window.addEventListener('hashchange', this.onHashChange);
-                });
-            } else {
-                await this.loadPageConfig();
-            }
+            await this.bootstrapPage();
         } catch (error) {
-            console.error('Ошибка загрузки конфигурации страницы:', error);
-            this.error = 'Ошибка загрузки конфигурации страницы';
+            const normalized = this.reportError(error, {
+                scope: FRONTEND_ERROR_SCOPES.page,
+                recoverable: false,
+                message: 'Ошибка загрузки конфигурации страницы',
+                asPageError: true
+            });
+            this.showNotification(normalized.message, 'danger');
         } finally {
             this.loading = false;
         }
     },
 
     beforeUnmount() {
-        window.removeEventListener('hashchange', this.onHashChange);
+        this.unregisterHashListener();
         this.clearSnackbarTimer();
     },
 
     methods: {
-        async loadPageConfig() {
-            try {
-                const pathParts = window.location.pathname.split('/');
-                const pageName = pathParts[pathParts.length - 1];
-                const response = await fetch(`/api/page/${pageName}`);
+        waitForViewUpdate() {
+            return new Promise((resolve) => {
+                this.$nextTick(resolve);
+            });
+        },
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+        reportError(error, options = {}) {
+            const normalized = presentFrontendError(
+                normalizeFrontendError(error, options)
+            );
 
-                const data = await response.json();
-                this.pageConfig = data.page;
-                this.allAttrs = data.allAttrs || {};
-                this.loadedAttrNames = Object.keys(this.allAttrs);
-
-                if (!window.pageData) {
-                    window.pageData = {};
-                }
-
-                window.pageData.pageConfig = this.pageConfig;
-                window.pageData.allAttrs = this.allAttrs;
-
-                this.parseConfiguration();
-                this.$nextTick(() => {
-                    this.setActiveViewFromHash();
-                    this.fetchActiveViewAttrs();
-                    window.addEventListener('hashchange', this.onHashChange);
-                });
-            } catch (error) {
-                console.error('Ошибка загрузки конфигурации страницы:', error);
-                throw error;
+            if (options.asPageError === true) {
+                this.pageError = normalized;
+                return normalized;
             }
+
+            const next = this.appErrors.slice();
+            const existingIndex = next.findIndex((item) =>
+                item &&
+                item.scope === normalized.scope &&
+                item.code === normalized.code &&
+                item.message === normalized.message
+            );
+
+            if (existingIndex >= 0) {
+                next.splice(existingIndex, 1, normalized);
+            } else {
+                next.push(normalized);
+            }
+
+            this.appErrors = next;
+            return normalized;
+        },
+
+        handleRecoverableError(error, options = {}) {
+            const normalized = this.reportError(error, {
+                recoverable: true,
+                ...options
+            });
+            this.showNotification(normalized.message, 'danger');
+            return normalized;
+        },
+
+        dismissPageError() {
+            this.pageError = null;
+        },
+
+        dismissAppError(index) {
+            const next = this.appErrors.slice();
+            next.splice(index, 1);
+            this.appErrors = next;
+        },
+
+        registerHashListener() {
+            if (this.uiState.hashListenerBound) {
+                return;
+            }
+            window.addEventListener('hashchange', this.onHashChange);
+            this.uiState.hashListenerBound = true;
+        },
+
+        unregisterHashListener() {
+            if (!this.uiState.hashListenerBound) {
+                return;
+            }
+            window.removeEventListener('hashchange', this.onHashChange);
+            this.uiState.hashListenerBound = false;
+        },
+
+        async bootstrapPage() {
+            const bootstrapPayload = readPageBootstrap();
+
+            if (bootstrapPayload) {
+                this.applyPagePayload(normalizePageResponse(bootstrapPayload));
+                this.parseConfiguration();
+            } else {
+                await this.loadPageConfig();
+            }
+
+            await this.finishInitialViewActivation();
+        },
+
+        applyPagePayload(payload) {
+            applyPagePayloadFlow(this, payload || {});
+        },
+
+        async loadPageConfig() {
+            return loadPageConfigFlow(this);
         },
 
         parseConfiguration() {
-            this.parseGuiConfig();
-            this.parseAttrsConfig();
+            parseConfigurationFlow(this);
         },
 
-        parseGuiConfig() {
-            const parsed = window.GuiParser
-                ? window.GuiParser.parsePageGui(this.pageConfig)
-                : { menus: [], modals: {} };
-
-            this.menus = parsed.menus || [];
-            this.rootContentOnly = Boolean(parsed.rootContentOnly);
-
-            if (window.pageData) {
-                window.pageData.parsedGui = parsed;
-            }
-
-            this.normalizeActiveState();
-
-            if (!this.menus.length) {
-                console.warn('No menus found in GUI config');
-            }
+        async finishInitialViewActivation() {
+            this.setActiveViewFromHash();
+            await this.waitForViewUpdate();
+            this.restoreActiveViewScroll();
+            await this.fetchActiveViewAttrs();
+            this.registerHashListener();
         },
 
         normalizeActiveState() {
@@ -147,9 +418,7 @@ const app = createApp({
                 this.activeMenuIndex = 0;
             }
 
-            const menu = this.activeMenu;
-            const tabs = menu && Array.isArray(menu.tabs) ? menu.tabs : [];
-
+            const tabs = this.activeTabs;
             if (!tabs.length) {
                 this.activeTabIndex = 0;
                 return;
@@ -184,19 +453,22 @@ const app = createApp({
                 return;
             }
 
-            let newHash = `#menu-${this.activeMenuIndex}`;
+            let nextHash = `#menu-${this.activeMenuIndex}`;
             if (this.activeTabs.length) {
-                newHash += `-tab-${this.activeTabIndex}`;
+                nextHash += `-tab-${this.activeTabIndex}`;
             }
 
-            if (window.location.hash !== newHash) {
-                history.replaceState(null, '', newHash);
+            if (window.location.hash !== nextHash) {
+                history.replaceState(null, '', nextHash);
             }
         },
 
-        onHashChange() {
+        async onHashChange() {
+            this.rememberActiveViewScroll();
             this.setActiveViewFromHash();
-            this.fetchActiveViewAttrs();
+            await this.waitForViewUpdate();
+            this.restoreActiveViewScroll();
+            await this.fetchActiveViewAttrs();
         },
 
         onMenuClick(index) {
@@ -204,11 +476,12 @@ const app = createApp({
                 return;
             }
 
+            this.rememberActiveViewScroll();
             this.activeMenuIndex = index;
             this.activeTabIndex = 0;
             this.normalizeActiveState();
             this.updateHash();
-            this.fetchActiveViewAttrs();
+            void this.refreshActiveViewAfterNavigation();
         },
 
         onTabClick(index) {
@@ -216,59 +489,32 @@ const app = createApp({
                 return;
             }
 
+            this.rememberActiveViewScroll();
             this.activeTabIndex = index;
             this.normalizeActiveState();
             this.updateHash();
-            this.fetchActiveViewAttrs();
+            void this.refreshActiveViewAfterNavigation();
         },
 
-        parseAttrsConfig() {
-            this.widgets = this.allAttrs || {};
-            this.initializeWidgetValues(this.widgets);
-        },
-
-        initializeWidgetValues(attrsMap) {
-            if (!attrsMap || typeof attrsMap !== 'object') {
-                return;
-            }
-
-            const nextValues = { ...this.widgetValues };
-            let changed = false;
-
-            Object.entries(attrsMap).forEach(([name, config]) => {
-                if (name in nextValues) {
-                    return;
-                }
-
-                if (config && typeof config === 'object' && config.default !== undefined) {
-                    nextValues[name] = config.default;
-                    changed = true;
-                }
-            });
-
-            if (changed) {
-                this.widgetValues = nextValues;
-            }
+        async refreshActiveViewAfterNavigation() {
+            await this.waitForViewUpdate();
+            this.restoreActiveViewScroll();
+            await this.fetchActiveViewAttrs();
         },
 
         getCurrentPageName() {
-            if (this.pageConfig && this.pageConfig.name) {
-                return this.pageConfig.name;
-            }
-
-            if (window.pageData && window.pageData.pageConfig && window.pageData.pageConfig.name) {
-                return window.pageData.pageConfig.name;
-            }
-
-            return '';
+            return selectCurrentPageName(this.configState);
         },
 
-        collectActiveWidgetNames() {
-            if (!window.GuiParser || !this.activeMenu) {
-                return [];
+        async ensureAttrsLoaded(names) {
+            try {
+                return await ensureAttrsLoadedFlow(this, names);
+            } catch (error) {
+                throw this.handleRecoverableError(error, {
+                    scope: FRONTEND_ERROR_SCOPES.attrs,
+                    message: 'Не удалось загрузить атрибуты'
+                });
             }
-
-            return window.GuiParser.collectWidgetNamesFromMenu(this.activeMenu, this.activeTabIndex);
         },
 
         async fetchActiveViewAttrs() {
@@ -276,109 +522,18 @@ const app = createApp({
                 return;
             }
 
-            const required = this.collectActiveWidgetNames();
-            const toLoad = required.filter((name) => !this.loadedAttrNames.includes(name));
-
-            if (toLoad.length === 0) {
-                return;
-            }
-
             try {
-                const query = encodeURIComponent(toLoad.join(','));
-                const pageName = encodeURIComponent(this.getCurrentPageName());
-                const resp = await fetch(`/api/attrs?page=${pageName}&names=${query}`);
-                if (!resp.ok) {
-                    throw new Error(`HTTP ${resp.status}`);
-                }
-
-                const data = await resp.json();
-
-                Object.assign(this.allAttrs, data);
-                Object.assign(this.widgets, data);
-                this.loadedAttrNames.push(...toLoad);
-
-                if (window.pageData) {
-                    if (!window.pageData.allAttrs) {
-                        window.pageData.allAttrs = {};
-                    }
-
-                    Object.assign(window.pageData.allAttrs, data);
-                }
-
-                this.parseAttrsConfig();
-                await this.loadTableListSources(Object.keys(data));
+                await fetchActiveViewAttrsFlow(this);
             } catch (error) {
-                console.error('Не удалось загрузить атрибуты для активного меню', error);
-                this.showNotification('Ошибка загрузки данных', 'danger');
-            }
-        },
-
-        async loadTableListSources(attrNames) {
-            if (!attrNames || attrNames.length === 0) {
-                return;
-            }
-
-            const extra = new Set();
-            const builtinTokens = new Set(['ip', 'ip_mask', 'datetime', 'int', 'float']);
-
-            attrNames.forEach((name) => {
-                const cfg = this.allAttrs[name];
-                if (!cfg || cfg.widget !== 'table' || !cfg.table_attrs) {
-                    return;
-                }
-
-                const text = String(cfg.table_attrs);
-                const re = /:([A-Za-z_][A-Za-z0-9_]*)/g;
-                let match;
-
-                while ((match = re.exec(text)) !== null) {
-                    const token = match[1];
-                    if (builtinTokens.has(token) || this.loadedAttrNames.includes(token)) {
-                        continue;
-                    }
-
-                    extra.add(token);
-                }
-            });
-
-            const extraNames = Array.from(extra);
-            if (extraNames.length === 0) {
-                return;
-            }
-
-            try {
-                const query = encodeURIComponent(extraNames.join(','));
-                const pageName = encodeURIComponent(this.getCurrentPageName());
-                const resp = await fetch(`/api/attrs?page=${pageName}&names=${query}`);
-                if (!resp.ok) {
-                    throw new Error(`HTTP ${resp.status}`);
-                }
-
-                const data = await resp.json();
-
-                Object.assign(this.allAttrs, data);
-                Object.assign(this.widgets, data);
-                this.loadedAttrNames.push(...extraNames);
-
-                if (window.pageData) {
-                    if (!window.pageData.allAttrs) {
-                        window.pageData.allAttrs = {};
-                    }
-
-                    Object.assign(window.pageData.allAttrs, data);
-                }
-
-                this.parseAttrsConfig();
-            } catch (error) {
-                console.error('Не удалось загрузить list-источники таблиц', error);
+                this.handleRecoverableError(error, {
+                    scope: FRONTEND_ERROR_SCOPES.attrs,
+                    message: 'Не удалось загрузить данные для активного раздела'
+                });
             }
         },
 
         getWidgetConfig(widgetName) {
-            return this.widgets[widgetName] || {
-                widget: 'str',
-                label: widgetName
-            };
+            return selectWidgetConfig(this.allAttrs, widgetName);
         },
 
         onWidgetInput(payload) {
@@ -386,34 +541,68 @@ const app = createApp({
                 return;
             }
 
-            this.widgetValues = {
-                ...this.widgetValues,
-                [payload.name]: payload.value
-            };
+            PageSessionStore.setWidgetValue(
+                this.sessionState,
+                payload.name,
+                payload.value
+            );
         },
 
         getWidgetValue(widgetName) {
-            if (Object.prototype.hasOwnProperty.call(this.widgetValues, widgetName)) {
-                return this.widgetValues[widgetName];
-            }
-
-            const widgetConfig = this.getWidgetConfig(widgetName);
-            if (widgetConfig && widgetConfig.default !== undefined) {
-                return widgetConfig.default;
-            }
-
-            return null;
+            return selectWidgetValue(this.sessionState, this.allAttrs, widgetName);
         },
 
-        resolveCommandParams(commandData) {
-            const names = Array.isArray(commandData?.outputAttrs)
-                ? commandData.outputAttrs
-                : [];
+        getActiveViewId() {
+            if (!this.activeMenu) {
+                return '';
+            }
 
-            return names.reduce((params, attrName) => {
-                params[attrName] = this.getWidgetValue(attrName);
-                return params;
-            }, {});
+            const tabPart = this.activeTabs.length ? `tab-${this.activeTabIndex}` : 'content';
+            return `menu-${this.activeMenuIndex}-${tabPart}`;
+        },
+
+        getPageScrollRoot() {
+            return this.$refs.pageScrollRoot || null;
+        },
+
+        rememberActiveViewScroll() {
+            const viewId = this.getActiveViewId();
+            const scrollRoot = this.getPageScrollRoot();
+            if (!viewId || !scrollRoot) {
+                return;
+            }
+
+            this.viewScrollTopById = {
+                ...this.viewScrollTopById,
+                [viewId]: scrollRoot.scrollTop || 0
+            };
+        },
+
+        restoreActiveViewScroll(viewId = this.getActiveViewId()) {
+            this.$nextTick(() => {
+                if (!viewId || viewId !== this.getActiveViewId()) {
+                    return;
+                }
+
+                const scrollRoot = this.getPageScrollRoot();
+                if (!scrollRoot) {
+                    return;
+                }
+
+                const top = Object.prototype.hasOwnProperty.call(this.viewScrollTopById, viewId)
+                    ? this.viewScrollTopById[viewId]
+                    : 0;
+
+                if (typeof scrollRoot.scrollTo === 'function') {
+                    scrollRoot.scrollTo({ top, left: 0, behavior: 'auto' });
+                } else {
+                    scrollRoot.scrollTop = top;
+                }
+
+                if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+                    window.scrollTo(0, 0);
+                }
+            });
         },
 
         getSectionCollapseId(sectionIndex) {
@@ -426,56 +615,39 @@ const app = createApp({
         },
 
         toggleSectionCollapse(sectionIndex) {
-            const id = this.getSectionCollapseId(sectionIndex);
-            this.collapsedSections = { ...this.collapsedSections, [id]: !this.collapsedSections[id] };
+            const sectionId = this.getSectionCollapseId(sectionIndex);
+            this.collapsedSections = {
+                ...this.collapsedSections,
+                [sectionId]: !this.collapsedSections[sectionId]
+            };
         },
 
         async executeCommand(commandData) {
             try {
-                const widgetConfig = this.getWidgetConfig(commandData.widget);
-                if (widgetConfig.url) {
-                    window.location.href = widgetConfig.url;
-                    return;
-                }
-
-                const response = await fetch('/api/execute', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        command: commandData.command,
-                        params: this.resolveCommandParams(commandData),
-                        output_attrs: commandData.outputAttrs || [],
-                        widget: commandData.widget,
-                        page: this.getCurrentPageName()
-                    })
-                });
-
-                const result = await response.json().catch(() => ({}));
-                if (response.ok && result.success) {
-                    this.showNotification(result.message || 'Команда выполнена успешно', 'success');
-                    return;
-                }
-
-                const errorMessage = result.message
-                    || result.error
-                    || `Команда "${commandData.command}" не выполнена`;
-                this.showNotification(errorMessage, 'danger');
+                await executeCommandFlow(this, commandData);
             } catch (error) {
-                console.error('Ошибка выполнения команды:', error);
-                this.showNotification('Не удалось связаться с бэкендом для выполнения команды', 'danger');
+                this.handleRecoverableError(error, {
+                    scope: FRONTEND_ERROR_SCOPES.execute,
+                    message: error && error.message
+                        ? error.message
+                        : 'Не удалось выполнить команду'
+                });
             }
         },
 
-        onTabsFocusOut(e) {
-            if (!this.$refs.pageTabs || this.$refs.pageTabs.contains(e.relatedTarget)) return;
+        onTabsFocusOut(event) {
+            if (!this.$refs.pageTabs || this.$refs.pageTabs.contains(event.relatedTarget)) {
+                return;
+            }
             this.tabsFocused = false;
         },
 
         clearSnackbarTimer() {
-            if (this.snackbarHideTimerId) {
-                clearTimeout(this.snackbarHideTimerId);
-                this.snackbarHideTimerId = 0;
+            if (!this.snackbarHideTimerId) {
+                return;
             }
+            clearTimeout(this.snackbarHideTimerId);
+            this.snackbarHideTimerId = 0;
         },
 
         closeNotification() {
@@ -484,17 +656,18 @@ const app = createApp({
         },
 
         showNotification(message, type = 'info') {
-            const id = this.snackbarSeq + 1;
-            this.snackbarSeq = id;
+            const notificationId = this.snackbarSeq + 1;
+            this.snackbarSeq = notificationId;
             this.clearSnackbarTimer();
             this.snackbar = {
-                id,
+                id: notificationId,
                 type,
                 message: String(message || ''),
                 duration: 5000
             };
+
             this.snackbarHideTimerId = window.setTimeout(() => {
-                if (this.snackbar && this.snackbar.id === id) {
+                if (this.snackbar && this.snackbar.id === notificationId) {
                     this.snackbar = null;
                 }
                 this.snackbarHideTimerId = 0;
@@ -503,9 +676,9 @@ const app = createApp({
     }
 });
 
-app.config.globalProperties.$isFontIcon = (icon) => window.GuiParser?.isFontIcon(icon) ?? false;
-app.config.globalProperties.$getIconSrc = (icon) => window.GuiParser?.getIconSrc(icon) ?? null;
-app.config.globalProperties.$onIconError = (e) => window.GuiParser?.onIconError(e);
+app.config.globalProperties.$isFontIcon = (icon) => isFontIcon(icon);
+app.config.globalProperties.$getIconSrc = (icon) => getIconSrc(icon);
+app.config.globalProperties.$onIconError = (event) => onIconError(event);
 
 app.component('widget-renderer', WidgetRenderer);
 app.component('item-icon', ItemIcon);
@@ -514,4 +687,6 @@ app.component('content-rows', ContentRows);
 app.component('modal-manager', ModalManager);
 app.component('modal-buttons', ModalButtons);
 app.component('confirm-modal', ConfirmModal);
+app.component('diagnostics-panel', DiagnosticsPanel);
+app.component('error-panel', ErrorPanel);
 app.mount('#app');

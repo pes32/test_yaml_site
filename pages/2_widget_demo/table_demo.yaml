@@ -1,4 +1,19 @@
 # === ТАБЛИЦЫ ===
+# sticky_header: true  # Только стартовое состояние; в runtime пользователь может переключить его из меню заголовка
+# sort: false          # Отключает сортировку
+# line_numbers: true   # Добавляет служебную колонку №
+#                      # Во внешний payload (getValue/setValue/input) колонка № не попадает.
+#                      # line_numbres — старая опечатка черновика, runtime её не поддерживает.
+# Контекстное меню заголовка умеет:
+#   sticky_header toggle  — закрепление заголовка в runtime
+#   перенос по словам     — по умолчанию ячейки однострочные с хинтом при обрезании
+# table_lazy:
+#   true   — всегда использовать lazy pipeline.
+#   false  — всегда выключить lazy.
+#   omit   — auto: lazy включится сам, когда строк больше TABLE_LAZY_THRESHOLD (сейчас 100).
+
+# table поддерживает: str, int, float, date, time, datetime, list, ip, ip_mask.
+
 
 # Таблица (статичная, только просмотр)
 demo_table_1:
@@ -15,7 +30,7 @@ demo_table_1:
 # Таблица (редактируемая пользователем)
 demo_table_2:
   widget: table
-  label: "Таблица редактируемая:"
+  label: "Таблица редактируемая, 750px:"
   sup_text: "Пользователь может изменять значения в ячейках"
   width: 750px
   table_attrs: |
@@ -68,6 +83,7 @@ demo_table_6:
     value_1 /Значение 1
     value_2 /Значение 2
 
+
 # Журнал учёта
 journal_table:
   widget: table
@@ -88,6 +104,7 @@ pack_types:
 # Отчётная форма
 form_table:
   widget: table
+  line_numbers: true
   label: "Таблица ввода данных"
   source: proc_name
   table_attrs: |
@@ -111,7 +128,3 @@ form_table:
     pack_type /Тип упаковки :80 :pack_types №8
     address /ip-адрес :ip
     op_date /Дата операции :datetime
-
-
-# Так, у нас в таблице могут быть разные виджеты: date, time, list. Я пока больше других не вижу. 
-# Скажи мне, как они у нас работают и какие виджеты у нас есть для таблицы вообще? 

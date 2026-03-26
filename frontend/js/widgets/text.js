@@ -1,8 +1,11 @@
 // Виджет для многострочного текста (text)
 
+import Md3Field from './md3_field.js';
+import widgetMixin from './mixin.js';
+
 const TextWidget = {
-    components: { Md3Field: window.Md3Field },
-    mixins: [window.widgetMixin],
+    components: { Md3Field },
+    mixins: [widgetMixin],
     props: {
         widgetConfig: { type: Object, required: true },
         widgetName: { type: String, required: true }
@@ -20,7 +23,6 @@ const TextWidget = {
             container-modifier="textarea">
             <div class="md3-textarea-wrap w-100 min-w-0">
                 <textarea class="form-control"
-                         :style="textareaStyle"
                          :placeholder="showPlaceholder ? widgetConfig.placeholder : ''"
                          :disabled="widgetConfig.readonly"
                          :tabindex="widgetConfig.readonly ? -1 : null"
@@ -43,15 +45,7 @@ const TextWidget = {
     computed: {
         hasValue() { return Boolean(this.value); },
         labelFloats() { return this.hasValue || this.isFocused; },
-        showPlaceholder() { return !this.hasValue && this.isFocused && this.widgetConfig.placeholder; },
-        textareaStyle() {
-            const w = this.widgetConfig && this.widgetConfig.width;
-            if (w == null || w === '') return {};
-            const widthVal = typeof w === 'number' ? `${w}px` : String(w);
-            return {
-                width: widthVal
-            };
-        }
+        showPlaceholder() { return !this.hasValue && this.isFocused && this.widgetConfig.placeholder; }
     },
     methods: {
         onInput() {
@@ -69,4 +63,5 @@ const TextWidget = {
     }
 };
 
-window.TextWidget = TextWidget;
+export { TextWidget };
+export default TextWidget;

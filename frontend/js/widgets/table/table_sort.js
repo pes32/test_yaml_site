@@ -1,10 +1,9 @@
 /**
  * Сравнение ячеек для сортировки строк (без DOM).
  */
-(function (global) {
-    'use strict';
+import tableEngine from './table_core.js';
 
-    const Core = global.TableWidgetCore || (global.TableWidgetCore = {});
+const Core = tableEngine;
 
     function emptyForSort(value, column, listColumnIsMultiselect) {
         const lm = listColumnIsMultiselect || (() => false);
@@ -63,14 +62,16 @@
         const col = column || {};
         const t = col.type;
 
-        if (t === 'int' || t === 'float') {
+        if (t === 'int' || t === 'float' || t === 'line_number') {
             const na = Number(va);
             const nb = Number(vb);
-            if (!Number.isNaN(na) && !Number.isNaN(nb) && na !== nb) {
-                return na < nb ? -1 : 1;
-            }
+            const aNum = !Number.isNaN(na);
+            const bNum = !Number.isNaN(nb);
+            if (aNum && bNum && na !== nb) return na < nb ? -1 : 1;
+            if (aNum && !bNum) return -1;
+            if (!aNum && bNum) return 1;
             return String(va).localeCompare(String(vb), undefined, {
-                numeric: true,
+                numeric: false,
                 sensitivity: 'base'
             });
         }
@@ -94,28 +95,64 @@
         }
 
         return String(va).localeCompare(String(vb), undefined, {
-            numeric: true,
+            numeric: false,
             sensitivity: 'base'
         });
     }
 
+    function getCells(row) {
+        if (row && typeof row === 'object' && !Array.isArray(row) && Array.isArray(row.cells)) {
+            return row.cells;
+        }
+        return Array.isArray(row) ? row : [];
+    }
+
     /**
-     * @param {Array} rowA
-     * @param {Array} rowB
+     * @param {Array|{cells: Array}} rowA
+     * @param {Array|{cells: Array}} rowB
      * @param {number} colIndex
      * @param {Array} tableColumns
      * @param {function(object): boolean} listColumnIsMultiselect
      */
     function compareRows(rowA, rowB, colIndex, tableColumns, listColumnIsMultiselect) {
         const column = tableColumns[colIndex];
-        const va = Array.isArray(rowA) ? rowA[colIndex] : undefined;
-        const vb = Array.isArray(rowB) ? rowB[colIndex] : undefined;
+        const ca = getCells(rowA);
+        const cb = getCells(rowB);
+        const va = ca[colIndex];
+        const vb = cb[colIndex];
         return compareCells(va, vb, column, listColumnIsMultiselect);
+    }
+
+    /**
+     * Многоуровневая сортировка; tie-breaker — id строки.
+     * @param {{ col: number, dir: 'asc'|'desc' }[]} sortKeys
+     */
+    function compareRowsComposite(rowA, rowB, sortKeys, tableColumns, listColumnIsMultiselect) {
+        if (!Array.isArray(sortKeys) || sortKeys.length === 0) return 0;
+        for (let i = 0; i < sortKeys.length; i++) {
+            const sk = sortKeys[i];
+            const col = sk.col | 0;
+            const dir = sk.dir === 'desc' ? -1 : 1;
+            const cmp = compareRows(rowA, rowB, col, tableColumns, listColumnIsMultiselect);
+            if (cmp !== 0) return dir * cmp;
+        }
+        const idA = rowA && rowA.id != null ? String(rowA.id) : '';
+        const idB = rowB && rowB.id != null ? String(rowB.id) : '';
+        return idA.localeCompare(idB, undefined, { numeric: false, sensitivity: 'base' });
     }
 
     Core.Sort = {
         compareCells,
         compareRows,
+        compareRowsComposite,
         emptyForSort
     };
-})(typeof window !== 'undefined' ? window : this);
+
+export {
+    compareCells,
+    compareRows,
+    compareRowsComposite,
+    emptyForSort
+};
+
+export default Core.Sort;

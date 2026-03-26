@@ -2,6 +2,8 @@
 // Создаем глобальный компонент WidgetRenderer для Vue.js
 // Этот компонент использует фабрику виджетов для динамического рендеринга
 
+import widgetFactory from './widgets/factory.js';
+
 const WidgetRenderer = {
     props: {
         widgetConfig: {
@@ -29,12 +31,12 @@ const WidgetRenderer = {
     computed: {
         widgetComponent() {
             // Получаем компонент виджета из фабрики
-            if (window.widgetFactory && this.widgetConfig.widget) {
-                return window.widgetFactory.getWidgetComponent(this.widgetConfig.widget);
+            if (widgetFactory && this.widgetConfig.widget) {
+                return widgetFactory.getWidgetComponent(this.widgetConfig.widget);
             }
             
             // Fallback на StringWidget если фабрика не загружена
-            return window.StringWidget || 'div';
+            return 'div';
         },
 
         componentKey() {
@@ -56,9 +58,6 @@ const WidgetRenderer = {
     }
 };
 
-// Регистрируем компонент глобально
-window.WidgetRenderer = WidgetRenderer;
-
 // Компонент иконки (SVG или FontAwesome)
 const ItemIcon = {
     props: { icon: { type: String, default: '' } },
@@ -69,7 +68,6 @@ const ItemIcon = {
         </span>
     `
 };
-window.ItemIcon = ItemIcon;
 
 // Общий компонент рендеринга рядов секции (текст и row)
 const ContentRows = {
@@ -108,8 +106,6 @@ const ContentRows = {
         </template>
     `
 };
-
-window.ContentRows = ContentRows;
 
 // Карточка секции (заголовок + collapse + content). Одинакова для страницы и модалки.
 const SectionCard = {
@@ -303,10 +299,15 @@ const SectionCard = {
         }
     }
 };
-window.SectionCard = SectionCard;
 
 // Компонент для кнопок модального окна
 const ModalButtons = {
+    inject: {
+        getWidgetConfigByName: {
+            from: 'getWidgetConfigByName',
+            default: null
+        }
+    },
     props: {
         buttons: {
             type: Array,
@@ -343,314 +344,21 @@ const ModalButtons = {
             };
         },
         getWidgetConfig(widgetName) {
-            if (window.pageData && window.pageData.allAttrs && window.pageData.allAttrs[widgetName]) {
-                return window.pageData.allAttrs[widgetName];
+            if (typeof this.getWidgetConfigByName === 'function') {
+                return this.getWidgetConfigByName(widgetName);
             }
-            return null;
-        }
-    }
-};
-
-// Глобальный менеджер модальных окон
-const ModalManager = {
-    emits: ['execute', 'input'],
-    data() {
-        return {
-            showModal: false,
-            modalConfig: null,
-            activeTabIndex: 0,
-            collapsedModalSections: {}
-        };
-    },
-    mounted() {
-        window.modalManager = this;
-    },
-    template: `
-        <div v-if="showModal" class="modal-overlay flex-center" @click="closeModal">
-            <div class="modal-content w-100 gui-modal" @click.stop>
-                <div class="modal-header">
-                    <div class="d-flex align-items-center gap-2">
-                        <item-icon v-if="modalConfig && modalConfig.icon" :icon="modalConfig.icon"></item-icon>
-                        <h5 class="modal-title page-section-title" v-text="modalTitle"></h5>
-                    </div>
-                    <button type="button" class="ui-close-button" @click="closeModal" aria-label="Закрыть"></button>
-                </div>
-                
-                <div class="modal-body">
-                    <div v-if="modalConfig" class="gui-modal-body-inner">
-                        <ul v-if="modalTabs.length > 1" class="nav nav-tabs page-tabs" role="tablist">
-                            <li class="nav-item" v-for="(tab, index) in modalTabs" :key="index">
-                                <a class="nav-link" 
-                                   :class="{ active: index === activeTabIndex }" 
-                                   @click.prevent="setActiveTab(index)"
-                                   href="#"
-                                   role="tab">
-                                    <item-icon v-if="tab.icon" :icon="tab.icon"></item-icon>
-                                    <span class="page-tab-label" v-text="tab.name || ('Вкладка ' + (index + 1))"></span>
-                                </a>
-                            </li>
-                        </ul>
-                        
-                        <div class="tab-content page-tab-content gui-modal-tab-pane-outer u-wide"
-                             :class="{ 'page-tab-content--with-tabs': modalTabs.length > 1 }">
-                            <div v-if="modalTabs.length > 1" class="gui-modal-tab-stack">
-                                <div v-for="(tab, tidx) in modalTabs"
-                                     :key="'mtab-' + tidx"
-                                     class="gui-modal-tab-layer"
-                                     :class="{ 'gui-modal-tab-layer--active': tidx === activeTabIndex }">
-                                    <section-card
-                                        v-for="(section, sidx) in sectionsForTab(tidx)"
-                                        :key="'mt-' + tidx + '-' + sidx"
-                                        :section="section"
-                                        :section-index="sidx"
-                                        :collapse-id="getModalSectionCollapseId(tidx, sidx)"
-                                        :is-collapsed="isModalSectionCollapsed(tidx, sidx)"
-                                        :on-toggle="() => toggleModalSectionCollapse(tidx, sidx)"
-                                        :on-input="onWidgetInput"
-                                        :get-widget-config="getWidgetConfig"
-                                        :on-execute="onWidgetExecute">
-                                    </section-card>
-                                </div>
-                            </div>
-                            <div v-else class="tab-pane active show u-wide gui-modal-tab-single">
-                                <section-card
-                                    v-for="(section, sidx) in sectionsForTab(0)"
-                                    :key="sidx"
-                                    :section="section"
-                                    :section-index="sidx"
-                                    :collapse-id="getModalSectionCollapseId(0, sidx)"
-                                    :is-collapsed="isModalSectionCollapsed(0, sidx)"
-                                    :on-toggle="() => toggleModalSectionCollapse(0, sidx)"
-                                    :on-input="onWidgetInput"
-                                    :get-widget-config="getWidgetConfig"
-                                    :on-execute="onWidgetExecute">
-                                </section-card>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div v-if="modalConfig && modalConfig.buttons && modalConfig.buttons.length" class="modal-footer">
-                    <modal-buttons 
-                        :buttons="modalConfig.buttons"
-                        @close="closeModal"
-                        @execute="onWidgetExecute">
-                    </modal-buttons>
-                </div>
-            </div>
-        </div>
-    `,
-    computed: {
-        modalTitle() {
-            if (!this.modalConfig) return 'Модальное окно';
-            return this.modalConfig.name || 'Модальное окно';
-        },
-        modalTabs() {
-            if (!this.modalConfig || !Array.isArray(this.modalConfig.tabs)) {
-                return [];
-            }
-
-            return this.modalConfig.tabs;
-        }
-    },
-    methods: {
-        sectionsForTab(tabIndex) {
-            if (!window.GuiParser || !this.modalConfig) {
-                return [];
-            }
-            return window.GuiParser.getActiveSections(this.modalConfig, tabIndex, this.modalTabs);
-        },
-
-        async openModal(modalName) {
-            await this.ensureModalGuiLoaded(modalName);
-            this.loadModalConfig(modalName);
-            await this.ensureModalAttrsLoaded();
-            this.showModal = true;
-        },
-
-        async ensureModalGuiLoaded(modalName) {
-            const parsedGui = this.getParsedGui();
-            if (parsedGui.modals && parsedGui.modals[modalName]) {
-                return;
-            }
-
-            const pageName = (
-                (this.$root && typeof this.$root.getCurrentPageName === 'function' && this.$root.getCurrentPageName())
-                || (window.pageData && window.pageData.pageConfig && window.pageData.pageConfig.name)
-                || ''
-            ).trim();
-
-            if (!pageName || !window.GuiParser || typeof window.GuiParser.parseModalPayload !== 'function') {
-                return;
-            }
-
-            try {
-                const resp = await fetch(
-                    `/api/modal-gui?page=${encodeURIComponent(pageName)}&id=${encodeURIComponent(modalName)}`
-                );
-                if (!resp.ok) {
-                    console.warn('modal-gui: не удалось загрузить', modalName, resp.status);
-                    return;
-                }
-                const payload = await resp.json();
-                if (payload.error) {
-                    console.warn('modal-gui:', payload.error);
-                    return;
-                }
-                const modal = window.GuiParser.parseModalPayload(modalName, payload);
-                if (!parsedGui.modals) {
-                    parsedGui.modals = {};
-                }
-                parsedGui.modals[modalName] = modal;
-            } catch (e) {
-                console.error('modal-gui', e);
-            }
-        },
-        
-        closeModal() {
-            this.showModal = false;
-            this.activeTabIndex = 0;
-        },
-        
-        setActiveTab(index) {
-            if (index < 0 || index >= this.modalTabs.length) {
-                return;
-            }
-
-            this.activeTabIndex = index;
-        },
-
-        getModalSectionCollapseId(tabIndex, sectionIndex) {
-            if (!this.modalTabs.length) {
-                return `modal-section-content-${sectionIndex}`;
-            }
-            const idx = this.modalTabs.length === 1 ? 0 : tabIndex;
-            return `modal-section-${idx}-${sectionIndex}`;
-        },
-
-        isModalSectionCollapsed(tabIndex, sectionIndex) {
-            return Boolean(this.collapsedModalSections[this.getModalSectionCollapseId(tabIndex, sectionIndex)]);
-        },
-
-        toggleModalSectionCollapse(tabIndex, sectionIndex) {
-            const id = this.getModalSectionCollapseId(tabIndex, sectionIndex);
-            this.collapsedModalSections = { ...this.collapsedModalSections, [id]: !this.collapsedModalSections[id] };
-        },
-
-        getParsedGui() {
-            if (!window.pageData || !window.pageData.pageConfig || !window.GuiParser) {
-                return { menus: [], modals: {} };
-            }
-
-            if (!window.pageData.parsedGui) {
-                const pageConfig = window.pageData.pageConfig;
-                window.pageData.parsedGui = window.GuiParser.parsePageGui(pageConfig || {});
-            }
-
-            return window.pageData.parsedGui;
-        },
-
-        loadModalConfig(modalName) {
-            const parsedGui = this.getParsedGui();
-            if (parsedGui.modals && parsedGui.modals[modalName]) {
-                this.modalConfig = parsedGui.modals[modalName];
-                this.activeTabIndex = 0;
-                return;
-            }
-
-            console.warn('Modal config not found for:', modalName);
-
-            this.modalConfig = {
-                id: modalName,
-                name: modalName,
-                icon: '',
-                tabs: [],
-                content: [{
-                    type: 'box',
-                    name: '',
-                    icon: '',
-                    rows: [{
-                        widgets: ['popup_string', 'popup_int']
-                    }],
-                    collapsible: false,
-                    showHeader: false
-                }],
-                buttons: ['CLOSE']
-            };
-        },
-        
-        getWidgetConfig(widgetName) {
-            // Получаем конфигурацию виджета из глобальных данных
-            if (window.pageData && window.pageData.allAttrs) {
-                return window.pageData.allAttrs[widgetName] || {
-                    widget: 'str',
-                    label: widgetName
-                };
-                }
             return {
                 widget: 'str',
                 label: widgetName
             };
-        },
-        
-        onWidgetExecute(data) {
-            // Передаем события от виджетов в модальном окне
-            this.$emit('execute', data);
-        },
-
-        onWidgetInput(data) {
-            this.$emit('input', data);
-        },
-
-        collectModalWidgetNames() {
-            if (!window.GuiParser || !this.modalConfig) {
-                return [];
-            }
-
-            return window.GuiParser.collectWidgetNamesFromModal(this.modalConfig);
-        },
-
-        async ensureModalAttrsLoaded() {
-            try {
-                const required = this.collectModalWidgetNames();
-                if (!required.length) return;
-                const globalAttrs = (window.pageData && window.pageData.allAttrs) || {};
-                const pageName = (
-                    window.pageData
-                    && window.pageData.pageConfig
-                    && window.pageData.pageConfig.name
-                ) || "";
-                const namesToLoad = required.filter((n) => !(n in globalAttrs));
-                if (!namesToLoad.length) return;
-
-                const query = encodeURIComponent(namesToLoad.join(","));
-                const resp = await fetch(`/api/attrs?page=${encodeURIComponent(pageName)}&names=${query}`);
-                if (!resp.ok) return;
-                const data = await resp.json();
-                // merge
-                Object.assign(globalAttrs, data);
-                if (window.pageData) window.pageData.allAttrs = globalAttrs;
-                if (this.$root) {
-                    if (!this.$root.allAttrs) {
-                        this.$root.allAttrs = {};
-                    }
-                    if (!this.$root.widgets) {
-                        this.$root.widgets = {};
-                    }
-
-                    Object.assign(this.$root.allAttrs, data);
-                    Object.assign(this.$root.widgets, data);
-                }
-                if (this.$root && typeof this.$root.initializeWidgetValues === 'function') {
-                    this.$root.initializeWidgetValues(data);
-                }
-            } catch (e) {
-                console.error("Не удалось подгрузить атрибуты для модального окна", e);
-            }
         }
-
     }
 };
 
-window.ModalManager = ModalManager;
-window.ModalButtons = ModalButtons; 
+export {
+    ContentRows,
+    ItemIcon,
+    ModalButtons,
+    SectionCard,
+    WidgetRenderer
+};

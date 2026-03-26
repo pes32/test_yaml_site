@@ -1,4 +1,11 @@
-const { createApp } = Vue;
+import { createApp } from 'vue';
+import frontendApiClient from './runtime/api_client.js';
+import {
+    FRONTEND_ERROR_SCOPES,
+    normalizeFrontendError,
+    presentFrontendError
+} from './runtime/error_model.js';
+import { DiagnosticsPanel, ErrorPanel } from './widgets/feedback.js';
 
 createApp({
     data() {
@@ -6,13 +13,16 @@ createApp({
             activeTab: 0,
             apiRoutes: [],
             apiLoading: false,
-            apiError: null,
             logLines: [],
             logsLoading: false,
-            logError: null,
             pages: [],
             pagesLoading: false,
-            pagesError: null,
+            diagnostics: [],
+            scopeErrors: {
+                api: null,
+                logs: null,
+                pages: null
+            }
         };
     },
     computed: {
@@ -21,13 +31,27 @@ createApp({
         },
         apiText() {
             const lines = [];
-            for (const r of this.apiRoutes) {
-                for (const m of r.methods) {
-                    lines.push(`${m} ${r.rule} ${r.endpoint}`);
+            for (const route of this.apiRoutes) {
+                for (const method of route.methods) {
+                    lines.push(`${method} ${route.rule} ${route.endpoint}`);
                 }
             }
             return lines.join('\n');
         },
+        visibleErrors() {
+            return Object.entries(this.scopeErrors)
+                .filter(([, item]) => Boolean(item))
+                .map(([scope, item]) => ({ scope, item }));
+        },
+        apiError() {
+            return this.scopeErrors.api;
+        },
+        logError() {
+            return this.scopeErrors.logs;
+        },
+        pagesError() {
+            return this.scopeErrors.pages;
+        }
     },
     mounted() {
         this.loadApi();
@@ -35,47 +59,78 @@ createApp({
         this.loadPages();
     },
     methods: {
+        reportScopeError(scope, error, message) {
+            const normalized = presentFrontendError(
+                normalizeFrontendError(error, {
+                    scope: FRONTEND_ERROR_SCOPES.debug,
+                    recoverable: true,
+                    message,
+                    details: {
+                        debugScope: scope
+                    }
+                })
+            );
+            this.scopeErrors = {
+                ...this.scopeErrors,
+                [scope]: normalized
+            };
+            return normalized;
+        },
+        clearScopeError(scope) {
+            this.scopeErrors = {
+                ...this.scopeErrors,
+                [scope]: null
+            };
+        },
+        dismissScopeError(scope) {
+            this.clearScopeError(scope);
+        },
         async loadApi() {
             this.apiLoading = true;
-            this.apiError = null;
+            this.clearScopeError('api');
             try {
-                const res = await fetch('/api/debug/structure');
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Ошибка загрузки');
+                const data = await frontendApiClient.fetchDebugStructure();
                 this.apiRoutes = data.routes || [];
-            } catch (e) {
-                this.apiError = e.message;
+            } catch (error) {
+                this.reportScopeError('api', error, 'Не удалось загрузить структуру API');
             } finally {
                 this.apiLoading = false;
             }
         },
         async loadLogs() {
             this.logsLoading = true;
-            this.logError = null;
+            this.clearScopeError('logs');
             try {
-                const res = await fetch('/api/debug/logs');
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Ошибка загрузки');
+                const data = await frontendApiClient.fetchDebugLogs();
                 this.logLines = data.lines || [];
-            } catch (e) {
-                this.logError = e.message;
+            } catch (error) {
+                this.reportScopeError('logs', error, 'Не удалось загрузить debug-лог');
             } finally {
                 this.logsLoading = false;
             }
         },
         async loadPages() {
             this.pagesLoading = true;
-            this.pagesError = null;
+            this.clearScopeError('pages');
             try {
-                const res = await fetch('/api/debug/pages');
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Ошибка загрузки');
+                const data = await frontendApiClient.fetchDebugPages();
                 this.pages = data.pages || [];
-            } catch (e) {
-                this.pagesError = e.message;
+                this.diagnostics = Array.isArray(data.diagnostics) ? data.diagnostics : [];
+                if (data.lastError) {
+                    this.reportScopeError(
+                        'pages',
+                        new Error(data.lastError),
+                        'Snapshot сообщает об ошибке'
+                    );
+                }
+            } catch (error) {
+                this.reportScopeError('pages', error, 'Не удалось загрузить YAML-страницы');
             } finally {
                 this.pagesLoading = false;
             }
-        },
-    },
-}).mount('#debugApp');
+        }
+    }
+})
+    .component('diagnostics-panel', DiagnosticsPanel)
+    .component('error-panel', ErrorPanel)
+    .mount('#debugApp');

@@ -42,4 +42,5 @@ const ConfirmModal = {
     }
 };
 
-window.ConfirmModal = ConfirmModal;
+export { ConfirmModal };
+export default ConfirmModal;

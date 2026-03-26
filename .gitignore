@@ -41,3 +41,9 @@ templates/files/
 
 # Локальные файлы
 templates/mems/
+
+# Node / Vite
+node_modules/
+tooling/vite/node_modules/
+frontend/dist/
+npm-debug.log*

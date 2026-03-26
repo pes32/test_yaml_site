@@ -1,5 +1,8 @@
 // datetime, date, time
 
+import Md3Field from './md3_field.js';
+import widgetMixin from './mixin.js';
+
 const WEEKDAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
 const dateTimeMixin = {
@@ -332,8 +335,8 @@ const dateTimeMixin = {
 };
 
 const DateWidget = {
-    mixins: [window.widgetMixin, dateTimeMixin],
-    components: { Md3Field: window.Md3Field },
+    mixins: [widgetMixin, dateTimeMixin],
+    components: { Md3Field },
     props: { widgetConfig: { type: Object, required: true }, widgetName: { type: String, required: true } },
     emits: ['input'],
     data() {
@@ -362,16 +365,18 @@ const DateWidget = {
     },
     template: `
         <md3-field :widget-config="widgetConfig" :has-value="hasValue" :label-floats="labelFloats"
-                   :is-focused="isFocused" :wrap-extra="{ 'widget-dt': true }" :wrap-data="{ 'data-type': 'date' }"
+                   :is-focused="isFocused" :wrap-extra="{ 'widget-dt': true, error: !!tableCellCommitError }" :wrap-data="{ 'data-type': 'date' }"
                    :has-supporting="!!widgetConfig.sup_text">
-            <div class="widget-dt-host" ref="pickerHost">
+            <div class="widget-dt-host"
+                 v-bind="tableCellRootAttrs"
+                 ref="pickerHost">
                 <div class="widget-dt-inner">
                     <div class="widget-dt-segment widget-dt-segment--single" ref="dateAnchor">
-                        <input type="text" class="form-control widget-dt-input widget-dt-input--date" v-model="value"
+                        <input type="text" class="form-control widget-dt-input widget-dt-input--date" data-table-editor-target="true" v-model="value"
                                :disabled="widgetConfig.readonly" :tabindex="widgetConfig.readonly ? -1 : null"
                                @input="onInput" @focus="isFocused = true" @blur="onBlur">
                         <span class="widget-dt-icon-wrap">
-                            <span class="widget-dt-icon" role="button" tabindex="-1" aria-label="Выбрать дату"
+                            <span class="widget-dt-icon" data-table-action-trigger="date" role="button" tabindex="-1" aria-label="Выбрать дату"
                                   @click="openPicker" @mousedown.prevent>
                                 <img src="/templates/icons/calendar.svg" alt="">
                             </span>
@@ -429,6 +434,7 @@ const DateWidget = {
         },
         commitInput() {
             if (!this.value) {
+                this.handleTableCellCommitValidation('');
                 this.emit(this.value);
                 return;
             }
@@ -436,6 +442,9 @@ const DateWidget = {
             const { value, parsedDate } = this.normalizeDateInputValue(this.value);
             this.value = value;
             this.setCalendarViewFromDate(parsedDate);
+            this.handleTableCellCommitValidation(
+                parsedDate ? '' : 'Неверный формат даты'
+            );
             this.emit(this.value);
         },
         openPicker() {
@@ -476,8 +485,20 @@ const DateWidget = {
         },
         getValue() { return this.value; }
     },
+    watch: {
+        'widgetConfig.value': {
+            immediate: true,
+            handler(value) {
+                if (value === undefined) return;
+                if (this.tableCellMode && this.isFocused) return;
+                this.setValue(value);
+            }
+        }
+    },
     mounted() {
-        if (this.widgetConfig.default === 'now') {
+        if (this.widgetConfig.value !== undefined) {
+            this.setValue(this.widgetConfig.value);
+        } else if (this.widgetConfig.default === 'now') {
             const date = this.getNow();
             this.value = this.formatDate(date);
             this.calendarView = this.monthStart(date);
@@ -493,8 +514,8 @@ const DateWidget = {
 };
 
 const TimeWidget = {
-    mixins: [window.widgetMixin, dateTimeMixin],
-    components: { Md3Field: window.Md3Field },
+    mixins: [widgetMixin, dateTimeMixin],
+    components: { Md3Field },
     props: { widgetConfig: { type: Object, required: true }, widgetName: { type: String, required: true } },
     emits: ['input'],
     data() {
@@ -514,16 +535,18 @@ const TimeWidget = {
     },
     template: `
         <md3-field :widget-config="widgetConfig" :has-value="hasValue" :label-floats="labelFloats"
-                   :is-focused="isFocused" :wrap-extra="{ 'widget-dt': true }" :wrap-data="{ 'data-type': 'time' }"
+                   :is-focused="isFocused" :wrap-extra="{ 'widget-dt': true, error: !!tableCellCommitError }" :wrap-data="{ 'data-type': 'time' }"
                    :has-supporting="!!widgetConfig.sup_text">
-            <div class="widget-dt-host" ref="pickerHost">
+            <div class="widget-dt-host"
+                 v-bind="tableCellRootAttrs"
+                 ref="pickerHost">
                 <div class="widget-dt-inner">
                     <div class="widget-dt-segment widget-dt-segment--single" ref="timeAnchor">
-                        <input type="text" class="form-control widget-dt-input widget-dt-input--time" v-model="value"
+                        <input type="text" class="form-control widget-dt-input widget-dt-input--time" data-table-editor-target="true" v-model="value"
                                :disabled="widgetConfig.readonly" :tabindex="widgetConfig.readonly ? -1 : null"
                                @input="onInput" @focus="isFocused = true" @blur="onBlur">
                         <span class="widget-dt-icon-wrap">
-                            <span class="widget-dt-icon" role="button" tabindex="-1" aria-label="Выбрать время"
+                            <span class="widget-dt-icon" data-table-action-trigger="time" role="button" tabindex="-1" aria-label="Выбрать время"
                                   @click="openPicker" @mousedown.prevent>
                                 <img src="/templates/icons/clock.svg" alt="">
                             </span>
@@ -607,6 +630,7 @@ const TimeWidget = {
         },
         commitInput() {
             if (!this.value) {
+                this.handleTableCellCommitValidation('');
                 this.emit(this.value);
                 return;
             }
@@ -614,6 +638,9 @@ const TimeWidget = {
             const { value, parsedTime } = this.normalizeTimeInputValue(this.value);
             this.value = value;
             this.applyTimePickerState(parsedTime);
+            this.handleTableCellCommitValidation(
+                parsedTime ? '' : 'Неверный формат времени'
+            );
             this.emit(this.value);
         },
         openPicker() {
@@ -639,8 +666,20 @@ const TimeWidget = {
         },
         getValue() { return this.value; }
     },
+    watch: {
+        'widgetConfig.value': {
+            immediate: true,
+            handler(value) {
+                if (value === undefined) return;
+                if (this.tableCellMode && this.isFocused) return;
+                this.setValue(value);
+            }
+        }
+    },
     mounted() {
-        if (this.widgetConfig.default === 'now') {
+        if (this.widgetConfig.value !== undefined) {
+            this.setValue(this.widgetConfig.value);
+        } else if (this.widgetConfig.default === 'now') {
             const now = this.getNow();
             this.value = this.formatTime({ h: now.getHours(), m: now.getMinutes(), s: now.getSeconds(), hasSeconds: false }, { includeSeconds: false });
             this.syncTimePickerState(this.value);
@@ -656,8 +695,8 @@ const TimeWidget = {
 };
 
 const DateTimeWidget = {
-    mixins: [window.widgetMixin, dateTimeMixin],
-    components: { Md3Field: window.Md3Field },
+    mixins: [widgetMixin, dateTimeMixin],
+    components: { Md3Field },
     props: { widgetConfig: { type: Object, required: true }, widgetName: { type: String, required: true } },
     emits: ['input'],
     data() {
@@ -697,28 +736,30 @@ const DateTimeWidget = {
     },
     template: `
         <md3-field :widget-config="widgetConfig" :has-value="hasValue" :label-floats="labelFloats"
-                   :is-focused="isFocused" :wrap-extra="{ 'widget-dt': true, 'widget-dt--datetime': true }"
+                   :is-focused="isFocused" :wrap-extra="{ 'widget-dt': true, 'widget-dt--datetime': true, error: !!tableCellCommitError }"
                    :wrap-data="{ 'data-type': 'datetime' }" :has-supporting="!!widgetConfig.sup_text"
                    container-modifier="datetime">
-            <div class="widget-dt-host widget-dt-host--datetime" ref="pickerHost">
+            <div class="widget-dt-host widget-dt-host--datetime"
+                 v-bind="tableCellRootAttrs"
+                 ref="pickerHost">
                 <div class="widget-dt-inner widget-dt-inner--datetime">
                     <div class="widget-dt-segment widget-dt-segment--date" ref="dateAnchor">
-                        <input type="text" class="form-control widget-dt-input widget-dt-input--date" v-model="dateValue"
+                        <input type="text" class="form-control widget-dt-input widget-dt-input--date" data-table-editor-target="true" v-model="dateValue"
                                :disabled="widgetConfig.readonly" :tabindex="widgetConfig.readonly ? -1 : null"
                                @input="onDateInput" @focus="isFocused = true" @blur="onDateBlur">
                         <span class="widget-dt-icon-wrap">
-                            <span class="widget-dt-icon" role="button" tabindex="-1" aria-label="Выбрать дату"
+                            <span class="widget-dt-icon" data-table-action-trigger="date" role="button" tabindex="-1" aria-label="Выбрать дату"
                                   @click="openDatePicker" @mousedown.prevent>
                                 <img src="/templates/icons/calendar.svg" alt="">
                             </span>
                         </span>
                     </div>
                     <div class="widget-dt-segment widget-dt-segment--time" ref="timeAnchor">
-                        <input type="text" class="form-control widget-dt-input widget-dt-input--time" v-model="timeValue"
+                        <input type="text" class="form-control widget-dt-input widget-dt-input--time" data-table-editor-target="true" v-model="timeValue"
                                :disabled="widgetConfig.readonly" :tabindex="widgetConfig.readonly ? -1 : null"
                                @input="onTimeInput" @focus="isFocused = true" @blur="onTimeBlur">
                         <span class="widget-dt-icon-wrap">
-                            <span class="widget-dt-icon" role="button" tabindex="-1" aria-label="Выбрать время"
+                            <span class="widget-dt-icon" data-table-action-trigger="time" role="button" tabindex="-1" aria-label="Выбрать время"
                                   @click="openTimePicker" @mousedown.prevent>
                                 <img src="/templates/icons/clock.svg" alt="">
                             </span>
@@ -850,6 +891,7 @@ const DateTimeWidget = {
         },
         commitDateInput() {
             if (!this.dateValue) {
+                this.handleTableCellCommitValidation('');
                 this.syncValue();
                 return;
             }
@@ -857,10 +899,14 @@ const DateTimeWidget = {
             const { value, parsedDate } = this.normalizeDateInputValue(this.dateValue);
             this.dateValue = value;
             this.setCalendarViewFromDate(parsedDate);
+            this.handleTableCellCommitValidation(
+                parsedDate ? '' : 'Неверный формат даты'
+            );
             this.syncValue();
         },
         commitTimeInput() {
             if (!this.timeValue) {
+                this.handleTableCellCommitValidation('');
                 this.syncValue();
                 return;
             }
@@ -868,6 +914,9 @@ const DateTimeWidget = {
             const { value, parsedTime } = this.normalizeTimeInputValue(this.timeValue);
             this.timeValue = value;
             this.applyTimePickerState(parsedTime);
+            this.handleTableCellCommitValidation(
+                parsedTime ? '' : 'Неверный формат времени'
+            );
             this.syncValue();
         },
         openDatePicker() {
@@ -927,8 +976,20 @@ const DateTimeWidget = {
         },
         getValue() { return this.value; }
     },
+    watch: {
+        'widgetConfig.value': {
+            immediate: true,
+            handler(value) {
+                if (value === undefined) return;
+                if (this.tableCellMode && this.isFocused) return;
+                this.setValue(value);
+            }
+        }
+    },
     mounted() {
-        if (this.widgetConfig.default === 'now') {
+        if (this.widgetConfig.value !== undefined) {
+            this.setValue(this.widgetConfig.value);
+        } else if (this.widgetConfig.default === 'now') {
             const now = this.getNow();
             const time = { h: now.getHours(), m: now.getMinutes(), s: now.getSeconds(), hasSeconds: false };
             this.dateValue = this.formatDate(now);
@@ -946,6 +1007,4 @@ const DateTimeWidget = {
     }
 };
 
-window.DateWidget = DateWidget;
-window.TimeWidget = TimeWidget;
-window.DateTimeWidget = DateTimeWidget;
+export { DateWidget, TimeWidget, DateTimeWidget };

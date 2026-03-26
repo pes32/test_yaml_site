@@ -1,12 +1,16 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+    {% set debug_bundle = vite_entry_assets('src/entry/debug.ts') %}
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Debug</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-    <link href="{{ url_for('static', filename='css/fonts.css') }}?v={{ ASSETS_VERSION }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/style.css') }}?v={{ ASSETS_VERSION }}" rel="stylesheet">
+    {% if debug_bundle and debug_bundle.get('css') %}
+        {% for css_file in debug_bundle.get('css', []) %}
+    <link href="{{ url_for('static', filename='dist/' ~ css_file) }}" rel="stylesheet">
+        {% endfor %}
+    {% endif %}
 </head>
 <body>
     {% raw %}
@@ -19,6 +23,13 @@
         <div class="container-fluid mt-3">
             <div class="page-shell u-wide">
                 <div class="page-content-column u-wide">
+                <diagnostics-panel :diagnostics="diagnostics"></diagnostics-panel>
+                <error-panel
+                    v-for="entry in visibleErrors"
+                    :key="'debug-error-' + entry.scope"
+                    :error="entry.item"
+                    @dismiss="dismissScopeError(entry.scope)">
+                </error-panel>
                 <ul class="nav nav-tabs page-tabs" role="tablist">
                     <li class="nav-item">
                         <a class="nav-link" :class="{ active: activeTab === 0 }" href="#" role="tab" @click.prevent="activeTab = 0">API</a>
@@ -39,7 +50,7 @@
                         </div>
                         <div class="card-body">
                             <pre v-if="apiLoading" class="text-muted">Загрузка...</pre>
-                            <pre v-else-if="apiError" class="text-danger">{{ apiError }}</pre>
+                            <pre v-else-if="apiError" class="text-danger">{{ apiError.message }}</pre>
                             <pre v-else style="margin:0;white-space:pre-wrap;word-break:break-all">{{ apiText }}</pre>
                         </div>
                     </div>
@@ -52,7 +63,7 @@
                         </div>
                         <div class="card-body" style="max-height:70vh;overflow-y:auto">
                             <pre v-if="logsLoading && !logLines.length" class="text-muted">Загрузка...</pre>
-                            <pre v-else-if="logError" class="text-danger">{{ logError }}</pre>
+                            <pre v-else-if="logError" class="text-danger">{{ logError.message }}</pre>
                             <pre v-else style="margin:0;white-space:pre-wrap;word-break:break-all">{{ logText }}</pre>
                         </div>
                     </div>
@@ -64,7 +75,7 @@
                         </div>
                         <div class="card-body">
                             <pre v-if="pagesLoading" class="text-muted">Загрузка...</pre>
-                            <pre v-else-if="pagesError" class="text-danger">{{ pagesError }}</pre>
+                            <pre v-else-if="pagesError" class="text-danger">{{ pagesError.message }}</pre>
                             <div v-else class="pages-list">
                                 <div v-for="p in pages" :key="p.name" class="pages-line">
                                     {{ p.name }} {{ p.title }}
@@ -80,8 +91,8 @@
         </div>
     </div>
     {% endraw %}
-
-    <script src="{{ url_for('static', filename='js/vendor/vue.global.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/debug.js') }}?v={{ ASSETS_VERSION }}"></script>
+    {% if debug_bundle %}
+    <script type="module" src="{{ url_for('static', filename='dist/' ~ debug_bundle['file']) }}"></script>
+    {% endif %}
 </body>
 </html>

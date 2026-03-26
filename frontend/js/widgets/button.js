@@ -1,7 +1,13 @@
 // Виджет для кнопок (button)
 
+import { isFontIcon } from '../gui_parser.js';
+
 const ButtonWidget = {
-    inject: { getConfirmModal: { from: 'getConfirmModal', default: () => null } },
+    inject: {
+        getConfirmModal: { from: 'getConfirmModal', default: () => null },
+        openUiModal: { from: 'openUiModal', default: null },
+        closeUiModal: { from: 'closeUiModal', default: null }
+    },
     props: {
         widgetConfig: {
             type: Object,
@@ -64,7 +70,7 @@ const ButtonWidget = {
             return 'Кнопка';
         },
         iconStyle() {
-            if (!this.widgetConfig.icon || (window.GuiParser && window.GuiParser.isFontIcon(this.widgetConfig.icon))) {
+            if (!this.widgetConfig.icon || isFontIcon(this.widgetConfig.icon)) {
                 return {};
             }
             const size = Number(this.widgetConfig.size) || 24;
@@ -167,9 +173,8 @@ const ButtonWidget = {
             
             // Проверяем специальную команду для закрытия модального окна
             if (this.widgetConfig.command === 'CLOSE_MODAL') {
-                // Закрываем модальное окно через глобальный менеджер
-                if (this.$root.$refs.modalManager) {
-                    this.$root.$refs.modalManager.closeModal();
+                if (typeof this.closeUiModal === 'function') {
+                    this.closeUiModal();
                 }
                 return;
             }
@@ -177,10 +182,8 @@ const ButtonWidget = {
             // Проверяем, является ли команда UI-командой (содержит -ui)
             if (this.widgetConfig.command.includes(' -ui')) {
                 const modalName = this.widgetConfig.command.replace(' -ui', '').trim();
-                // Открываем модальное окно через глобальный менеджер
-                const mgr = (this.$root && this.$root.$refs && this.$root.$refs.modalManager) || window.modalManager;
-                if (mgr && typeof mgr.openModal === 'function') {
-                    mgr.openModal(modalName);
+                if (typeof this.openUiModal === 'function') {
+                    Promise.resolve(this.openUiModal(modalName)).catch(() => {});
                 }
                 return;
             }
@@ -216,5 +219,5 @@ const ButtonWidget = {
     }
 };
 
-// Регистрируем виджет глобально
-window.ButtonWidget = ButtonWidget;
+export { ButtonWidget };
+export default ButtonWidget;

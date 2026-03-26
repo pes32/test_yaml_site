@@ -1,10 +1,9 @@
 /**
  * Клавиатура редактируемой таблицы: цепочка обработчиков + диспетчер.
  */
-(function (global) {
-    'use strict';
+import tableEngine from './table_core.js';
 
-    const Core = global.TableWidgetCore || (global.TableWidgetCore = {});
+const Core = tableEngine;
 
     function callJump(vm, jumpRow, jumpCol, dr, dc) {
         const J = Core.Jump;
@@ -18,14 +17,62 @@
         return vm.editingCell;
     }
 
+    function findEmbeddedWidgetRoot(target) {
+        return target && target.closest
+            ? target.closest('[data-table-embedded-widget="true"]')
+            : null;
+    }
+
+    function normalizeConsumeKeys(root) {
+        if (!root) return [];
+        const raw = root.getAttribute('data-table-consume-keys') || '';
+        return String(raw)
+            .split(',')
+            .map((part) => part.trim().toLowerCase())
+            .filter(Boolean);
+    }
+
+    function consumeKeyMatches(token, key) {
+        if (!token || !key) return false;
+        if (token === 'enter') return key === 'Enter';
+        if (token === 'tab') return key === 'Tab';
+        if (token === 'arrows') {
+            return (
+                key === 'ArrowLeft' ||
+                key === 'ArrowRight' ||
+                key === 'ArrowUp' ||
+                key === 'ArrowDown'
+            );
+        }
+        return token === String(key || '').toLowerCase();
+    }
+
+    function embeddedWidgetConsumesKey(target, key) {
+        const root = findEmbeddedWidgetRoot(target);
+        if (!root) return false;
+        const consume = normalizeConsumeKeys(root);
+        for (let i = 0; i < consume.length; i++) {
+            if (consumeKeyMatches(consume[i], key)) return true;
+        }
+        return false;
+    }
+
     function handleTabNavigation(vm, event /* , ctx */) {
         if (event.key !== 'Tab') return false;
-        const lastRow = vm.tableData.length - 1;
-        const lastCol = vm.tableColumns.length - 1;
-        if (lastRow < 0 || lastCol < 0) return false;
         const ed = editFocus(vm);
         const r = ed ? ed.r : vm.selFocus.r;
         const c = ed ? ed.c : vm.selFocus.c;
+        if (typeof vm.navigateTableByTabFromCell === 'function') {
+            if (!vm.navigateTableByTabFromCell(r, c, !!event.shiftKey)) {
+                return false;
+            }
+            event.preventDefault();
+            Core.log('keydown Tab →', vm.selFocus.r, vm.selFocus.c);
+            return true;
+        }
+        const lastRow = tbodyRowCount(vm) - 1;
+        const lastCol = vm.tableColumns.length - 1;
+        if (lastRow < 0 || lastCol < 0) return false;
         let nr;
         let nc;
         if (event.shiftKey) {
@@ -55,8 +102,14 @@
         return true;
     }
 
+    function tbodyRowCount(vm) {
+        if (typeof vm.tbodyRowCount === 'function') return vm.tbodyRowCount();
+        return vm.tableData.length;
+    }
+
     function handleClipboardShortcuts(vm, event, ctx) {
         if (!vm.isEditable) return false;
+        if (vm.groupingActive || vm.tableUiLocked) return false;
         if (!(event.ctrlKey || event.metaKey) || event.altKey) return false;
         const k = event.key && String(event.key).toLowerCase();
         if (k !== 'c' && k !== 'x' && k !== 'v') return false;
@@ -112,6 +165,7 @@
     }
 
     function handleShiftSpaceFullRow(vm, event, ctx) {
+        if (vm.groupingActive || vm.tableUiLocked) return false;
         const row = ctx.row;
         const col = ctx.col;
         if (
@@ -153,8 +207,10 @@
     }
 
     function handleDeleteBackspace(vm, event /* , ctx */) {
+        if (vm.tableUiLocked) return false;
         if (event.key !== 'Delete' && event.key !== 'Backspace') return false;
         if (vm.isMultiCellSelection()) {
+            if (vm.groupingActive) return false;
             event.preventDefault();
             vm.clearSelectedCells();
             return true;
@@ -170,6 +226,7 @@
     }
 
     function handleRowInsertDeleteShortcuts(vm, event /* , ctx */) {
+        if (vm.groupingActive || vm.tableUiLocked) return false;
         const cmd = event.ctrlKey || event.metaKey;
         if (
             cmd &&
@@ -203,6 +260,7 @@
      * ctx приоритетнее selFocus при расхождении; без _tableFocusWithin не перехватываем.
      */
     function handleAltRowMoveDuplicate(vm, event) {
+        if (vm.groupingActive || vm.tableUiLocked) return false;
         if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return false;
         if (!event.altKey || event.ctrlKey || event.metaKey) return false;
 
@@ -311,7 +369,7 @@
         const col = ctx.col;
         if (event.key !== 'Enter') return false;
         event.preventDefault();
-        const lastRow = vm.tableData.length - 1;
+        const lastRow = tbodyRowCount(vm) - 1;
         const lastCol = vm.tableColumns.length - 1;
         if (vm.isCellEditing(row, col)) {
             vm.exitCellEdit();
@@ -340,6 +398,7 @@
 
     function handlePrintableReplace(vm, event, ctx) {
         const dropdownOpen = ctx.dropdownOpen;
+        if (vm.tableUiLocked) return false;
         if (
             vm.editingCell ||
             vm.isMultiCellSelection() ||
@@ -368,6 +427,7 @@
 
         const t = event.target;
         const cmdOrCtrl = event.metaKey || event.ctrlKey;
+        if (vm.groupingActive && cmdOrCtrl) return false;
         const isTextLikeInput =
             t.tagName === 'INPUT' &&
             ['text', 'search', 'tel', 'url', 'password'].includes(t.type || 'text');
@@ -492,7 +552,7 @@
         else if (event.key === 'ArrowDown') nextR = row + 1;
 
         if (nextC < 0 || nextC >= vm.tableColumns.length) return false;
-        if (nextR < 0 || nextR >= vm.tableData.length) return false;
+        if (nextR < 0 || nextR >= tbodyRowCount(vm)) return false;
 
         event.preventDefault();
         vm.exitCellEdit();
@@ -515,14 +575,14 @@
 
     function TableWidgetHandleKeydown(vm, event) {
         if (!vm.isEditable) return;
-        if (handleAltRowMoveDuplicate(vm, event)) return;
-
         const dom = Core.dom;
         const cell =
             dom && typeof dom.getCellFromEvent === 'function'
                 ? dom.getCellFromEvent(vm, event)
                 : null;
         if (!cell) return;
+        if (embeddedWidgetConsumesKey(event.target, event.key)) return;
+        if (handleAltRowMoveDuplicate(vm, event)) return;
 
         const dropdownOpen = cell.td.querySelector(
             '.dropdown.show, [data-dropdown-open="true"]'
@@ -540,4 +600,6 @@
     }
 
     Core.Keyboard.handleKeydown = TableWidgetHandleKeydown;
-})(typeof window !== 'undefined' ? window : this);
+
+export { TableWidgetHandleKeydown };
+export default Core.Keyboard;

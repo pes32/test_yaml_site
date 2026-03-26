@@ -19,6 +19,12 @@
     height: auto;
 }
 
+/* Раскрытая секция: без overflow:hidden — иначе thead таблицы не липнет к .page-tab-content */
+.page-section-card .collapse.show:not(.collapse-animating),
+.card .collapse.show:not(.collapse-animating) {
+    overflow: visible;
+}
+
 .page-section-card .collapse.collapse-animating,
 .card .collapse.collapse-animating {
     transition: height calc(var(--anim-ms) * 1ms) ease;
@@ -35,10 +41,10 @@
     min-height: var(--min-h-0);
 }
 
+/* Перебиваем overflow:hidden у .collapse-inner > * — иначе sticky thead не видит .page-tab-content */
 .collapse-inner > .page-section-body,
 .collapse-inner > .card-body {
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow: visible;
 }
 
 .collapse-inner .row,

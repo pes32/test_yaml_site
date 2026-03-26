@@ -60,7 +60,7 @@
     min-height: var(--icon-size);
     font-size: 0;
     line-height: 0;
-    background: transparent url("/templates/icons/close.svg") center / contain no-repeat;
+    background: transparent url("../../../templates/icons/close.svg") center / contain no-repeat;
 }
 
 .modal-header .ui-close-button::before {
@@ -120,15 +120,17 @@
     overflow: hidden;
 }
 
-/* Строка табов не участвует в прокрутке и не сжимается (фон как у .page-tabs в layout.css) */
+/* Как на странице: табы под контентом по z-index, чтобы липкие заголовки таблиц не прятались под полосой табов */
 .gui-modal .gui-modal-body-inner > .page-tabs {
     flex: 0 0 auto;
     position: relative;
-    z-index: 1;
+    z-index: var(--z-base);
 }
 
 /* Область контента вкладок забирает остаток высоты; скролл только внутри слоёв */
 .gui-modal .gui-modal-tab-pane-outer.page-tab-content {
+    position: relative;
+    z-index: var(--z-raised);
     flex: 1 1 0%;
     min-height: 0;
     min-width: 0;
@@ -164,6 +166,8 @@
     box-sizing: border-box;
     overflow-x: auto;
     overflow-y: auto;
+    /* Верх scrollport уже с отступом от табов (margin у .gui-modal-tab-stack), иначе унаследуется --page-gap от .page-tab-content--with-tabs */
+    --widget-table-sticky-top: 0px;
 }
 
 .gui-modal .gui-modal-tab-layer:not(.gui-modal-tab-layer--active) {
@@ -174,7 +178,7 @@
 .gui-modal .gui-modal-tab-layer--active {
     visibility: visible;
     pointer-events: auto;
-    z-index: 1;
+    z-index: var(--z-raised);
 }
 
 .gui-modal .gui-modal-tab-single {

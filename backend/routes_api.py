@@ -1,14 +1,16 @@
 # backend/routes_api.py
 """REST-эндпоинты, не относящиеся к debug-панели."""
+
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any, Callable
 
 from flask import jsonify, make_response, request
+from pydantic import ValidationError
 
-from .config import ConfigLoadError, PAGES_DIR, load_modal_gui_payload
+from .api_response import error_payload, success_payload
+from .contracts import ExecuteRequest, ExecuteResponse
 
 logger = logging.getLogger(__name__)
 META_KEYS = frozenset({"url", "title", "description"})
@@ -28,176 +30,294 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
             pass
         return resp
 
+    def _json_response(payload: dict[str, Any], status: int = 200):
+        return _no_cache(make_response(jsonify(payload), status))
+
+    def _snapshot():
+        return config_service.get_snapshot()
+
+    def _page_diagnostics(page_config: dict[str, Any]) -> list[dict[str, Any]]:
+        return list(page_config.get("diagnostics") or [])
+
     def _public_page_config(page_config: dict[str, Any]) -> dict[str, Any]:
-        result = {
-            key: value
-            for key, value in page_config.items()
-            if key != "attrs"
+        gui = page_config.get("gui") or {}
+        root_keys = page_config.get("guiMenuKeys")
+        if not isinstance(root_keys, list):
+            root_keys = [key for key in gui.keys() if key not in META_KEYS]
+
+        return {
+            "name": page_config.get("name"),
+            "url": page_config.get("url"),
+            "title": page_config.get("title"),
+            "gui": gui,
+            "guiMenuKeys": root_keys,
+            "modalGuiIds": page_config.get("modalGuiIds") or [],
         }
-        gui = (page_config.get("gui") or {})
-        if gui:
-            result["guiMenuKeys"] = [
-                k for k in gui.keys()
-                if k not in META_KEYS
-            ]
-        mids = page_config.get("modalGuiIds")
-        if mids:
-            result["modalGuiIds"] = mids
-        return result
+
+    def _page_payload(page_config: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "page": _public_page_config(page_config),
+            "attrs": page_config.get("attrs") or {},
+        }
 
     @app.route("/api/config")
     def api_get_config():
-        snapshot = config_service.get_snapshot()
-        return _no_cache(make_response(jsonify(snapshot)))
+        snapshot = _snapshot()
+        return _json_response(success_payload(data=snapshot, snapshot=snapshot))
 
     @app.route("/api/pages")
     def api_get_pages():
-        snapshot = config_service.get_snapshot()
+        snapshot = _snapshot()
         pages_list = [
             {
                 "name": name,
                 "title": cfg.get("title", name),
                 "url": cfg.get("url", f"/page/{name}"),
             }
-            for name, cfg in snapshot["pages"].items()
+            for name, cfg in snapshot.get("pages", {}).items()
         ]
-        return _no_cache(make_response(jsonify(pages_list)))
+        return _json_response(
+            success_payload(
+                data={"pages": pages_list},
+                snapshot=snapshot,
+            )
+        )
 
     @app.route("/api/page/<page_name>")
     def api_get_page(page_name):
-        page_config = config_service.get_page(page_name)
+        snapshot = _snapshot()
+        page_config = snapshot.get("pages", {}).get(page_name)
         if not page_config:
-            return _no_cache(make_response(jsonify({"error": "Страница не найдена"}), 404))
+            return _json_response(
+                error_payload(
+                    code="page_not_found",
+                    message="Страница не найдена",
+                    snapshot=snapshot,
+                ),
+                404,
+            )
 
-        return _no_cache(make_response(jsonify({
-            "page": _public_page_config(page_config),
-            "allAttrs": page_config.get("attrs", {}),
-        })))
+        return _json_response(
+            success_payload(
+                data=_page_payload(page_config),
+                snapshot=snapshot,
+                diagnostics=_page_diagnostics(page_config),
+            )
+        )
 
     @app.route("/api/attrs")
     def api_get_attrs():
+        snapshot = _snapshot()
         page_name = (request.args.get("page") or "").strip()
         if not page_name:
-            return _no_cache(make_response(jsonify({"error": "Не указан параметр page"}), 400))
+            return _json_response(
+                error_payload(
+                    code="page_required",
+                    message="Не указан параметр page",
+                    snapshot=snapshot,
+                ),
+                400,
+            )
 
-        page_config = config_service.get_page(page_name)
+        page_config = snapshot.get("pages", {}).get(page_name)
         if not page_config:
-            return _no_cache(make_response(jsonify({"error": "Страница не найдена"}), 404))
+            return _json_response(
+                error_payload(
+                    code="page_not_found",
+                    message="Страница не найдена",
+                    snapshot=snapshot,
+                ),
+                404,
+            )
 
-        page_attrs = page_config.get("attrs", {})
+        page_attrs = page_config.get("attrs") or {}
         names_param = request.args.get("names")
         if names_param:
-            requested = [n.strip() for n in names_param.split(",") if n.strip()]
-            subset = {n: page_attrs.get(n) for n in requested if n in page_attrs}
-            return _no_cache(make_response(jsonify(subset)))
+            requested = []
+            seen = set()
+            for raw_name in names_param.split(","):
+                name = raw_name.strip()
+                if not name or name in seen:
+                    continue
+                seen.add(name)
+                requested.append(name)
+            attrs = {name: page_attrs[name] for name in requested if name in page_attrs}
+            missing_names = [name for name in requested if name not in page_attrs]
+            resolved_names = list(attrs.keys())
+        else:
+            attrs = dict(page_attrs)
+            resolved_names = list(attrs.keys())
+            missing_names = []
 
-        return _no_cache(make_response(jsonify(page_attrs)))
+        data = {
+            "page": page_name,
+            "attrs": attrs,
+            "resolved_names": resolved_names,
+            "missing_names": missing_names,
+        }
+        return _json_response(
+            success_payload(
+                data=data,
+                snapshot=snapshot,
+                diagnostics=_page_diagnostics(page_config),
+            )
+        )
 
     @app.route("/api/modal-gui")
     def api_modal_gui():
-        """Ленивая загрузка разметки модалки из pages/<page>/modal_<id>.yaml."""
+        """Нормализованная ленивая загрузка модалки из snapshot страницы."""
+        snapshot = _snapshot()
         page_name = (request.args.get("page") or "").strip()
         modal_id = (request.args.get("id") or "").strip()
         if not page_name or not modal_id:
-            return _no_cache(make_response(jsonify({
-                "error": "Укажите query-параметры page и id",
-            }), 400))
+            return _json_response(
+                error_payload(
+                    code="modal_query_required",
+                    message="Укажите query-параметры page и id",
+                    snapshot=snapshot,
+                ),
+                400,
+            )
 
-        page_config = config_service.get_page(page_name)
+        page_config = snapshot.get("pages", {}).get(page_name)
         if not page_config:
-            return _no_cache(make_response(jsonify({"error": "Страница не найдена"}), 404))
+            return _json_response(
+                error_payload(
+                    code="page_not_found",
+                    message="Страница не найдена",
+                    snapshot=snapshot,
+                ),
+                404,
+            )
 
-        page_path = os.path.join(PAGES_DIR, page_name)
-        try:
-            payload = load_modal_gui_payload(page_path, modal_id)
-        except ConfigLoadError as exc:
-            logger.info("modal-gui: %s", exc)
-            return _no_cache(make_response(jsonify({
-                "error": str(exc),
-            }), 404))
+        modal = (page_config.get("modals") or {}).get(modal_id)
+        if not modal:
+            return _json_response(
+                error_payload(
+                    code="modal_not_found",
+                    message=f"Модалка '{modal_id}' не найдена",
+                    snapshot=snapshot,
+                    diagnostics=_page_diagnostics(page_config),
+                ),
+                404,
+            )
 
-        return _no_cache(make_response(jsonify(payload)))
+        page_attrs = page_config.get("attrs") or {}
+        widget_names = list(modal.get("widgetNames") or [])
+        attrs = {name: page_attrs[name] for name in widget_names if name in page_attrs}
+        missing_names = [name for name in widget_names if name not in page_attrs]
+        data = {
+            "page": page_name,
+            "modal": modal,
+            "attrs": attrs,
+            "resolved_names": list(attrs.keys()),
+            "missing_names": missing_names,
+            "dependencies": {
+                "widget_names": widget_names,
+            },
+        }
+        return _json_response(
+            success_payload(
+                data=data,
+                snapshot=snapshot,
+                diagnostics=_page_diagnostics(page_config),
+            )
+        )
 
     @app.route("/api/reload", methods=["POST"])
     def api_reload_config():
         try:
             result = config_service.force_reload()
             snapshot = result["snapshot"]
-            return _no_cache(make_response(jsonify({
-                "success": result["last_error"] is None,
+            data = {
                 "updated": result["updated"],
+                "page_count": len(snapshot.get("pages", {})),
+                "last_error": result["last_error"],
                 "message": (
                     "Snapshot конфигурации обновлён"
-                    if result["updated"]
-                    else "Изменений не найдено или сохранён предыдущий валидный snapshot"
+                    if result["last_error"] is None and result["updated"]
+                    else "Изменений не найдено, используется актуальный snapshot"
+                    if result["last_error"] is None
+                    else "Сохранён предыдущий валидный snapshot"
                 ),
-                "pagesCount": len(snapshot["pages"]),
-                "lastError": result["last_error"],
-            })))
-        except Exception as e:  # pragma: no cover
+                "meta": snapshot.get("meta") or {},
+            }
+            if result["last_error"] is None:
+                payload = success_payload(
+                    data=data,
+                    snapshot=snapshot,
+                    diagnostics=snapshot.get("diagnostics") or [],
+                )
+            else:
+                payload = error_payload(
+                    code="reload_failed",
+                    message=result["last_error"],
+                    snapshot=snapshot,
+                    diagnostics=snapshot.get("diagnostics") or [],
+                )
+            return _json_response(payload)
+        except Exception as exc:  # pragma: no cover
             logger.exception("Ошибка при принудительном обновлении конфигурации")
-            return _no_cache(make_response(jsonify({"success": False, "error": str(e)}), 500))
+            return _json_response(
+                error_payload(
+                    code="reload_failed_unexpected",
+                    message=str(exc),
+                    snapshot=_snapshot(),
+                ),
+                500,
+            )
 
     @app.route("/api/execute", methods=["POST"])
     def api_execute():
-        # silent=True — не генерировать 400 при пустом/битом JSON
+        snapshot = _snapshot()
         data = request.get_json(silent=True) or {}
-        command = str(data.get("command") or "").strip()
-        if not command:
-            return _no_cache(make_response(jsonify({
-                "success": False,
-                "code": "command_required",
-                "error": "Не указана команда для выполнения",
-                "message": "Не указана команда для выполнения",
-            }), 400))
+        try:
+            payload = ExecuteRequest.model_validate(data)
+        except ValidationError:
+            return _json_response(
+                error_payload(
+                    code="invalid_execute_request",
+                    message="Некорректное тело запроса execute",
+                    snapshot=snapshot,
+                ),
+                400,
+            )
 
-        params = data.get("params") or {}
-        if not isinstance(params, dict):
-            return _no_cache(make_response(jsonify({
-                "success": False,
-                "code": "invalid_params",
-                "error": "Параметр params должен быть JSON-объектом",
-                "message": "Параметр params должен быть JSON-объектом",
-            }), 400))
-
-        handler = COMMAND_HANDLERS.get(command)
+        handler = COMMAND_HANDLERS.get(payload.command)
         if handler is None:
-            return _no_cache(make_response(jsonify({
-                "success": False,
-                "code": "command_not_found",
-                "error": f"Команда '{command}' не зарегистрирована на бэкенде",
-                "message": f"Команда '{command}' не зарегистрирована на бэкенде",
-                "command": command,
-                "params": params,
-                "page": data.get("page"),
-                "widget": data.get("widget"),
-                "availableCommands": sorted(COMMAND_HANDLERS.keys()),
-            }), 404))
+            return _json_response(
+                error_payload(
+                    code="command_not_found",
+                    message=f"Команда '{payload.command}' не зарегистрирована на бэкенде",
+                    snapshot=snapshot,
+                ),
+                404,
+            )
 
         try:
-            result = handler({
-                "command": command,
-                "params": params,
-                "page": data.get("page"),
-                "widget": data.get("widget"),
-                "output_attrs": data.get("output_attrs") or [],
-            }) or {}
+            result = handler(payload.model_dump(by_alias=True)) or {}
         except Exception as exc:  # pragma: no cover
-            logger.exception("Ошибка выполнения backend-команды '%s'", command)
-            return _no_cache(make_response(jsonify({
-                "success": False,
-                "code": "command_failed",
-                "error": str(exc),
-                "message": f"Ошибка выполнения команды '{command}'",
-                "command": command,
-            }), 500))
+            logger.exception("Ошибка выполнения backend-команды '%s'", payload.command)
+            return _json_response(
+                error_payload(
+                    code="command_failed",
+                    message=str(exc) or f"Ошибка выполнения команды '{payload.command}'",
+                    snapshot=snapshot,
+                ),
+                500,
+            )
 
-        return _no_cache(make_response(jsonify({
-            "success": True,
-            "command": command,
-            "params": params,
-            "page": data.get("page"),
-            "widget": data.get("widget"),
-            "message": result.get("message") or f"Команда '{command}' выполнена",
-            "data": result.get("data"),
-        })))
+        response_data = ExecuteResponse(
+            command=payload.command,
+            params=payload.params,
+            page=payload.page,
+            widget=payload.widget,
+            message=result.get("message") or f"Команда '{payload.command}' выполнена",
+            data=result.get("data"),
+        )
+        return _json_response(
+            success_payload(
+                data=response_data.model_dump(),
+                snapshot=snapshot,
+            )
+        )

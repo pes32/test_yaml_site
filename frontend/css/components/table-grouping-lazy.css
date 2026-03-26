@@ -1,0 +1,34 @@
+/* components/table-grouping-lazy.css — grouping rows, locked state, lazy-loading helpers */
+
+.widget-table-container--locked {
+    position: relative;
+    pointer-events: none;
+    opacity: var(--table-locked-opacity);
+}
+
+.widget-table td.widget-table__group-row {
+    cursor: pointer;
+    background-color: var(--color-bg-muted);
+    font-weight: var(--fw-semibold);
+    user-select: none;
+    padding-left: calc(var(--table-cell-padding-x) + var(--widget-table-group-depth, 0) * var(--space-lg));
+}
+
+.widget-table__group-toggle {
+    display: inline-block;
+    width: var(--table-group-toggle-width);
+    text-align: center;
+    margin-right: var(--space-xs);
+    font-family: monospace;
+}
+
+.widget-table__group-label {
+    vertical-align: middle;
+}
+
+.widget-table__lazy-sentinel .widget-table__lazy-hint {
+    font-size: var(--table-lazy-hint-font-size);
+    color: var(--color-text-muted);
+    padding: var(--space-sm) var(--space-md);
+    border-top: 1px dashed var(--color-border);
+}

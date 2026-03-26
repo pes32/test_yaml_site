@@ -48,4 +48,5 @@ const ImgWidget = {
     }
 };
 
-window.ImgWidget = ImgWidget;
+export { ImgWidget };
+export default ImgWidget;

@@ -1,16 +1,46 @@
 // Общий миксин для полевых виджетов: валидация и единый формат emit
 
 const widgetMixin = {
+    inject: {
+        showAppNotification: {
+            from: 'showAppNotification',
+            default: null
+        }
+    },
     data() {
         return {
             intError: '',
-            floatError: ''
+            floatError: '',
+            tableCellCommitError: ''
         };
     },
     computed: {
+        tableCellMode() {
+            return !!(
+                this.widgetConfig && this.widgetConfig.table_cell_mode === true
+            );
+        },
+        tableCellRootAttrs() {
+            if (!this.tableCellMode) return {};
+            const attrs = {
+                'data-table-embedded-widget': 'true'
+            };
+            const consume =
+                this.widgetConfig && this.widgetConfig.table_consume_keys;
+            if (consume) {
+                attrs['data-table-consume-keys'] = String(consume);
+            }
+            return attrs;
+        },
         /** Собирает все ошибки поля (regex, int, float) для отображения. */
         fieldError() {
-            return this.regexError || this.intError || this.floatError || '';
+            return (
+                this.regexError ||
+                this.intError ||
+                this.floatError ||
+                this.tableCellCommitError ||
+                ''
+            );
         }
     },
     methods: {
@@ -37,8 +67,44 @@ const widgetMixin = {
                 value,
                 config: this.widgetConfig
             });
+        },
+        showWidgetNotification(message, type = 'danger') {
+            if (typeof this.showAppNotification === 'function') {
+                this.showAppNotification(message, type);
+                return;
+            }
+
+            const root = this.$root;
+            if (root && typeof root.showNotification === 'function') {
+                root.showNotification(message, type);
+            }
+        },
+        syncTableCellValidationState(message) {
+            const handler =
+                this.widgetConfig &&
+                this.widgetConfig.table_cell_validation_handler;
+            if (typeof handler !== 'function') return;
+            try {
+                handler(String(message || '').trim());
+            } catch (e) {
+                /* best effort */
+            }
+        },
+        handleTableCellCommitValidation(message) {
+            const errorMessage = String(message || '').trim();
+            if (!this.tableCellMode) {
+                this.tableCellCommitError = '';
+                return errorMessage === '';
+            }
+            this.tableCellCommitError = errorMessage;
+            this.syncTableCellValidationState(errorMessage);
+            if (errorMessage) {
+                this.showWidgetNotification(errorMessage, 'danger');
+            }
+            return errorMessage === '';
         }
     }
 };
 
-window.widgetMixin = widgetMixin;
+export { widgetMixin };
+export default widgetMixin;

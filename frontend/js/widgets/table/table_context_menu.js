@@ -1,10 +1,9 @@
 /**
  * Контекстное меню таблицы: пункты (icon, label, kbd, visible, disabled, separatorBefore).
  */
-(function (global) {
-    'use strict';
+import tableEngine from './table_core.js';
 
-    const Core = global.TableWidgetCore || (global.TableWidgetCore = {});
+const Core = tableEngine;
 
     function isApplePlatform() {
         return (
@@ -77,6 +76,14 @@
      * @param {number} p.numCols
      * @param {boolean} p.headerSortEnabled
      * @param {boolean} p.isEditingCell — v1: при true move/duplicate скрыты (согласовано с клавиатурой)
+     * @param {boolean} [p.groupingActive]
+     * @param {boolean} [p.tableUiLocked]
+     * @param {boolean} [p.isFullyLoaded]
+     * @param {number} [p.groupingLevelsLen]
+     * @param {boolean} [p.groupingCanAddLevel] — предрасчёт из table grouping runtime
+     * @param {boolean} [p.stickyHeaderEnabled]
+     * @param {boolean} [p.wordWrapEnabled]
+     * @param {object|null} [p.headerColumn]
      */
     function buildMenuItems(p) {
         const target = p.target || {};
@@ -89,49 +96,135 @@
         const rowKbd = rowShortcutsKbd();
         const alt = altLabel(isApple);
         const isEditingCell = !!p.isEditingCell;
+        const groupingActive = !!p.groupingActive;
+        const tableUiLocked = !!p.tableUiLocked;
+        const isFullyLoaded = p.isFullyLoaded !== false;
+        const gLevelsLen = p.groupingLevelsLen | 0;
+        const stickyHeaderEnabled = !!p.stickyHeaderEnabled;
+        const wordWrapEnabled = !!p.wordWrapEnabled;
+        const G = Core.Grouping;
+        const canAddComputed =
+            G && typeof G.canAddGroupingLevel === 'function'
+                ? G.canAddGroupingLevel(nCols, gLevelsLen)
+                : false;
+        const canAddLevel = p.groupingCanAddLevel !== undefined ? !!p.groupingCanAddLevel : canAddComputed;
+        const headerColumn = p.headerColumn || null;
+        const isLineNumberHeader = !!(
+            headerColumn &&
+            (headerColumn.isLineNumber === true ||
+                headerColumn.type === 'line_number')
+        );
 
-        if (target.kind === 'header' && p.headerSortEnabled && nCols > 0) {
+        if (target.kind === 'header' && nCols > 0) {
             const col = snap.headerCol;
-            const activeHere =
-                snap.sortColumnIndex != null && snap.sortColumnIndex === col;
-            const items = [
-                {
-                    id: 'sort_asc',
-                    icon: 'sort.svg',
-                    iconClass: 'widget-table-ctx__sort-asc',
-                    label: 'По возрастанию',
-                    kbd: '',
-                    visible: true,
-                    disabled: false,
-                    separatorBefore: false
-                },
-                {
-                    id: 'sort_desc',
-                    icon: 'sort.svg',
-                    label: 'По убыванию',
-                    kbd: '',
-                    visible: true,
-                    disabled: false,
-                    separatorBefore: false
-                },
-                {
-                    id: 'sort_reset',
+            const items = [];
+            const hasSortBlock = !!(p.headerSortEnabled && col != null && col >= 0);
+            const canToggleSticky = col != null && col >= 0;
+            let placedSepBeforeGroupingBlock = false;
+            function separatorBeforeGroupingBlock() {
+                if (placedSepBeforeGroupingBlock) return false;
+                placedSepBeforeGroupingBlock = true;
+                return items.length > 0;
+            }
+            if (hasSortBlock) {
+                const skList = Array.isArray(snap.sortKeys) ? snap.sortKeys : [];
+                const activeHere = skList.some((x) => x && x.col === col);
+                items.push(
+                    {
+                        id: 'sort_asc',
+                        icon: 'sort.svg',
+                        iconClass: 'widget-table-ctx__sort-asc',
+                        label: 'По возрастанию',
+                        kbd: '',
+                        visible: true,
+                        disabled: false,
+                        separatorBefore: false
+                    },
+                    {
+                        id: 'sort_desc',
+                        icon: 'sort.svg',
+                        label: 'По убыванию',
+                        kbd: '',
+                        visible: true,
+                        disabled: false,
+                        separatorBefore: false
+                    },
+                    {
+                        id: 'sort_reset',
+                        icon: null,
+                        label: 'Сбросить',
+                        kbd: '',
+                        visible: true,
+                        disabled: !activeHere,
+                        separatorBefore: false
+                    }
+                );
+            }
+            if (canToggleSticky) {
+                items.push({
+                    id: 'toggle_sticky_header',
                     icon: null,
-                    label: 'Сбросить',
+                    label: stickyHeaderEnabled ? 'Открепить заголовки' : 'Закрепить заголовки',
                     kbd: '',
                     visible: true,
-                    disabled: !activeHere,
-                    separatorBefore: true
-                }
-            ];
-            return normalizeMenuSeparators(items);
+                    disabled: tableUiLocked,
+                    separatorBefore: items.length > 0
+                });
+                items.push({
+                    id: 'toggle_word_wrap',
+                    icon: null,
+                    label: wordWrapEnabled
+                        ? 'Отключить перенос по словам'
+                        : 'Перенос по словам',
+                    kbd: '',
+                    visible: true,
+                    disabled: tableUiLocked,
+                    separatorBefore: false
+                });
+            }
+            if (isLineNumberHeader) {
+                items.push({
+                    id: 'recalculate_line_numbers',
+                    icon: null,
+                    label: 'Пересчитать нумерацию',
+                    kbd: '',
+                    visible: true,
+                    disabled: tableUiLocked,
+                    separatorBefore: items.length > 0
+                });
+            }
+            if (col != null && col >= 0 && canAddLevel && !isLineNumberHeader) {
+                const dup = snap.groupingLevelsSnapshot && snap.groupingLevelsSnapshot.indexOf(col) >= 0;
+                items.push({
+                    id: 'group_add_level',
+                    icon: 'grouping.svg',
+                    label: 'Группировка',
+                    kbd: '',
+                    visible: true,
+                    disabled: tableUiLocked || dup,
+                    separatorBefore: separatorBeforeGroupingBlock()
+                });
+            }
+            if (groupingActive) {
+                items.push({
+                    id: 'group_clear',
+                    icon: null,
+                    label: 'Снять группировку',
+                    kbd: '',
+                    visible: true,
+                    disabled: tableUiLocked,
+                    separatorBefore: separatorBeforeGroupingBlock()
+                });
+            }
+            if (items.length > 0) return normalizeMenuSeparators(items);
         }
 
         const bodyMode = snap.bodyMode;
         const rowMode = bodyMode === 'row';
         const cellLike = bodyMode === 'cell' || bodyMode === 'cells';
-        const canAddRows = (rowMode || cellLike) && nCols > 0;
-        const canDeleteRow = rowMode && nCols > 0;
+        const canAddRows =
+            (rowMode || cellLike) && nCols > 0 && !groupingActive && !tableUiLocked;
+        const canDeleteRow = rowMode && nCols > 0 && !groupingActive && !tableUiLocked;
 
         const items = [];
 
@@ -172,13 +265,16 @@
 
         /* v1 ordering contract: add above/below → delete → move up/down → duplicate above/below → clipboard */
         const anchorRow = snap.anchorRow | 0;
-        const rowMoveOk = rowMoveDuplicateOpsAllowed({
-            isEditable: !!p.isEditable,
-            tableDataLength: len,
-            numCols: nCols,
-            bodyMode: bodyMode,
-            isEditingCell: isEditingCell
-        });
+        const rowMoveOk =
+            !groupingActive &&
+            !tableUiLocked &&
+            rowMoveDuplicateOpsAllowed({
+                isEditable: !!p.isEditable,
+                tableDataLength: len,
+                numCols: nCols,
+                bodyMode: bodyMode,
+                isEditingCell: isEditingCell
+            });
         if (rowMoveOk) {
             items.push(
                 {
@@ -221,6 +317,7 @@
             );
         }
 
+        const clipOk = !groupingActive && !tableUiLocked;
         items.push(
             {
                 id: 'copy',
@@ -228,7 +325,7 @@
                 label: 'Копировать',
                 kbd: mod + 'C',
                 visible: true,
-                disabled: nCols === 0 || len === 0,
+                disabled: nCols === 0 || len === 0 || !clipOk,
                 separatorBefore: items.length > 0
             },
             {
@@ -237,7 +334,7 @@
                 label: 'Вырезать',
                 kbd: mod + 'X',
                 visible: true,
-                disabled: nCols === 0 || len === 0,
+                disabled: nCols === 0 || len === 0 || !clipOk,
                 separatorBefore: false
             },
             {
@@ -246,7 +343,7 @@
                 label: 'Вставить',
                 kbd: mod + 'V',
                 visible: true,
-                disabled: nCols === 0 || len === 0,
+                disabled: nCols === 0 || len === 0 || !clipOk,
                 separatorBefore: false
             },
             {
@@ -255,7 +352,7 @@
                 label: 'Очистить',
                 kbd: 'Del',
                 visible: true,
-                disabled: nCols === 0 || len === 0,
+                disabled: nCols === 0 || len === 0 || !clipOk,
                 separatorBefore: false
             }
         );
@@ -271,4 +368,14 @@
         normalizeMenuSeparators,
         buildMenuItems
     };
-})(typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : this);
+
+export {
+    altLabel,
+    buildMenuItems,
+    isApplePlatform,
+    modLabel,
+    normalizeMenuSeparators,
+    rowMoveDuplicateOpsAllowed
+};
+
+export default Core.ContextMenu;

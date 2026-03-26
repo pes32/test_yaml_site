@@ -2,10 +2,9 @@
  * Прыжок по стрелкам с Cmd/Ctrl как в Excel: вдоль строки/столбца
  * по непрерывному блоку заполненных или пустых ячеек.
  */
-(function (global) {
-    'use strict';
+import tableEngine from './table_core.js';
 
-    const Core = global.TableWidgetCore || (global.TableWidgetCore = {});
+const Core = tableEngine;
     const clamp =
         (Core.Utils && Core.Utils.clamp) ||
         function (v, min, max) {
@@ -14,8 +13,9 @@
 
     function cellValue(tableData, row, col) {
         const r = tableData[row];
-        if (!Array.isArray(r)) return '';
-        return r[col];
+        const U = Core.Utils;
+        const cells = U && U.getRowCells ? U.getRowCells(r) : Array.isArray(r) ? r : [];
+        return cells[col];
     }
 
     function isEmpty(tableData, tableColumns, row, col, listMultiFn) {
@@ -146,4 +146,6 @@
     }
 
     Core.Jump = { jumpTarget, isEmpty, buildJumpOpts };
-})(typeof window !== 'undefined' ? window : this);
+
+export { buildJumpOpts, isEmpty, jumpTarget };
+export default Core.Jump;

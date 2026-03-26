@@ -1,184 +1,95 @@
 # YAML System
 
-Система для создания интерфейсов через YAML конфигурацию.
+YAML-driven UI система на Flask + Vue 3, где backend собирает versioned snapshot конфигурации, а frontend работает только через Vite bundle и нормализованные API-контракты.
 
-## Описание
+## Что в проекте сейчас
 
-Система позволяет создавать веб-интерфейсы, описывая их структуру и поведение в YAML файлах. Поддерживаются различные типы виджетов, динамическая валидация, и выполнение команд.
+- backend собирает `AppSnapshot` из YAML-страниц, attrs-фрагментов и модалок;
+- HTML страницы отдают bootstrap envelope через `<script id="page-data">`;
+- frontend стартует только через Vite entrypoints из `tooling/vite/`;
+- UI не зависит от `window.*`-глобалов, ручного порядка `<script>` и legacy payload shape;
+- transport-формат API нормализуется в одном месте: `frontend/js/runtime/api_client.js`.
 
-## Структура проекта
+## Быстрый запуск
 
-```
-test_site/
-├── app.py                  # Точка входа (Flask), debug без reloader, host=127.0.0.1
-├── backend/                # Бэкенд-приложение (Flask)
-│   ├── __init__.py         # Создание app, инициализация ConfigService, регистрация маршрутов
-│   ├── config.py           # Загрузка YAML страниц и сбор snapshot конфигурации
-│   ├── config_service.py   # Live-updating snapshot по mtime
-│   ├── logging_setup.py    # Логирование в logs/app.log с ротацией
-│   ├── routes_api.py       # /api/* (config, pages, page/<name>, attrs, reload, execute)
-│   ├── routes_pages.py     # HTML-страницы приложения
-│   ├── routes_debug.py     # /debug и /api/debug/* (structure, modules, logs, routes)
-│   └── routes_static.py    # /templates/icons/* и /favicon.ico
-├── frontend/               # Фронтенд-ассеты, раздаются по /frontend (url_for('static', ...))
-│   ├── css/
-│   │   ├── style.css       # Точка входа: @import tokens, base, ui, layout, components/*, widgets, utilities
-│   │   ├── tokens.css      # Дизайн-токены
-│   │   ├── fonts.css       # Подключение в page.html отдельно
-│   │   └── components/     # table.css, modal.css, dropdown.css, datetime.css, …
-│   └── js/
-│       ├── page.js         # Логика страниц, ленивые загрузки по вкладкам
-│       ├── debug.js        # Панель отладки (списки файлов/маршрутов, REST-тестер)
-│       ├── gui_parser.js   # Разбор GUI YAML во Vue-компоненты
-│       ├── widgets.js      # Рендерер виджетов + ModalManager
-│       └── widgets/        # Модульные виджеты
-│           ├── button.js
-│           ├── confirm_modal.js
-│           ├── datetime_widgets.js
-│           ├── factory.js
-│           ├── float.js
-│           ├── img.js
-│           ├── int.js
-│           ├── ip_widgets.js
-│           ├── list.js
-│           ├── mixin.js
-│           ├── md3_field.js
-│           ├── string.js
-│           ├── table/      # виджет table (общий namespace TableWidgetCore)
-│           │   ├── table_core.js       # window.TableWidgetCore: DEBUG, log, dom.getCellFromEvent, заготовки модулей
-│           │   ├── table_jump.js       # Cmd/Ctrl+стрелки по блокам ячеек (как в Excel)
-│           │   ├── table_parse_attrs.js # разбор table_attrs → tableColumns, headerRows
-│           │   ├── table_utils.js      # clamp, cloneTableData, safeCellValue, …
-│           │   ├── table_format.js     # форматирование чисел/отображение ячеек
-│           │   ├── table_sort.js       # сравнение ячеек для сортировки
-│           │   ├── table_clipboard.js  # TSV serialize/deserialize
-│           │   ├── table_context_menu.js
-│           │   ├── table_selection.js  # SelectionMethods → methods виджета
-│           │   ├── table_keyboard.js   # Keyboard.handleKeydown
-│           │   ├── table_widget_helpers.js # WidgetMeasure, WidgetUiCoords
-│           │   └── table_widget.js     # компонент Vue; registerTableWidget(factory)
-│           └── text.js
-├── pages/                  # Страницы системы (YAML), URL = имя папки
-│   ├── main/
-│   ├── 1_ui_demo/
-│   ├── 2_widget_demo/      # демо виджетов (attrs_table.yaml, modal_gui.yaml, …)
-│   └── about_author/
-├── templates/              # HTML шаблоны
-│   ├── debug.html          # Панель отладки
-│   ├── page.html           # Шаблон страницы (порядок подключения скриптов, в т.ч. table/*)
-│   └── icons/              # SVG иконки для кнопок и UI
-├── logs/
-│   └── app.log             # Лог приложения с ротацией
-├── requirements.txt        # Python зависимости
-└── start.sh                # Скрипт запуска (активация venv и python app.py)
+Установите Python-зависимости:
+
+```bash
+python3 -m pip install -r requirements.txt
 ```
 
-## Установка и запуск
+Установите frontend-зависимости:
 
-1. Установите зависимости:
-   ```bash
-   python3 -m pip install -r requirements.txt
-   ```
+```bash
+npm --prefix tooling/vite install
+```
 
-2. Запустите приложение (через скрипт или напрямую):
-   ```bash
-   ./start.sh
-   # или
-   python3 app.py
-   ```
-   По умолчанию сервер слушает 127.0.0.1:8000, reloader отключён.
+Запустите локальную сборку и Flask:
 
-3. Откройте в браузере:
-   - Главная страница: http://localhost:8000/
-   - Панель отладки: http://localhost:8000/debug
+```bash
+./start.sh
+```
 
-## Создание новых страниц
+По умолчанию `start.sh`:
 
-1. Создайте папку в директории `pages/` с именем страницы
-2. Добавьте один файл `gui.yaml` с описанием интерфейса страницы
-3. Добавьте любое количество `attrs`-фрагментов в той же папке страницы
+- активирует `.venv`;
+- собирает frontend через Vite;
+- запускает Flask на `http://127.0.0.1:8000`.
 
-Правила загрузки:
+Полезные переменные:
 
-- На одну страницу должен приходиться ровно один `gui.yaml` или `gui.yml`
-- Все остальные `*.yaml` / `*.yml` в папке страницы считаются attrs-фрагментами, **кроме** файлов **`modal_<id>.yaml`** (разметка модальных окон)
-- Модалки: файл `pages/<страница>/modal_<id>.yaml`, где `<id>` совпадает с префиксом команды кнопки до ` -ui` (пример: `modal_gui.yaml` → `command: modal_gui -ui`). Подгрузка при открытии: `GET /api/modal-gui`. Формат файла: **один ключ в стиле gui** (`любой_префикс "Заголовок окна":` и далее список), **или корень — список**, **или** `{ name?, icon?, content: [ ... ] }`. В основном `gui.yaml` модалку можно не дублировать (встроенный блок по-прежнему имеет приоритет в кэше, если есть).
-- Snapshot конфигурации обновляется автоматически по `mtime` YAML-файлов
-- Flask routes не перерегистрируются: URL страниц резолвятся через актуальный snapshot
+```bash
+LOWCODE_SKIP_VITE_BUILD=1 ./start.sh
+LOWCODE_FLASK_RELOADER=1 ./start.sh
+LOWCODE_FLASK_PORT=8001 ./start.sh
+```
 
-Если в YAML есть синтаксическая ошибка, она попадает в лог, а приложение продолжает работать на последнем валидном snapshot.
+## Frontend workflow
 
-## Ленивые загрузки
+Проверка типов:
 
-- Атрибуты загружаются в контексте текущей страницы и не смешиваются между страницами.
-- Страница может дозагружать attrs для активного меню/вкладки и модальных окон, но запрос всегда ограничен текущей страницей.
-- Частичная выборка доступна через параметр `names`:
-  ```
-  GET /api/attrs?page=<имя_страницы>&names=name1,name2,name3
-  ```
+```bash
+npm --prefix tooling/vite run typecheck
+```
 
-## Доступные виджеты
+Production/build bundle:
 
-Типы по умолчанию регистрируются в [frontend/js/widgets/factory.js](frontend/js/widgets/factory.js). Виджет **table** подключается отдельно вызовом `registerTableWidget(widgetFactory)` из [table_widget.js](frontend/js/widgets/table/table_widget.js) после создания фабрики.
+```bash
+npm --prefix tooling/vite run build
+```
 
-- **str** — строковое поле ввода
-- **int** — целочисленное поле с валидацией
-- **float** — поле для дробных чисел
-- **text** — многострочное текстовое поле
-- **list** — выпадающий список (single/multi select)
-- **ip** — поле для IP-адреса
-- **ip_mask** — поле для IP с маской подсети
-- **datetime** — выбор даты и времени
-- **date** — только дата
-- **time** — только время
-- **img** — изображение по URL или пути
-- **button** — кнопка (url, command, dialog, icon)
-- **table** — таблица данных: редактирование (по умолчанию), `readonly: true`, полосы строк `zebra` (по умолчанию вкл.), сортировка по заголовкам (по умолчанию вкл.; **`sort: false`** отключает), минимальное число строк при загрузке **`row: N`** (пустые строки дополняются при инициализации и `setValue`). Логика разнесена по `widgets/table/*` и объединена в **`window.TableWidgetCore`** (в т.ч. Utils, Jump, Format, Sort, Clipboard, ContextMenu, Keyboard, SelectionMethods, `parseTableAttrs`, `dom`, `WidgetMeasure`, `WidgetUiCoords`). Порядок скриптов в [templates/page.html](templates/page.html): **`table_core.js` → `table_jump.js` → `table_parse_attrs.js` → `table_utils.js` → `table_format.js` → `table_sort.js` → `table_clipboard.js` → `table_context_menu.js` → `table_selection.js` → `table_keyboard.js` → `table_widget_helpers.js` → `table_widget.js`**. Отладочный лог таблицы: в консоли `TableWidgetCore.DEBUG = true`. Пример: [pages/2_widget_demo/attrs_table.yaml](pages/2_widget_demo/attrs_table.yaml).
+Flask использует manifest из `frontend/dist/.vite/manifest.json`. Legacy fallback больше нет: если bundle не собран, приложение не должно считаться готовым к запуску.
 
-### Параметры виджета button
+## Валидация конфигурации
 
-Типы кнопок:
-- **icon-only** — только иконка: `icon`, `hint` (подсказка), без `label`; `size` задаёт иконку, внешний квадрат без `width` масштабируется пропорционально эталону 24px→40px; явный `width` — размер кнопки (бордер-бокс)
-- **icon+text** — иконка и текст: `icon`, `label`
-- **text-only** — только текст: `label`
+Проверить YAML без запуска UI:
 
-- **label** — текст кнопки (для icon+text и text-only)
-- **hint** — подсказка при наведении (для icon-only)
-- **sup_text** — дополнительный текст под виджетом
-- **command** — команда (в т.ч. `NAME -ui` для модалки)
-- **url** — URL для перехода (приоритет над command)
-- **dialog** — диалог подтверждения
-- **icon** — файл в `templates/icons/` или FontAwesome класс
-- **size** — размер иконки в px (по умолчанию 24)
-- **width** — для icon-only: явный размер кнопки в px; если не задан, выводится от `size` с теми же пропорциями отступов, что у 24→40
-- **output_attrs** — атрибуты для передачи в команде
+```bash
+python3 -m backend.tools.validate_config
+python3 -m backend.tools.validate_config --json
+```
 
-## API Endpoints
+## Архитектура
 
-- `GET  /api/config` — полная конфигурация системы
-- `GET  /api/pages` — список доступных страниц
-- `GET  /api/page/<name>` — конфигурация конкретной страницы
-- `GET  /api/attrs?page=<name>` — все attrs указанной страницы
-- `GET  /api/attrs?page=<name>&names=a,b,c` — выборка указанных attrs в рамках страницы
-- `GET  /api/modal-gui?page=<name>&id=<modal_id>` — ленивая загрузка YAML модалки (`modal_<id>.yaml` в папке страницы)
-- `POST /api/execute` — выполнение команд (тело JSON: `{ "command": "...", "params": {...} }`)
-- `POST /api/reload` — принудительная проверка YAML и обновление snapshot без мутаций Flask routes
-- `GET  /api/debug/structure` — список файлов проекта (yaml/py/js)
-- `GET  /api/debug/modules` — список загруженных модулей Python
-- `GET  /api/debug/logs` — последние строки лога
-- `GET  /api/debug/routes` — список зарегистрированных API-маршрутов
+- `backend/` — snapshot builder, API, debug routes, CLI tools
+- `pages/` — исходные YAML-страницы
+- `frontend/js/runtime/` — bootstrap parser, API client, flow-модули, stores, error/diagnostics model
+- `frontend/js/widgets/` — widget registry и feature-виджеты
+- `frontend/js/widgets/table/` — table subsystem без глобальных namespace
+- `tooling/vite/` — Vite + TypeScript contracts + entrypoints
+- `templates/` — HTML шаблоны, подключающие только Vite bundles
+- `docs/` — актуальные архитектурные и контрактные описания
 
-Дополнительно:
-- `GET /templates/icons/<name.svg>` — отдача SVG-иконок
-- `GET /favicon.ico` — favicon из `frontend/`
+## Документация
 
-## Особенности
+- [docs/runtime-architecture.md](docs/runtime-architecture.md) — финальная runtime-архитектура frontend/backend
+- [docs/api-contracts.md](docs/api-contracts.md) — transport и domain-контракты API
+- [docs/table-subsystem.md](docs/table-subsystem.md) — устройство table feature
+- [docs/yaml-dsl.md](docs/yaml-dsl.md) — правила YAML DSL и backend normalization
 
-- Live-updating snapshot конфигурации по `mtime`
-- Постраничный scope attrs
-- Ленивые загрузки attrs для меню, вкладок и модалок в пределах одной страницы
+## Production notes
 
-## Примечания по разработке
-
-- Логи пишутся в `logs/app.log` с ротацией.
-- Статические файлы в каталоге `frontend/`. В шаблонах используется `url_for('static', filename=...)` — Flask отдаёт URL вида `/frontend/...`.
+- выключайте debug routes через `LOWCODE_ENV=production` или `LOWCODE_ENABLE_DEBUG_ROUTES=0`;
+- перед выкладкой прогоняйте `python3 -m backend.tools.validate_config`;
+- frontend bundle должен собираться заранее командой `npm --prefix tooling/vite run build`;
+- для production используйте normal WSGI/server process, а не dev-server Flask.

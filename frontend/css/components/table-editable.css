@@ -1,0 +1,184 @@
+/* components/table-editable.css — editable cells, embedded widgets, selection/focus intersections */
+
+.widget-table--editable .cell-input {
+    display: block;
+    width: 100%;
+    padding: var(--zero);
+    margin: var(--zero);
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    font: inherit;
+    line-height: var(--lh-lg);
+    height: var(--lh-lg);
+    min-height: var(--lh-lg);
+    color: inherit;
+    box-sizing: border-box;
+}
+
+/*
+ * Focus ring for native editors is rendered by the owning table cell via
+ * inline cellSelectionOutlineStyle() in table_selection.js.
+ */
+.widget-table--editable .cell-input:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+.widget-table--editable .cell-input.cell-input--view {
+    pointer-events: none;
+}
+
+.widget-table--editable select.cell-input {
+    padding-right: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background: transparent;
+}
+
+.widget-table--editable .widget-container {
+    margin: var(--zero);
+    padding: var(--zero);
+    background: transparent;
+    border: var(--zero);
+}
+
+.widget-table--editable .cell-editor-wrap {
+    width: 100%;
+}
+
+.widget-table--editable .cell-editor-wrap > * {
+    width: 100%;
+    min-width: 0;
+}
+
+.widget-table--editable [data-table-embedded-widget="true"] {
+    width: 100%;
+    min-width: 0;
+}
+
+.widget-table--editable [data-table-embedded-widget="true"].widget-dropdown {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+}
+
+.widget-table--editable input[data-table-embedded-widget="true"],
+.widget-table--editable [data-table-embedded-widget="true"] .form-control {
+    min-height: var(--lh-lg);
+    height: var(--lh-lg);
+    padding-top: 0;
+    padding-bottom: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    line-height: var(--lh-lg);
+    box-sizing: border-box;
+    font: inherit;
+    color: inherit;
+}
+
+.widget-table--editable input[data-table-embedded-widget="true"] {
+    width: 100%;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.widget-table--editable [data-table-embedded-widget="true"] .list-combobox-input {
+    width: 100%;
+    max-width: 100%;
+    padding: 0 var(--dropdown-arrow-space) 0 var(--space-md);
+}
+
+.widget-table--editable [data-table-embedded-widget="true"] .widget-dt-input {
+    width: auto;
+    padding: 0 var(--zero) 0 var(--space-md);
+}
+
+.widget-table--editable [data-table-embedded-widget="true"] .widget-dt-input--date {
+    min-width: var(--widget-dt-date-mask-w);
+    width: var(--widget-dt-date-mask-w);
+}
+
+.widget-table--editable [data-table-embedded-widget="true"] .widget-dt-input--time {
+    min-width: var(--widget-dt-time-mask-w);
+    width: var(--widget-dt-time-mask-w);
+    padding-left: var(--space-xs);
+    padding-right: 0;
+}
+
+.widget-table--editable [data-table-embedded-widget="true"] .list-combobox-inner,
+.widget-table--editable [data-table-embedded-widget="true"] .widget-dt-inner,
+.widget-table--editable [data-table-embedded-widget="true"] .widget-dt-segment {
+    min-height: var(--lh-lg);
+    height: var(--lh-lg);
+}
+
+.widget-table--editable [data-table-embedded-widget="true"] .widget-dt-inner,
+.widget-table--editable [data-table-embedded-widget="true"] .widget-dt-segment {
+    width: auto;
+}
+
+.widget-table--editable [data-table-embedded-widget="true"] .widget-dt-host--datetime .widget-dt-segment--time {
+    padding-left: var(--space-xs);
+}
+
+.widget-table--editable [data-table-embedded-widget="true"] .list-combobox-arrow-wrap {
+    background: transparent;
+}
+
+.widget-table--editable tbody td:not(.widget-table__group-row) > span {
+    display: block;
+    min-height: var(--lh-lg);
+    line-height: var(--lh-lg);
+}
+
+.widget-table--word-wrap.widget-table--editable tbody td:not(.widget-table__group-row) > span.widget-table__cell-value {
+    min-height: 0;
+    line-height: var(--table-word-wrap-line-height);
+}
+
+.widget-table--editable .widget-container .widget-label {
+    display: none;
+}
+
+.widget-table--editable .widget-ip {
+    padding: var(--zero);
+    margin: var(--zero);
+    border: none;
+    border-radius: var(--zero);
+    background: transparent;
+    box-shadow: none;
+    font: inherit;
+    line-height: inherit;
+    height: auto;
+    color: inherit;
+}
+
+/* Embedded IP widgets keep visible focus on the owning field wrapper / table cell. */
+.widget-table--editable .widget-ip:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+/* Контур выделения задаётся inline (cellSelectionOutlineStyle) — единый стиль для 1 ячейки, блока и строки целиком. */
+.widget-table--editable tbody td.widget-table__td-focusable:focus {
+    outline: none;
+}
+
+/* Якорь мультивыделения — пунктир внутри ячейки (не заменяет boxShadow контура). */
+.widget-table--editable tbody td.widget-table__cell--sel-anchor::after {
+    content: '';
+    position: absolute;
+    inset: var(--table-selection-anchor-inset);
+    border: 1px dashed var(--widget-table-cell-outline-color, var(--table-focus-ring-color));
+    border-radius: var(--radius-sm);
+    pointer-events: none;
+    z-index: var(--table-selection-anchor-z);
+}
+
+.widget-table--editable .cell-editor-wrap--inactive {
+    pointer-events: none;
+    user-select: none;
+}

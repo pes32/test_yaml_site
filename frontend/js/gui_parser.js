@@ -1,7 +1,6 @@
-(function () {
-    const META_KEYS = new Set(['url', 'title']);
-    const raw = getComputedStyle(document.documentElement).getPropertyValue('--anim-ms');
-    const COLLAPSE_ANIM_MS = raw ? parseInt(String(raw).trim(), 10) : 350;
+const META_KEYS = new Set(['url', 'title']);
+const raw = getComputedStyle(document.documentElement).getPropertyValue('--anim-ms');
+const COLLAPSE_ANIM_MS = raw ? parseInt(String(raw).trim(), 10) : 350;
 
     function parseDynamicKey(rawKey) {
         const key = String(rawKey || '').trim();
@@ -461,18 +460,35 @@
         return modal;
     }
 
-    window.GuiParser = {
-        parseDynamicKey: parseDynamicKey,
-        parsePageGui: parsePageGui,
-        parseModalPayload: parseModalPayload,
-        getMenuSections: getMenuSections,
-        collectWidgetNamesFromSections: collectWidgetNamesFromSections,
-        collectWidgetNamesFromMenu: collectWidgetNamesFromMenu,
-        collectWidgetNamesFromModal: collectWidgetNamesFromModal,
-        isFontIcon: isFontIcon,
-        getIconSrc: getIconSrc,
-        onIconError: onIconError,
-        getActiveSections: getActiveSections,
-        COLLAPSE_ANIM_MS
-    };
-})();
+const GuiParser = {
+    parseDynamicKey,
+    parsePageGui,
+    parseModalPayload,
+    getMenuSections,
+    collectWidgetNamesFromSections,
+    collectWidgetNamesFromMenu,
+    collectWidgetNamesFromModal,
+    isFontIcon,
+    getIconSrc,
+    onIconError,
+    getActiveSections,
+    COLLAPSE_ANIM_MS
+};
+
+export {
+    COLLAPSE_ANIM_MS,
+    GuiParser,
+    collectWidgetNamesFromMenu,
+    collectWidgetNamesFromModal,
+    collectWidgetNamesFromSections,
+    getActiveSections,
+    getIconSrc,
+    getMenuSections,
+    isFontIcon,
+    onIconError,
+    parseDynamicKey,
+    parseModalPayload,
+    parsePageGui
+};
+
+export default GuiParser;

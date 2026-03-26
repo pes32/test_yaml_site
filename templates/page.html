@@ -1,17 +1,21 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+    {% set page_bundle = vite_entry_assets('src/entry/page.ts') %}
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>YAML System - {{ page_config.title if page_config.title else (page_config.name if page_config.name else 'main') }}</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-    <link href="{{ url_for('static', filename='css/fonts.css') }}?v={{ ASSETS_VERSION }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/style.css') }}?v={{ ASSETS_VERSION }}" rel="stylesheet">
+    {% if page_bundle and page_bundle.get('css') %}
+        {% for css_file in page_bundle.get('css', []) %}
+    <link href="{{ url_for('static', filename='dist/' ~ css_file) }}" rel="stylesheet">
+        {% endfor %}
+    {% endif %}
 </head>
-<body>
+<body data-page-name="{{ page_config.name }}">
     <div id="app">
         <!-- Глобальный модальный менеджер -->
-        <modal-manager ref="modalManager" @execute="executeCommand" @input="onWidgetInput"></modal-manager>
+        <modal-manager @execute="executeCommand" @input="onWidgetInput"></modal-manager>
         <!-- Диалог подтверждения -->
         <confirm-modal ref="confirmModal"></confirm-modal>
         
@@ -41,7 +45,29 @@
                 </aside>
 
                 <main class="page-content-column u-wide">
-                    <div v-if="activeMenu" class="page-main-stack">
+                    <diagnostics-panel
+                        :diagnostics="diagnostics"
+                        :snapshot-version="snapshotVersion">
+                    </diagnostics-panel>
+
+                    <error-panel
+                        v-if="pageError"
+                        :error="pageError"
+                        @dismiss="dismissPageError">
+                    </error-panel>
+
+                    <error-panel
+                        v-for="(item, index) in appErrors"
+                        :key="'app-error-' + index + '-' + item.scope + '-' + item.message"
+                        :error="item"
+                        @dismiss="dismissAppError(index)">
+                    </error-panel>
+
+                    <div v-if="blockingPageError" class="page-empty-placeholder">
+                        Не удалось подготовить страницу для отображения. Проверь diagnostics и runtime-ошибки выше.
+                    </div>
+
+                    <div v-else-if="activeMenu" class="page-main-stack">
                         <ul v-if="activeTabs.length > 1" ref="pageTabs" class="nav nav-tabs page-tabs" :class="{ 'page-tabs--focused': tabsFocused }" id="mainTabs" role="tablist" @focusin="tabsFocused = true" @focusout="onTabsFocusOut">
                             <li class="nav-item" v-for="(tab, index) in activeTabs" :key="index">
                                 <a class="nav-link"
@@ -55,7 +81,7 @@
                             </li>
                         </ul>
 
-                        <div class="tab-content page-tab-content u-wide" :class="{ 'page-tab-content--with-tabs': activeTabs.length > 1 }" id="mainTabContent">
+                        <div ref="pageScrollRoot" class="tab-content page-tab-content u-wide" :class="{ 'page-tab-content--with-tabs': activeTabs.length > 1 }" id="mainTabContent">
                             <div class="tab-pane active show u-wide">
                                 <section-card
                                     v-for="(section, sidx) in activeSections"
@@ -104,43 +130,12 @@
             </transition>
         </div>
     </div>
-
-    <script src="{{ url_for('static', filename='js/vendor/vue.global.js') }}?v={{ ASSETS_VERSION }}"></script>
     <!-- Передаем данные страницы без смешивания Jinja и JS -->
     <script id="page-data" type="application/json">
-        {{ {"pageConfig": page_config, "allAttrs": all_attrs} | tojson }}
+        {{ page_bootstrap | tojson }}
     </script>
-    <script>
-        window.pageData = JSON.parse(document.getElementById('page-data').textContent);
-    </script>
-    <!-- Загружаем виджеты: сначала миксин и базовая обёртка, затем виджеты -->
-    <script src="{{ url_for('static', filename='js/widgets/mixin.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets/md3_field.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets/string.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets/int.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets/float.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets/list.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets/ip_widgets.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets/datetime_widgets.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets/text.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets/table/table_core.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets/table/table_jump.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets/table/table_parse_attrs.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets/table/table_utils.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets/table/table_format.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets/table/table_sort.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets/table/table_clipboard.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets/table/table_context_menu.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets/table/table_selection.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets/table/table_keyboard.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets/table/table_widget_helpers.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets/table/table_widget.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets/button.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets/img.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/gui_parser.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets/confirm_modal.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets/factory.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/widgets.js') }}?v={{ ASSETS_VERSION }}"></script>
-    <script src="{{ url_for('static', filename='js/page.js') }}?v={{ ASSETS_VERSION }}"></script>
+    {% if page_bundle %}
+    <script type="module" src="{{ url_for('static', filename='dist/' ~ page_bundle['file']) }}"></script>
+    {% endif %}
 </body>
 </html>

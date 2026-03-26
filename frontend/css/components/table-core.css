@@ -1,0 +1,279 @@
+/* components/table-core.css — widget-table base box, sticky contract, shared cell display */
+
+.widget-table-container {
+    position: relative;
+    max-width: 100%;
+}
+
+/*
+ * Do not add overflow to the table wrapper:
+ * any overflow-x/y here creates a new scroll container and breaks the sticky-header contract.
+ * Horizontal scroll for wide tables belongs to .page-tab-content / .gui-modal-tab-layer.
+ */
+.widget-table-wrapper {
+    max-width: 100%;
+    min-width: 0;
+}
+
+/* Specialized table layer on top of the generic .table rules from ui.css. */
+.widget-table {
+    width: auto;
+    border-collapse: collapse;
+    table-layout: fixed;
+    margin-top: var(--space-sm);
+}
+
+/* Без width в YAML: ширина определяется суммой колонок / естественной шириной, а не растягивается на весь контейнер. */
+.widget-table:not(.widget-table--explicit-width) {
+    min-width: 0;
+}
+
+/* С width в YAML: ширина и table-layout задаются inline — не тянуть min-width по содержимому. */
+.widget-table.widget-table--explicit-width {
+    min-width: 0;
+}
+
+.widget-table th,
+.widget-table td {
+    padding: var(--table-cell-padding-y) var(--table-cell-padding-x);
+    border: 1px solid var(--color-border);
+    text-align: left;
+    white-space: normal;
+    position: relative;
+}
+
+/* collapse + sticky на th/td в таблицах не поддерживается — отдельная сетка границ только для sticky. */
+.widget-table--sticky-header {
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid var(--color-border);
+}
+
+.widget-table--sticky-header th,
+.widget-table--sticky-header td {
+    border: none;
+    border-right: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.widget-table--sticky-header thead th:last-child,
+.widget-table--sticky-header tbody td:last-child {
+    border-right: none;
+}
+
+.widget-table--sticky-header tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/*
+ * Липкий заголовок: sticky_header в YAML -> класс widget-table--sticky-header + JS в table_widget.js.
+ * Отступ сверху читает JS из --widget-table-sticky-top на активном scroll root.
+ */
+.widget-table--sticky-header thead th {
+    background-color: var(--color-bg-muted);
+    background-clip: padding-box;
+    box-shadow: var(--table-header-shadow);
+}
+
+/*
+ * Fixed sticky clone intentionally keeps auto stacking.
+ * Explicit z-index here changes interaction with page tabs and modal overlays.
+ */
+.widget-table__sticky-overlay {
+    position: fixed;
+    margin-top: 0;
+    pointer-events: auto;
+}
+
+.widget-table__thead--js-source-hidden {
+    visibility: hidden;
+}
+
+.widget-table__cell-display {
+    display: flex;
+    align-items: center;
+    gap: var(--table-cell-display-gap);
+    position: relative;
+    width: 100%;
+    min-width: 0;
+    min-height: var(--lh-lg);
+    box-sizing: border-box;
+}
+
+.widget-table__cell-display--actionable {
+    gap: 0;
+}
+
+.widget-table__cell-value {
+    display: block;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    box-sizing: border-box;
+}
+
+.widget-table__cell-display-text {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: var(--lh-lg);
+    box-sizing: border-box;
+}
+
+.widget-table__cell-display-text--ip,
+.widget-table__cell-display-text--ip_mask {
+    font-family: var(--font-mono);
+    letter-spacing: 0.1em;
+}
+
+.widget-table__cell-display-text--date,
+.widget-table__cell-display-text--time,
+.widget-table__cell-display-text--datetime {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+}
+
+.widget-table__cell-actions {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--table-cell-action-gap);
+    flex: 0 0 auto;
+}
+
+.widget-table__cell-actions--list {
+    right: 1px;
+    min-width: var(--dropdown-arrow-space);
+    justify-content: center;
+    gap: 0;
+}
+
+.widget-table__cell-actions--date,
+.widget-table__cell-actions--time {
+    min-width: var(--widget-dt-icon-slot-w);
+    justify-content: center;
+}
+
+.widget-table__cell-actions--datetime {
+    min-width: calc((var(--widget-dt-icon-slot-w) * 2) + var(--table-cell-action-gap));
+    justify-content: center;
+}
+
+.widget-table__cell-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--table-action-size);
+    height: var(--table-action-size);
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: transparent;
+    color: var(--color-text-muted);
+    cursor: pointer;
+}
+
+.widget-table__cell-action:focus {
+    outline: none;
+}
+
+.widget-table__cell-action:focus-visible {
+    box-shadow: 0 0 0 var(--table-focus-ring-width) var(--table-focus-ring-color);
+    border-radius: var(--radius-sm);
+}
+
+.widget-table__cell-action:hover {
+    color: var(--color-text-main);
+}
+
+.widget-table__cell-action--readonly {
+    cursor: default;
+    opacity: var(--table-readonly-action-opacity);
+}
+
+.widget-table__cell-action svg,
+.widget-table__cell-action img {
+    display: block;
+    width: var(--table-action-icon-size);
+    height: var(--table-action-icon-size);
+}
+
+.widget-table__cell-action--list {
+    width: var(--dropdown-arrow-space);
+    height: var(--lh-lg);
+    color: var(--color-text-main);
+}
+
+.widget-table__cell-action--list svg {
+    width: var(--table-action-size);
+    height: var(--table-action-size);
+    transform: rotate(180deg);
+    transition: transform calc(var(--anim-ms) * 1ms) ease;
+}
+
+.widget-table__cell-action--date,
+.widget-table__cell-action--time {
+    width: var(--table-action-size-emphasis);
+    height: var(--table-action-size-emphasis);
+    border-radius: 50%;
+    color: var(--color-text-main);
+}
+
+.widget-table__cell-action--date:focus-visible,
+.widget-table__cell-action--time:focus-visible {
+    border-radius: 50%;
+}
+
+.widget-table__cell-action--date:hover,
+.widget-table__cell-action--time:hover {
+    background: var(--color-accent-soft);
+    color: var(--color-text-dark);
+}
+
+.widget-table__cell-action--date img,
+.widget-table__cell-action--time img {
+    width: var(--table-action-icon-size-lg);
+    height: var(--table-action-icon-size-lg);
+}
+
+.widget-table--word-wrap .widget-table__cell-display {
+    align-items: flex-start;
+}
+
+.widget-table--word-wrap .widget-table__cell-value,
+.widget-table--word-wrap .widget-table__cell-display-text {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    line-height: var(--table-word-wrap-line-height);
+}
+
+.widget-table tbody tr:nth-of-type(odd) {
+    background-color: var(--color-bg-stripe);
+}
+
+.widget-table tbody tr:nth-of-type(even) {
+    background-color: var(--color-bg);
+}
+
+/* zebra: false — без чередования фона строк */
+.widget-table--no-zebra tbody tr:nth-of-type(odd),
+.widget-table--no-zebra tbody tr:nth-of-type(even) {
+    background-color: var(--color-bg);
+}
+
+.widget-table tbody tr:hover {
+    background-color: var(--color-table-hover);
+}

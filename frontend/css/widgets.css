@@ -1,6 +1,7 @@
 /* widgets.css — widget containers, validation, media, and row-level widget layout */
 
 .widget-container {
+    display: block;
     margin-bottom: var(--space-md);
 }
 
@@ -48,11 +49,8 @@
     color: var(--color-muted);
 }
 
-/* Row layout */
+/* Row layout: block (не inline-block — в Chromium ломается цепочка к scrollport для липких/фиксированных thead). */
 .row .col-auto .widget-container {
-    display: inline-block;
-    width: auto;
-    vertical-align: top;
     margin-bottom: var(--space-sm);
 }
 
@@ -89,24 +87,33 @@
     width: 100%;
 }
 
+.widget-container--textarea,
 .widget-container--textarea .md3-field,
-.widget-container--textarea .md3-textarea-wrap {
-    max-width: none;
+.widget-container--textarea .md3-field-wrap--textarea,
+.widget-container--textarea .md3-textarea-wrap,
+.widget-container--textarea textarea {
+    max-width: 100%;
 }
 
 .widget-container--textarea .md3-field {
     width: fit-content;
-    min-width: 100%;
+    min-width: min(var(--widget-textarea-base-width, var(--widget-field-w)), 100%);
 }
 
 .row .col-auto .widget-container--textarea .md3-field {
-    width: var(--widget-field-w);
+    width: fit-content;
 }
 
+.widget-container--textarea .md3-field-wrap--textarea,
+.widget-container--textarea .md3-textarea-wrap,
 .row .col-auto .widget-container--textarea .md3-field-wrap--textarea,
 .row .col-auto .widget-container--textarea .md3-textarea-wrap {
-    width: 100%;
+    width: fit-content;
     min-width: 100%;
+}
+
+.widget-container--textarea textarea {
+    width: var(--widget-textarea-inner-width, calc(var(--widget-textarea-base-width, var(--widget-field-w)) - 2px));
 }
 
 .widget-container--textarea.widget-explicit-width .md3-field-wrap {

@@ -4,6 +4,7 @@
 from flask import send_from_directory
 import logging
 import os
+from werkzeug.exceptions import NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +21,10 @@ def register_static_routes(app):
         """Отдаёт SVG-иконки из каталога templates/icons."""
         try:
             return send_from_directory(icons_dir, filename, mimetype="image/svg+xml")
+        except NotFound:
+            raise
         except Exception as exc:  # pragma: no cover
-            logger.error("Ошибка при загрузке иконки %s: %s", filename, exc)
+            logger.exception("Ошибка при загрузке иконки %s", filename)
             return f"Ошибка загрузки иконки: {exc}", 500
 
     @app.route("/templates/<path:filename>")
@@ -29,8 +32,10 @@ def register_static_routes(app):
         """Отдаёт файлы (изображения и пр.) из каталога templates."""
         try:
             return send_from_directory(templates_dir, filename)
+        except NotFound:
+            raise
         except Exception as exc:  # pragma: no cover
-            logger.error("Ошибка при загрузке файла %s: %s", filename, exc)
+            logger.exception("Ошибка при загрузке файла %s", filename)
             return f"Ошибка загрузки: {exc}", 500
 
     # favicon в корне — переброс к файлу во frontend
@@ -46,4 +51,3 @@ def register_static_routes(app):
         ext = os.path.splitext(filename)[1].lower()
         mime = {".ttf": "font/ttf", ".woff": "font/woff", ".woff2": "font/woff2"}.get(ext)
         return send_from_directory(webfonts_dir, filename, mimetype=mime)
-

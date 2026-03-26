@@ -1,10 +1,9 @@
 /**
  * Методы выделения ячеек для TableWidget (подмешиваются в methods).
  */
-(function (global) {
-    'use strict';
+import tableEngine from './table_core.js';
 
-    const Core = global.TableWidgetCore || (global.TableWidgetCore = {});
+const Core = tableEngine;
     const clamp =
         (Core.Utils && Core.Utils.clamp) ||
         function (v, min, max) {
@@ -79,9 +78,27 @@
             return r >= r0 && r <= r1 && c >= c0 && c <= c1;
         },
         cellSelectionOutlineStyle(r, c) {
-            if (!this.isEditable || !this.isCellInSelection(r, c)) return {};
-            /* Не рисовать рамку выделения до первого реального фокуса внутри таблицы (см. _tableFocusWithin). */
-            if (!this._tableFocusWithin) return {};
+            const hasError =
+                typeof this.cellHasCommitError === 'function' &&
+                this.cellHasCommitError(r, c);
+            const inSelection = this.isEditable && this.isCellInSelection(r, c);
+            const selectionVisible = inSelection && this._tableFocusWithin;
+            if (!selectionVisible && !hasError) return {};
+            const color = hasError
+                ? 'var(--bs-danger, #dc3545)'
+                : 'var(--focus-color)';
+            const style = {
+                '--widget-table-cell-outline-color': color
+            };
+            if (!selectionVisible) {
+                style.boxShadow = [
+                    `inset 0 2px 0 0 ${color}`,
+                    `inset 0 -2px 0 0 ${color}`,
+                    `inset 2px 0 0 0 ${color}`,
+                    `inset -2px 0 0 0 ${color}`
+                ].join(', ');
+                return style;
+            }
             const { r0, r1, c0, c1 } = this.getSelRect();
             const multi = this.isMultiCellSelection();
             const fw =
@@ -92,15 +109,19 @@
                     ? 3
                     : 2;
             const parts = [];
-            if (r === r0) parts.push(`inset 0 ${fw}px 0 0 var(--focus-color)`);
-            if (r === r1) parts.push(`inset 0 -${fw}px 0 0 var(--focus-color)`);
-            if (c === c0) parts.push(`inset ${fw}px 0 0 0 var(--focus-color)`);
-            if (c === c1) parts.push(`inset -${fw}px 0 0 0 var(--focus-color)`);
-            return { boxShadow: parts.join(', ') };
+            if (r === r0) parts.push(`inset 0 ${fw}px 0 0 ${color}`);
+            if (r === r1) parts.push(`inset 0 -${fw}px 0 0 ${color}`);
+            if (c === c0) parts.push(`inset ${fw}px 0 0 0 ${color}`);
+            if (c === c1) parts.push(`inset -${fw}px 0 0 0 ${color}`);
+            style.boxShadow = parts.join(', ');
+            return style;
         },
         cellTdClass(row, col) {
             return {
                 'widget-table__td-focusable': this.isEditable,
+                'widget-table__cell--error':
+                    typeof this.cellHasCommitError === 'function' &&
+                    this.cellHasCommitError(row, col),
                 'widget-table__cell--sel-anchor':
                     this.isEditable &&
                     this.isMultiCellSelection() &&
@@ -124,18 +145,34 @@
             return r0 === r1 && r0 === r && c0 === 0 && c1 === n - 1;
         },
         emptyCellValueForColumn(colIndex) {
+            if (typeof this.blankCellValueForColumn === 'function') {
+                return this.blankCellValueForColumn(colIndex);
+            }
             const column = this.tableColumns[colIndex];
             if (this.listColumnIsMultiselect(column)) return [];
             return '';
         },
         clearSelectedCells() {
+            const U = Core.Utils;
+            const getCells = U && U.getRowCells;
             const { r0, r1, c0, c1 } = this.getSelRect();
             for (let r = r0; r <= r1; r++) {
-                const updatedRow = [...this.tableData[r]];
+                const row = this.tableData[r];
+                const base = getCells ? [...getCells(row)] : [...(Array.isArray(row) ? row : [])];
                 for (let c = c0; c <= c1; c++) {
-                    updatedRow[c] = this.emptyCellValueForColumn(c);
+                    if (
+                        typeof this.canMutateColumnIndex === 'function' &&
+                        !this.canMutateColumnIndex(c)
+                    ) {
+                        continue;
+                    }
+                    base[c] = this.emptyCellValueForColumn(c);
                 }
-                this.tableData.splice(r, 1, updatedRow);
+                if (row && typeof row === 'object' && row.id != null && !Array.isArray(row)) {
+                    this.tableData.splice(r, 1, { id: row.id, cells: base });
+                } else {
+                    this.tableData.splice(r, 1, base);
+                }
             }
             this.onInput();
         },
@@ -152,4 +189,5 @@
             return true;
         }
     };
-})(typeof window !== 'undefined' ? window : this);
+
+export default Core.SelectionMethods;

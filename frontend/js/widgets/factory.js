@@ -1,5 +1,16 @@
 // Фабрика виджетов для Vue.js
 
+import StringWidget from './string.js';
+import IntWidget from './int.js';
+import FloatWidget from './float.js';
+import ListWidget from './list.js';
+import { IpMaskWidget, IpWidget } from './ip_widgets.js';
+import { DateTimeWidget, DateWidget, TimeWidget } from './datetime_widgets.js';
+import TextWidget from './text.js';
+import ButtonWidget from './button.js';
+import ImgWidget from './img.js';
+import TableWidget from './table/index.js';
+
 const DEFAULT_WIDGET_REGISTRY = Object.freeze([
     ['str', StringWidget],
     ['int', IntWidget],
@@ -12,7 +23,8 @@ const DEFAULT_WIDGET_REGISTRY = Object.freeze([
     ['time', TimeWidget],
     ['text', TextWidget],
     ['button', ButtonWidget],
-    ['img', ImgWidget]
+    ['img', ImgWidget],
+    ['table', TableWidget]
 ]);
 
 class WidgetFactory {
@@ -48,13 +60,7 @@ class WidgetFactory {
     }
 }
 
-// Создаем глобальный экземпляр фабрики
 const widgetFactory = new WidgetFactory();
 
-if (typeof window.registerTableWidget === 'function') {
-    window.registerTableWidget(widgetFactory);
-}
-
-// Экспорт для браузера
-window.WidgetFactory = WidgetFactory;
-window.widgetFactory = widgetFactory;
+export { DEFAULT_WIDGET_REGISTRY, WidgetFactory, widgetFactory };
+export default widgetFactory;

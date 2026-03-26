@@ -2,11 +2,10 @@
  * Чистые хелперы для table_widget: автоширина заголовков, геометрия меню/вставки, путь к иконке ПКМ.
  * Загрузка: после table_keyboard.js, до table_widget.js.
  */
-(function (global) {
-    'use strict';
+import tableEngine from './table_core.js';
 
-    const C = global.TableWidgetCore;
-    if (!C) return;
+const globalScope = typeof window !== 'undefined' ? window : globalThis;
+const C = tableEngine;
 
     let _measureCanvas = null;
     let _measureCtx = null;
@@ -22,6 +21,26 @@
     C.WidgetMeasure = {
         headerSortAffordancePx(widgetConfig) {
             return widgetConfig && widgetConfig.sort === false ? 0 : 26;
+        },
+
+        normalizeWidthToPx(width) {
+            const raw = String(width == null ? '' : width).trim();
+            if (!raw) return null;
+            const match = raw.match(/^(\d+(?:\.\d+)?)(px)?$/i);
+            if (!match) return null;
+            const value = Number(match[1]);
+            return Number.isFinite(value) ? value : null;
+        },
+
+        sumColumnWidthsPx(columns) {
+            if (!Array.isArray(columns) || !columns.length) return null;
+            let total = 0;
+            for (const column of columns) {
+                const px = this.normalizeWidthToPx(column && column.width);
+                if (px == null) return null;
+                total += px;
+            }
+            return total > 0 ? `${Math.ceil(total)}px` : null;
         },
 
         computeAutoWidth(label, sortExtra, tableEl) {
@@ -75,11 +94,11 @@
         },
 
         clampMenuPosition(event) {
-            const x = (event.clientX || 0) + (global.scrollX || 0);
-            const y = (event.clientY || 0) + (global.scrollY || 0);
+            const x = (event.clientX || 0) + (globalScope.scrollX || 0);
+            const y = (event.clientY || 0) + (globalScope.scrollY || 0);
             const pad = 8;
-            const w = typeof global.innerWidth === 'number' ? global.innerWidth : 800;
-            const h = typeof global.innerHeight === 'number' ? global.innerHeight : 600;
+            const w = typeof globalScope.innerWidth === 'number' ? globalScope.innerWidth : 800;
+            const h = typeof globalScope.innerHeight === 'number' ? globalScope.innerHeight : 600;
             const mw = 280;
             const mh = 400;
             return {
@@ -94,10 +113,5 @@
             return '/templates/icons/' + n;
         }
     };
-})(
-    typeof window !== 'undefined'
-        ? window
-        : typeof global !== 'undefined'
-          ? global
-          : this
-);
+
+export { C as tableWidgetHelpers };

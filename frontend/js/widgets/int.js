@@ -1,8 +1,11 @@
 // Виджет для целых чисел (int)
 
+import Md3Field from './md3_field.js';
+import widgetMixin from './mixin.js';
+
 const IntWidget = {
-    components: { Md3Field: window.Md3Field },
-    mixins: [window.widgetMixin],
+    components: { Md3Field },
+    mixins: [widgetMixin],
     props: {
         widgetConfig: { type: Object, required: true },
         widgetName: { type: String, required: true }
@@ -18,13 +21,15 @@ const IntWidget = {
             :has-supporting="!!(widgetConfig.sup_text || fieldError)">
             <input type="text"
                    class="form-control"
+                   data-table-editor-target="true"
+                   v-bind="tableCellRootAttrs"
                    :placeholder="showPlaceholder ? widgetConfig.placeholder : ''"
                    :disabled="widgetConfig.readonly"
                    :tabindex="widgetConfig.readonly ? -1 : null"
                    v-model="value"
                    @input="onIntInput"
                    @focus="isFocused = true"
-                   @blur="isFocused = false">
+                   @blur="onBlur">
             <template #supporting>
                 <span v-if="fieldError" class="md3-error" v-text="fieldError"></span>
                 <span v-else v-text="widgetConfig.sup_text"></span>
@@ -57,16 +62,37 @@ const IntWidget = {
             this.validateRegex();
             this.emitInput(this.value);
         },
+        onBlur() {
+            this.isFocused = false;
+            this.validateRegex();
+            this.handleTableCellCommitValidation(this.fieldError);
+        },
         onInput() { this.emitInput(this.value); },
-        setValue(value) { this.value = value; },
+        setValue(value) {
+            this.value = value == null ? '' : String(value);
+            this.intError = '';
+            this.validateRegex();
+        },
         getValue() { return this.value; }
     },
+    watch: {
+        'widgetConfig.value': {
+            immediate: true,
+            handler(value) {
+                if (value === undefined) return;
+                this.setValue(value);
+            }
+        }
+    },
     mounted() {
-        if (this.widgetConfig.default !== undefined) {
+        if (this.widgetConfig.value !== undefined) {
+            this.setValue(this.widgetConfig.value);
+        } else if (this.widgetConfig.default !== undefined) {
             this.value = this.widgetConfig.default;
         }
         this.validateRegex();
     }
 };
 
-window.IntWidget = IntWidget;
+export { IntWidget };
+export default IntWidget;

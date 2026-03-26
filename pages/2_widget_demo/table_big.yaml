@@ -1,0 +1,81 @@
+# Формат числа в column-definition задаётся токеном `#...` внутри `table_attrs`.
+# Общий синтаксис:
+#   `#`      — начало format hint
+#   `,`      — разделитель тысяч
+#   `.N`     — число знаков после точки
+#   `f`      — fixed-point, например `#,.3f` -> `12,345.678`
+#   `e`      — экспоненциальный формат, например `#,.2e` -> `1.23e+4`
+#   `d`      — целое число, например `#,d` -> `12,345`
+# Примеры:
+#   amount /Сумма #,.2f
+#   mass /Масса #,.3f
+#   exp_value /Эксп #,.2e
+#   count /Количество #,d
+
+big_table:
+  widget: table
+  line_numbers: true
+  label: "Таблица ввода данных"
+  source: proc_name #я так понимаю, это пока заглушка. Пусть будет. Потом поправим. 
+  sticky_header: true
+  table_attrs: |
+    attr_1 /Строка 1 №1
+    attr_2 /Узкая строка :90 №2
+
+    /Числа
+    attr_3 /Целое #d №3
+    attr_4 /Float #f №4
+    attr_5 /Float_2 c разделителем #,.3f №5
+    attr_6 /Exp #e №6
+    attr_7 /Exp_2 #,.2e  №7
+    attr_8 /С виджетом :table_int_1 №8
+  
+    /Дата и время
+    attr_9 /Дата :table_date :200 №9
+    attr_10 /Время :table_time :150 №10
+
+    /Списки
+    attr_11 /Список :table_list :200 №11
+    attr_12 /Список списка :table_list_2 №12
+    attr_13 /Мультисписок :table_list_3 №13
+
+    /Адреса
+    attr_14 /ip :table_ip :200
+    attr_15 /ip_mask :table_ip_mask :200
+
+
+# Табличные виджеты.
+
+table_date:
+  widget: date
+
+table_time:
+  widget: time
+  default: now
+
+table_list:
+  widget: list
+  source: ["Парам 1", "Парам 11", "Парам 111", "Парам 1111"]
+
+table_list_2:
+  widget: list
+  editable: false
+  source: ["Парам 1", "Парам 11", "Парам 111", "Парам 1111"]
+  
+table_list_3:
+  widget: list
+  multiselect: true
+  source: ["Парам 1", "Парам 11", "Парам 111", "Парам 1111"]
+
+table_ip:
+  widget: ip
+
+table_ip_mask:
+  widget: ip_mask
+  default: "255.255.255.0/24"
+
+table_int_1:
+  widget: int
+  err_text: "Введи 11..."
+  regex: "^11$"
+  placeholder: "11, ok?"
