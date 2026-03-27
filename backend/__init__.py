@@ -7,7 +7,6 @@ import time
 import os
 import json
 from flask import Flask
-from flask_cors import CORS
 
 # Отключаем ANSI-цвета в логах Werkzeug, чтобы [36m, [0m и т.п. не попадали в app.log
 import werkzeug.serving
@@ -107,7 +106,6 @@ app = Flask(
     static_folder=os.path.join(ROOT_DIR, "frontend"),
     static_url_path="/frontend",  # URL, по которому отдаётся статика
 )
-CORS(app)
 app.config["DEBUG_TOOLING_ENABLED"] = _debug_tooling_enabled()
 
 # Busting кэша статических ассетов

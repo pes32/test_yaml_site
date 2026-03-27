@@ -60,6 +60,8 @@ npm --prefix tooling/vite run build
 
 Flask использует manifest из `frontend/dist/.vite/manifest.json`. Legacy fallback больше нет: если bundle не собран, приложение не должно считаться готовым к запуску.
 
+Для table feature важно, что `frontend/js/widgets/table/index.js` подтягивает side-effect модули, которые регистрируют части внутреннего engine namespace (`Utils`, `Format`, `Sort`, `Grouping` и т.д.). Если такой импорт потерять, исходник может выглядеть корректно, но Vite выкинет модуль из bundle, и поведение тихо деградирует в runtime.
+
 ## Валидация конфигурации
 
 Проверить YAML без запуска UI:

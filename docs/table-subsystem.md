@@ -34,6 +34,24 @@
 - `table_core.js` — внутренний engine namespace;
 - `index.js` — единая точка экспорта feature.
 
+## Registration contract
+
+`table_core.js` держит общий engine namespace, а часть `table_*` модулей регистрирует свои разделы через side effects:
+
+- `table_utils.js` -> `Core.Utils`
+- `table_format.js` -> `Core.Format`
+- `table_sort.js` -> `Core.Sort`
+- `table_grouping.js` -> `Core.Grouping`
+- `table_selection.js` -> `Core.SelectionMethods`
+- `table_context_menu.js` -> `Core.ContextMenu`
+- `table_clipboard.js` -> `Core.Clipboard`
+- `table_sticky.js` -> `Core.Sticky`
+- `table_jump.js` -> `Core.Jump`
+- `table_widget_helpers.js` -> `Core.WidgetMeasure` / `Core.WidgetUiCoords`
+- `table_parse_attrs.js` -> `Core.parseTableAttrs` и `Core.TableSchema.*`
+
+Поэтому `index.js` обязан импортировать все такие модули даже тогда, когда их exports не используются напрямую. Для Vite это не "мёртвый код", а обязательная инициализация feature runtime.
+
 ## External contract
 
 Снаружи таблица зависит только от:

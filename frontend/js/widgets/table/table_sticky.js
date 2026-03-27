@@ -252,6 +252,15 @@ const Core = tableEngine;
         });
     }
 
+    function applyOverlayHorizontalClip(overlay, tableRect, rootRect) {
+        if (!overlay || !tableRect || !rootRect) return;
+        const clipLeft = Math.max(0, rootRect.left - tableRect.left);
+        const clipRight = Math.max(0, tableRect.right - rootRect.right);
+        const clipPath = `inset(0px ${clipRight}px 0px ${clipLeft}px)`;
+        overlay.style.clipPath = clipPath;
+        overlay.style.webkitClipPath = clipPath;
+    }
+
     function scheduleUpdate(vm) {
         if (!vm || !vm.stickyHeaderEnabled) return;
         if (vm._stickyRaf) return;
@@ -337,6 +346,7 @@ const Core = tableEngine;
             margin: '0',
             boxSizing: 'border-box'
         });
+        applyOverlayHorizontalClip(overlay, tableRect, rootRect);
     }
 
     function bindStickyThead(vm) {

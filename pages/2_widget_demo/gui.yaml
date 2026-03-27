@@ -148,4 +148,6 @@ menu "Таблицы":
       - row: demo_table_7
 
   - tab "Сложная таблица":
+    - "Сложная таблица с разным описанием по столбцам. "
+    - row: button_backend_demo
     - row: big_table

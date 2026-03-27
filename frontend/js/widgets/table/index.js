@@ -1,6 +1,7 @@
 import './table_jump.js';
 import './table_parse_attrs.js';
 import './table_utils.js';
+import './table_format.js';
 import './table_grouping.js';
 import './table_clipboard.js';
 import './table_context_menu.js';

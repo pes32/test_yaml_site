@@ -9,12 +9,17 @@ function resolveMd3ContainerStyle(widgetConfig) {
 
     const widthValue = typeof width === 'number' ? `${width}px` : String(width);
     const isTextarea = widgetConfig && widgetConfig.widget === 'text';
+    const explicitWidthStyle = {
+        width: widthValue,
+        maxWidth: 'none'
+    };
     return isTextarea
         ? {
+            ...explicitWidthStyle,
             '--widget-textarea-base-width': widthValue,
             '--widget-textarea-inner-width': `calc(${widthValue} - 2px)`
         }
-        : { width: widthValue };
+        : explicitWidthStyle;
 }
 
 function resolveMd3ContainerClass(hasExplicitWidth, containerModifier) {

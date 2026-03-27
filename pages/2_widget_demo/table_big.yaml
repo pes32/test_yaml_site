@@ -1,16 +1,4 @@
-# Формат числа в column-definition задаётся токеном `#...` внутри `table_attrs`.
-# Общий синтаксис:
-#   `#`      — начало format hint
-#   `,`      — разделитель тысяч
-#   `.N`     — число знаков после точки
-#   `f`      — fixed-point, например `#,.3f` -> `12,345.678`
-#   `e`      — экспоненциальный формат, например `#,.2e` -> `1.23e+4`
-#   `d`      — целое число, например `#,d` -> `12,345`
-# Примеры:
-#   amount /Сумма #,.2f
-#   mass /Масса #,.3f
-#   exp_value /Эксп #,.2e
-#   count /Количество #,d
+# Полная универсальная документация по table-widget и максимальный пример см. в `table_demo.yaml`.
 
 big_table:
   widget: table
@@ -79,3 +67,8 @@ table_int_1:
   err_text: "Введи 11..."
   regex: "^11$"
   placeholder: "11, ok?"
+
+button_backend_demo:
+  widget: button
+  label: Смотреть!
+  url: "/backend_demo"

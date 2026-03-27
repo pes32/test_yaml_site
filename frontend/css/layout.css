@@ -367,7 +367,9 @@
     border: none;
     box-shadow: none;
     background: transparent;
-    min-width: 0; /* позволяет секции сжиматься, overflow даст скролл при широкой таблице */
+    width: max-content;
+    min-width: 100%;
+    max-width: none;
 }
 
 .card-header.page-section-header {

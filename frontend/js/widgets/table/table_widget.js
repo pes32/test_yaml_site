@@ -482,7 +482,12 @@ const TableWidget = {
                     ? M.sumColumnWidthsPx(this.tableColumns)
                     : null;
             if (!this.hasExplicitTableWidth) {
-                if (sumWidths) o.minWidth = sumWidths;
+                if (sumWidths) {
+                    // `table-layout: fixed` needs a concrete table width; with `width:auto`
+                    // long cell content can still affect the final column layout.
+                    o.width = sumWidths;
+                    o.minWidth = sumWidths;
+                }
                 return o;
             }
             const w = this.widgetConfig.width;
