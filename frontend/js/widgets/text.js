@@ -29,8 +29,10 @@ const TextWidget = {
                          :rows="widgetConfig.rows || 3"
                          v-model="value"
                          @input="onInput"
-                         @focus="isFocused = true"
-                         @blur="isFocused = false">
+                         @focus="onFocus"
+                         @blur="onBlur"
+                         @keydown.ctrl.enter.prevent="onCommitShortcut"
+                         @keydown.meta.enter.prevent="onCommitShortcut">
                 </textarea>
             </div>
             <template #supporting>
@@ -48,17 +50,45 @@ const TextWidget = {
         showPlaceholder() { return !this.hasValue && this.isFocused && this.widgetConfig.placeholder; }
     },
     methods: {
+        onFocus() {
+            this.isFocused = true;
+            this.activateDraftController();
+        },
         onInput() {
             this.validateRegex();
+            if (this.tableCellMode) {
+                this.emitInput(this.value);
+                return;
+            }
+
+            this.activateDraftController();
+        },
+        onBlur() {
+            this.isFocused = false;
+            this.commitDraft();
+            this.deactivateDraftController();
+        },
+        onCommitShortcut() {
+            this.commitDraft();
+        },
+        commitDraft() {
+            this.validateRegex();
+            this.handleTableCellCommitValidation(this.fieldError);
             this.emitInput(this.value);
         },
-        setValue(value) { this.value = value; },
+        setValue(value) { this.value = value == null ? '' : String(value); },
         getValue() { return this.value; }
     },
-    mounted() {
-        if (this.widgetConfig.default !== undefined) {
-            this.value = this.widgetConfig.default;
+    watch: {
+        'widgetConfig.value': {
+            immediate: true,
+            handler(value) {
+                if (value === undefined) return;
+                this.syncCommittedValue(value, (nextValue) => this.setValue(nextValue));
+            }
         }
+    },
+    mounted() {
         this.validateRegex();
     }
 };

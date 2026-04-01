@@ -40,6 +40,9 @@
                     <li class="nav-item">
                         <a class="nav-link" :class="{ active: activeTab === 2 }" href="#" role="tab" @click.prevent="activeTab = 2">Yaml</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" :class="{ active: activeTab === 3 }" href="#" role="tab" @click.prevent="activeTab = 3">SQL</a>
+                    </li>
                 </ul>
 
                 <div class="tab-content page-tab-content u-wide page-tab-content--with-tabs">
@@ -82,6 +85,43 @@
                                     <a :href="p.url" class="pages-url">{{ p.url }}</a>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+                <div v-show="activeTab === 3" class="tab-pane" :class="{ active: activeTab === 3, show: activeTab === 3 }">
+                    <div class="card page-section-card">
+                        <div class="card-header page-section-header d-flex justify-content-between align-items-center">
+                            <h5>SQL (только SELECT)</h5>
+                            <button type="button" class="widget-button inline-flex-center" @click="runSql" :disabled="sqlLoading || !canRunSql">Выполнить</button>
+                        </div>
+                        <div class="card-body">
+                            <div class="text-muted mb-2">Только одиночные SELECT-запросы. Иные комманды, комментарии или сложные запросы запрещены.</div>
+                            <textarea
+                                class="form-control mb-3"
+                                rows="6"
+                                v-model="sqlQuery"
+                                placeholder="SELECT * FROM your_table LIMIT 20"
+                                @keydown="onSqlKeydown"></textarea>
+
+                            <pre v-if="sqlLoading" class="text-muted">Выполнение...</pre>
+                            <pre v-else-if="sqlError" class="text-danger">{{ sqlError.message }}</pre>
+                            <div v-else-if="sqlResult">
+                                <div class="text-muted mb-2">{{ sqlSummary }}</div>
+                                <div v-if="!sqlRows.length" class="text-muted">Запрос выполнен, строк не найдено.</div>
+                                <table v-else class="table table-striped mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th v-for="(column, columnIndex) in sqlColumns" :key="'sql-head-' + columnIndex">{{ column }}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="(row, rowIndex) in sqlRows" :key="'sql-row-' + rowIndex">
+                                            <td v-for="(column, columnIndex) in sqlColumns" :key="'sql-cell-' + rowIndex + '-' + columnIndex">{{ formatSqlCell(row[column]) }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div v-else class="text-muted">Введите SELECT-запрос к пользовательской таблице и нажмите кнопку или Ctrl/Cmd + Enter.</div>
                         </div>
                     </div>
                 </div>

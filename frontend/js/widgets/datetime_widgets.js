@@ -374,7 +374,7 @@ const DateWidget = {
                     <div class="widget-dt-segment widget-dt-segment--single" ref="dateAnchor">
                         <input type="text" class="form-control widget-dt-input widget-dt-input--date" data-table-editor-target="true" v-model="value"
                                :disabled="widgetConfig.readonly" :tabindex="widgetConfig.readonly ? -1 : null"
-                               @input="onInput" @focus="isFocused = true" @blur="onBlur">
+                               @input="onInput" @focus="onFocus" @blur="onBlur" @keydown.enter="onEnterCommit">
                         <span class="widget-dt-icon-wrap">
                             <span class="widget-dt-icon" data-table-action-trigger="date" role="button" tabindex="-1" aria-label="Выбрать дату"
                                   @click="openPicker" @mousedown.prevent>
@@ -425,12 +425,31 @@ const DateWidget = {
             if (!this.isCalendarOpen) return;
             this.updateFloatingPopover('dateAnchor', 'calendarPopover', 'calendarPopoverStyle', { align: 'start' });
         },
+        onFocus() {
+            this.isFocused = true;
+            this.activateDraftController();
+        },
         onInput() {
-            this.emit(this.value);
+            if (this.tableCellMode) {
+                this.emit(this.value);
+                return;
+            }
+
+            this.activateDraftController();
         },
         onBlur() {
             this.isFocused = false;
-            this.commitInput();
+            this.commitDraft();
+            this.deactivateDraftController();
+        },
+        onEnterCommit(event) {
+            if (this.tableCellMode) {
+                return;
+            }
+
+            event.preventDefault();
+            this.commitDraft();
+            event.target?.blur?.();
         },
         commitInput() {
             if (!this.value) {
@@ -446,6 +465,9 @@ const DateWidget = {
                 parsedDate ? '' : 'Неверный формат даты'
             );
             this.emit(this.value);
+        },
+        commitDraft() {
+            this.commitInput();
         },
         openPicker() {
             if (this.widgetConfig.readonly) return;
@@ -490,21 +512,8 @@ const DateWidget = {
             immediate: true,
             handler(value) {
                 if (value === undefined) return;
-                if (this.tableCellMode && this.isFocused) return;
-                this.setValue(value);
+                this.syncCommittedValue(value, (nextValue) => this.setValue(nextValue));
             }
-        }
-    },
-    mounted() {
-        if (this.widgetConfig.value !== undefined) {
-            this.setValue(this.widgetConfig.value);
-        } else if (this.widgetConfig.default === 'now') {
-            const date = this.getNow();
-            this.value = this.formatDate(date);
-            this.calendarView = this.monthStart(date);
-            this.emit(this.value);
-        } else if (this.widgetConfig.default !== undefined && this.widgetConfig.default !== '') {
-            this.setValue(String(this.widgetConfig.default));
         }
     },
     beforeUnmount() {
@@ -544,7 +553,7 @@ const TimeWidget = {
                     <div class="widget-dt-segment widget-dt-segment--single" ref="timeAnchor">
                         <input type="text" class="form-control widget-dt-input widget-dt-input--time" data-table-editor-target="true" v-model="value"
                                :disabled="widgetConfig.readonly" :tabindex="widgetConfig.readonly ? -1 : null"
-                               @input="onInput" @focus="isFocused = true" @blur="onBlur">
+                               @input="onInput" @focus="onFocus" @blur="onBlur" @keydown.enter="onEnterCommit">
                         <span class="widget-dt-icon-wrap">
                             <span class="widget-dt-icon" data-table-action-trigger="time" role="button" tabindex="-1" aria-label="Выбрать время"
                                   @click="openPicker" @mousedown.prevent>
@@ -621,12 +630,31 @@ const TimeWidget = {
             if (part === 'pickerSecond') this.pickerHasSeconds = true;
             this.applyPickedTime(shouldClose);
         },
+        onFocus() {
+            this.isFocused = true;
+            this.activateDraftController();
+        },
         onInput() {
-            this.emit(this.value);
+            if (this.tableCellMode) {
+                this.emit(this.value);
+                return;
+            }
+
+            this.activateDraftController();
         },
         onBlur() {
             this.isFocused = false;
-            this.commitInput();
+            this.commitDraft();
+            this.deactivateDraftController();
+        },
+        onEnterCommit(event) {
+            if (this.tableCellMode) {
+                return;
+            }
+
+            event.preventDefault();
+            this.commitDraft();
+            event.target?.blur?.();
         },
         commitInput() {
             if (!this.value) {
@@ -642,6 +670,9 @@ const TimeWidget = {
                 parsedTime ? '' : 'Неверный формат времени'
             );
             this.emit(this.value);
+        },
+        commitDraft() {
+            this.commitInput();
         },
         openPicker() {
             if (this.widgetConfig.readonly) return;
@@ -671,21 +702,8 @@ const TimeWidget = {
             immediate: true,
             handler(value) {
                 if (value === undefined) return;
-                if (this.tableCellMode && this.isFocused) return;
-                this.setValue(value);
+                this.syncCommittedValue(value, (nextValue) => this.setValue(nextValue));
             }
-        }
-    },
-    mounted() {
-        if (this.widgetConfig.value !== undefined) {
-            this.setValue(this.widgetConfig.value);
-        } else if (this.widgetConfig.default === 'now') {
-            const now = this.getNow();
-            this.value = this.formatTime({ h: now.getHours(), m: now.getMinutes(), s: now.getSeconds(), hasSeconds: false }, { includeSeconds: false });
-            this.syncTimePickerState(this.value);
-            this.emit(this.value);
-        } else if (this.widgetConfig.default !== undefined && this.widgetConfig.default !== '') {
-            this.setValue(String(this.widgetConfig.default));
         }
     },
     beforeUnmount() {
@@ -746,7 +764,7 @@ const DateTimeWidget = {
                     <div class="widget-dt-segment widget-dt-segment--date" ref="dateAnchor">
                         <input type="text" class="form-control widget-dt-input widget-dt-input--date" data-table-editor-target="true" v-model="dateValue"
                                :disabled="widgetConfig.readonly" :tabindex="widgetConfig.readonly ? -1 : null"
-                               @input="onDateInput" @focus="isFocused = true" @blur="onDateBlur">
+                               @input="onDateInput" @focus="onSegmentFocus" @blur="onDateBlur" @keydown.enter="onDateEnterCommit">
                         <span class="widget-dt-icon-wrap">
                             <span class="widget-dt-icon" data-table-action-trigger="date" role="button" tabindex="-1" aria-label="Выбрать дату"
                                   @click="openDatePicker" @mousedown.prevent>
@@ -757,7 +775,7 @@ const DateTimeWidget = {
                     <div class="widget-dt-segment widget-dt-segment--time" ref="timeAnchor">
                         <input type="text" class="form-control widget-dt-input widget-dt-input--time" data-table-editor-target="true" v-model="timeValue"
                                :disabled="widgetConfig.readonly" :tabindex="widgetConfig.readonly ? -1 : null"
-                               @input="onTimeInput" @focus="isFocused = true" @blur="onTimeBlur">
+                               @input="onTimeInput" @focus="onSegmentFocus" @blur="onTimeBlur" @keydown.enter="onTimeEnterCommit">
                         <span class="widget-dt-icon-wrap">
                             <span class="widget-dt-icon" data-table-action-trigger="time" role="button" tabindex="-1" aria-label="Выбрать время"
                                   @click="openTimePicker" @mousedown.prevent>
@@ -862,6 +880,29 @@ const DateTimeWidget = {
             this.value = this.composeValue();
             if (shouldEmit) this.emit(this.value);
         },
+        onSegmentFocus() {
+            this.isFocused = true;
+            this.activateDraftController();
+        },
+        finalizeSegmentBlur(commitHandler) {
+            this.isFocused = false;
+            if (typeof commitHandler === 'function') {
+                commitHandler();
+            }
+
+            if (this.tableCellMode) {
+                return;
+            }
+
+            window.setTimeout(() => {
+                const root = this.resolveRefElement('pickerHost');
+                const active = document.activeElement;
+                if (root && active && root.contains(active)) {
+                    return;
+                }
+                this.deactivateDraftController();
+            }, 0);
+        },
         onTimePickerPartInput(part, max, event) {
             const digits = String(event.target.value || '').replace(/\D+/g, '').slice(0, 2);
             this[part] = digits;
@@ -876,18 +917,40 @@ const DateTimeWidget = {
             if (shouldClose) this.closePopovers();
         },
         onDateInput() {
-            this.syncValue();
+            this.syncValue(this.tableCellMode);
+            if (!this.tableCellMode) {
+                this.activateDraftController();
+            }
         },
         onTimeInput() {
-            this.syncValue();
+            this.syncValue(this.tableCellMode);
+            if (!this.tableCellMode) {
+                this.activateDraftController();
+            }
         },
         onDateBlur() {
-            this.isFocused = false;
-            this.commitDateInput();
+            this.finalizeSegmentBlur(() => this.commitDateInput());
         },
         onTimeBlur() {
-            this.isFocused = false;
+            this.finalizeSegmentBlur(() => this.commitTimeInput());
+        },
+        onDateEnterCommit(event) {
+            if (this.tableCellMode) {
+                return;
+            }
+
+            event.preventDefault();
+            this.commitDateInput();
+            event.target?.blur?.();
+        },
+        onTimeEnterCommit(event) {
+            if (this.tableCellMode) {
+                return;
+            }
+
+            event.preventDefault();
             this.commitTimeInput();
+            event.target?.blur?.();
         },
         commitDateInput() {
             if (!this.dateValue) {
@@ -918,6 +981,10 @@ const DateTimeWidget = {
                 parsedTime ? '' : 'Неверный формат времени'
             );
             this.syncValue();
+        },
+        commitDraft() {
+            this.commitDateInput();
+            this.commitTimeInput();
         },
         openDatePicker() {
             if (this.widgetConfig.readonly) return;
@@ -981,24 +1048,8 @@ const DateTimeWidget = {
             immediate: true,
             handler(value) {
                 if (value === undefined) return;
-                if (this.tableCellMode && this.isFocused) return;
-                this.setValue(value);
+                this.syncCommittedValue(value, (nextValue) => this.setValue(nextValue));
             }
-        }
-    },
-    mounted() {
-        if (this.widgetConfig.value !== undefined) {
-            this.setValue(this.widgetConfig.value);
-        } else if (this.widgetConfig.default === 'now') {
-            const now = this.getNow();
-            const time = { h: now.getHours(), m: now.getMinutes(), s: now.getSeconds(), hasSeconds: false };
-            this.dateValue = this.formatDate(now);
-            this.timeValue = this.formatTime(time, { includeSeconds: false });
-            this.setCalendarViewFromDate(now);
-            this.applyTimePickerState(time);
-            this.syncValue();
-        } else if (this.widgetConfig.default !== undefined && this.widgetConfig.default !== '') {
-            this.setValue(String(this.widgetConfig.default));
         }
     },
     beforeUnmount() {

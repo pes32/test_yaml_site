@@ -6,6 +6,7 @@ import { normalizePageResponse } from './runtime/api_client.js';
 import { ensureAttrsLoaded as ensureAttrsLoadedFlow, fetchActiveViewAttrs as fetchActiveViewAttrsFlow } from './runtime/attrs_loader.js';
 import readPageBootstrap from './runtime/bootstrap.js';
 import {
+    FRONTEND_ERROR_PRESENTATIONS,
     FRONTEND_ERROR_SCOPES,
     normalizeFrontendError,
     presentFrontendError
@@ -33,6 +34,8 @@ import {
     getMenus,
     getParsedGuiState,
     getRootContentOnly,
+    selectWidgetAttrs,
+    selectWidgetRuntimeValue,
     getWidgetConfig as selectWidgetConfig,
     getWidgetValue as selectWidgetValue
 } from './runtime/page_selectors.js';
@@ -47,7 +50,7 @@ import {
     SectionCard,
     WidgetRenderer
 } from './widgets.js';
-import { DiagnosticsPanel, ErrorPanel } from './widgets/feedback.js';
+import { ErrorPanel } from './widgets/feedback.js';
 
 const app = createApp({
     provide() {
@@ -57,18 +60,25 @@ const app = createApp({
                 ? this.modalRuntimeController.openModal(modalName)
                 : Promise.resolve(null),
             closeUiModal: () => {
+                this.commitActiveDraftWidget();
                 if (this.modalRuntimeController) {
                     this.modalRuntimeController.closeModal();
                 }
             },
             getWidgetConfigByName: (widgetName) => this.getWidgetConfig(widgetName),
+            getWidgetAttrsByName: (widgetName) => this.getWidgetAttrs(widgetName),
+            getWidgetRuntimeValueByName: (widgetName) => this.getWidgetRuntimeValue(widgetName),
             getModalRuntimeState: () => this.modalRuntimeState,
             getModalRuntimeController: () => this.modalRuntimeController,
             getCurrentPageNameFromRuntime: () => this.getCurrentPageName(),
             getAllAttrsMap: () => this.allAttrs,
             showAppNotification: (message, type) => this.showNotification(message, type),
-            reportAppError: (error, options) => this.reportError(error, options),
-            handleRecoverableAppError: (error, options) => this.handleRecoverableError(error, options)
+            reportAppError: (error, options) => this.reportDiagnosticError(error, options),
+            handleRecoverableAppError: (error, options) => this.handleRecoverableError(error, options),
+            setActiveDraftWidgetController: (controller) =>
+                this.setActiveDraftWidgetController(controller),
+            clearActiveDraftWidgetController: (controller) =>
+                this.clearActiveDraftWidgetController(controller)
         };
     },
 
@@ -78,6 +88,9 @@ const app = createApp({
             sessionState: PageSessionStore.createEmptyStore(),
             modalRuntimeState: createEmptyModalRuntimeState(),
             modalRuntimeController: null,
+            draftState: {
+                activeController: null
+            },
             uiState: {
                 activeMenuIndex: 0,
                 activeTabIndex: 0,
@@ -91,8 +104,7 @@ const app = createApp({
             },
             asyncState: {
                 loading: true,
-                pageError: null,
-                errors: []
+                pageError: null
             }
         };
     },
@@ -194,17 +206,6 @@ const app = createApp({
             }
         },
 
-        appErrors: {
-            get() {
-                return Array.isArray(this.asyncState.errors)
-                    ? this.asyncState.errors
-                    : [];
-            },
-            set(value) {
-                this.asyncState.errors = Array.isArray(value) ? value : [];
-            }
-        },
-
         collapsedSections: {
             get() {
                 return this.uiState.collapsedSections;
@@ -275,7 +276,9 @@ const app = createApp({
             if (!this.pageError) {
                 return null;
             }
-            return this.pageError.recoverable ? null : this.pageError;
+            return this.pageError.presentation === FRONTEND_ERROR_PRESENTATIONS.fatal
+                ? this.pageError
+                : null;
         }
     },
 
@@ -287,13 +290,11 @@ const app = createApp({
         try {
             await this.bootstrapPage();
         } catch (error) {
-            const normalized = this.reportError(error, {
+            this.reportFatalError(error, {
                 scope: FRONTEND_ERROR_SCOPES.page,
-                recoverable: false,
                 message: 'Ошибка загрузки конфигурации страницы',
                 asPageError: true
             });
-            this.showNotification(normalized.message, 'danger');
         } finally {
             this.loading = false;
         }
@@ -311,36 +312,39 @@ const app = createApp({
             });
         },
 
-        reportError(error, options = {}) {
-            const normalized = presentFrontendError(
+        normalizeAppError(error, options = {}) {
+            return presentFrontendError(
                 normalizeFrontendError(error, options)
             );
+        },
 
-            if (options.asPageError === true) {
+        reportError(error, options = {}) {
+            const normalized = this.normalizeAppError(error, options);
+            if (normalized.presentation === FRONTEND_ERROR_PRESENTATIONS.fatal || options.asPageError === true) {
                 this.pageError = normalized;
-                return normalized;
             }
-
-            const next = this.appErrors.slice();
-            const existingIndex = next.findIndex((item) =>
-                item &&
-                item.scope === normalized.scope &&
-                item.code === normalized.code &&
-                item.message === normalized.message
-            );
-
-            if (existingIndex >= 0) {
-                next.splice(existingIndex, 1, normalized);
-            } else {
-                next.push(normalized);
-            }
-
-            this.appErrors = next;
             return normalized;
+        },
+
+        reportFatalError(error, options = {}) {
+            return this.reportError(error, {
+                presentation: FRONTEND_ERROR_PRESENTATIONS.fatal,
+                recoverable: false,
+                ...options
+            });
+        },
+
+        reportDiagnosticError(error, options = {}) {
+            return this.reportError(error, {
+                presentation: FRONTEND_ERROR_PRESENTATIONS.diagnostic,
+                recoverable: false,
+                ...options
+            });
         },
 
         handleRecoverableError(error, options = {}) {
             const normalized = this.reportError(error, {
+                presentation: FRONTEND_ERROR_PRESENTATIONS.recoverable,
                 recoverable: true,
                 ...options
             });
@@ -350,12 +354,6 @@ const app = createApp({
 
         dismissPageError() {
             this.pageError = null;
-        },
-
-        dismissAppError(index) {
-            const next = this.appErrors.slice();
-            next.splice(index, 1);
-            this.appErrors = next;
         },
 
         registerHashListener() {
@@ -464,6 +462,7 @@ const app = createApp({
         },
 
         async onHashChange() {
+            this.commitActiveDraftWidget();
             this.rememberActiveViewScroll();
             this.setActiveViewFromHash();
             await this.waitForViewUpdate();
@@ -476,6 +475,7 @@ const app = createApp({
                 return;
             }
 
+            this.commitActiveDraftWidget();
             this.rememberActiveViewScroll();
             this.activeMenuIndex = index;
             this.activeTabIndex = 0;
@@ -489,6 +489,7 @@ const app = createApp({
                 return;
             }
 
+            this.commitActiveDraftWidget();
             this.rememberActiveViewScroll();
             this.activeTabIndex = index;
             this.normalizeActiveState();
@@ -532,6 +533,31 @@ const app = createApp({
             }
         },
 
+        setActiveDraftWidgetController(controller) {
+            this.draftState.activeController = controller || null;
+        },
+
+        clearActiveDraftWidgetController(controller) {
+            if (!controller || this.draftState.activeController === controller) {
+                this.draftState.activeController = null;
+            }
+        },
+
+        commitActiveDraftWidget() {
+            const controller = this.draftState.activeController;
+            if (controller && typeof controller.commitDraft === 'function') {
+                controller.commitDraft();
+            }
+        },
+
+        getWidgetAttrs(widgetName) {
+            return selectWidgetAttrs(this.allAttrs, widgetName);
+        },
+
+        getWidgetRuntimeValue(widgetName) {
+            return selectWidgetRuntimeValue(this.sessionState, this.allAttrs, widgetName);
+        },
+
         getWidgetConfig(widgetName) {
             return selectWidgetConfig(this.allAttrs, widgetName);
         },
@@ -543,6 +569,7 @@ const app = createApp({
 
             PageSessionStore.setWidgetValue(
                 this.sessionState,
+                this.allAttrs,
                 payload.name,
                 payload.value
             );
@@ -687,6 +714,5 @@ app.component('content-rows', ContentRows);
 app.component('modal-manager', ModalManager);
 app.component('modal-buttons', ModalButtons);
 app.component('confirm-modal', ConfirmModal);
-app.component('diagnostics-panel', DiagnosticsPanel);
 app.component('error-panel', ErrorPanel);
 app.mount('#app');

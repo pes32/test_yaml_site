@@ -132,6 +132,8 @@ Request:
 }
 ```
 
+`output_attrs` здесь относится только к transport/API-запросу и не является YAML-ключом в attrs-конфиге.
+
 Success `data`:
 
 ```json
@@ -155,6 +157,24 @@ Debug routes используют тот же envelope:
 - `GET /api/debug/logs`
 - `GET /api/debug/pages`
 - `GET /api/debug/snapshot`
+- `POST /api/debug/sql`
+
+`POST /api/debug/sql` принимает JSON вида:
+
+```json
+{
+  "query": "SELECT * FROM some_table LIMIT 20"
+}
+```
+
+Ограничения debug SQL:
+
+- разрешён только один `SELECT`;
+- запрос должен читать пользовательские таблицы;
+- SQL-комментарии и дополнительные команды запрещены;
+- системные схемы `pg_catalog`, `information_schema` и relation names `pg_*` запрещены;
+- запрос выполняется в read-only транзакции;
+- результат ограничивается серверным `max_rows`.
 
 Их raw transport тоже проходит через `frontend/js/runtime/api_client.js`.
 

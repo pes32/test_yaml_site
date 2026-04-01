@@ -213,6 +213,21 @@ function normalizeDebugSnapshotResponse(payload) {
     };
 }
 
+function normalizeDebugSqlResponse(payload) {
+    const data = readEnvelopeData(payload);
+    return {
+        query: asString(data.query),
+        columns: Array.isArray(data.columns) ? data.columns.map((item) => asString(item)).filter(Boolean) : [],
+        rows: Array.isArray(data.rows) ? data.rows.map((item) => asObject(item)) : [],
+        rowCount: Number(data.row_count) || 0,
+        truncated: Boolean(data.truncated),
+        maxRows: Number(data.max_rows) || 0,
+        durationMs: Number(data.duration_ms) || 0,
+        diagnostics: readEnvelopeDiagnostics(payload),
+        snapshotVersion: readEnvelopeSnapshotVersion(payload)
+    };
+}
+
 function createFrontendApiClient() {
     return {
         requestEnvelope,
@@ -270,6 +285,16 @@ function createFrontendApiClient() {
             return normalizeDebugSnapshotResponse(
                 await requestEnvelope('/api/debug/snapshot')
             );
+        },
+
+        async executeDebugSql(query) {
+            return normalizeDebugSqlResponse(
+                await requestEnvelope('/api/debug/sql', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                })
+            );
         }
     };
 }
@@ -283,6 +308,7 @@ export {
     normalizeAttrsResponse,
     normalizeDebugLogsResponse,
     normalizeDebugPagesResponse,
+    normalizeDebugSqlResponse,
     normalizeDebugSnapshotResponse,
     normalizeDebugStructureResponse,
     normalizeEnvelopeErrorMessage,

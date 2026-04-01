@@ -51,10 +51,6 @@ button_0:
   label: Перейти
   url: "/widget_demo#menu-0-tab-1"
 
-title: "Виджеты"
-
-url: "/widget_demo"
-
 gui_yaml:
   widget: text
   label: ""
@@ -207,3 +203,198 @@ attrs_str:
       readonly: true
       width: 280
 
+all_table_yaml:
+  widget: text
+  readonly: true
+  width: 1250
+  rows: 200
+  default: |
+    # <table_name>:
+    #   widget: table
+    #   label: "Текст"                        # Опционально. Заголовок над таблицей
+    #   sup_text: "Текст под таблицей"        # Опционально. Текст под таблицей.
+    #   width: 1400                           # Опционально. Ширина таблицы.
+    #   row: 3                                # Опционально. Кол-во строк в пустой редактируемой таблице
+    #   sticky_header: true                   # Опционально. Стартовое состояние. Прилипающие заголовки.
+    #   sort: false                           # Опционально. Выключает сортировку для таблиц.
+    #   zebra: false                          # Опционально. Выключает стиль зебры для таблицы. 
+    #   line_numbers: true                    # Опционально. Добавляет служебную колонку № строки. Не влияет на данные.
+    #   table_lazy: true | false              # Опционально. Ленивая загрузка, о умолчанию true, если не указывать.
+    #   source: proc_name                     # Либо имя внешнего источника, либо inline matrix [["a", "b"], ...].
+    #   readonly: true                        # Опционально. Делает таблицу справочной, без редактирования.
+    #   table_attrs: |                        # Описание столбцов.
+    #     attr /Заголовок
+
+    # Синтаксис table_attrs:
+    #   attr /Заголовок       — обычная колонка
+    #   /Группа               — group-header над следующими колонками. Группа отделяется пустой строкой. 
+    #   :150                  — явная ширина колонки в px
+    #   :str|:int|:float
+    #   :date|:time|:datetime
+    #   :list|:ip|:ip_mask    — встроенный table-cell widget. Строку указывать не обязательно, она будет по умолчанию
+    #   :table_widget         — ссылка на внешний attrs-виджет (имя может быть любое, если такой атрибут существует)
+    #   #,.2f / #,d / #,.2e   — формат чисел
+    #   №7                    — номер колонки, выводится отдельной строкой заголовка
+    #
+    # Формат числа в column-definition задаётся токеном `#...` внутри `table_attrs`.
+    # Общий синтаксис:
+    #   `#`      — начало format hint
+    #   `,`      — разделитель тысяч
+    #   `.N`     — число знаков после точки
+    #   `f`      — fixed-point, например `#,.3f` -> `12,345.678`
+    #   `e`      — экспоненциальный формат, например `#,.2e` -> `1.23e+4`
+    #   `d`      — целое число, например `#,d` -> `12,345`
+    # Примеры:
+    #   amount /Сумма #,.2f
+    #   mass /Масса #,.3f
+    #   exp_value /Эксп #,.2e
+    #   count /Количество #,d
+
+    # Контекстное меню заголовка умеет:
+    #   sort asc / desc / reset
+    #   sticky_header toggle
+    #   перенос по словам
+    #   группировка / снять группировку
+    #   пересчитать нумерацию (для служебной колонки №)
+    #
+    # Контекстное меню строк/ячеек умеет:
+    #   добавить строку выше / ниже
+    #   дублировать строку выше / ниже
+    #   сдвинуть строку вверх / вниз
+    #   удалить строку
+    #   copy / cut / paste / clear
+    #
+    # table поддерживает: str, int, float, date, time, datetime, list, ip, ip_mask.
+
+
+    # Таблица (статичная, только просмотр)
+    demo_table_1:
+      widget: table
+      label: "Это справочная таблица:"
+      sup_text: "Статичная таблица без редактирования"
+      table_attrs: |
+        name /Имя
+        age /Возраст
+        city /Город
+      source: [["Иван", "25", "Москва"], ["Мария", "30", "СПб"], ["Петр", "35", "Казань"]]
+      readonly: true
+
+    # Таблица (редактируемая пользователем)
+    demo_table_2:
+      widget: table
+      label: "Таблица редактируемая, 750px:"
+      sup_text: "Пользователь может изменять значения в ячейках"
+      width: 750px
+      table_attrs: |
+        param /Параметр (300px) :300
+        value_1 /Значение 1 (210px) :210
+        value_2 /Значение 2 (остаток)
+
+    demo_table_3:
+      widget: table
+      label: "Справочная, без зебры:"
+      sup_text: "Статичная таблица без редактирования"
+      zebra: false
+      table_attrs: |
+        name /Имя
+        age /Возраст
+        city /Город
+      source: [["Иван", "25", "Москва"], ["Мария", "30", "СПб"], ["Петр", "35", "Казань"]]
+      readonly: true
+
+    demo_table_4:
+      widget: table
+      label: "Таблица редактируемая, без зебры:"
+      zebra: false
+      sup_text: "Здесь задан вывод 3-х пустых строк"
+      row: 3
+      table_attrs: |
+        param /Параметр
+        value_1 /Значение 1
+        value_2 /Значение 2
+
+    demo_table_5:
+      widget: table
+      label: "Справочная, без сортировки:"
+      sup_text: "Статичная таблица без редактирования"
+      sort: false
+      table_attrs: |
+        name /Имя
+        age /Возраст
+        city /Город
+      source: [["Иван", "25", "Москва"], ["Мария", "30", "СПб"], ["Петр", "35", "Казань"]]
+      readonly: true
+
+    demo_table_6:
+      widget: table
+      label: "Таблица редактируемая, без сортировки:"
+      sort: false
+      row: 3
+      table_attrs: |
+        param /Параметр
+        value_1 /Значение 1
+        value_2 /Значение 2
+
+    # Большая и сложная таблица
+
+    big_table:
+      widget: table
+      line_numbers: true
+      label: "Таблица ввода данных"
+      source: test_source                 #заглушка
+      sticky_header: true
+      table_attrs: |
+        attr_1 /Строка 1 №1
+        attr_2 /Узкая строка :90 №2
+
+        /Числа
+        attr_3 /Целое #d №3
+        attr_4 /Float #f №4
+        attr_5 /Float_2 c разделителем #,.3f №5
+        attr_6 /Exp #e №6
+        attr_7 /Exp_2 #,.2e  №7
+        attr_8 /С виджетом :table_int_1 №8
+
+        /Дата и время
+        attr_9 /Дата :date :200 №9
+        attr_10 /Время :table_time :150 №10
+
+        /Списки
+        attr_11 /Список :table_list :200 №11
+        attr_12 /Список списка :table_list_2 №12
+        attr_13 /Мультисписок :table_list_3 №13
+
+        /Адреса
+        attr_14 /ip :ip :200
+        attr_15 /ip_mask :table_ip_mask :200
+
+
+    # Табличные виджеты.
+
+    table_time:
+      widget: time
+      default: now
+
+    table_list:
+      widget: list
+      source: ["Парам 1", "Парам 11", "Парам 111", "Парам 1111"]
+
+    table_list_2:
+      widget: list
+      editable: false
+      source: ["Парам 1", "Парам 11", "Парам 111", "Парам 1111"]
+
+    table_list_3:
+      widget: list
+      multiselect: true
+      source: ["Парам 1", "Парам 11", "Парам 111", "Парам 1111"]
+
+    table_ip_mask:
+      widget: ip_mask
+      default: "255.255.255.0/24"
+
+    table_int_1:
+      widget: int
+      err_text: "Введи 11..."
+      regex: "^11$"
+      placeholder: "11, ok?"

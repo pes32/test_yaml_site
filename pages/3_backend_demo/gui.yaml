@@ -2,5 +2,20 @@ title: "Backend demo"
 
 url: "/backend_demo"
 
-box "Демо бэка":
-  - "Скоро здесь появятся виджеты для демонстрации работы бэка..."
+tab "Запросы ИЗ бд":
+  - box "Простейшие запросы из бд":
+    - "НА ТЕКУЩИЦ МОМЕНТ НЕ РЕАЛИЗОВАНО!!!"
+    - "Заполним виджеты из базы:"
+    - row: back_button_1
+    - row: back_str, back_text
+    - row: back_int, back_float
+    - row: back_ip, back_ip_mask
+    - row: back_date, back_time, back_datetime
+    - "Эти списки подтягивают значения из базы:"
+    - row: back_list, back_list_2 , back_multilist
+    - "Теперь заполним таблицу из БД:"
+    - row: back_button_2
+    - row: back_table
+  - tab "Заполняем БД":
+    - box "Простейшие запросы в бд":
+    - "Надо что-то написать..."

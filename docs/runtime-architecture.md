@@ -63,6 +63,12 @@
 - `error_model.js` — единый frontend error contract;
 - `diagnostics.js` — нормализация и presentation helpers для diagnostics.
 
+Для page/modal widget render path теперь действует отдельное правило:
+
+- `page_selectors.js` отдаёт attrs и runtime value раздельно;
+- `widgets.js / WidgetRenderer` — единственная точка, где собирается `resolvedWidgetConfig`;
+- render path не должен смешивать attrs и session state в произвольных helper-функциях.
+
 ### Stores
 
 Runtime state теперь разделён намеренно.
@@ -81,6 +87,30 @@ Runtime state теперь разделён намеренно.
 - `loadedAttrNames`
 - `loadedModalIds`
 - `parsedGui`
+
+`widgetValues` — это committed runtime state формы. Для stateful page/modal widgets он нормализуется централизованно в `page_session_store.js`, а не внутри widget-компонентов.
+
+### Widget value contract
+
+Для stateful page/modal widgets действует runtime-контракт:
+
+- текущее committed value приходит через `resolvedWidgetConfig.value`;
+- значение берётся из `PageSessionStore`, а не из локального `data()` компонента;
+- `WidgetRenderer` получает `widgetAttrs` и `widgetValue` раздельно и мемоизированно собирает `resolvedWidgetConfig`;
+- виджеты не нормализуют `null` / `undefined` самостоятельно и не восстанавливаются из `default` после remount.
+
+Локальное состояние виджета допускается только как временный `draft` во время активного редактирования.
+
+### Draft / commit model
+
+Модель редактирования теперь такая:
+
+- store хранит только committed state;
+- widget держит локальный `draftValue` только пока поле в фокусе и пользователь редактирует его;
+- входящие store updates не должны перетирать активный draft;
+- перед `execute`, сменой page-tab/menu и закрытием/переключением modal-tab runtime принудительно вызывает `commitActiveDraftWidget()`.
+
+Это убирает рассинхронизацию вида “на экране пусто, а в execute ушло старое значение из store”.
 
 `page.js` держит отдельно UI/session state:
 
@@ -153,9 +183,10 @@ Diagnostics живут по следующей цепочке:
 1. `page.js` читает bootstrap из `<script id="page-data">`;
 2. при отсутствии bootstrap вызывает `page_bootstrap_flow.loadPageConfig`;
 3. `page_store.js` принимает snapshot-derived state;
-4. `page_session_store.js` и `page_selectors.js` строят runtime/session view;
+4. `page_session_store.js` нормализует committed widget values, а `page_selectors.js` строит runtime/session view;
 5. `attrs_loader.js` догружает attrs только для активного view и table dependencies;
-6. template рендерит diagnostics, error panels и widget tree.
+6. `WidgetRenderer` собирает `resolvedWidgetConfig` из attrs + runtime value;
+7. template рендерит diagnostics, error panels и widget tree.
 
 ## Modal flow
 
@@ -165,7 +196,8 @@ Modal path теперь такой:
 2. `page.js` делегирует open/close/tab/collapse в `modal_runtime_service.js`;
 3. `modal_flow.js` получает `/api/modal-gui`, мержит attrs в `page_store.js` и обновляет `page_session_store.js`;
 4. `widgets/modal_manager.js` только рендерит modal runtime state и больше не знает про backend/loading path;
-5. ошибки modal path нормализуются через `error_model.js`, а не уходят в silent console-only failures.
+5. перед close/tab-switch modal runtime принудительно коммитит активный draft;
+6. ошибки modal path нормализуются через `error_model.js`, а не уходят в silent console-only failures.
 
 ## Debug flow
 

@@ -1,0 +1,63 @@
+# Виджеты для теста бэка
+
+back_str:
+  widget: str
+  label: "str"
+
+back_text:
+  widget: text
+  label: "text"
+  rows: 1
+
+back_int:
+  widget: int
+  label: "int"
+
+back_float:
+  widget: float
+  label: "float"
+
+back_list:
+  widget: list
+  label: "list"
+  source: test_voc_1 -pg
+
+back_list_2:
+  widget: list
+  label: "list-only"
+  editable: false
+  source: test_voc_1 -pg
+
+back_multilist:
+  widget: list
+  label: "multi-list"
+  multiselect: true
+  source: test_voc_1 -pg
+
+back_ip:
+  widget: ip
+  label: "ip-адрес"
+
+back_ip_mask:
+  widget: ip_mask
+  label: "ip с маской"
+
+back_date:
+  widget: date
+  label: "дата"
+
+back_time:
+  widget: time
+  label: "время"
+
+back_datetime:
+  widget: datetime
+  label: "дата и время"
+
+back_table:
+  widget: table
+  label: "таблица"
+  table_attrs: |
+    value_1 /Значение 1
+    value_2 /Значение 2
+    value_3 /Значение 3

@@ -8,7 +8,7 @@ import threading
 import time
 from typing import Any, Dict
 
-from .config import ROOT_DIR, ConfigLoadError, build_config_snapshot, make_diagnostic
+from .config import ROOT_DIR, ConfigLoadError, SnapshotValidationError, build_config_snapshot, make_diagnostic
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,8 @@ class ConfigService:
         self._fingerprint: Dict[str, int] = {}
         self._failed_fingerprint: Dict[str, int] | None = None
         self._last_error: str | None = None
+        self._last_logged_snapshot_version: str | None = None
+        self._last_logged_failure_signature: tuple[tuple[str, int], ...] | None = None
         self._scan_interval_seconds = self._read_scan_interval_seconds()
         self._next_scan_at = 0.0
         self.force_reload()
@@ -98,6 +100,99 @@ class ConfigService:
 
         return fingerprint
 
+    def _fingerprint_signature(self, fingerprint: Dict[str, int]) -> tuple[tuple[str, int], ...]:
+        return tuple(sorted(fingerprint.items()))
+
+    def _diagnostic_line(self, item: dict[str, Any]) -> str:
+        message = str(item.get("message") or "").strip()
+        if not message:
+            message = str(item.get("code") or "diagnostic").strip()
+
+        if item.get("code") in {
+            "duplicate_attr",
+            "unused_attr",
+            "missing_attr_reference",
+        }:
+            return message
+
+        location_parts = []
+        if item.get("file"):
+            location_parts.append(str(item["file"]))
+        if item.get("line"):
+            location_parts.append(f"стр.{item['line']}")
+        if item.get("node_path"):
+            location_parts.append(str(item["node_path"]))
+
+        if not location_parts:
+            return message
+        return f"{message} ({' | '.join(location_parts)})"
+
+    def _log_diagnostic_group(self, level: int, header: str, items: list[dict[str, Any]]) -> None:
+        if not items:
+            return
+        logger.log(level, header)
+        for item in items:
+            logger.log(level, self._diagnostic_line(item))
+
+    def _log_snapshot_diagnostics(self, diagnostics: list[dict[str, Any]]) -> None:
+        duplicate_attrs = [item for item in diagnostics if item.get("code") == "duplicate_attr"]
+        unused_attrs = [item for item in diagnostics if item.get("code") == "unused_attr"]
+        missing_attrs = [item for item in diagnostics if item.get("code") == "missing_attr_reference"]
+        invalid_gui = [item for item in diagnostics if item.get("code") == "invalid_gui_value"]
+
+        self._log_diagnostic_group(logging.WARNING, "Обнаружены дубликаты attrs:", duplicate_attrs)
+        self._log_diagnostic_group(logging.WARNING, "Обнаружены не используемые attrs:", unused_attrs)
+        self._log_diagnostic_group(logging.ERROR, "Обнаруженны не существующие attrs:", missing_attrs)
+        self._log_diagnostic_group(logging.ERROR, "Обнаружены ошибки структуры gui.yaml:", invalid_gui)
+
+        grouped_codes = {
+            "duplicate_attr",
+            "unused_attr",
+            "missing_attr_reference",
+            "invalid_gui_value",
+        }
+        for item in diagnostics:
+            if item.get("code") in grouped_codes:
+                continue
+            level_name = str(item.get("level") or "info").lower()
+            level = logging.INFO
+            if level_name == "warning":
+                level = logging.WARNING
+            elif level_name == "error":
+                level = logging.ERROR
+            logger.log(level, self._diagnostic_line(item))
+
+    def _log_success_once(self, snapshot: Dict[str, Any]) -> None:
+        meta = snapshot.get("meta") or {}
+        version = str(meta.get("version") or "").strip()
+        if version and version == self._last_logged_snapshot_version:
+            return
+
+        self._last_logged_snapshot_version = version or None
+        self._last_logged_failure_signature = None
+        logger.info(
+            "Snapshot конфигурации загружен: version=%s pages=%s",
+            version or "unknown",
+            meta.get("page_count") or 0,
+        )
+        self._log_snapshot_diagnostics(list(snapshot.get("diagnostics") or []))
+
+    def _log_failure_once(
+        self,
+        fingerprint: Dict[str, int],
+        *,
+        last_error: str,
+        diagnostics: list[dict[str, Any]] | None = None,
+    ) -> None:
+        signature = self._fingerprint_signature(fingerprint)
+        if signature == self._last_logged_failure_signature:
+            return
+
+        self._last_logged_failure_signature = signature
+        if diagnostics:
+            self._log_snapshot_diagnostics(diagnostics)
+        logger.error("Не удалось обновить snapshot конфигурации: %s", last_error)
+
     def _reload_if_needed(self, force: bool = False) -> bool:
         if (
             not force
@@ -118,6 +213,27 @@ class ConfigService:
 
         try:
             snapshot = build_config_snapshot(self.pages_dir)
+        except SnapshotValidationError as exc:
+            self._failed_fingerprint = fingerprint
+            self._last_error = str(exc)
+            self._snapshot = self._set_build_status(
+                self._snapshot,
+                last_error=self._last_error,
+                diagnostics=[
+                    make_diagnostic(
+                        "error",
+                        "snapshot_build_failed",
+                        self._last_error,
+                    ).model_dump()
+                ],
+            )
+            self._schedule_next_scan()
+            self._log_failure_once(
+                fingerprint,
+                last_error="Новый snapshot отклонён из-за validation errors; сохранён предыдущий валидный snapshot",
+                diagnostics=[item.model_dump() for item in exc.diagnostics],
+            )
+            return False
         except ConfigLoadError as exc:
             self._failed_fingerprint = fingerprint
             self._last_error = str(exc)
@@ -133,7 +249,7 @@ class ConfigService:
                 ],
             )
             self._schedule_next_scan()
-            logger.error("Не удалось обновить snapshot конфигурации: %s", exc)
+            self._log_failure_once(fingerprint, last_error=str(exc))
             return False
         except Exception as exc:  # pragma: no cover
             self._failed_fingerprint = fingerprint
@@ -150,6 +266,7 @@ class ConfigService:
                 ],
             )
             self._schedule_next_scan()
+            self._log_failure_once(fingerprint, last_error=str(exc))
             logger.exception("Неожиданная ошибка при обновлении snapshot конфигурации: %s", exc)
             return False
 
@@ -158,6 +275,7 @@ class ConfigService:
         self._failed_fingerprint = None
         self._last_error = None
         self._schedule_next_scan()
+        self._log_success_once(snapshot)
         return True
 
     def get_snapshot(self) -> Dict[str, Any]:

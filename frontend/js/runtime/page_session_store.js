@@ -1,5 +1,13 @@
 'use strict';
 
+import { resolveAttrConfig } from './attrs_resolver.js';
+import {
+    isStatefulWidgetConfig,
+    normalizeStatefulWidgetValue,
+    normalizedStatefulValueEquals,
+    resolveInitialWidgetValue
+} from './widget_contract.js';
+
 /**
  * Session/runtime state that is not derived directly from snapshot payload.
  *
@@ -70,16 +78,27 @@ function initializeWidgetValues(store, attrsByName) {
     const attrs = asObject(attrsByName);
     const nextValues = { ...asObject(store.widgetValues) };
     let changed = false;
+    const now = new Date();
 
     Object.entries(attrs).forEach(([name, config]) => {
-        if (Object.prototype.hasOwnProperty.call(nextValues, name)) {
+        if (!isStatefulWidgetConfig(config)) {
             return;
         }
 
-        if (config && typeof config === 'object' && config.default !== undefined) {
-            nextValues[name] = config.default;
-            changed = true;
+        const hasCurrentValue = Object.prototype.hasOwnProperty.call(nextValues, name);
+        const normalizedValue = hasCurrentValue
+            ? normalizeStatefulWidgetValue(config, nextValues[name], { now })
+            : resolveInitialWidgetValue(config, { now });
+
+        if (
+            hasCurrentValue &&
+            normalizedStatefulValueEquals(nextValues[name], normalizedValue)
+        ) {
+            return;
         }
+
+        nextValues[name] = normalizedValue;
+        changed = true;
     });
 
     if (changed) {
@@ -89,16 +108,34 @@ function initializeWidgetValues(store, attrsByName) {
     return store.widgetValues;
 }
 
-function setWidgetValue(store, name, value) {
+function setWidgetValue(store, attrsByName, name, value) {
     const key = String(name || '').trim();
     if (!key) {
         return store.widgetValues;
     }
 
+    const currentValues = asObject(store.widgetValues);
+    const attrs = asObject(attrsByName);
+    const config = resolveAttrConfig(attrs, key);
+    const normalizedValue = isStatefulWidgetConfig(config)
+        ? normalizeStatefulWidgetValue(config, value)
+        : value;
+    const previousValue = Object.prototype.hasOwnProperty.call(currentValues, key)
+        ? currentValues[key]
+        : undefined;
+    const isEqual = isStatefulWidgetConfig(config)
+        ? normalizedStatefulValueEquals(previousValue, normalizedValue)
+        : previousValue === normalizedValue;
+
+    if (isEqual) {
+        return store.widgetValues;
+    }
+
     store.widgetValues = {
-        ...asObject(store.widgetValues),
-        [key]: value
+        ...currentValues,
+        [key]: normalizedValue
     };
+
     return store.widgetValues;
 }
 

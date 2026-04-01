@@ -4,11 +4,21 @@
 
 import widgetFactory from './widgets/factory.js';
 
+const CLOSE_BUTTON_CONFIG = Object.freeze({
+    widget: 'button',
+    label: 'Закрыть',
+    command: 'CLOSE_MODAL'
+});
+
 const WidgetRenderer = {
     props: {
-        widgetConfig: {
+        widgetAttrs: {
             type: Object,
             required: true
+        },
+        widgetValue: {
+            required: false,
+            default: undefined
         },
         widgetName: {
             type: String,
@@ -16,37 +26,66 @@ const WidgetRenderer = {
         }
     },
     emits: ['input', 'execute'],
-    
+    data() {
+        return {
+            lastResolvedAttrs: null,
+            lastResolvedValue: undefined,
+            lastResolvedConfig: null
+        };
+    },
     template: `
         <component 
             :is="widgetComponent"
             :key="componentKey"
-            :widget-config="widgetConfig"
+            :widget-config="resolvedWidgetConfig"
             :widget-name="widgetName"
             @input="onInput"
             @execute="onExecute">
         </component>
     `,
-    
+
     computed: {
+        resolvedWidgetConfig() {
+            if (this.widgetValue === undefined) {
+                return this.widgetAttrs;
+            }
+
+            if (
+                this.lastResolvedConfig &&
+                this.lastResolvedAttrs === this.widgetAttrs &&
+                this.lastResolvedValue === this.widgetValue
+            ) {
+                return this.lastResolvedConfig;
+            }
+
+            this.lastResolvedAttrs = this.widgetAttrs;
+            this.lastResolvedValue = this.widgetValue;
+            this.lastResolvedConfig = {
+                ...this.widgetAttrs,
+                value: this.widgetValue
+            };
+
+            return this.lastResolvedConfig;
+        },
+
         widgetComponent() {
             // Получаем компонент виджета из фабрики
-            if (widgetFactory && this.widgetConfig.widget) {
-                return widgetFactory.getWidgetComponent(this.widgetConfig.widget);
+            if (widgetFactory && this.resolvedWidgetConfig.widget) {
+                return widgetFactory.getWidgetComponent(this.resolvedWidgetConfig.widget);
             }
-            
-            // Fallback на StringWidget если фабрика не загружена
-            return 'div';
+
+            // Даже если attrs пришёл без widget, по контракту это строковый виджет.
+            return widgetFactory.getWidgetComponent('str');
         },
 
         componentKey() {
-            const widgetType = this.widgetConfig && this.widgetConfig.widget
-                ? this.widgetConfig.widget
+            const widgetType = this.resolvedWidgetConfig && this.resolvedWidgetConfig.widget
+                ? this.resolvedWidgetConfig.widget
                 : 'str';
             return `${widgetType}:${this.widgetName}`;
         }
     },
-    
+
     methods: {
         onInput(data) {
             this.$emit('input', data);
@@ -73,7 +112,8 @@ const ItemIcon = {
 const ContentRows = {
     props: {
         rows: { type: Array, required: true },
-        getWidgetConfig: { type: Function, required: true },
+        getWidgetAttrs: { type: Function, required: true },
+        getWidgetValue: { type: Function, required: true },
         textClass: { type: String, default: 'page-section-text' }
     },
     emits: ['execute', 'input'],
@@ -94,7 +134,8 @@ const ContentRows = {
                     <div class="row">
                         <div v-for="(item, itemIndex) in row.widgets" :key="itemIndex" class="col-auto">
                             <widget-renderer
-                                :widget-config="getWidgetConfig(item)"
+                                :widget-attrs="getWidgetAttrs(item)"
+                                :widget-value="getWidgetValue(item)"
                                 :widget-name="item"
                                 @input="$emit('input', $event)"
                                 @execute="$emit('execute', $event)">
@@ -116,7 +157,8 @@ const SectionCard = {
         isCollapsed: { type: Boolean, default: false },
         onToggle: { type: Function, default: null },
         onInput: { type: Function, default: null },
-        getWidgetConfig: { type: Function, required: true },
+        getWidgetAttrs: { type: Function, required: true },
+        getWidgetValue: { type: Function, required: true },
         onExecute: { type: Function, required: true },
         headerId: { type: String, default: '' }
     },
@@ -153,7 +195,8 @@ const SectionCard = {
                         <div :class="bodyClass">
                             <content-rows
                                 :rows="section.rows"
-                                :get-widget-config="getWidgetConfig"
+                                :get-widget-attrs="getWidgetAttrs"
+                                :get-widget-value="getWidgetValue"
                                 :text-class="contentTextClass"
                                 @input="onInput ? onInput($event) : null"
                                 @execute="onExecute">
@@ -303,8 +346,12 @@ const SectionCard = {
 // Компонент для кнопок модального окна
 const ModalButtons = {
     inject: {
-        getWidgetConfigByName: {
-            from: 'getWidgetConfigByName',
+        getWidgetAttrsByName: {
+            from: 'getWidgetAttrsByName',
+            default: null
+        },
+        getWidgetRuntimeValueByName: {
+            from: 'getWidgetRuntimeValueByName',
             default: null
         }
     },
@@ -320,14 +367,15 @@ const ModalButtons = {
             <template v-for="buttonName in buttons" :key="buttonName">
                 <!-- Кнопка CLOSE - используем стандартный виджет кнопки -->
                 <widget-renderer v-if="buttonName === 'CLOSE'"
-                    :widget-config="getCloseButtonConfig()"
+                    :widget-attrs="getCloseButtonConfig()"
                     :widget-name="'CLOSE'"
                     @execute="$emit('execute', $event)">
                 </widget-renderer>
                 
                 <!-- Обычная кнопка из attrs -->
                 <widget-renderer v-else
-                    :widget-config="getWidgetConfig(buttonName)"
+                    :widget-attrs="getWidgetAttrs(buttonName)"
+                    :widget-value="getWidgetValue(buttonName)"
                     :widget-name="buttonName"
                     @execute="$emit('execute', $event)">
                 </widget-renderer>
@@ -336,21 +384,21 @@ const ModalButtons = {
     `,
     methods: {
         getCloseButtonConfig() {
-            // Создаем стандартную конфигурацию для кнопки закрытия
-            return {
-                widget: 'button',
-                label: 'Закрыть',
-                command: 'CLOSE_MODAL'
-            };
+            return CLOSE_BUTTON_CONFIG;
         },
-        getWidgetConfig(widgetName) {
-            if (typeof this.getWidgetConfigByName === 'function') {
-                return this.getWidgetConfigByName(widgetName);
+        getWidgetAttrs(widgetName) {
+            if (typeof this.getWidgetAttrsByName === 'function') {
+                return this.getWidgetAttrsByName(widgetName);
             }
             return {
                 widget: 'str',
                 label: widgetName
             };
+        },
+        getWidgetValue(widgetName) {
+            return typeof this.getWidgetRuntimeValueByName === 'function'
+                ? this.getWidgetRuntimeValueByName(widgetName)
+                : undefined;
         }
     }
 };

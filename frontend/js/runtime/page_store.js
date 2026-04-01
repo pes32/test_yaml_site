@@ -1,5 +1,7 @@
 'use strict';
 
+import { normalizeAttrsMap } from './attrs_resolver.js';
+
 /**
  * Snapshot-derived page state.
  *
@@ -43,7 +45,7 @@ function createEmptyStore() {
 
 function normalizePageState(payload) {
         const page = asObject(payload && payload.page);
-        const attrs = asObject(payload && payload.attrs);
+        const attrs = normalizeAttrsMap(payload && payload.attrs);
         return {
             page: Object.keys(page).length ? page : null,
             attrs,
@@ -53,7 +55,7 @@ function normalizePageState(payload) {
     }
 
 function normalizeAttrsState(payload) {
-        const attrs = asObject(payload && payload.attrs);
+        const attrs = normalizeAttrsMap(payload && payload.attrs);
         const resolvedNames = uniqueNames(
             (payload && payload.resolvedNames)
             || Object.keys(attrs)
@@ -72,7 +74,7 @@ function normalizeAttrsState(payload) {
 
 function normalizeModalState(payload) {
         const modal = asObject(payload && payload.modal);
-        const attrs = asObject(payload && payload.attrs);
+        const attrs = normalizeAttrsMap(payload && payload.attrs);
         return {
             modal: Object.keys(modal).length ? modal : null,
             attrs: attrs,

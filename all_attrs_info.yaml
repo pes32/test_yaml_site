@@ -1,0 +1,311 @@
+# =============================================================================
+# СПРАВОЧНИК ПО ATTRS И BACKEND-COMMANDS
+# =============================================================================
+#
+# Этот файл можно использовать как локальную шпаргалку по текущему runtime-
+# контракту attrs. Здесь собраны:
+# - все типы виджетов, которые сейчас реально поддерживает система;
+# - поля, которые уже используются в коде;
+# - поля, которые поддерживаются runtime, но почти не документированы;
+# - пояснение, как работают команды на backend и как добавить новую.
+#
+# -----------------------------------------------------------------------------
+# 1. ОБЩАЯ ФОРМА ATTRS-ВИДЖЕТА
+# -----------------------------------------------------------------------------
+#
+# <attr_name>:
+#   widget: str | text | int | float | list | ip | ip_mask | date | time | datetime | button | img | table
+#   label: "Подпись виджета"                                             # Подпись виджета
+#   sup_text: "Текст под виджетом"                                       # Подпись под виджетом
+#   width: 350 | "20rem" | "100%"                                        # Ширина поля
+#   readonly: true                                                       # Только для чтения
+#   default: ...                                                         # Значение по умолчанию 
+#   regex: "^выражение$"                                                 # Regex для str/text/int/float/ip/ip_mask
+#   err_text: "Текст ошибки для regex/валидации"                         # Текст ошибки для regex
+#   placeholder: "Подсказка внутри поля"                                 # Текст внутри виджета
+#   rows: число                                                          # Для table/text - число строк
+#   editable: false                                                      # Для list - выбор только из списка, без поиска.
+#   multiselect: true                                                    # Для list - множественный выбор
+#   icon: "file.svg"                                                     # Для button - Иконка для кнопки
+#   hint: "Tooltip для icon-only кнопки"                                 # Для img - хинт
+#   fon: true                                                            # Для button - фон
+#   size: 24                                                             # Для button - размер для иконки
+#   width: 40 | 500 | "20rem"                                            # ширина виджетов
+#   source: ["Опция 1", "Опция 2", "Опция 3"]                            # Для list - источник данных
+#   source: "templates/file.pdf"                                         # Для button - источник данных (открывает файлы)
+#   source: [["a", "b"], ["c", "d"]]                                     # Для table - источник данных в таблицу
+#   url: "/path" | "https://..."                                         # Для button - адрес для открытия
+#   sticky_header: true                                                  # Для table. Включить липкий заголовок по умолчанию
+#   sort: false                                                          # Для table. Отключить сортировку
+#   zebra: false                                                         # Для table. Отключить зебру
+#   line_numbers: true                                                   # Для table. Вкл. нумерацию строк
+#   table_lazy: true | false                                             # Для table. Вкл. ленивую загрузку
+#   dialog:                                                              # Для button - диалог с параметрами
+#     title: "Заголовок"
+#     text: "Текст"
+#     accept: "Да"
+#     cancel: "Отмена"
+#   table_attrs: |                                                       # Разметка столбцов для таблиц
+#     attr /Заголовок
+#     attr2 /Заголовок 2 :150
+#   command: modal_id -ui                                                # переход к модальным окнам.
+#   command: "save"                       !!!!!                          # команды для бэка. Как работают???????
+#   output_attrs: [attr_1, attr_2]        !!!!!
+#   value:  Runtime override              !!!!!
+#   data: ???                             !!!!!
+
+
+# Важно:
+# - в старых демо встречается str без `widget: str`, но по текущему runtime
+#   безопаснее всегда писать widget явно;
+#
+# -----------------------------------------------------------------------------
+# 2. СПИСОК ВСЕХ ПОДДЕРЖИВАЕМЫХ ВИДЖЕТОВ
+# -----------------------------------------------------------------------------
+#
+# 2.1. str
+#
+# <name>:
+#   widget: str
+#   label: "Текст"
+#   sup_text: "Текст"
+#   placeholder: "Текст"
+#   default: "Значение"
+#   value: "Runtime override"
+#   readonly: true
+#   width: 350
+#   regex: "^...$"
+#   err_text: "Текст ошибки"
+#
+# 2.2. text
+#
+# <name>:
+#   widget: text
+#   label: "Текст"
+#   sup_text: "Текст"
+#   placeholder: "Текст"
+#   default: "Значение"
+#   value: "Runtime override"
+#   readonly: true
+#   width: 350
+#   rows: 3
+#   regex: "^...$"
+#   err_text: "Текст ошибки"
+#
+# 2.3. int
+#
+# <name>:
+#   widget: int
+#   label: "Текст"
+#   sup_text: "Текст"
+#   placeholder: "Текст"
+#   default: 42
+#   value: 42
+#   readonly: true
+#   width: 350
+#   regex: "^...$"
+#   err_text: "Текст ошибки"
+#
+# 2.4. float
+#
+# <name>:
+#   widget: float
+#   label: "Текст"
+#   sup_text: "Текст"
+#   placeholder: "Текст"
+#   default: 3.14
+#   value: 3.14
+#   readonly: true
+#   width: 350
+#   regex: "^...$"
+#   err_text: "Текст ошибки"
+#
+# 2.5. list
+#
+# <name>:
+#   widget: list
+#   label: "Текст"
+#   sup_text: "Текст"
+#   placeholder: "Текст"
+#   default: "Опция 1"          # для single-select
+#   default: ["Опция 1"]        # для multiselect
+#   value: "Runtime override"
+#   value: ["Runtime override"]
+#   readonly: true
+#   width: 350
+#   source: ["Опция 1", "Опция 2", "Опция 3"]
+#   editable: false             # выбор только из списка, без поиска
+#   multiselect: true           # множественный выбор
+#
+# 2.6. ip
+#
+# <name>:
+#   widget: ip
+#   label: "Текст"
+#   sup_text: "Текст"
+#   placeholder: "192.168.0.1"
+#   default: "192.168.0.1"
+#   value: "192.168.0.1"
+#   readonly: true
+#   width: 350
+#   regex: "^...$"
+#   err_text: "Текст ошибки"
+#
+# Примечание:
+# - у ip есть встроенная живая валидация;
+# - допустимые разделители во время ввода: ".", ",", пробел, "|" и "\".
+#
+# 2.7. ip_mask
+#
+# <name>:
+#   widget: ip_mask
+#   label: "Текст"
+#   sup_text: "Текст"
+#   placeholder: "192.168.0.1/24"
+#   default: "192.168.0.1/24"
+#   value: "192.168.0.1/24"
+#   readonly: true
+#   width: 350
+#   regex: "^...$"
+#   err_text: "Текст ошибки"
+#
+# 2.8. date
+#
+# <name>:
+#   widget: date
+#   label: "Текст"
+#   sup_text: "Текст"
+#   default: "2026-03-27"
+#   default: now
+#   value: "2026-03-27"
+#   readonly: true
+#   width: 350 | "20rem"
+#
+# Поддерживаемые форматы ввода:
+# - DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD
+# - DD.MM, DD/MM, DD-MM
+# - DD
+# - DDMM, DDMMYY, DDMMYYYY, YYYYMMDD
+#
+# 2.9. time
+#
+# <name>:
+#   widget: time
+#   label: "Текст"
+#   sup_text: "Текст"
+#   default: "13:45"
+#   default: now
+#   value: "13:45"
+#   readonly: true
+#   width: 350 | "20rem"
+#
+# Поддерживаемые форматы ввода:
+# - HH:MM, HH:MM:SS, HH.MM, HH, HHMM, HHMMSS
+#
+# 2.10. datetime
+#
+# <name>:
+#   widget: datetime
+#   label: "Текст"
+#   sup_text: "Текст"
+#   default: "2026-03-27 13:45"
+#   default: now
+#   value: "2026-03-27T13:45:00"
+#   readonly: true
+#   width: 350 | "20rem"
+#
+# Примечание:
+# - datetime раскладывается на date-part и time-part;
+# - допускаются разделители и через пробел, и через `T`.
+#
+# 2.11. button
+#
+# <name>:
+#   widget: button
+#   label: "Кнопка"
+#   sup_text: "Текст под кнопкой"
+#   default: "внутреннее значение"
+#   icon: "file.svg" | "fa-solid fa-gear"
+#   hint: "Tooltip для icon-only кнопки"
+#   fon: true
+#   size: 24
+#   width: 40 | 500 | "20rem"
+#   source: "templates/file.pdf"   # открыть файл/ресурс в новой вкладке
+#   url: "/path" | "https://..."
+#   command: "save"
+#   command: "modal_id -ui"
+#   output_attrs: [attr_1, attr_2]
+#   dialog:
+#     title: "Заголовок"
+#     text: "Текст"
+#     accept: "Да"
+#     cancel: "Отмена"
+#
+# Примечания:
+# - `source` у кнопки открывает файл/ресурс в новой вкладке;
+# - `url` делает переход в текущей вкладке;
+# - `command` без ` -ui` уходит в POST /api/execute;
+# - `command: "<modal> -ui"` не идёт в /api/execute, а открывает UI-модалку;
+# - `CLOSE_MODAL` — специальная frontend-only команда закрытия модалки;
+# - если указан dialog, то url/command выполняется только после подтверждения.
+#
+# 2.12. img
+#
+# <name>:
+#   widget: img
+#   label: "Подпись сверху"
+#   sup_text: "Подпись снизу"
+#   source: "templates/image.png" | "/templates/image.png"
+#   width: 600 | "50%"
+#
+#
+# 2.13. table
+#
+# <name>:
+#   widget: table
+#   label: "Заголовок таблицы"
+#   sup_text: "Текст под таблицей"
+#   width: 1400 | "1400px" | "100%"
+#   row: 3
+#   sticky_header: true
+#   sort: false
+#   zebra: false
+#   line_numbers: true
+#   table_lazy: true | false
+#   source: [["a", "b"], ["c", "d"]]
+#   data: [["a", "b"], ["c", "d"]]   # скрытый алиас, реально читается TableWidget
+#   readonly: true
+#   table_attrs: |
+#     attr /Заголовок
+#     attr2 /Заголовок 2 :150
+#
+#
+# Важно:
+# - если `table_lazy` не задан, lazy включается автоматически при rowCount > 100.
+#
+# -----------------------------------------------------------------------------
+# 3. СИНТАКСИС table_attrs
+# -----------------------------------------------------------------------------
+#
+# Базовая форма:
+#   attr /Заголовок
+#
+# Дополнительные токены:
+# - :150
+#   Явная ширина колонки в px.
+#
+# - :str | :int | :float | :date | :time | :datetime | :list | :ip | :ip_mask
+#   Встроенный тип ячейки таблицы.
+#
+# - :some_attr_name
+#   Ссылка на внешний attrs-виджет.
+#
+# - #,.2f | #,d | #,.2e
+#   Формат числа
+#
+# - №7
+#   Номер колонки, выводится отдельной строкой заголовка.
+#
+# - /Группа
+#   Group-header над следующими колонками.
+#

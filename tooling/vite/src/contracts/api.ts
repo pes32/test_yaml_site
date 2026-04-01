@@ -4,6 +4,8 @@ export interface Diagnostic {
   message: string;
   page?: string | null;
   file?: string | null;
+  line?: number | null;
+  url?: string | null;
   node_path?: string | null;
 }
 
@@ -93,6 +95,18 @@ export interface ExecuteResult {
   widget: string | null;
   message: string;
   data: unknown;
+  diagnostics: Diagnostic[];
+  snapshotVersion: string;
+}
+
+export interface DebugSqlResult {
+  query: string;
+  columns: string[];
+  rows: Record<string, unknown>[];
+  rowCount: number;
+  truncated: boolean;
+  maxRows: number;
+  durationMs: number;
   diagnostics: Diagnostic[];
   snapshotVersion: string;
 }

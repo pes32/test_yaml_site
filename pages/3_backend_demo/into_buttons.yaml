@@ -1,0 +1,28 @@
+#     input_attrs: [attr_1, attr_2] - записываем В бд
+
+#     attrs_map:
+#      attr_1: map_name_db
+#      attr_2: map_name_db_2
+
+
+back_button_1:
+  widget: button
+  label: Заполнить виджеты
+  select_attrs: back_str, back_text, back_int, back_float, back_ip, back_ip_mask,
+                back_date, back_time, back_datetime
+  command: test_select_1 -pg
+
+back_button_2:
+  widget: button
+  label: Заполнить таблицу
+  select_attrs: back_table
+  command: test_select_2 -pg
+
+
+# back_table:
+#   widget: table
+#   label: "таблица"
+#   table_attrs: |
+#     value_1 /Значение 1
+#     value_2 /Значение 2
+#     value_3 /Значение 3

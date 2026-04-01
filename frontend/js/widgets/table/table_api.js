@@ -1,4 +1,5 @@
 import tableEngine from './table_core.js';
+import { resolveAttrConfig } from '../../runtime/attrs_resolver.js';
 
 const Core = tableEngine;
 
@@ -20,7 +21,7 @@ function getListOptions(allAttrs, sourceName) {
     if (!sourceName || !allAttrs || typeof allAttrs !== 'object') {
         return [];
     }
-    const attr = allAttrs[sourceName];
+    const attr = resolveAttrConfig(allAttrs, sourceName);
     return attr && Array.isArray(attr.source) ? attr.source : [];
 }
 

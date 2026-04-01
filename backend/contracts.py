@@ -26,6 +26,8 @@ class Diagnostic(BaseModel):
     message: str
     page: Optional[str] = None
     file: Optional[str] = None
+    line: Optional[int] = None
+    url: Optional[str] = None
     node_path: Optional[str] = None
 
 
@@ -153,6 +155,22 @@ class ExecuteRequest(BaseModel):
         stripped = str(value or "").strip()
         if not stripped:
             raise ValueError("command is required")
+        return stripped
+
+
+class DebugSqlRequest(BaseModel):
+    """Контракт тела POST /api/debug/sql."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    query: str
+
+    @field_validator("query")
+    @classmethod
+    def _validate_query(cls, value: str) -> str:
+        stripped = str(value or "").strip()
+        if not stripped:
+            raise ValueError("query is required")
         return stripped
 
 

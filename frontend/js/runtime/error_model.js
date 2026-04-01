@@ -5,6 +5,7 @@ import { FrontendApiError } from './api_client.js';
  *
  * @typedef {Object} FrontendRuntimeError
  * @property {true} __frontendError
+ * @property {string} presentation
  * @property {string} kind
  * @property {string} scope
  * @property {boolean} recoverable
@@ -36,12 +37,48 @@ const FRONTEND_ERROR_SCOPES = Object.freeze({
     debug: 'debug'
 });
 
+const FRONTEND_ERROR_PRESENTATIONS = Object.freeze({
+    fatal: 'fatal',
+    recoverable: 'recoverable',
+    diagnostic: 'diagnostic'
+});
+
+function normalizePresentation(value) {
+    const key = typeof value === 'string' ? value.trim() : '';
+    return Object.prototype.hasOwnProperty.call(FRONTEND_ERROR_PRESENTATIONS, key)
+        ? FRONTEND_ERROR_PRESENTATIONS[key]
+        : '';
+}
+
+function resolvePresentation(options = {}) {
+    const explicit = normalizePresentation(options.presentation);
+    if (explicit) {
+        return explicit;
+    }
+
+    if (options.asPageError === true || options.recoverable === false) {
+        return FRONTEND_ERROR_PRESENTATIONS.fatal;
+    }
+
+    if (options.diagnostic === true) {
+        return FRONTEND_ERROR_PRESENTATIONS.diagnostic;
+    }
+
+    if (options.recoverable === true) {
+        return FRONTEND_ERROR_PRESENTATIONS.recoverable;
+    }
+
+    return FRONTEND_ERROR_PRESENTATIONS.diagnostic;
+}
+
 function createFrontendError(options = {}) {
+    const presentation = resolvePresentation(options);
     return {
         __frontendError: true,
+        presentation,
         kind: options.kind || FRONTEND_ERROR_KINDS.unknown,
         scope: options.scope || FRONTEND_ERROR_SCOPES.page,
-        recoverable: options.recoverable === true,
+        recoverable: presentation === FRONTEND_ERROR_PRESENTATIONS.recoverable,
         message: String(options.message || 'Произошла ошибка'),
         code: typeof options.code === 'string' ? options.code : '',
         status: Number(options.status) || 0,
@@ -107,9 +144,10 @@ function presentFrontendError(error) {
         return normalized;
     }
 
-    const header = `[frontend:${normalized.scope}:${normalized.kind}] ${normalized.message}`;
+    const header = `[frontend:${normalized.scope}:${normalized.presentation}:${normalized.kind}] ${normalized.message}`;
     if (typeof console.groupCollapsed === 'function') {
         console.groupCollapsed(header);
+        console.log('presentation:', normalized.presentation);
         if (normalized.code) {
             console.log('code:', normalized.code);
         }
@@ -138,6 +176,7 @@ function presentFrontendError(error) {
 
 export {
     FRONTEND_ERROR_KINDS,
+    FRONTEND_ERROR_PRESENTATIONS,
     FRONTEND_ERROR_SCOPES,
     createFrontendError,
     normalizeFrontendError,

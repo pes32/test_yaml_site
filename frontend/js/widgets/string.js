@@ -29,8 +29,9 @@ const StringWidget = {
                    v-model="value"
                    :title="value"
                    @input="onInput"
-                   @focus="isFocused = true"
-                   @blur="onBlur">
+                   @focus="onFocus"
+                   @blur="onBlur"
+                   @keydown.enter="onEnterCommit">
             <template #supporting>
                 <span v-if="fieldError" class="md3-error" v-text="fieldError"></span>
                 <span v-else v-text="widgetConfig.sup_text"></span>
@@ -46,14 +47,37 @@ const StringWidget = {
         showPlaceholder() { return !this.hasValue && this.isFocused && this.widgetConfig.placeholder; }
     },
     methods: {
+        onFocus() {
+            this.isFocused = true;
+            this.activateDraftController();
+        },
         onInput() {
             this.validateRegex();
-            this.emitInput(this.value);
+            if (this.tableCellMode) {
+                this.emitInput(this.value);
+                return;
+            }
+
+            this.activateDraftController();
         },
         onBlur() {
             this.isFocused = false;
+            this.commitDraft();
+            this.deactivateDraftController();
+        },
+        onEnterCommit(event) {
+            if (this.tableCellMode) {
+                return;
+            }
+
+            event.preventDefault();
+            this.commitDraft();
+            event.target?.blur?.();
+        },
+        commitDraft() {
             this.validateRegex();
             this.handleTableCellCommitValidation(this.fieldError);
+            this.emitInput(this.value);
         },
         setValue(value) {
             this.value = value == null ? '' : String(value);
@@ -66,16 +90,11 @@ const StringWidget = {
             immediate: true,
             handler(value) {
                 if (value === undefined) return;
-                this.setValue(value);
+                this.syncCommittedValue(value, (nextValue) => this.setValue(nextValue));
             }
         }
     },
     mounted() {
-        if (this.widgetConfig.value !== undefined) {
-            this.setValue(this.widgetConfig.value);
-        } else if (this.widgetConfig.default !== undefined) {
-            this.value = this.widgetConfig.default;
-        }
         this.validateRegex();
     }
 };

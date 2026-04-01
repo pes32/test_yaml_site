@@ -2,6 +2,7 @@
  * Canonical schema для table_attrs: runtimeColumns / leafColumns / headerRows / dependencies.
  */
 import tableEngine from './table_core.js';
+import { normalizeAttrConfig } from '../../runtime/attrs_resolver.js';
 
 const Core = tableEngine;
     const LINE_NUMBER_ATTR = '__line_numbers__';
@@ -92,8 +93,10 @@ const Core = tableEngine;
         if (!key) return null;
         if (/^\d+$/.test(key)) return { kind: 'width', value: `${key}px` };
         const attrCfg =
-            allAttrs && allAttrs[key] && typeof allAttrs[key] === 'object'
-                ? allAttrs[key]
+            allAttrs &&
+            typeof allAttrs === 'object' &&
+            Object.prototype.hasOwnProperty.call(allAttrs, key)
+                ? normalizeAttrConfig(key, allAttrs[key])
                 : null;
         if (attrCfg) {
             uniqPush(dependencies, key);

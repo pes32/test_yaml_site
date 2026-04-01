@@ -19,7 +19,7 @@ big_table:
     attr_8 /С виджетом :table_int_1 №8
   
     /Дата и время
-    attr_9 /Дата :table_date :200 №9
+    attr_9 /Дата :date :200 №9
     attr_10 /Время :table_time :150 №10
 
     /Списки
@@ -28,14 +28,11 @@ big_table:
     attr_13 /Мультисписок :table_list_3 №13
 
     /Адреса
-    attr_14 /ip :table_ip :200
+    attr_14 /ip :ip :200
     attr_15 /ip_mask :table_ip_mask :200
 
 
 # Табличные виджеты.
-
-table_date:
-  widget: date
 
 table_time:
   widget: time
@@ -54,9 +51,6 @@ table_list_3:
   widget: list
   multiselect: true
   source: ["Парам 1", "Парам 11", "Парам 111", "Парам 1111"]
-
-table_ip:
-  widget: ip
 
 table_ip_mask:
   widget: ip_mask

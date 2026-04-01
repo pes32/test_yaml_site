@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 LOG_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
 CONSOLE_LEVEL = logging.WARNING
-FILE_LEVEL = logging.ERROR
+FILE_LEVEL = logging.INFO
 
 
 def _configure_console_handler(root_logger: logging.Logger, formatter: logging.Formatter) -> None:
@@ -78,7 +78,7 @@ def setup_logging(app: "Flask") -> str:
 
     formatter = logging.Formatter(LOG_FORMAT)
     root_logger = logging.getLogger()
-    root_logger.setLevel(CONSOLE_LEVEL)
+    root_logger.setLevel(min(CONSOLE_LEVEL, FILE_LEVEL))
 
     _configure_console_handler(root_logger, formatter)
     _configure_file_handler(root_logger, log_file, formatter)
@@ -89,7 +89,7 @@ def setup_logging(app: "Flask") -> str:
     # Не добавляем хендлеров к app.logger — пусть сообщения всплывают к root.
     if default_handler in app.logger.handlers:
         app.logger.removeHandler(default_handler)
-    app.logger.setLevel(logging.ERROR)
+    app.logger.setLevel(logging.NOTSET)
     app.logger.propagate = True
 
     return log_file

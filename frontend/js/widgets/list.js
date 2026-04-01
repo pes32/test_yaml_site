@@ -2,6 +2,7 @@
 
 import Md3Field from './md3_field.js';
 import widgetMixin from './mixin.js';
+import { normalizeListOptions } from '../runtime/widget_contract.js';
 
 const ListWidget = {
     components: { Md3Field },
@@ -19,13 +20,12 @@ const ListWidget = {
             :is-focused="isFocused"
             :wrap-extra="{ 'md3-dropdown-wrap': true }"
             :has-supporting="!!widgetConfig.sup_text"
-            @focusout="onListFocusOut"
-            @container-focusout="onFocusOut">
+            @focusout="onWidgetFocusOut"
+            @container-focusout="onWidgetFocusOut">
             <div class="dropdown widget-dropdown list-combobox w-100 min-w-0 max-w-none"
                  :class="{ show: isDropdownOpen }"
                  :data-dropdown-open="isDropdownOpen ? 'true' : undefined"
                  v-bind="tableCellRootAttrs"
-                 @focusout="tableCellMode && onFocusOut()"
                  ref="dropdownRoot">
                 <div class="list-combobox-inner" ref="dropdownToggle">
                     <input type="text"
@@ -40,9 +40,7 @@ const ListWidget = {
                            :readonly="!isEditable || widgetConfig.multiselect"
                            :disabled="widgetConfig.readonly"
                            :tabindex="widgetConfig.readonly ? -1 : null"
-                           :title="inputDisplayValue"
-                           :aria-expanded="isDropdownOpen"
-                           @focusout="tableCellMode && onListFocusOut()">
+                           :title="inputDisplayValue">
                         <span class="list-combobox-arrow-wrap">
                             <span class="list-combobox-arrow"
                               data-table-action-trigger="list"
@@ -59,25 +57,28 @@ const ListWidget = {
                 </div>
                 <Teleport to="body">
                     <ul class="dropdown-menu widget-dd-menu widget-dd-menu--teleport"
-                        :class="{ show: isDropdownOpen, scrollable: filteredList.length > 10 }"
+                        :class="{ show: isDropdownOpen, scrollable: filteredOptions.length > 10 }"
                         :style="menuPosition"
                         role="listbox"
                         :aria-activedescendant="highlightedId"
                         tabindex="-1"
                         @keydown="onMenuKeydown"
                         ref="dropdownMenu">
-                        <li v-for="(item, idx) in filteredList" :key="item" role="option" :id="'list-item-' + listId + '-' + idx">
+                        <li v-for="(option, idx) in filteredOptions"
+                            :key="option.id"
+                            role="option"
+                            :id="listItemId(idx)">
                             <a class="dropdown-item"
                                href="#"
                                :tabindex="-1"
                                :class="{
-                                   'active': (highlightedIndex >= 0 ? highlightedIndex === idx : isItemSelected(item)),
-                                   'dropdown-item--selected': widgetConfig.multiselect && isItemSelected(item)
+                                   'active': (highlightedIndex >= 0 ? highlightedIndex === idx : isOptionSelected(option)),
+                                   'dropdown-item--selected': widgetConfig.multiselect && isOptionSelected(option)
                                }"
-                               @click.prevent="selectItem(item, $event)"
+                               @click.prevent="selectOption(option, $event)"
                                @mousedown.prevent="highlightedIndex = idx"
-                               :title="item">
-                                <span v-text="item"></span>
+                               :title="option.label">
+                                <span v-text="option.label"></span>
                             </a>
                         </li>
                     </ul>
@@ -90,9 +91,9 @@ const ListWidget = {
     `,
     data() {
         return {
-            value: null,
+            value: '',
             inputValue: '',
-            lastSelectedItem: null,
+            lastSelectedOptionId: '',
             isDropdownOpen: false,
             isFocused: false,
             menuPosition: {},
@@ -104,12 +105,15 @@ const ListWidget = {
         isEditable() {
             return this.widgetConfig.editable !== false;
         },
+        isMultiselect() {
+            return this.widgetConfig.multiselect === true;
+        },
         hasValue() {
-            const v = this.widgetConfig.multiselect ? this.value : this.inputDisplayValue;
-            if (this.widgetConfig.multiselect) {
+            if (this.isMultiselect) {
                 return Array.isArray(this.value) && this.value.length > 0;
             }
-            return v !== null && v !== undefined && String(v).trim() !== '';
+
+            return String(this.value || '').trim() !== '';
         },
         labelFloats() {
             return this.hasValue || this.isFocused;
@@ -117,47 +121,145 @@ const ListWidget = {
         showPlaceholder() {
             return !this.hasValue && this.isFocused && this.widgetConfig.placeholder;
         },
-        inputDisplayValue() {
-            if (this.widgetConfig.multiselect) {
-                return (Array.isArray(this.value) && this.value.length > 0)
-                    ? this.value.join(', ')
-                    : '';
-            }
-            if (!this.isEditable) {
-                return this.value != null ? String(this.value) : '';
-            }
-            return this.inputValue !== '' ? this.inputValue : (this.value != null ? String(this.value) : '');
+        listOptions() {
+            return normalizeListOptions(this.widgetConfig.source);
         },
-        listSource() {
-            if (Array.isArray(this.widgetConfig.source)) {
-                return this.widgetConfig.source;
-            }
-            return [];
-        },
-        filteredList() {
-            if (this.isEditable && !this.widgetConfig.multiselect && this.isDropdownOpen && this.inputValue.trim()) {
-                const q = this.inputValue.trim().toLowerCase();
-                return this.listSource.filter(item =>
-                    String(item).toLowerCase().includes(q)
+        filteredOptions() {
+            if (this.isEditable && !this.isMultiselect && this.isDropdownOpen && this.inputValue.trim()) {
+                const query = this.inputValue.trim().toLowerCase();
+                return this.listOptions.filter((option) =>
+                    option.label.toLowerCase().includes(query)
                 );
             }
-            return this.listSource;
+
+            return this.listOptions;
+        },
+        inputDisplayValue() {
+            if (this.isMultiselect) {
+                return this.getSelectedLabels().join(', ');
+            }
+
+            if (!this.isEditable) {
+                return this.getOptionLabelByValue(this.value);
+            }
+
+            if (this.isDraftEditing) {
+                return this.inputValue;
+            }
+
+            return this.inputValue !== ''
+                ? this.inputValue
+                : this.getOptionLabelByValue(this.value);
         },
         highlightedId() {
-            return this.highlightedIndex >= 0 && this.highlightedIndex < this.filteredList.length
-                ? `list-item-${this.listId}-${this.highlightedIndex}`
+            return this.highlightedIndex >= 0 && this.highlightedIndex < this.filteredOptions.length
+                ? this.listItemId(this.highlightedIndex)
                 : null;
         }
     },
     methods: {
-        onInputChange(e) {
-            if (!this.isEditable || this.widgetConfig.multiselect) return;
-            this.inputValue = e.target.value;
-            this.value = this.inputValue;
-            this.emitInput(this.value);
+        listItemId(index) {
+            return `list-item-${this.listId}-${index}`;
+        },
+        getOptionByValue(value, options = this.listOptions) {
+            return options.find((option) => option.value === String(value ?? '')) || null;
+        },
+        getOptionById(optionId, options = this.listOptions) {
+            return options.find((option) => option.id === optionId) || null;
+        },
+        getOptionLabelByValue(value) {
+            const normalized = value == null ? '' : String(value);
+            if (!normalized) {
+                return '';
+            }
+
+            const option = this.getOptionByValue(normalized);
+            return option ? option.label : normalized;
+        },
+        getSelectedLabels() {
+            if (!this.isMultiselect || !Array.isArray(this.value)) {
+                return [];
+            }
+
+            return this.value
+                .map((itemValue) => this.getOptionLabelByValue(itemValue))
+                .filter(Boolean);
+        },
+        resolveSingleCommittedValue(rawDraft) {
+            const draft = String(rawDraft ?? '');
+            if (!draft) {
+                return '';
+            }
+
+            const matchedOption = this.listOptions.find((option) =>
+                option.label === draft || option.value === draft
+            );
+
+            return matchedOption ? matchedOption.value : draft;
+        },
+        setSingleValue(value) {
+            this.value = value == null ? '' : String(value);
+            if (!this.isDraftEditing) {
+                this.inputValue = this.getOptionLabelByValue(this.value);
+            }
+        },
+        setMultiValue(value) {
+            this.value = Array.isArray(value)
+                ? value.map((item) => String(item ?? ''))
+                : [];
+        },
+        setValue(value) {
+            if (this.isMultiselect) {
+                this.setMultiValue(value);
+                return;
+            }
+
+            const nextValue = Array.isArray(value)
+                ? (value[0] == null ? '' : String(value[0]))
+                : String(value ?? '');
+            this.setSingleValue(nextValue);
+        },
+        syncInputDraftFromCommittedValue() {
+            if (this.isMultiselect || this.isDraftEditing) {
+                return;
+            }
+
+            this.inputValue = this.getOptionLabelByValue(this.value);
+        },
+        resolveHighlightedIndex() {
+            if (this.isMultiselect) {
+                const anchorOption = this.getOptionById(this.lastSelectedOptionId, this.filteredOptions);
+                if (anchorOption) {
+                    return this.filteredOptions.findIndex((option) => option.id === anchorOption.id);
+                }
+                return -1;
+            }
+
+            const selectedOption = this.getOptionByValue(this.value, this.filteredOptions);
+            if (selectedOption) {
+                return this.filteredOptions.findIndex((option) => option.id === selectedOption.id);
+            }
+            return -1;
+        },
+        onInputChange(event) {
+            if (!this.isEditable || this.isMultiselect) {
+                return;
+            }
+
+            this.inputValue = String(event.target.value || '');
+            this.activateDraftController();
+            if (!this.isDropdownOpen) {
+                this.openDropdown();
+            } else if (this.highlightedIndex >= this.filteredOptions.length) {
+                this.highlightedIndex = Math.max(0, this.filteredOptions.length - 1);
+            }
         },
         onInputFocus() {
             this.isFocused = true;
+            if (!this.isMultiselect && this.isEditable && !this.isDraftEditing) {
+                this.inputValue = this.getOptionLabelByValue(this.value);
+                this.activateDraftController();
+            }
         },
         onInputBlur() {
             this.isFocused = false;
@@ -166,31 +268,37 @@ const ListWidget = {
                 input.scrollLeft = 0;
                 input.setSelectionRange(0, 0);
             }
-            setTimeout(() => {
-                const active = document.activeElement;
-                const inMenu = this.$refs.dropdownMenu?.contains(active);
-                if (!inMenu) this.closeDropdown();
+
+            window.setTimeout(() => {
+                if (this.isFocusInsideWidget()) {
+                    return;
+                }
+
+                if (!this.isMultiselect && this.isEditable) {
+                    this.commitDraft();
+                }
+                this.closeDropdown();
+                this.deactivateDraftController();
             }, 150);
         },
-        onInputKeydown(e) {
-            if (this.widgetConfig.readonly) return;
-            if (this.widgetConfig.multiselect && (e.key === 'Backspace' || e.key === 'Delete')) {
-                e.preventDefault();
+        onInputKeydown(event) {
+            if (this.widgetConfig.readonly) {
+                return;
+            }
+
+            if (this.isMultiselect && (event.key === 'Backspace' || event.key === 'Delete')) {
+                event.preventDefault();
                 this.removeLastSelected();
                 return;
             }
-            if (!this.isEditable && (e.key === 'Backspace' || e.key === 'Delete')) {
-                e.preventDefault();
+
+            if (!this.isEditable && (event.key === 'Backspace' || event.key === 'Delete')) {
+                event.preventDefault();
                 this.clearValue();
                 return;
             }
-            const expandKeys = (e.altKey || e.metaKey) && e.key === 'ArrowDown';
-            if (expandKeys || (e.key === 'Enter' && !this.isDropdownOpen)) {
-                e.preventDefault();
-                this.toggleDropdown();
-                return;
-            }
-            if (e.key === 'Tab') {
+
+            if (event.key === 'Tab') {
                 const tabHandler =
                     this.widgetConfig &&
                     this.widgetConfig.table_cell_tab_handler;
@@ -198,88 +306,121 @@ const ListWidget = {
                     this.tableCellMode &&
                     typeof tabHandler === 'function'
                 ) {
-                    e.preventDefault();
+                    event.preventDefault();
                     this.closeDropdown();
-                    tabHandler(!!e.shiftKey);
+                    tabHandler(!!event.shiftKey);
                     return;
                 }
             }
-            if (this.isDropdownOpen && this.filteredList.length > 0) {
-                if (e.key === 'ArrowDown') {
-                    e.preventDefault();
+
+            const expandKeys = (event.altKey || event.metaKey) && event.key === 'ArrowDown';
+            if (expandKeys) {
+                event.preventDefault();
+                this.openDropdown();
+                return;
+            }
+
+            if (event.key === 'Enter' && !this.isDropdownOpen) {
+                if (!this.isMultiselect && this.isEditable) {
+                    event.preventDefault();
+                    this.commitDraft();
+                    event.target?.blur?.();
+                    return;
+                }
+
+                event.preventDefault();
+                this.openDropdown();
+                return;
+            }
+
+            if (this.isDropdownOpen && this.filteredOptions.length > 0) {
+                if (event.key === 'ArrowDown') {
+                    event.preventDefault();
                     this.focusMenuItem(this.highlightedIndex >= 0 ? this.highlightedIndex : 0);
                     return;
                 }
-                if (e.key === 'ArrowUp') {
-                    e.preventDefault();
-                    this.focusMenuItem(this.filteredList.length - 1);
+                if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    this.focusMenuItem(this.filteredOptions.length - 1);
                     return;
                 }
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    const len = this.filteredList.length;
-                    if (this.highlightedIndex >= 0 && this.highlightedIndex < len) {
-                        this.selectItem(this.filteredList[this.highlightedIndex], e);
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    const length = this.filteredOptions.length;
+                    if (this.highlightedIndex >= 0 && this.highlightedIndex < length) {
+                        this.selectOption(this.filteredOptions[this.highlightedIndex], event);
                     }
                     return;
                 }
-                if (e.key === 'Escape') {
-                    e.preventDefault();
+                if (event.key === 'Escape') {
+                    event.preventDefault();
                     this.closeDropdown();
                     this.$refs.dropdownToggle?.querySelector('.list-combobox-input')?.focus();
-                    return;
                 }
             }
         },
         focusMenuItem(index) {
             const items = this.$refs.dropdownMenu?.querySelectorAll('[role="option"]');
-            if (!items || index < 0 || index >= items.length) return;
+            if (!items || index < 0 || index >= items.length) {
+                return;
+            }
+
             this.highlightedIndex = index;
             this.$nextTick(() => {
-                const el = items[index]?.querySelector('.dropdown-item') || items[index];
-                if (el) {
-                    el.focus();
-                    el.scrollIntoView({ block: 'nearest' });
+                const element = items[index]?.querySelector('.dropdown-item') || items[index];
+                if (element) {
+                    element.focus();
+                    element.scrollIntoView({ block: 'nearest' });
                 }
             });
         },
-        onMenuKeydown(e) {
-            if (!this.isDropdownOpen) return;
-            const items = this.filteredList;
-            const len = items.length;
-            if (len === 0) return;
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                this.highlightedIndex = (this.highlightedIndex + 1) % len;
+        onMenuKeydown(event) {
+            if (!this.isDropdownOpen) {
+                return;
+            }
+
+            const options = this.filteredOptions;
+            const length = options.length;
+            if (length === 0) {
+                return;
+            }
+
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                this.highlightedIndex = (this.highlightedIndex + 1) % length;
                 this.$nextTick(() => this.focusMenuItem(this.highlightedIndex));
                 return;
             }
-            if (e.key === 'ArrowUp') {
-                e.preventDefault();
+
+            if (event.key === 'ArrowUp') {
+                event.preventDefault();
                 if (this.highlightedIndex <= 0) {
                     this.highlightedIndex = -1;
                     this.$refs.dropdownToggle?.querySelector('.list-combobox-input')?.focus();
                 } else {
-                    this.highlightedIndex = this.highlightedIndex - 1;
+                    this.highlightedIndex -= 1;
                     this.$nextTick(() => this.focusMenuItem(this.highlightedIndex));
                 }
                 return;
             }
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                if (this.highlightedIndex >= 0 && this.highlightedIndex < len) {
-                    this.selectItem(items[this.highlightedIndex], e);
+
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                if (this.highlightedIndex >= 0 && this.highlightedIndex < length) {
+                    this.selectOption(options[this.highlightedIndex], event);
                     this.$refs.dropdownToggle?.querySelector('.list-combobox-input')?.focus();
                 }
                 return;
             }
-            if (e.key === 'Escape') {
-                e.preventDefault();
+
+            if (event.key === 'Escape') {
+                event.preventDefault();
                 this.closeDropdown();
                 this.$refs.dropdownToggle?.querySelector('.list-combobox-input')?.focus();
                 return;
             }
-            if (e.key === 'Tab') {
+
+            if (event.key === 'Tab') {
                 const tabHandler =
                     this.widgetConfig &&
                     this.widgetConfig.table_cell_tab_handler;
@@ -287,88 +428,116 @@ const ListWidget = {
                     this.tableCellMode &&
                     typeof tabHandler === 'function'
                 ) {
-                    e.preventDefault();
+                    event.preventDefault();
                     this.closeDropdown();
-                    tabHandler(!!e.shiftKey);
+                    tabHandler(!!event.shiftKey);
                     return;
                 }
+
                 this.closeDropdown();
             }
-            if (this.widgetConfig.multiselect && (e.key === 'Backspace' || e.key === 'Delete')) {
-                e.preventDefault();
+
+            if (this.isMultiselect && (event.key === 'Backspace' || event.key === 'Delete')) {
+                event.preventDefault();
                 this.removeLastSelected();
-                this.closeDropdown();
-                this.$refs.dropdownToggle?.querySelector('.list-combobox-input')?.focus();
-            }
-            if (!this.isEditable && (e.key === 'Backspace' || e.key === 'Delete')) {
-                e.preventDefault();
-                this.clearValue();
                 this.closeDropdown();
                 this.$refs.dropdownToggle?.querySelector('.list-combobox-input')?.focus();
             }
         },
         onArrowClick() {
-            if (this.widgetConfig.readonly) return;
+            if (this.widgetConfig.readonly) {
+                return;
+            }
+
             this.$refs.dropdownToggle?.querySelector('.list-combobox-input')?.focus();
-            this.toggleDropdown();
-        },
-        selectItem(item, event) {
-            if (this.widgetConfig.multiselect) {
-                if (!Array.isArray(this.value)) this.value = [];
-                if (event && event.shiftKey && this.lastSelectedItem) {
-                    const lastIndex = this.listSource.indexOf(this.lastSelectedItem);
-                    const currentIndex = this.listSource.indexOf(item);
-                    const start = Math.min(lastIndex, currentIndex);
-                    const end = Math.max(lastIndex, currentIndex);
-                    for (let i = start; i <= end; i++) {
-                        const rangeItem = this.listSource[i];
-                        if (!this.value.includes(rangeItem)) this.value.push(rangeItem);
-                    }
-                } else {
-                    const index = this.value.indexOf(item);
-                    if (index > -1) {
-                        this.value.splice(index, 1);
-                    } else {
-                        this.value.push(item);
-                    }
-                }
-                this.lastSelectedItem = item;
-            } else {
-                if (this.value === item) {
-                    this.clearValue();
-                } else {
-                    this.value = item;
-                    this.inputValue = item;
-                }
-                this.closeDropdown();
-            }
-            this.emitInput(this.value);
-        },
-        isItemSelected(item) {
-            if (this.widgetConfig.multiselect) {
-                return Array.isArray(this.value) && this.value.includes(item);
-            }
-            return this.value === item;
-        },
-        toggleDropdown() {
-            if (this.widgetConfig.readonly) return;
-            this.isDropdownOpen = !this.isDropdownOpen;
             if (this.isDropdownOpen) {
-                this.highlightedIndex = this.filteredList.indexOf(this.value);
-                this.$nextTick(() => {
-                    this.updateMenuPosition();
-                    this.addClickOutsideListener();
-                    this.addScrollListener();
-                });
+                this.closeDropdown();
             } else {
-                this.highlightedIndex = -1;
-                this.removeClickOutsideListener();
-                this.removeScrollListener();
+                this.openDropdown();
             }
+        },
+        buildNextMultiValue(option, event) {
+            const currentValues = Array.isArray(this.value) ? [...this.value] : [];
+            if (event && event.shiftKey && this.lastSelectedOptionId) {
+                const anchorIndex = this.listOptions.findIndex((item) => item.id === this.lastSelectedOptionId);
+                const currentIndex = this.listOptions.findIndex((item) => item.id === option.id);
+
+                if (anchorIndex !== -1 && currentIndex !== -1) {
+                    const start = Math.min(anchorIndex, currentIndex);
+                    const end = Math.max(anchorIndex, currentIndex);
+                    const nextValues = [...currentValues];
+
+                    for (let index = start; index <= end; index += 1) {
+                        const rangeOption = this.listOptions[index];
+                        if (!rangeOption || nextValues.includes(rangeOption.value)) {
+                            continue;
+                        }
+                        nextValues.push(rangeOption.value);
+                    }
+
+                    return nextValues;
+                }
+            }
+
+            const optionIndex = currentValues.indexOf(option.value);
+            if (optionIndex >= 0) {
+                currentValues.splice(optionIndex, 1);
+                return currentValues;
+            }
+
+            currentValues.push(option.value);
+            return currentValues;
+        },
+        selectOption(option, event) {
+            if (!option) {
+                return;
+            }
+
+            if (this.isMultiselect) {
+                this.value = this.buildNextMultiValue(option, event);
+                this.lastSelectedOptionId = option.id;
+                this.emitInput([...this.value]);
+                return;
+            }
+
+            const nextValue = this.value === option.value ? '' : option.value;
+            this.value = nextValue;
+            this.inputValue = this.getOptionLabelByValue(nextValue);
+            this.lastSelectedOptionId = option.id;
+            this.emitInput(nextValue);
+            this.closeDropdown();
+            this.deactivateDraftController();
+        },
+        isOptionSelected(option) {
+            if (!option) {
+                return false;
+            }
+
+            if (this.isMultiselect) {
+                return Array.isArray(this.value) && this.value.includes(option.value);
+            }
+
+            return this.value === option.value;
+        },
+        openDropdown() {
+            if (this.widgetConfig.readonly) {
+                return;
+            }
+
+            this.isDropdownOpen = true;
+            this.highlightedIndex = this.resolveHighlightedIndex();
+            this.$nextTick(() => {
+                this.updateMenuPosition();
+                this.addClickOutsideListener();
+                this.addScrollListener();
+            });
         },
         updateMenuPosition() {
             const toggle = this.$refs.dropdownToggle;
-            if (!toggle) return;
+            if (!toggle) {
+                return;
+            }
+
             const rect = toggle.getBoundingClientRect();
             this.menuPosition = {
                 position: 'fixed',
@@ -381,7 +550,9 @@ const ListWidget = {
         addScrollListener() {
             this.removeScrollListener();
             this._scrollUpdate = () => {
-                if (this.isDropdownOpen) this.updateMenuPosition();
+                if (this.isDropdownOpen) {
+                    this.updateMenuPosition();
+                }
             };
             window.addEventListener('scroll', this._scrollUpdate, true);
         },
@@ -392,23 +563,29 @@ const ListWidget = {
             }
         },
         closeDropdown() {
-            if (this.isDropdownOpen) {
-                this.isDropdownOpen = false;
-                this.highlightedIndex = -1;
-                this.removeClickOutsideListener();
-                this.removeScrollListener();
+            if (!this.isDropdownOpen) {
+                return;
             }
+
+            this.isDropdownOpen = false;
+            this.highlightedIndex = -1;
+            this.removeClickOutsideListener();
+            this.removeScrollListener();
         },
         addClickOutsideListener() {
             this.removeClickOutsideListener();
-            this._clickOutside = (e) => {
+            this._clickOutside = (event) => {
+                const target = event.target;
                 const root = this.$refs.dropdownRoot;
                 const menu = this.$refs.dropdownMenu;
-                const target = e.target;
                 const inRoot = root && root.contains(target);
                 const inMenu = menu && menu.contains(target);
                 if (!inRoot && !inMenu) {
+                    if (!this.isMultiselect && this.isEditable) {
+                        this.commitDraft();
+                    }
                     this.closeDropdown();
+                    this.deactivateDraftController();
                 }
             };
             this._clickOutsideTimerId = window.setTimeout(() => {
@@ -428,101 +605,84 @@ const ListWidget = {
                 this._clickOutside = null;
             }
         },
-        onTab() {
-            if (this.widgetConfig.multiselect) this.closeDropdown();
+        isFocusInsideWidget() {
+            const root = this.$refs.dropdownRoot;
+            const menu = this.$refs.dropdownMenu;
+            const active = document.activeElement;
+            if (root && active && root.contains(active)) {
+                return true;
+            }
+            return Boolean(menu && active && menu.contains(active));
         },
-        onFocusOut() {
-            if (!this.widgetConfig.multiselect) return;
-            setTimeout(() => {
-                const root = this.$refs.dropdownRoot;
-                const menu = this.$refs.dropdownMenu;
-                const active = document.activeElement;
-                if (root && root.contains(active)) return;
-                if (menu && menu.contains(active)) return;
+        onWidgetFocusOut() {
+            window.setTimeout(() => {
+                if (this.isFocusInsideWidget()) {
+                    return;
+                }
+
+                if (!this.isMultiselect && this.isEditable) {
+                    this.commitDraft();
+                }
                 this.closeDropdown();
-            }, 0);
-        },
-        onListFocusOut() {
-            setTimeout(() => {
-                const root = this.$refs.dropdownRoot;
-                const menu = this.$refs.dropdownMenu;
-                const active = document.activeElement;
-                if (root && root.contains(active)) return;
-                if (menu && menu.contains(active)) return;
-                this.closeDropdown();
+                this.deactivateDraftController();
             }, 0);
         },
         removeLastSelected() {
-            if (!this.widgetConfig.multiselect || !Array.isArray(this.value) || this.value.length === 0) return;
-            this.value = this.value.slice(0, -1);
-            this.emitInput(this.value);
-        },
-        clearValue() {
-            if (this.widgetConfig.multiselect) {
-                this.value = [];
-            } else {
-                this.value = '';
-                this.inputValue = '';
-            }
-            this.emitInput(this.value);
-        },
-        setValue(value) {
-            this.value = value;
-            if (!this.widgetConfig.multiselect) {
-                this.inputValue = value != null ? String(value) : '';
-            }
-        },
-        getValue() { return this.value; },
-        applyValueFromConfig(val) {
-            if (this.widgetConfig.multiselect) {
-                const next = Array.isArray(val) ? val : val ? [val] : [];
-                this.value = [...next];
+            if (!this.isMultiselect || !Array.isArray(this.value) || this.value.length === 0) {
                 return;
             }
-            let v = val;
-            if (Array.isArray(v)) v = v[0] || '';
-            if (v === null || v === undefined) v = '';
-            this.value = v;
-            this.inputValue = String(v);
+
+            this.value = this.value.slice(0, -1);
+            this.emitInput([...this.value]);
+        },
+        clearValue() {
+            if (this.isMultiselect) {
+                this.value = [];
+                this.emitInput([]);
+                this.lastSelectedOptionId = '';
+                return;
+            }
+
+            this.value = '';
+            this.inputValue = '';
+            this.emitInput('');
+        },
+        commitDraft() {
+            if (this.isMultiselect || !this.isEditable) {
+                return;
+            }
+
+            const committedValue = this.resolveSingleCommittedValue(this.inputValue);
+            this.value = committedValue;
+            this.inputValue = this.getOptionLabelByValue(committedValue);
+            this.emitInput(committedValue);
+        },
+        getValue() {
+            return this.value;
         }
     },
     watch: {
-        widgetConfig: {
-            deep: true,
-            handler(cfg) {
-                if (!cfg || !Object.prototype.hasOwnProperty.call(cfg, 'value')) return;
-                this.applyValueFromConfig(cfg.value);
-            }
-        },
-        value: {
-            handler(val) {
-                if (!this.widgetConfig.multiselect && this.inputValue !== val) {
-                    this.inputValue = val != null ? String(val) : '';
+        'widgetConfig.value': {
+            immediate: true,
+            handler(value) {
+                if (value === undefined) {
+                    return;
                 }
-            },
-            immediate: true
+
+                this.syncCommittedValue(value, (nextValue) => this.setValue(nextValue));
+            }
         },
-        filteredList() {
-            if (this.highlightedIndex >= this.filteredList.length) {
-                this.highlightedIndex = Math.max(0, this.filteredList.length - 1);
+        filteredOptions() {
+            if (this.highlightedIndex >= this.filteredOptions.length) {
+                this.highlightedIndex = Math.max(0, this.filteredOptions.length - 1);
             }
-        }
-    },
-    mounted() {
-        if (Object.prototype.hasOwnProperty.call(this.widgetConfig, 'value')) {
-            this.applyValueFromConfig(this.widgetConfig.value);
-        } else if (this.widgetConfig.default !== undefined) {
-            this.applyValueFromConfig(this.widgetConfig.default);
-        }
-        if (this.widgetConfig.multiselect) {
-            if (!Array.isArray(this.value)) this.value = [];
-        } else {
-            if (Array.isArray(this.value)) {
-                this.value = this.value[0] || '';
-            } else if (this.value === null || this.value === undefined) {
-                this.value = '';
+        },
+        listOptions() {
+            if (this.lastSelectedOptionId && !this.getOptionById(this.lastSelectedOptionId)) {
+                this.lastSelectedOptionId = '';
             }
-            this.inputValue = this.value != null ? String(this.value) : '';
+
+            this.syncInputDraftFromCommittedValue();
         }
     },
     beforeUnmount() {

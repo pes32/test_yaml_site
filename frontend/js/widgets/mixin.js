@@ -5,13 +5,22 @@ const widgetMixin = {
         showAppNotification: {
             from: 'showAppNotification',
             default: null
+        },
+        setActiveDraftWidgetController: {
+            from: 'setActiveDraftWidgetController',
+            default: null
+        },
+        clearActiveDraftWidgetController: {
+            from: 'clearActiveDraftWidgetController',
+            default: null
         }
     },
     data() {
         return {
             intError: '',
             floatError: '',
-            tableCellCommitError: ''
+            tableCellCommitError: '',
+            isDraftEditing: false
         };
     },
     computed: {
@@ -68,6 +77,44 @@ const widgetMixin = {
                 config: this.widgetConfig
             });
         },
+        usesDraftCommitModel() {
+            return !this.tableCellMode;
+        },
+        syncCommittedValue(value, applyValue) {
+            if (typeof applyValue !== 'function') {
+                return;
+            }
+
+            const editingLocked = this.usesDraftCommitModel()
+                ? this.isDraftEditing
+                : !!this.isFocused;
+
+            if (editingLocked) {
+                return;
+            }
+
+            applyValue(value);
+        },
+        activateDraftController() {
+            if (!this.usesDraftCommitModel() || this.widgetConfig.readonly) {
+                return;
+            }
+
+            this.isDraftEditing = true;
+            if (typeof this.setActiveDraftWidgetController === 'function') {
+                this.setActiveDraftWidgetController(this);
+            }
+        },
+        deactivateDraftController() {
+            if (!this.usesDraftCommitModel()) {
+                return;
+            }
+
+            this.isDraftEditing = false;
+            if (typeof this.clearActiveDraftWidgetController === 'function') {
+                this.clearActiveDraftWidgetController(this);
+            }
+        },
         showWidgetNotification(message, type = 'danger') {
             if (typeof this.showAppNotification === 'function') {
                 this.showAppNotification(message, type);
@@ -103,6 +150,9 @@ const widgetMixin = {
             }
             return errorMessage === '';
         }
+    },
+    beforeUnmount() {
+        this.deactivateDraftController();
     }
 };
 

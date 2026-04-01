@@ -45,7 +45,9 @@ async function loadTableListSources(vm, attrNames) {
 
     const extra = new Set();
     attrNames.forEach((name) => {
-        const cfg = vm.allAttrs[name];
+        const cfg = typeof vm.getWidgetConfig === 'function'
+            ? vm.getWidgetConfig(name)
+            : vm.allAttrs[name];
         if (!cfg || cfg.widget !== 'table' || !cfg.table_attrs) {
             return;
         }

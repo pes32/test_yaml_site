@@ -45,26 +45,14 @@
                 </aside>
 
                 <main class="page-content-column u-wide">
-                    <diagnostics-panel
-                        :diagnostics="diagnostics"
-                        :snapshot-version="snapshotVersion">
-                    </diagnostics-panel>
-
                     <error-panel
                         v-if="pageError"
                         :error="pageError"
                         @dismiss="dismissPageError">
                     </error-panel>
 
-                    <error-panel
-                        v-for="(item, index) in appErrors"
-                        :key="'app-error-' + index + '-' + item.scope + '-' + item.message"
-                        :error="item"
-                        @dismiss="dismissAppError(index)">
-                    </error-panel>
-
                     <div v-if="blockingPageError" class="page-empty-placeholder">
-                        Не удалось подготовить страницу для отображения. Проверь diagnostics и runtime-ошибки выше.
+                        Не удалось подготовить страницу для отображения. Проверь логи приложения или debug-страницу.
                     </div>
 
                     <div v-else-if="activeMenu" class="page-main-stack">
@@ -92,7 +80,8 @@
                                     :is-collapsed="isSectionCollapsed(sidx)"
                                     :on-toggle="() => toggleSectionCollapse(sidx)"
                                     :on-input="onWidgetInput"
-                                    :get-widget-config="getWidgetConfig"
+                                    :get-widget-attrs="getWidgetAttrs"
+                                    :get-widget-value="getWidgetRuntimeValue"
                                     :on-execute="executeCommand"
                                     :header-id="'heading-' + activeMenuIndex + '-' + sidx">
                                 </section-card>

@@ -17,11 +17,15 @@ createApp({
             logsLoading: false,
             pages: [],
             pagesLoading: false,
+            sqlQuery: '',
+            sqlLoading: false,
+            sqlResult: null,
             diagnostics: [],
             scopeErrors: {
                 api: null,
                 logs: null,
-                pages: null
+                pages: null,
+                sql: null
             }
         };
     },
@@ -51,6 +55,32 @@ createApp({
         },
         pagesError() {
             return this.scopeErrors.pages;
+        },
+        sqlError() {
+            return this.scopeErrors.sql;
+        },
+        canRunSql() {
+            return Boolean((this.sqlQuery || '').trim());
+        },
+        sqlColumns() {
+            return Array.isArray(this.sqlResult?.columns) ? this.sqlResult.columns : [];
+        },
+        sqlRows() {
+            return Array.isArray(this.sqlResult?.rows) ? this.sqlResult.rows : [];
+        },
+        sqlSummary() {
+            if (!this.sqlResult) {
+                return '';
+            }
+
+            const parts = [`Показано строк: ${this.sqlResult.rowCount || 0}`];
+            if (this.sqlResult.truncated) {
+                parts.push(`результат ограничен первыми ${this.sqlResult.maxRows} строками`);
+            }
+            if (this.sqlResult.durationMs > 0) {
+                parts.push(`время: ${this.sqlResult.durationMs} мс`);
+            }
+            return parts.join(' · ');
         }
     },
     mounted() {
@@ -84,6 +114,31 @@ createApp({
         },
         dismissScopeError(scope) {
             this.clearScopeError(scope);
+        },
+        formatSqlCell(value) {
+            if (value === null) {
+                return 'null';
+            }
+            if (value === undefined) {
+                return '';
+            }
+            if (typeof value === 'object') {
+                try {
+                    return JSON.stringify(value);
+                } catch (error) {
+                    return String(value);
+                }
+            }
+            return String(value);
+        },
+        onSqlKeydown(event) {
+            if (event.key !== 'Enter' || (!event.ctrlKey && !event.metaKey)) {
+                return;
+            }
+            event.preventDefault();
+            if (this.canRunSql && !this.sqlLoading) {
+                this.runSql();
+            }
         },
         async loadApi() {
             this.apiLoading = true;
@@ -127,6 +182,25 @@ createApp({
                 this.reportScopeError('pages', error, 'Не удалось загрузить YAML-страницы');
             } finally {
                 this.pagesLoading = false;
+            }
+        },
+        async runSql() {
+            if (!this.canRunSql) {
+                return;
+            }
+
+            this.sqlLoading = true;
+            this.sqlResult = null;
+            this.clearScopeError('sql');
+
+            try {
+                const data = await frontendApiClient.executeDebugSql(this.sqlQuery);
+                this.sqlResult = data;
+                this.diagnostics = Array.isArray(data.diagnostics) ? data.diagnostics : [];
+            } catch (error) {
+                this.reportScopeError('sql', error, 'Не удалось выполнить SQL-запрос');
+            } finally {
+                this.sqlLoading = false;
             }
         }
     }

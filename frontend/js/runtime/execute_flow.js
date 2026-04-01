@@ -12,6 +12,10 @@ function resolveCommandParams(vm, commandData) {
 }
 
 async function executeCommand(vm, commandData) {
+    if (vm && typeof vm.commitActiveDraftWidget === 'function') {
+        vm.commitActiveDraftWidget();
+    }
+
     const widgetConfig = vm.getWidgetConfig(commandData.widget);
     if (widgetConfig.url) {
         window.location.href = widgetConfig.url;

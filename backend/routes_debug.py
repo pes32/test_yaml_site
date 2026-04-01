@@ -6,9 +6,12 @@ from __future__ import annotations
 import logging
 import os
 
-from flask import jsonify, make_response, render_template
+from flask import jsonify, make_response, render_template, request
+from pydantic import ValidationError
 
 from .api_response import error_payload, success_payload
+from .contracts import DebugSqlRequest
+from .database import DebugSqlError, get_db_manager
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +142,46 @@ def register_debug_routes(app, config_service, log_file_path: str):
                     "diagnostics": snapshot.get("diagnostics") or [],
                     "last_error": config_service.get_last_error(),
                 },
+                snapshot=snapshot,
+                diagnostics=snapshot.get("diagnostics") or [],
+            )
+        )
+
+    @app.route("/api/debug/sql", methods=["POST"])
+    def api_debug_sql():
+        """Read-only SQL helper для debug-панели."""
+        snapshot = _snapshot()
+        data = request.get_json(silent=True) or {}
+
+        try:
+            payload = DebugSqlRequest.model_validate(data)
+        except ValidationError:
+            return _json_response(
+                error_payload(
+                    code="invalid_debug_sql_request",
+                    message="Некорректное тело запроса debug SQL",
+                    snapshot=snapshot,
+                    diagnostics=snapshot.get("diagnostics") or [],
+                ),
+                400,
+            )
+
+        try:
+            result = get_db_manager().execute_readonly_select(payload.query)
+        except DebugSqlError as exc:
+            return _json_response(
+                error_payload(
+                    code=exc.code,
+                    message=str(exc),
+                    snapshot=snapshot,
+                    diagnostics=snapshot.get("diagnostics") or [],
+                ),
+                exc.status_code,
+            )
+
+        return _json_response(
+            success_payload(
+                data=result,
                 snapshot=snapshot,
                 diagnostics=snapshot.get("diagnostics") or [],
             )

@@ -17,8 +17,12 @@ const ModalManager = {
             from: 'getModalRuntimeState',
             default: null
         },
-        getWidgetConfigByName: {
-            from: 'getWidgetConfigByName',
+        getWidgetAttrsByName: {
+            from: 'getWidgetAttrsByName',
+            default: null
+        },
+        getWidgetRuntimeValueByName: {
+            from: 'getWidgetRuntimeValueByName',
             default: null
         }
     },
@@ -66,7 +70,8 @@ const ModalManager = {
                                         :is-collapsed="isModalSectionCollapsed(tidx, sidx)"
                                         :on-toggle="() => toggleModalSectionCollapse(tidx, sidx)"
                                         :on-input="onWidgetInput"
-                                        :get-widget-config="getWidgetConfig"
+                                        :get-widget-attrs="getWidgetAttrs"
+                                        :get-widget-value="getWidgetValue"
                                         :on-execute="onWidgetExecute">
                                     </section-card>
                                 </div>
@@ -81,7 +86,8 @@ const ModalManager = {
                                     :is-collapsed="isModalSectionCollapsed(0, sidx)"
                                     :on-toggle="() => toggleModalSectionCollapse(0, sidx)"
                                     :on-input="onWidgetInput"
-                                    :get-widget-config="getWidgetConfig"
+                                    :get-widget-attrs="getWidgetAttrs"
+                                    :get-widget-value="getWidgetValue"
                                     :on-execute="onWidgetExecute">
                                 </section-card>
                             </div>
@@ -143,6 +149,7 @@ const ModalManager = {
             );
         },
         closeModal() {
+            this.$root?.commitActiveDraftWidget?.();
             this.rememberActiveModalScroll();
             if (this.modalRuntimeController && typeof this.modalRuntimeController.closeModal === 'function') {
                 this.modalRuntimeController.closeModal();
@@ -153,6 +160,7 @@ const ModalManager = {
                 return;
             }
 
+            this.$root?.commitActiveDraftWidget?.();
             this.rememberActiveModalScroll();
             this.modalRuntimeController.setActiveTab(index);
             this.restoreActiveModalScroll();
@@ -177,14 +185,19 @@ const ModalManager = {
         sectionsForTab(tabIndex) {
             return sectionsForTab(this.modalRuntimeState, tabIndex);
         },
-        getWidgetConfig(widgetName) {
-            if (typeof this.getWidgetConfigByName === 'function') {
-                return this.getWidgetConfigByName(widgetName);
+        getWidgetAttrs(widgetName) {
+            if (typeof this.getWidgetAttrsByName === 'function') {
+                return this.getWidgetAttrsByName(widgetName);
             }
             return {
                 widget: 'str',
                 label: widgetName
             };
+        },
+        getWidgetValue(widgetName) {
+            return typeof this.getWidgetRuntimeValueByName === 'function'
+                ? this.getWidgetRuntimeValueByName(widgetName)
+                : undefined;
         },
         onWidgetExecute(payload) {
             this.$emit('execute', payload);

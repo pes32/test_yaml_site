@@ -171,7 +171,7 @@ function createIpLikeWidget(maskTemplate, validateFn, allowMask) {
                        @input="onInputHandler"
                        @keydown="onKeyDown"
                        @blur="handleBlur"
-                       @focus="isFocused = true">
+                       @focus="onFocus">
                 <template #supporting>
                     <span v-if="displayError" class="md3-error" v-text="displayError"></span>
                     <span v-else v-text="widgetConfig.sup_text"></span>
@@ -205,12 +205,20 @@ function createIpLikeWidget(maskTemplate, validateFn, allowMask) {
             emitValue() {
                 this.emitInput(this.inputValue);
             },
+            onFocus() {
+                this.isFocused = true;
+                this.activateDraftController();
+            },
             applyNormalizedValue(rawValue, caretPosition) {
                 const prevValue = this.inputValue;
                 const normalized = normalizeIpLikeValue(rawValue, allowMask);
                 this.inputValue = normalized.value;
                 this.error = hasLiveIpLikeError(normalized, allowMask) ? 'Неверный формат' : '';
-                this.emitValue();
+                if (this.tableCellMode) {
+                    this.emitValue();
+                } else {
+                    this.activateDraftController();
+                }
 
                 let nextCursor = null;
                 if (
@@ -276,8 +284,8 @@ function createIpLikeWidget(maskTemplate, validateFn, allowMask) {
             },
             handleBlur() {
                 this.isFocused = false;
-                this.onBlur();
-                this.handleTableCellCommitValidation(this.error);
+                this.commitDraft();
+                this.deactivateDraftController();
             },
             onBlur() {
                 if (this.inputValue === '') {
@@ -297,6 +305,11 @@ function createIpLikeWidget(maskTemplate, validateFn, allowMask) {
                     ? ''
                     : this.widgetConfig.err_text || 'Неверный формат';
             },
+            commitDraft() {
+                this.onBlur();
+                this.handleTableCellCommitValidation(this.error);
+                this.emitValue();
+            },
             setValue(value) {
                 const raw = value == null ? '' : String(value);
                 this.inputValue = normalizeIpLikeValue(raw, allowMask).value;
@@ -308,18 +321,8 @@ function createIpLikeWidget(maskTemplate, validateFn, allowMask) {
                 immediate: true,
                 handler(value) {
                     if (value === undefined) return;
-                    this.setValue(value);
+                    this.syncCommittedValue(value, (nextValue) => this.setValue(nextValue));
                 }
-            }
-        },
-        mounted() {
-            const def =
-                this.widgetConfig.value !== undefined
-                    ? undefined
-                    : this.widgetConfig.default;
-            if (typeof def === 'string' && def.trim().length > 0) {
-                this.inputValue = normalizeIpLikeValue(def, allowMask).value;
-                this.emitValue();
             }
         }
     };

@@ -67,6 +67,8 @@ Attrs-фрагменты мержатся на backend.
 - дубликаты допустимы;
 - дубликаты фиксируются в diagnostics;
 - побеждает последний встретившийся ключ.
+- если `widget` у attrs не указан, для обычного поля по умолчанию используется `str`;
+- attrs проходят schema-validation на backend до попадания в snapshot.
 
 Нормализованный attrs map потом используется:
 
@@ -74,6 +76,20 @@ Attrs-фрагменты мержатся на backend.
 - для lazy `/api/attrs`;
 - для modal attrs loading;
 - для table dependency resolution.
+
+### Attrs schema notes
+
+Backend валидирует:
+
+- допустимый `widget` type;
+- разрешённые ключи для этого widget;
+- форму значений для `dialog`, `rows`, boolean flags, `source`, `select_attrs`.
+
+Важно:
+
+- `select_attrs` — допустимый YAML-ключ `button`, который резервирует список имён виджетов для будущего механизма заполнения;
+- `select_attrs` пока не реализует само заполнение, но его синтаксис считается корректным;
+- `output_attrs` не является YAML-ключом attrs-конфига и относится только к transport request `POST /api/execute`.
 
 ## UI-команды
 

@@ -5,9 +5,9 @@ demo_table_7:
   readonly: true
   sticky_header: true
   table_attrs: |
-    row_id / № :60
-    code / Код
-    region / Регион
+    row_id / № :60 #d
+    code / Код :150
+    region / Регион :180
     status / Статус
     note / Примечание
   source:

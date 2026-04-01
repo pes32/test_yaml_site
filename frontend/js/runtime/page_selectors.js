@@ -1,4 +1,9 @@
 import GuiParser from '../gui_parser.js';
+import { resolveAttrConfig } from './attrs_resolver.js';
+import {
+    isStatefulWidgetConfig,
+    resolveInitialWidgetValue
+} from './widget_contract.js';
 
 const EMPTY_PARSED_GUI = Object.freeze({
     menus: [],
@@ -78,12 +83,26 @@ function getCurrentPageName(configState) {
     return fromBody || '';
 }
 
+function selectWidgetAttrs(attrsByName, widgetName) {
+    return resolveAttrConfig(attrsByName, widgetName);
+}
+
+function selectWidgetRuntimeValue(sessionState, attrsByName, widgetName) {
+    const widgetConfig = selectWidgetAttrs(attrsByName, widgetName);
+    if (!isStatefulWidgetConfig(widgetConfig)) {
+        return undefined;
+    }
+
+    const widgetValues = asObject(sessionState && sessionState.widgetValues);
+    if (Object.prototype.hasOwnProperty.call(widgetValues, widgetName)) {
+        return widgetValues[widgetName];
+    }
+
+    return resolveInitialWidgetValue(widgetConfig);
+}
+
 function getWidgetConfig(attrsByName, widgetName) {
-    const attrs = asObject(attrsByName);
-    return attrs[widgetName] || {
-        widget: 'str',
-        label: widgetName
-    };
+    return selectWidgetAttrs(attrsByName, widgetName);
 }
 
 function getWidgetValue(sessionState, attrsByName, widgetName) {
@@ -92,7 +111,11 @@ function getWidgetValue(sessionState, attrsByName, widgetName) {
         return widgetValues[widgetName];
     }
 
-    const widgetConfig = getWidgetConfig(attrsByName, widgetName);
+    const widgetConfig = selectWidgetAttrs(attrsByName, widgetName);
+    if (isStatefulWidgetConfig(widgetConfig)) {
+        return resolveInitialWidgetValue(widgetConfig);
+    }
+
     return widgetConfig && widgetConfig.default !== undefined
         ? widgetConfig.default
         : null;
@@ -109,6 +132,8 @@ export {
     getModalMap,
     getParsedGuiState,
     getRootContentOnly,
+    selectWidgetAttrs,
+    selectWidgetRuntimeValue,
     getWidgetConfig,
     getWidgetValue
 };
