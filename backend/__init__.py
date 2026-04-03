@@ -1,26 +1,33 @@
 # backend/__init__.py
-"""Главная точка сборки backend-части
-Формирует объект `app`, настраивает логирование, загружает конфигурацию
-и регистрирует все маршруты, разбитые по модулям."""
+"""Главная точка сборки backend-части."""
 
-import time
-import os
+from __future__ import annotations
+
 import json
+import os
+import time
+
 from flask import Flask
 
 # Отключаем ANSI-цвета в логах Werkzeug, чтобы [36m, [0m и т.п. не попадали в app.log
 import werkzeug.serving
-werkzeug.serving._log_add_style = False
 
-from .logging_setup import setup_logging
 from .config_service import ConfigService
+from .logging_setup import setup_logging
+
+
+werkzeug.serving._log_add_style = False
 
 # Корневая директория проекта (папка выше backend)
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
 VITE_MANIFEST_PATH = os.path.join(ROOT_DIR, "frontend", "dist", ".vite", "manifest.json")
 
+CONFIG_SERVICE: ConfigService | None = None
+CONFIG: dict | None = None
+LOG_FILE_PATH: str | None = None
 
-def _parse_bool_env(name):
+
+def _parse_bool_env(name: str):
     raw = os.getenv(name)
     if raw is None:
         return None
@@ -32,13 +39,13 @@ def _parse_bool_env(name):
     return None
 
 
-def _debug_tooling_enabled():
-    forced = _parse_bool_env("LOWCODE_ENABLE_DEBUG_ROUTES")
+def _debug_tooling_enabled() -> bool:
+    forced = _parse_bool_env("YAMLS_ENABLE_DEBUG_ROUTES")
     if forced is not None:
         return forced
 
     env_name = (
-        os.getenv("LOWCODE_ENV")
+        os.getenv("YAMLS_ENV")
         or os.getenv("APP_ENV")
         or os.getenv("FLASK_ENV")
         or ""
@@ -99,43 +106,47 @@ def _vite_entry_assets(entry_name: str) -> dict:
         "css": css_files,
     }
 
-# Создаём Flask-приложение, указывая реальные каталоги templates и static
-app = Flask(
-    __name__,
-    template_folder=os.path.join(ROOT_DIR, "templates"),
-    static_folder=os.path.join(ROOT_DIR, "frontend"),
-    static_url_path="/frontend",  # URL, по которому отдаётся статика
-)
-app.config["DEBUG_TOOLING_ENABLED"] = _debug_tooling_enabled()
 
-# Busting кэша статических ассетов
-app.jinja_env.globals["ASSETS_VERSION"] = int(time.time())
-app.jinja_env.globals["vite_manifest"] = _load_vite_manifest
-app.jinja_env.globals["vite_entry_assets"] = _vite_entry_assets
+def create_app() -> Flask:
+    """Создаёт и настраивает Flask-приложение."""
 
-# Логирование
-LOG_FILE_PATH = setup_logging(app)
+    global CONFIG_SERVICE, CONFIG, LOG_FILE_PATH
 
-try:
-    # Единый live-updating snapshot конфигурации
-    CONFIG_SERVICE = ConfigService(ROOT_DIR)
-    CONFIG = CONFIG_SERVICE.get_snapshot()
+    app = Flask(
+        __name__,
+        template_folder=os.path.join(ROOT_DIR, "templates"),
+        static_folder=os.path.join(ROOT_DIR, "frontend"),
+        static_url_path="/frontend",
+    )
+    app.config["DEBUG_TOOLING_ENABLED"] = _debug_tooling_enabled()
 
-    # ---- Регистрация маршрутов ----
-    # Статические маршруты (/templates/*, favicon и т.д.) — до catch-all страниц
-    from .routes_static import register_static_routes
-    from .routes_pages import register_page_routes
-    from .routes_api import register_api_routes
-    from .routes_debug import register_debug_routes
+    app.jinja_env.globals["ASSETS_VERSION"] = int(time.time())
+    app.jinja_env.globals["vite_manifest"] = _load_vite_manifest
+    app.jinja_env.globals["vite_entry_assets"] = _vite_entry_assets
 
-    register_static_routes(app)
-    if app.config["DEBUG_TOOLING_ENABLED"]:
-        register_debug_routes(app, CONFIG_SERVICE, LOG_FILE_PATH)  # до catch-all страниц
-    register_page_routes(app, CONFIG_SERVICE)
-    register_api_routes(app, CONFIG_SERVICE, LOG_FILE_PATH)
-except Exception:  # pragma: no cover
-    app.logger.exception("Ошибка инициализации backend")
-    raise
+    LOG_FILE_PATH = setup_logging(app)
 
-# Упрощённый экспорт
-__all__ = ["app", "CONFIG", "CONFIG_SERVICE", "LOG_FILE_PATH"]
+    try:
+        CONFIG_SERVICE = ConfigService(ROOT_DIR)
+        CONFIG = CONFIG_SERVICE.get_snapshot()
+
+        from .routes_api import register_api_routes
+        from .routes_debug import register_debug_routes
+        from .routes_pages import register_page_routes
+        from .routes_postgres import register_postgres_routes
+        from .routes_static import register_static_routes
+
+        register_static_routes(app)
+        register_postgres_routes(app)
+        if app.config["DEBUG_TOOLING_ENABLED"]:
+            register_debug_routes(app, CONFIG_SERVICE, LOG_FILE_PATH)
+        register_page_routes(app, CONFIG_SERVICE)
+        register_api_routes(app, CONFIG_SERVICE, LOG_FILE_PATH)
+    except Exception:  # pragma: no cover
+        app.logger.exception("Ошибка инициализации backend")
+        raise
+
+    return app
+
+
+__all__ = ["create_app", "ROOT_DIR", "VITE_MANIFEST_PATH", "CONFIG", "CONFIG_SERVICE", "LOG_FILE_PATH"]

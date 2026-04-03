@@ -14,7 +14,7 @@
 # -----------------------------------------------------------------------------
 #
 # <attr_name>:
-#   widget: str | text | int | float | list | ip | ip_mask | date | time | datetime | button | img | table
+#   widget: str | text | int | float | list | ip | ip_mask | date | time | datetime | button | split_button | img | table
 #   label: "Подпись виджета"                                             # Подпись виджета
 #   sup_text: "Текст под виджетом"                                       # Подпись под виджетом
 #   width: 350 | "20rem" | "100%"                                        # Ширина поля
@@ -26,21 +26,21 @@
 #   rows: число                                                          # Для table/text - число строк
 #   editable: false                                                      # Для list - выбор только из списка, без поиска.
 #   multiselect: true                                                    # Для list - множественный выбор
-#   icon: "file.svg"                                                     # Для button - Иконка для кнопки
+#   icon: "file.svg"                                                     # Для button/split_button - Иконка для кнопки
 #   hint: "Tooltip для icon-only кнопки"                                 # Для img - хинт
-#   fon: true                                                            # Для button - фон
-#   size: 24                                                             # Для button - размер для иконки
+#   fon: true                                                            # Для button/split_button - фон icon-only primary части
+#   size: 24                                                             # Для button/split_button - размер для иконки
 #   width: 40 | 500 | "20rem"                                            # ширина виджетов
 #   source: ["Опция 1", "Опция 2", "Опция 3"]                            # Для list - источник данных
-#   source: "templates/file.pdf"                                         # Для button - источник данных (открывает файлы)
+#   source: "templates/file.pdf"                                         # Для button/split_button - источник данных
 #   source: [["a", "b"], ["c", "d"]]                                     # Для table - источник данных в таблицу
-#   url: "/path" | "https://..."                                         # Для button - адрес для открытия
+#   url: "/path" | "https://..."                                         # Для button/split_button - адрес для открытия
 #   sticky_header: true                                                  # Для table. Включить липкий заголовок по умолчанию
 #   sort: false                                                          # Для table. Отключить сортировку
 #   zebra: false                                                         # Для table. Отключить зебру
 #   line_numbers: true                                                   # Для table. Вкл. нумерацию строк
 #   table_lazy: true | false                                             # Для table. Вкл. ленивую загрузку
-#   dialog:                                                              # Для button - диалог с параметрами
+#   dialog:                                                              # Для button/split_button - диалог с параметрами
 #     title: "Заголовок"
 #     text: "Текст"
 #     accept: "Да"
@@ -49,8 +49,8 @@
 #     attr /Заголовок
 #     attr2 /Заголовок 2 :150
 #   command: modal_id -ui                                                # переход к модальным окнам.
-#   command: "save"                       !!!!!                          # команды для бэка. Как работают???????
-#   output_attrs: [attr_1, attr_2]        !!!!!
+#   command: "save"                                                      # команда для POST /api/execute
+#   output_attrs: [attr_1, attr_2]                                       # transport-only execute поле, не attrs YAML
 #   value:  Runtime override              !!!!!
 #   data: ???                             !!!!!
 
@@ -234,7 +234,6 @@
 #   url: "/path" | "https://..."
 #   command: "save"
 #   command: "modal_id -ui"
-#   output_attrs: [attr_1, attr_2]
 #   dialog:
 #     title: "Заголовок"
 #     text: "Текст"
@@ -249,7 +248,40 @@
 # - `CLOSE_MODAL` — специальная frontend-only команда закрытия модалки;
 # - если указан dialog, то url/command выполняется только после подтверждения.
 #
-# 2.12. img
+# 2.12. split_button
+#
+# <name>:
+#   widget: split_button
+#   label: "Сплит-кнопка"
+#   sup_text: "Текст под кнопкой"
+#   icon: "file.svg" | "fa-solid fa-gear"
+#   hint: "Tooltip для icon-only primary части"
+#   fon: true
+#   size: 24
+#   width: 500 | "20rem"
+#   url: |
+#     /page_a
+#     /page_b | Вторая страница
+#   source: |
+#     templates/file.pdf | PDF
+#   command: |
+#     save | Сохранить
+#     modal_demo -ui | Модалка
+#   dialog:
+#     title: "Заголовок"
+#     text: "Текст"
+#     accept: "Да"
+#     cancel: "Отмена"
+#
+# Примечания:
+# - split_button всегда остаётся dropdown-only control, даже если action один;
+# - порядок действий фиксированный: сначала url, затем source, затем command;
+# - пустые строки в multiline DSL игнорируются;
+# - malformed DSL-строки пропускаются и дают только console.warn;
+# - внутренние url могут дорезолвиться до title страницы через lazy `GET /api/pages`;
+# - local/same-origin source без label может дорезолвиться до basename файла при открытии dropdown.
+#
+# 2.13. img
 #
 # <name>:
 #   widget: img
@@ -259,7 +291,7 @@
 #   width: 600 | "50%"
 #
 #
-# 2.13. table
+# 2.14. table
 #
 # <name>:
 #   widget: table

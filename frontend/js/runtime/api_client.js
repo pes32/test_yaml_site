@@ -176,6 +176,21 @@ function normalizeExecuteResponse(payload) {
     };
 }
 
+function normalizePagesResponse(payload) {
+    const data = readEnvelopeData(payload);
+    return {
+        pages: Array.isArray(data.pages)
+            ? data.pages.map((item) => ({
+                name: asString(item && item.name),
+                title: asString(item && item.title),
+                url: asString(item && item.url)
+            }))
+            : [],
+        diagnostics: readEnvelopeDiagnostics(payload),
+        snapshotVersion: readEnvelopeSnapshotVersion(payload)
+    };
+}
+
 function normalizeDebugStructureResponse(payload) {
     const data = readEnvelopeData(payload);
     return {
@@ -253,6 +268,12 @@ function createFrontendApiClient() {
             );
         },
 
+        async fetchPages() {
+            return normalizePagesResponse(
+                await requestEnvelope('/api/pages')
+            );
+        },
+
         async executeCommand(payload) {
             return normalizeExecuteResponse(
                 await requestEnvelope('/api/execute', {
@@ -314,6 +335,7 @@ export {
     normalizeEnvelopeErrorMessage,
     normalizeExecuteResponse,
     normalizeModalResponse,
+    normalizePagesResponse,
     normalizePageResponse,
     requestEnvelope
 };

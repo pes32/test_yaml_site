@@ -11,7 +11,7 @@ from backend.config import ConfigLoadError, ROOT_DIR, build_config_snapshot
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Валидация YAML-конфигурации LowCode snapshot")
+    parser = argparse.ArgumentParser(description="Валидация YAML-конфигурации YAML System snapshot")
     parser.add_argument(
         "--pages-dir",
         default=str(Path(ROOT_DIR) / "pages"),

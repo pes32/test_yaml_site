@@ -16,6 +16,9 @@
 - `frontend/js/runtime/error_model.js`
   Единый error contract уже введён, но не весь код ещё типизирован вокруг него. Сейчас это архитектурная норма, но не максимальная защита от регрессов.
 
+- `frontend/js/runtime/action_runtime.js`
+  Общий action-runtime для `button` / `split_button` уже вынесен, но command-catalog для human-readable labels пока сознательно не введён. Если появится реестр backend-команд, его лучше добавлять как отдельный runtime-source, а не внутрь widget-компонентов.
+
 - `frontend/js/widgets/table/`
   Table больше не legacy-остров, но остаётся самой сложной feature-подсистемой проекта. Там ещё есть локальные debug-warnings и большой объём interaction-кода.
 

@@ -1,7 +1,7 @@
 # backend/routes_static.py
 """Раздача вспомогательных статических файлов, не попадающих под стандартный /static."""
 
-from flask import send_from_directory
+from flask import jsonify, request, send_from_directory
 import logging
 import os
 from werkzeug.exceptions import NotFound
@@ -11,6 +11,19 @@ logger = logging.getLogger(__name__)
 
 def register_static_routes(app):
     """Регистрирует вспомогательные статические маршруты."""
+
+    @app.route("/healthz")
+    def healthz():  # noqa: D401
+        """Технический endpoint для readiness/health checks."""
+        return jsonify(
+            {
+                "ok": True,
+                "scheme": request.scheme,
+                "is_secure": request.is_secure,
+                "host": request.host,
+                "url_root": request.url_root,
+            }
+        )
 
     # Каталог icons расположен внутри общей папки templates
     icons_dir = os.path.join(app.template_folder, "icons")

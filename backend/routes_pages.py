@@ -44,6 +44,7 @@ def register_page_routes(app, config_service):
         public_page = _public_page_config(page_config)
         return render_template(
             "page.html",
+            debug_tooling_enabled=bool(app.config.get("DEBUG_TOOLING_ENABLED")),
             page_config=public_page,
             page_bootstrap=_page_bootstrap(snapshot, page_config),
         )
@@ -61,7 +62,7 @@ def register_page_routes(app, config_service):
 
         return _render_page(snapshot, page_config)
 
-    @app.route("/page/<page_name>")
+    @app.route("/page/<path:page_name>")
     def page(page_name):
         snapshot = config_service.get_snapshot()
         page_config = snapshot["pages"].get(page_name)

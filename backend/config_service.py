@@ -26,12 +26,21 @@ class ConfigService:
         self._last_error: str | None = None
         self._last_logged_snapshot_version: str | None = None
         self._last_logged_failure_signature: tuple[tuple[str, int], ...] | None = None
+        self._live_reload_enabled = self._read_live_reload_enabled()
         self._scan_interval_seconds = self._read_scan_interval_seconds()
         self._next_scan_at = 0.0
         self.force_reload()
 
+    def _read_live_reload_enabled(self) -> bool:
+        raw = os.getenv("YAMLS_CONFIG_LIVE_RELOAD")
+        if raw is None:
+            return True
+        return raw.strip().lower() in {"1", "true", "yes", "on"}
+
     def _read_scan_interval_seconds(self) -> float:
-        raw = os.getenv("LOWCODE_CONFIG_SCAN_INTERVAL", "0.5")
+        if not self._live_reload_enabled:
+            return 0.0
+        raw = os.getenv("YAMLS_CONFIG_SCAN_INTERVAL", "0.5")
         try:
             value = float(raw)
         except (TypeError, ValueError):
@@ -83,16 +92,13 @@ class ConfigService:
         if not os.path.isdir(self.pages_dir):
             return fingerprint
 
-        for page_path in sorted(
-            os.path.join(self.pages_dir, name)
-            for name in os.listdir(self.pages_dir)
-            if os.path.isdir(os.path.join(self.pages_dir, name))
-        ):
-            for filename in sorted(os.listdir(page_path)):
+        for root, dirnames, filenames in os.walk(self.pages_dir):
+            dirnames.sort()
+            for filename in sorted(filenames):
                 if not filename.endswith((".yaml", ".yml")):
                     continue
 
-                filepath = os.path.join(page_path, filename)
+                filepath = os.path.join(root, filename)
                 try:
                     fingerprint[filepath] = os.stat(filepath).st_mtime_ns
                 except FileNotFoundError:
@@ -194,6 +200,8 @@ class ConfigService:
         logger.error("Не удалось обновить snapshot конфигурации: %s", last_error)
 
     def _reload_if_needed(self, force: bool = False) -> bool:
+        if not force and not self._live_reload_enabled:
+            return False
         if (
             not force
             and self._scan_interval_seconds > 0
@@ -212,7 +220,7 @@ class ConfigService:
                 return False
 
         try:
-            snapshot = build_config_snapshot(self.pages_dir)
+            snapshot = build_config_snapshot(self.pages_dir, strict=False)
         except SnapshotValidationError as exc:
             self._failed_fingerprint = fingerprint
             self._last_error = str(exc)

@@ -16,6 +16,7 @@ const Core = tableEngine;
         'time',
         'datetime',
         'list',
+        'voc',
         'ip',
         'ip_mask'
     ]);
@@ -27,6 +28,7 @@ const Core = tableEngine;
         time: ['default'],
         datetime: ['default'],
         list: ['source', 'editable', 'multiselect', 'default'],
+        voc: ['source', 'columns', 'placeholder', 'multiselect', 'default'],
         ip: ['placeholder', 'regex', 'err_text', 'default'],
         ip_mask: ['placeholder', 'regex', 'err_text', 'default']
     };

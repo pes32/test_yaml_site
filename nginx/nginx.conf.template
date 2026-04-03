@@ -1,0 +1,46 @@
+worker_processes  1;
+pid run/nginx.pid;
+error_log run/nginx.log info;
+
+events {
+    worker_connections 256;
+}
+
+http {
+    include __NGINX_MIME_TYPES__;
+    default_type application/octet-stream;
+    access_log run/nginx.log;
+    sendfile on;
+
+    server {
+        listen __NGINX_BIND_HOST__:__NGINX_PORT__ ssl;
+        server_name __SERVER_NAME__;
+
+        ssl_certificate     __TLS_CERT__;
+        ssl_certificate_key __TLS_KEY__;
+
+        location /frontend/dist/ {
+            alias __PROJECT_ROOT__/frontend/dist/;
+            expires 1h;
+            add_header Cache-Control "public";
+        }
+
+        location /frontend/ {
+            alias __PROJECT_ROOT__/frontend/;
+            expires 5m;
+        }
+
+        location / {
+            proxy_pass http://__WAITRESS_HOST__:__WAITRESS_PORT__;
+            proxy_http_version 1.1;
+            proxy_redirect off;
+
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header X-Forwarded-Port __NGINX_PORT__;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        }
+    }
+}

@@ -1,0 +1,44 @@
+1_9_remark:
+  widget: table
+  sort: FALSE
+  table_attrs: |
+    row /Номер строки
+    col /Номер графы
+    remark /Пояснение
+
+1_9_dolj:
+  label: "Должность"
+  width: 300
+
+1_9_fio:
+  width: 300
+  label: "ФИО"
+
+1_9_phone:
+  width: 300
+  label: "Телефон"
+
+1_9_mail:
+  width: 300
+  label: "Почта"
+
+form_1_9:
+  widget: table
+  line_numbers: true
+  label: ""
+  sticky_header: true
+  table_attrs: |
+    /Операция
+    code /Код :voc_1 :100 №2
+    date /Дата :date :170 №3
+
+    /Документ
+    doc_vid /вид №4
+    doc_numb /номер №5
+    doc_date /дата :date :170 №6
+
+    object_type_code /Код типа объектов учета №7
+
+    /Сведения о радиоактивных веществах
+    nuclid /радионуклид №8
+    active /активность, Бк #,.2e №9

@@ -1,0 +1,82 @@
+1_6_from:
+  widget: date
+  label: c
+
+1_6_to:
+  widget: date
+  label: по
+
+1_6_remark:
+  widget: table
+  sort: FALSE
+  table_attrs: |
+    row /Номер строки
+    col /Номер графы
+    remark /Пояснение
+
+1_6_dolj:
+  label: "Должность"
+  width: 300
+
+1_6_fio:
+  width: 300
+  label: "ФИО"
+
+1_6_phone:
+  width: 300
+  label: "Телефон"
+
+1_6_mail:
+  width: 300
+  label: "Почта"
+
+form_1_6:
+  widget: table
+  line_numbers: true
+  label: ""
+  sticky_header: true
+  table_attrs: |
+    /Операция
+    code /Код :voc_1 :100 №2
+    date /Дата :date :170 №3
+
+    rao_code /Код РАО №4
+    status_rao /Статус РАО №5
+
+    /Количество
+    volume /куб.м #.f №6
+    mass /т #.f №7
+
+    qty_oziii /Количество ОЗИИИ, шт. :int №8
+
+    /Основные радионуклиды
+    nuclid_trit /тритий №9
+    nuclid_bg /бета-, гамма-излучающие радионуклиды (исключая тритий) №10
+    nuclid_alpha /альфа-излучающие радионуклиды (исключая трансурановые) №11
+    nuclid_trans /трансурановые радионуклиды №12
+
+    active_sum /Суммарная активность, Бк #,.2e №13
+    active_date /Дата измерения активности :date :170 №14
+
+    /Документ
+    doc_vid /вид №15
+    doc_numb /номер №16
+    doc_date /дата :date :170 №17
+
+    /ОКПО
+    okpo_post /поставщика или получателя №18
+    okpo_driver /перевозчика №19
+
+    /Пункт хранения
+    storage_name /наименование №20
+    storage_code /код №21
+
+    process_code /Код переработки/сортировки РАО №22
+
+    /УКТ, упаковка или иная учетная единица
+    unit_name /наименование №23
+    unit_type /тип №24
+    unit_numb /номер №25
+
+    subsidy /Субсидия, % #.f №26
+    fcp_num /Номер мероприятия ФЦП №27

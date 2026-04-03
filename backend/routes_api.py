@@ -83,7 +83,7 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
             )
         )
 
-    @app.route("/api/page/<page_name>")
+    @app.route("/api/page/<path:page_name>")
     def api_get_page(page_name):
         snapshot = _snapshot()
         page_config = snapshot.get("pages", {}).get(page_name)

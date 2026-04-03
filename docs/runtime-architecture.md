@@ -59,6 +59,7 @@
 - `modal_flow.js` — догрузка modal definitions;
 - `modal_runtime_service.js` — modal session/runtime orchestration;
 - `execute_flow.js` — submit/execute path;
+- `action_runtime.js` — shared action model, DSL parsing, label resolution и unified execution helpers для `button` / `split_button`;
 - `page_selectors.js` — derived/read-only helpers для page runtime;
 - `error_model.js` — единый frontend error contract;
 - `diagnostics.js` — нормализация и presentation helpers для diagnostics.
@@ -68,6 +69,24 @@
 - `page_selectors.js` отдаёт attrs и runtime value раздельно;
 - `widgets.js / WidgetRenderer` — единственная точка, где собирается `resolvedWidgetConfig`;
 - render path не должен смешивать attrs и session state в произвольных helper-функциях.
+
+### Shared action runtime
+
+Для action-oriented widgets теперь действует отдельная граница:
+
+- backend валидирует только attrs schema;
+- `action_runtime.js` собирает `ActionItem = { type, target, label? }`;
+- `button` использует shared parser/executor для single action;
+- `split_button` использует тот же parser/executor/resolver и добавляет только dropdown UI.
+
+Что делает shared runtime:
+
+- парсит DSL строки `url` / `source` / `command`;
+- лениво загружает `/api/pages` для внутренних URL у `split_button`;
+- лениво probe’ит local/same-origin `source` без явной метки;
+- кэширует успешные resolution results на текущую page-session;
+- не кэширует ошибки навсегда;
+- не показывает snackbar на malformed DSL, а ограничивается агрегированным `console.warn`.
 
 ### Stores
 
@@ -187,6 +206,12 @@ Diagnostics живут по следующей цепочке:
 5. `attrs_loader.js` догружает attrs только для активного view и table dependencies;
 6. `WidgetRenderer` собирает `resolvedWidgetConfig` из attrs + runtime value;
 7. template рендерит diagnostics, error panels и widget tree.
+
+Для `split_button` поверх этого действует lazy-label policy:
+
+- меню открывается сразу с fallback/raw labels;
+- async resolution не блокирует open path;
+- поздний async result обновляет только label cache/state и не имеет права reopen’ить меню, сбрасывать focus или мигать UI.
 
 ## Modal flow
 

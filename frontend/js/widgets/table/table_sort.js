@@ -7,7 +7,7 @@ const Core = tableEngine;
 
     function emptyForSort(value, column, listColumnIsMultiselect) {
         const lm = listColumnIsMultiselect || (() => false);
-        if (column && column.type === 'list' && lm(column)) {
+        if (column && (column.type === 'list' || column.type === 'voc') && lm(column)) {
             return !Array.isArray(value) || value.length === 0;
         }
         if (value == null) return true;
@@ -37,7 +37,7 @@ const Core = tableEngine;
 
     function listSortKey(value, column, listColumnIsMultiselect) {
         const lm = listColumnIsMultiselect || (() => false);
-        if (column && column.type === 'list' && lm(column)) {
+        if (column && (column.type === 'list' || column.type === 'voc') && lm(column)) {
             if (!Array.isArray(value)) return '';
             return [...value].map((x) => String(x)).sort().join('\u0001');
         }
@@ -85,7 +85,7 @@ const Core = tableEngine;
             });
         }
 
-        if (t === 'list') {
+        if (t === 'list' || t === 'voc') {
             const ka = listSortKey(va, col, listColumnIsMultiselect);
             const kb = listSortKey(vb, col, listColumnIsMultiselect);
             return ka.localeCompare(kb, undefined, {

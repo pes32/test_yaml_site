@@ -5,30 +5,20 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
-echo "Запуск Flask приложения в debug-режиме..."
-
-# Активируем виртуальное окружение
-source .venv/bin/activate
-
-# Проверяем, что виртуальное окружение активировано
-if [ -z "$VIRTUAL_ENV" ]; then
-    echo "Ошибка: не удалось активировать виртуальное окружение"
-    exit 1
+ENV_FILE="${YAMLS_ENV_FILE:-$ROOT_DIR/production.env}"
+if [ -f "$ENV_FILE" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$ENV_FILE"
+    set +a
 fi
 
-echo "Виртуальное окружение активировано: $VIRTUAL_ENV"
-export LOWCODE_FLASK_DEBUG="${LOWCODE_FLASK_DEBUG:-1}"
-export LOWCODE_FLASK_RELOADER="${LOWCODE_FLASK_RELOADER:-0}"
-export LOWCODE_FLASK_HOST="${LOWCODE_FLASK_HOST:-127.0.0.1}"
-export LOWCODE_FLASK_PORT="${LOWCODE_FLASK_PORT:-8000}"
+export YAMLS_ENV="${YAMLS_ENV:-production}"
+export YAMLS_ENABLE_DEBUG_ROUTES="${YAMLS_ENABLE_DEBUG_ROUTES:-0}"
+export YAMLS_CONFIG_LIVE_RELOAD="${YAMLS_CONFIG_LIVE_RELOAD:-0}"
+export YAMLS_TRUST_PROXY="${YAMLS_TRUST_PROXY:-1}"
 
-if [ "${LOWCODE_SKIP_VITE_BUILD:-0}" != "1" ]; then
-    echo "Сборка frontend через Vite..."
-    npm --prefix tooling/vite run build
-fi
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/runtime_common.sh"
 
-echo "Запуск сервера на http://${LOWCODE_FLASK_HOST}:${LOWCODE_FLASK_PORT}"
-echo "Для остановки нажмите Ctrl+C"
-
-# Запускаем приложение
-python app.py
+start_stack "prod"

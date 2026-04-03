@@ -1,0 +1,68 @@
+1_2_from:
+  widget: date
+  label: c
+
+1_2_to:
+  widget: date
+  label: по
+
+1_2_remark:
+  widget: table
+  sort: FALSE
+  table_attrs: |
+    row /Номер строки
+    col /Номер графы
+    remark /Пояснение
+
+1_2_dolj:
+  label: "Должность"
+  width: 300
+
+1_2_fio:
+  width: 300
+  label: "ФИО"
+
+1_2_phone:
+  width: 300
+  label: "Телефон"
+
+1_2_mail:
+  width: 300
+  label: "Почта"
+
+form_1_2:
+  widget: table
+  line_numbers: true
+  label: ""
+  sticky_header: true
+  table_attrs: |
+    /Операция
+    code /Код :voc_1 :100 №2
+    date /Дата :date :170 №3
+
+    /Изделие из обедненного урана
+    pasp /№ паспорта №4
+    name /наименование №5
+    numb /номер №6
+    mass /масса, кг #.f №7
+    okpo_maker /ОКПО изготовителя №8
+    maker_date /дата выпуска :date :170 №9
+    nss /НСС, месяцев :int №10
+
+    /Право собственности на ИОУ
+    code_form /код формы собственности :voc_3 №11
+    pravo_obl /правообладатель №12
+
+    /Документ
+    doc_vid /вид №13
+    doc_numb /номер №14
+    doc_date /дата :date :170 №15
+
+    /ОКПО
+    okpo_post /поставщика или получателя №16
+    okpo_driver /перевозчика №17
+
+    /Прибор (установка), УКТ или иная упаковка
+    pack_name /наименование №18
+    pack_type /тип №19
+    pack_numb /номер №20

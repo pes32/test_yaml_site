@@ -1,6 +1,7 @@
 // Виджет для кнопок (button)
 
 import { isFontIcon } from '../gui_parser.js';
+import { executeAction, parseButtonAction } from '../runtime/action_runtime.js';
 
 const ButtonWidget = {
     inject: {
@@ -52,6 +53,9 @@ const ButtonWidget = {
         };
     },
     computed: {
+        buttonAction() {
+            return parseButtonAction(this.widgetConfig);
+        },
         isIconOnly() {
             return Boolean(this.widgetConfig.icon && !this.widgetConfig.label);
         },
@@ -121,91 +125,20 @@ const ButtonWidget = {
     },
     methods: {
         onButtonClick() {
-            // Если есть диалог — показываем его; действие (url/command) выполнится при нажатии accept
-            if (this.widgetConfig.dialog) {
-                this.showConfirmDialog();
+            if (!this.buttonAction) {
                 return;
             }
-            // source — открыть файл (PDF и т.д.) в новой вкладке
-            if (this.widgetConfig.source) {
-                const src = String(this.widgetConfig.source).trim();
-                const href = /^https?:\/\//i.test(src) || src.startsWith('/') ? src : '/' + src;
-                window.open(href, '_blank', 'noopener,noreferrer');
-                return;
-            }
-            // url — перейти по ссылке в текущей вкладке
-            if (this.widgetConfig.url) {
-                window.location.href = this.widgetConfig.url;
-                return;
-            }
-            if (this.widgetConfig.command) {
-                this.executeCommand();
-            }
-        },
-        
-        showConfirmDialog() {
-            const getModal = this.getConfirmModal;
-            if (!getModal) return;
-            const modal = getModal();
-            if (!modal) return;
-
-            const d = this.widgetConfig.dialog || {};
-            modal._acceptHandler = () => {
-                if (this.widgetConfig.url) {
-                    window.location.href = this.widgetConfig.url;
-                } else if (this.widgetConfig.command) {
-                    this.executeCommand();
-                }
-            };
-            modal.open({
-                title: d.title || 'Подтверждение',
-                text: d.text || 'Вы уверены?',
-                accept: d.accept || 'Подтвердить',
-                cancel: d.cancel || 'Отмена'
+            void executeAction(this, this.buttonAction, {
+                dialog: this.widgetConfig.dialog || null,
+                outputAttrs: this.widgetConfig.output_attrs,
+                widgetName: this.widgetName
             });
         },
-        
-        executeCommand() {
-            // Если нет команды, просто выходим
-            if (!this.widgetConfig.command) {
-                return;
-            }
-            
-            // Проверяем специальную команду для закрытия модального окна
-            if (this.widgetConfig.command === 'CLOSE_MODAL') {
-                if (typeof this.closeUiModal === 'function') {
-                    this.closeUiModal();
-                }
-                return;
-            }
-            
-            // Проверяем, является ли команда UI-командой (содержит -ui)
-            if (this.widgetConfig.command.includes(' -ui')) {
-                const modalName = this.widgetConfig.command.replace(' -ui', '').trim();
-                if (typeof this.openUiModal === 'function') {
-                    Promise.resolve(this.openUiModal(modalName)).catch(() => {});
-                }
-                return;
-            }
 
-            const outputAttrs = this.widgetConfig.output_attrs
-                ? (Array.isArray(this.widgetConfig.output_attrs)
-                    ? this.widgetConfig.output_attrs
-                    : [this.widgetConfig.output_attrs]
-                ).map((attr) => String(attr).trim()).filter(Boolean)
-                : [];
-
-            this.$emit('execute', {
-                command: this.widgetConfig.command,
-                outputAttrs: outputAttrs,
-                widget: this.widgetName
-            });
-        },
-        
         setValue(value) {
             this.value = value;
         },
-        
+
         getValue() {
             return this.value;
         }

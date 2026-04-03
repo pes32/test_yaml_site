@@ -53,21 +53,91 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: var(--space-sm);
     background-color: var(--color-navbar-bg);
 }
 .page-header-brand {
+    flex: 0 1 auto;
+    min-width: 0;
     font-size: var(--text-lg);
     font-weight: var(--fw-bold);
     text-decoration: none;
     color: var(--color-navbar-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .page-header-brand:hover { color: var(--color-bg); }
+.page-header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    margin-left: auto;
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
 .page-header-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2rem;
+    padding: 0 var(--space-xs);
     font-size: var(--text-md);
     text-decoration: none;
     color: var(--color-navbar-text);
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
 }
 .page-header-link:hover { color: var(--color-bg); }
+.page-header-icon-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    flex: 0 0 auto;
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    background: transparent;
+    transition: background-color var(--transition-fast) ease-in-out,
+                box-shadow var(--transition-fast) ease-in-out;
+}
+.page-header-icon-link:hover {
+    background-color: rgba(255, 255, 255, 0.12);
+}
+.page-header-icon-link.is-active {
+    background-color: rgba(255, 255, 255, 0.18);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+.page-header-icon-link img {
+    display: block;
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+}
+.page-header-brand:focus-visible,
+.page-header-link:focus-visible,
+.page-header-icon-link:focus-visible {
+    outline: 2px solid var(--color-bg);
+    outline-offset: 2px;
+}
+@media (max-width: 640px) {
+    .page-header {
+        padding: 0 var(--space-sm);
+    }
+
+    .page-header-brand {
+        font-size: var(--text-md);
+    }
+
+    .page-header-link {
+        font-size: var(--text-base);
+        padding: 0 var(--space-2xs);
+    }
+
+    .page-header-actions {
+        gap: var(--space-2xs);
+    }
+}
 
 /* === Nav / Tabs (для вкладок меню и модалок) === */
 .nav {

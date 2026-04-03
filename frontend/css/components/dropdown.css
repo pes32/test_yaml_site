@@ -137,3 +137,9 @@
     background-color: var(--color-dropdown-active);
     color: var(--color-text-main);
 }
+
+.voc-modal-search-input:focus {
+    outline: none;
+    border-color: var(--color-border-input);
+    box-shadow: none;
+}

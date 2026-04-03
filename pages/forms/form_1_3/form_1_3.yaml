@@ -1,0 +1,69 @@
+1_3_from:
+  widget: date
+  label: c
+
+1_3_to:
+  widget: date
+  label: по
+
+1_3_remark:
+  widget: table
+  sort: FALSE
+  table_attrs: |
+    row /Номер строки
+    col /Номер графы
+    remark /Пояснение
+
+1_3_dolj:
+  label: "Должность"
+  width: 300
+
+1_3_fio:
+  width: 300
+  label: "ФИО"
+
+1_3_phone:
+  width: 300
+  label: "Телефон"
+
+1_3_mail:
+  width: 300
+  label: "Почта"
+
+form_1_3:
+  widget: table
+  line_numbers: true
+  label: ""
+  sticky_header: true
+  table_attrs: |
+    /Операция
+    code /Код :voc_1 :100 №2
+    date /Дата :date :170 №3
+
+    /Открытый радионуклидный источник
+    pasp /№ паспорта №4
+    type /тип №5
+    nuclid /радионуклид №6
+    numb /номер №7
+    active /активность, Бк #,.2e №8
+    okpo_maker /ОКПО изготовителя №9
+    maker_date /дата выпуска :date :170 №10
+    state /агрегатное состояние №11
+
+    /Право собственности на ОРИ
+    code_form /код формы собственности :voc_3 №12
+    pravo_obl /правообладатель №13
+
+    /Документ
+    doc_vid /вид №14
+    doc_numb /номер №15
+    doc_date /дата :date :170 №16
+
+    /ОКПО
+    okpo_post /поставщика или получателя №17
+    okpo_driver /перевозчика №18
+
+    /Прибор (установка), УКТ или иная упаковка
+    pack_name /наименование №19
+    pack_type /тип №20
+    pack_numb /номер №21

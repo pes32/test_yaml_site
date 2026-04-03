@@ -1,0 +1,290 @@
+import { normalizeScalarStringValue } from './widget_contract.js';
+
+function normalizeVocColumns(columns) {
+    if (!Array.isArray(columns)) {
+        return [];
+    }
+
+    return columns
+        .map((item) => String(item ?? '').trim())
+        .filter(Boolean);
+}
+
+function canParseVocStringSource(source) {
+    const text = String(source ?? '');
+    return text.includes('\n') || text.includes(';');
+}
+
+function normalizeVocSourceRow(item) {
+    if (Array.isArray(item)) {
+        return item.map((cell) => normalizeScalarStringValue(cell).trim());
+    }
+    return [normalizeScalarStringValue(item).trim()];
+}
+
+function normalizeVocSourceRows(source) {
+    if (Array.isArray(source)) {
+        return source.map((item) => normalizeVocSourceRow(item));
+    }
+
+    if (typeof source === 'string' && canParseVocStringSource(source)) {
+        return String(source)
+            .split('\n')
+            .map((line) => String(line || '').trim())
+            .filter(Boolean)
+            .map((line) => line.split(';').map((cell) => String(cell || '').trim()));
+    }
+
+    return [];
+}
+
+function normalizeVocRows(columns, source) {
+    const normalizedColumns = normalizeVocColumns(columns);
+    const columnCount = normalizedColumns.length;
+    if (!columnCount) {
+        return [];
+    }
+
+    return normalizeVocSourceRows(source)
+        .map((cells, index) => {
+            const normalizedCells = Array.isArray(cells)
+                ? cells.map((cell) => String(cell ?? '').trim())
+                : [];
+            if (normalizedCells.length !== columnCount) {
+                return null;
+            }
+
+            return {
+                id: `voc-row-${index}`,
+                rowIndex: index,
+                cells: normalizedCells,
+                value: normalizedCells[0] || '',
+                searchText: normalizedCells.join('\n').toLocaleLowerCase()
+            };
+        })
+        .filter(Boolean);
+}
+
+function normalizeVocQuery(query) {
+    return String(query ?? '').trim().toLocaleLowerCase();
+}
+
+function filterVocRows(rows, query) {
+    const normalizedQuery = normalizeVocQuery(query);
+    const list = Array.isArray(rows) ? rows : [];
+    if (!normalizedQuery) {
+        return list;
+    }
+
+    return list.filter((row) =>
+        String(row && row.searchText ? row.searchText : '').includes(normalizedQuery)
+    );
+}
+
+function formatVocRowLabel(row) {
+    const cells = row && Array.isArray(row.cells) ? row.cells : [];
+    return cells.filter(Boolean).join(' | ');
+}
+
+function findFirstVocRowByValue(rows, value) {
+    const normalizedValue = String(value ?? '');
+    if (!normalizedValue) {
+        return null;
+    }
+    return (Array.isArray(rows) ? rows : []).find((row) => row && row.value === normalizedValue) || null;
+}
+
+function describeVocValueType(value) {
+    if (value === null) {
+        return 'null';
+    }
+    if (Array.isArray(value)) {
+        return 'array';
+    }
+    return typeof value;
+}
+
+function resolveSingleVocDraftCommit(rows, inputValue, committedValue, options = {}) {
+    const nextCommittedValue = committedValue == null ? '' : String(committedValue);
+    const draftDirty = options.draftDirty === true;
+
+    if (!draftDirty) {
+        return {
+            kind: 'sync-committed',
+            nextValue: nextCommittedValue,
+            nextInputValue: nextCommittedValue,
+            emit: false,
+            emittedValue: nextCommittedValue,
+            valueType: describeVocValueType(nextCommittedValue)
+        };
+    }
+
+    const nextDraftValue = String(inputValue ?? '').trim();
+    if (!nextDraftValue) {
+        return {
+            kind: 'clear',
+            nextValue: '',
+            nextInputValue: '',
+            emit: nextCommittedValue !== '',
+            emittedValue: '',
+            valueType: 'string'
+        };
+    }
+
+    const matchedRow = findFirstVocRowByValue(rows, nextDraftValue);
+    if (!matchedRow) {
+        return {
+            kind: 'revert-invalid',
+            nextValue: nextCommittedValue,
+            nextInputValue: nextCommittedValue,
+            emit: false,
+            emittedValue: nextCommittedValue,
+            valueType: describeVocValueType(nextCommittedValue)
+        };
+    }
+
+    const resolvedValue = String(matchedRow.value ?? '');
+    return {
+        kind: resolvedValue === nextCommittedValue ? 'noop-committed' : 'commit',
+        nextValue: resolvedValue,
+        nextInputValue: resolvedValue,
+        emit: resolvedValue !== nextCommittedValue,
+        emittedValue: resolvedValue,
+        valueType: describeVocValueType(resolvedValue)
+    };
+}
+
+function restoreVocRowIdsByValues(rows, values) {
+    const list = Array.isArray(rows) ? rows : [];
+    const targetValues = Array.isArray(values)
+        ? values.map((item) => String(item ?? ''))
+        : [];
+    const counts = new Map();
+    targetValues.forEach((value) => {
+        counts.set(value, (counts.get(value) || 0) + 1);
+    });
+
+    const selectedIds = new Set();
+    if (!counts.size) {
+        return selectedIds;
+    }
+
+    list.forEach((row) => {
+        const value = row && typeof row.value === 'string' ? row.value : '';
+        const remaining = counts.get(value) || 0;
+        if (!row || !value || remaining < 1) {
+            return;
+        }
+        selectedIds.add(row.id);
+        counts.set(value, remaining - 1);
+    });
+
+    return selectedIds;
+}
+
+function serializeVocValues(values) {
+    return (Array.isArray(values) ? values : [])
+        .map((item) => String(item ?? '').trim())
+        .filter((item) => item !== '')
+        .join(', ');
+}
+
+function normalizeVocDraftSeparators(text) {
+    return String(text ?? '')
+        .replace(/\r\n?/g, '\n')
+        .replace(/[\t\n]+/g, ',');
+}
+
+function parseVocDraft(text) {
+    const normalizedText = normalizeVocDraftSeparators(text);
+    const trailingSeparator = /,\s*$/.test(normalizedText);
+    const parts = normalizedText.split(',');
+    const tokens = parts.map((part) => String(part ?? '').trim());
+    const completedTokens = trailingSeparator ? tokens : tokens.slice(0, -1);
+    const activeToken = trailingSeparator ? '' : (tokens[tokens.length - 1] || '');
+
+    return {
+        normalizedText,
+        trailingSeparator,
+        completedTokens: completedTokens.filter((token) => token !== ''),
+        activeToken,
+        allTokens: tokens.filter((token) => token !== '')
+    };
+}
+
+function replaceVocDraftActiveToken(text, nextToken) {
+    const draft = parseVocDraft(text);
+    const baseTokens = draft.completedTokens.slice();
+    if (nextToken != null && String(nextToken).trim() !== '') {
+        baseTokens.push(String(nextToken).trim());
+    }
+    return baseTokens.length ? `${baseTokens.join(', ')}, ` : '';
+}
+
+function resolveVocManualTokens(rows, tokens) {
+    const list = Array.isArray(rows) ? rows : [];
+    const resolvedValues = [];
+    let invalidToken = '';
+
+    for (let index = 0; index < (Array.isArray(tokens) ? tokens : []).length; index += 1) {
+        const token = String(tokens[index] ?? '').trim();
+        if (!token) {
+            continue;
+        }
+        if (!findFirstVocRowByValue(list, token)) {
+            invalidToken = token;
+            break;
+        }
+        resolvedValues.push(token);
+    }
+
+    return {
+        resolvedValues,
+        invalidToken
+    };
+}
+
+function rowsToSourceOrderValues(rows, selectedIds) {
+    const ids = selectedIds instanceof Set ? selectedIds : new Set();
+    return (Array.isArray(rows) ? rows : [])
+        .filter((row) => row && ids.has(row.id))
+        .map((row) => row.value);
+}
+
+export {
+    canParseVocStringSource,
+    filterVocRows,
+    describeVocValueType,
+    findFirstVocRowByValue,
+    formatVocRowLabel,
+    normalizeVocColumns,
+    normalizeVocDraftSeparators,
+    normalizeVocQuery,
+    normalizeVocRows,
+    parseVocDraft,
+    replaceVocDraftActiveToken,
+    resolveSingleVocDraftCommit,
+    resolveVocManualTokens,
+    restoreVocRowIdsByValues,
+    rowsToSourceOrderValues,
+    serializeVocValues
+};
+
+export default {
+    canParseVocStringSource,
+    filterVocRows,
+    describeVocValueType,
+    findFirstVocRowByValue,
+    formatVocRowLabel,
+    normalizeVocColumns,
+    normalizeVocDraftSeparators,
+    normalizeVocQuery,
+    normalizeVocRows,
+    parseVocDraft,
+    replaceVocDraftActiveToken,
+    resolveSingleVocDraftCommit,
+    resolveVocManualTokens,
+    restoreVocRowIdsByValues,
+    rowsToSourceOrderValues,
+    serializeVocValues
+};

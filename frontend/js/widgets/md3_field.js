@@ -9,17 +9,19 @@ function resolveMd3ContainerStyle(widgetConfig) {
 
     const widthValue = typeof width === 'number' ? `${width}px` : String(width);
     const isTextarea = widgetConfig && widgetConfig.widget === 'text';
-    const explicitWidthStyle = {
+    if (isTextarea) {
+        return {
+            width: 'fit-content',
+            minWidth: widthValue,
+            maxWidth: 'none',
+            '--widget-textarea-base-width': widthValue
+        };
+    }
+
+    return {
         width: widthValue,
         maxWidth: 'none'
     };
-    return isTextarea
-        ? {
-            ...explicitWidthStyle,
-            '--widget-textarea-base-width': widthValue,
-            '--widget-textarea-inner-width': `calc(${widthValue} - 2px)`
-        }
-        : explicitWidthStyle;
 }
 
 function resolveMd3ContainerClass(hasExplicitWidth, containerModifier) {

@@ -26,10 +26,11 @@ big_table:
     attr_11 /Список :table_list :200 №11
     attr_12 /Список списка :table_list_2 №12
     attr_13 /Мультисписок :table_list_3 №13
+    attr_14 /Справочник :table_voc :220 №14
 
     /Адреса
-    attr_14 /ip :ip :200
-    attr_15 /ip_mask :table_ip_mask :200
+    attr_15 /ip :ip :200
+    attr_16 /ip_mask :table_ip_mask :200
 
 
 # Табличные виджеты.
@@ -51,6 +52,15 @@ table_list_3:
   widget: list
   multiselect: true
   source: ["Парам 1", "Парам 11", "Парам 111", "Парам 1111"]
+
+table_voc:
+  widget: voc
+  columns: ["Код", "Наименование"]
+  source:
+    - ["01", "Наличие на дату"]
+    - ["10", "Инвентаризация"]
+    - ["11", "Изготовление"]
+    - ["12", "Перевод"]
 
 table_ip_mask:
   widget: ip_mask

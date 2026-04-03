@@ -12,6 +12,15 @@
 #   multiselect: true         # Множественный выбор (по умолчанию false)
 #   width: 350                # Ширина поля в px
 
+# <name_attr>:
+#   widget: voc               # Справочник с inline-поиском и modal picker
+#   columns: ["Код", "Название"]  # Заголовки колонок справочника
+#   source: |                 # Block-scalar строки "col1; col2; ..."
+#     01; Значение 1
+#     02; Значение 2
+#   # persisted value = только первая колонка
+#   # multiselect поддерживает ввод через запятую и вставку из Excel
+
 # === СПИСКИ ===
 
 list_1:

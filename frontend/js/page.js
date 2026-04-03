@@ -1,4 +1,4 @@
-// Страница с виджетами LowCode System
+// Страница с виджетами YAML System
 
 import { createApp } from 'vue';
 import { getIconSrc, isFontIcon, onIconError } from './gui_parser.js';

@@ -21,7 +21,7 @@ const Core = tableEngine;
     function isEmpty(tableData, tableColumns, row, col, listMultiFn) {
         const column = tableColumns[col];
         const v = cellValue(tableData, row, col);
-        if (column && column.type === 'list' && listMultiFn(column)) {
+        if (column && (column.type === 'list' || column.type === 'voc') && listMultiFn(column)) {
             return !Array.isArray(v) || v.length === 0;
         }
         if (v == null) return true;

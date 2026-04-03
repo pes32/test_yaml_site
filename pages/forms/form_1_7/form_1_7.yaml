@@ -1,0 +1,73 @@
+1_7_remark:
+  widget: table
+  sort: FALSE
+  table_attrs: |
+    row /Номер строки
+    col /Номер графы
+    remark /Пояснение
+
+1_7_dolj:
+  label: "Должность"
+  width: 300
+
+1_7_fio:
+  width: 300
+  label: "ФИО"
+
+1_7_phone:
+  width: 300
+  label: "Телефон"
+
+1_7_mail:
+  width: 300
+  label: "Почта"
+
+form_1_7:
+  widget: table
+  line_numbers: true
+  label: ""
+  sticky_header: true
+  table_attrs: |
+    /Операция
+    code /Код :voc_1 :100 №2
+    date /Дата :date :170 №3
+
+    /Сведения об упаковке
+    pack_name /наименование №4
+    pack_type /тип №5
+    factory_numb /заводской номер №6
+    pack_ident /номер упаковки (идентификационный код) №7
+    form_date /дата формирования :date :170 №8
+    pasp /номер паспорта №9
+    pack_volume /объем, куб.м #.f №10
+    pack_mass /масса брутто, т #.f №11
+    nuclid_comp /радионуклидный состав №12
+
+    /Документ
+    doc_vid /вид №13
+    doc_numb /номер №14
+    doc_date /дата :date :170 №15
+
+    /ОКПО
+    okpo_post /поставщика или получателя №16
+    okpo_driver /перевозчика №17
+
+    /Пункт хранения
+    storage_name /наименование №18
+    storage_code /код №19
+
+    /Сведения о РАО
+    rao_code /код №20
+    status_rao /статус №21
+    rao_volume /объем без упаковки, куб.м #.f №22
+    rao_mass /масса без упаковки (нетто), т #.f №23
+    qty_oziii /количество ОЗИИИ, шт. :int №24
+    active_sum /суммарная активность, Бк #,.2e №25
+    process_code /код переработки/ сортировки РАО №26
+    active_trit /тритий #,.2e №27
+    active_bg /бета-, гамма-излучающие радионуклиды (исключая тритий) #,.2e №28
+    active_alpha /альфа-излучающие радионуклиды (исключая трансурановые) #,.2e №29
+    active_trans /трансурановые радионуклиды #,.2e №30
+
+    subsidy /Субсидия, % #.2f №31
+    fcp_num /Номер мероприятия ФЦП №32

@@ -1,0 +1,69 @@
+1_8_remark:
+  widget: table
+  sort: FALSE
+  table_attrs: |
+    row /Номер строки
+    col /Номер графы
+    remark /Пояснение
+
+1_8_dolj:
+  label: "Должность"
+  width: 300
+
+1_8_fio:
+  width: 300
+  label: "ФИО"
+
+1_8_phone:
+  width: 300
+  label: "Телефон"
+
+1_8_mail:
+  width: 300
+  label: "Почта"
+
+form_1_8:
+  widget: table
+  line_numbers: true
+  label: ""
+  sticky_header: true
+  table_attrs: |
+    /Операция
+    code /Код :voc_1 :100 №2
+    date /Дата :date :170 №3
+
+    /Сведения о партии ЖРО
+    batch_ident /индивидуальный номер (идентификационный код) партии ЖРО №4
+    pasp /номер паспорта №5
+    volume /объем, куб.м #.f №6
+    mass /масса, т #.f №7
+    salt /солесодержание, г/л #.f №8
+    nuclid_comp /радионуклидный состав №9
+
+    /Документ
+    doc_vid /вид №10
+    doc_numb /номер №11
+    doc_date /дата :date :170 №12
+
+    /ОКПО
+    okpo_post /поставщика или получателя №13
+    okpo_driver /перевозчика №14
+
+    /Пункт хранения
+    storage_name /наименование №15
+    storage_code /код №16
+
+    /Характеристика ЖРО
+    rao_code /код №17
+    status_rao /статус №18
+    rao_volume /объем, куб.м #.f №19
+    rao_mass /масса, т #.f №20
+    active_sum /суммарная активность, Бк #,.2e №21
+    process_code /код переработки/ сортировки РАО №22
+    active_trit /тритий #,.2e №23
+    active_bg /бета-, гамма-излучающие радионуклиды (исключая тритий) #,.2e №24
+    active_alpha /альфа-излучающие радионуклиды (исключая трансурановые) #,.2e №25
+    active_trans /трансурановые радионуклиды #,.2e №26
+
+    subsidy /Субсидия, % #.f №27
+    fcp_num /Номер мероприятия ФЦП №28

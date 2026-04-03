@@ -100,6 +100,25 @@ ATTR_WIDGET_SCHEMA: dict[str, dict[str, Any]] = {
             }
         ),
     },
+    "split_button": {
+        "allowed": frozenset(
+            {
+                "widget",
+                "command",
+                "dialog",
+                "fon",
+                "hint",
+                "icon",
+                "label",
+                "select_attrs",
+                "size",
+                "source",
+                "sup_text",
+                "url",
+                "width",
+            }
+        ),
+    },
     "str": {
         "allowed": frozenset(
             {
@@ -151,6 +170,22 @@ ATTR_WIDGET_SCHEMA: dict[str, dict[str, Any]] = {
                 "widget",
                 "default",
                 "editable",
+                "label",
+                "multiselect",
+                "placeholder",
+                "readonly",
+                "source",
+                "sup_text",
+                "width",
+            }
+        ),
+    },
+    "voc": {
+        "allowed": frozenset(
+            {
+                "widget",
+                "columns",
+                "default",
                 "label",
                 "multiselect",
                 "placeholder",
@@ -259,6 +294,21 @@ def make_diagnostic(
         url=url,
         node_path=node_path,
     )
+
+
+def _page_load_failure_diagnostic(page_name: str, page_path: str, message: str) -> Diagnostic:
+    return make_diagnostic(
+        "error",
+        "page_load_failed",
+        f"Страница '{page_name}' пропущена: {message}",
+        page=page_name,
+        file=_relpath(page_path),
+        url=f"/page/{page_name}",
+    )
+
+
+def _has_error_level_diagnostics(items: list[Diagnostic]) -> bool:
+    return any(item.level == "error" for item in items)
 
 
 def _relpath(path: str, root_dir: str = ROOT_DIR) -> str:
@@ -402,6 +452,10 @@ def _is_widget_name_list_value(value: Any) -> bool:
     )
 
 
+def _is_string_list_value(value: Any) -> bool:
+    return isinstance(value, list) and all(_is_string_attr_value(item) for item in value)
+
+
 def _is_bool_attr_value(value: Any) -> bool:
     return isinstance(value, bool)
 
@@ -434,7 +488,14 @@ def _is_source_value_valid(widget_type: str, value: Any) -> bool:
             return True
         return isinstance(value, list) and all(_is_list_source_option(item) for item in value)
 
-    if widget_type in {"button", "img"}:
+    if widget_type == "voc":
+        if _is_string_attr_value(value):
+            return True
+        return isinstance(value, list) and all(
+            _is_scalar_attr_value(item) or _is_scalar_sequence(item) for item in value
+        )
+
+    if widget_type in {"button", "split_button", "img"}:
         return _is_string_attr_value(value)
 
     if widget_type == "table":
@@ -449,6 +510,9 @@ def _validate_attr_option_value(widget_type: str, option_name: str, value: Any) 
 
     if option_name == "dialog" and not _is_dialog_value(value):
         return "ожидается словарь"
+
+    if option_name == "columns" and not _is_string_list_value(value):
+        return "ожидается список строк"
 
     if option_name == "rows" and not _is_int_attr_value(value):
         return "ожидается целое число"
@@ -472,12 +536,185 @@ def _validate_attr_option_value(widget_type: str, option_name: str, value: Any) 
     if option_name == "source" and not _is_source_value_valid(widget_type, value):
         if widget_type == "list":
             return "ожидается строка, список строк или список options-объектов"
-        if widget_type in {"button", "img"}:
+        if widget_type == "voc":
+            return "ожидается block-scalar строка, список строк или список строковых рядов"
+        if widget_type in {"button", "split_button", "img"}:
             return "ожидается строка"
         if widget_type == "table":
             return "ожидается строка или список строк"
 
     return None
+
+
+def _validate_voc_columns_config(
+    attr_name: str,
+    columns_value: Any,
+    *,
+    page_name: str,
+    page_url: str,
+    file_rel: str,
+    line: int | None,
+) -> list[Diagnostic]:
+    diagnostics: list[Diagnostic] = []
+
+    if not isinstance(columns_value, list):
+        return diagnostics
+
+    if not columns_value:
+        diagnostics.append(
+            _attr_option_diagnostic(
+                "error",
+                "voc_columns_required",
+                f"attrs '{attr_name}.columns' должен содержать хотя бы один заголовок",
+                page_name=page_name,
+                page_url=page_url,
+                file_rel=file_rel,
+                line=line,
+                node_path=f"{attr_name}.columns",
+            )
+        )
+        return diagnostics
+
+    for index, item in enumerate(columns_value):
+        label = str(item or "").strip() if isinstance(item, str) else ""
+        if label:
+            continue
+        diagnostics.append(
+            _attr_option_diagnostic(
+                "error",
+                "invalid_voc_column_label",
+                (
+                    f"attrs '{attr_name}.columns[{index}]' должен содержать "
+                    "непустую строку заголовка"
+                ),
+                page_name=page_name,
+                page_url=page_url,
+                file_rel=file_rel,
+                line=line,
+                node_path=f"{attr_name}.columns[{index}]",
+            )
+        )
+
+    return diagnostics
+
+
+def _validate_voc_source_config(
+    attr_name: str,
+    columns_value: Any,
+    source_value: Any,
+    source_node: Any,
+    *,
+    page_name: str,
+    page_url: str,
+    file_rel: str,
+) -> list[Diagnostic]:
+    diagnostics: list[Diagnostic] = []
+    if not isinstance(columns_value, list) or not columns_value:
+        return diagnostics
+
+    column_count = len(columns_value)
+    source_path = f"{attr_name}.source"
+
+    def add_row_width_error(
+        *,
+        line: int | None,
+        row_index: int,
+        actual_count: int,
+    ) -> None:
+        diagnostics.append(
+            _attr_option_diagnostic(
+                "error",
+                "invalid_voc_source_row_width",
+                (
+                    f"attrs '{source_path}' строка {row_index + 1} содержит {actual_count} "
+                    f"значений, ожидалось {column_count}"
+                ),
+                page_name=page_name,
+                page_url=page_url,
+                file_rel=file_rel,
+                line=line,
+                node_path=source_path,
+            )
+        )
+
+    if isinstance(source_value, str):
+        if not isinstance(source_node, ScalarNode):
+            return diagnostics
+
+        if _voc_source_is_unsupported_scalar(source_value, source_node):
+            diagnostics.append(
+                _attr_option_diagnostic(
+                    "warning",
+                    "unsupported_voc_scalar_source",
+                    (
+                        f"attrs '{source_path}' использует scalar-source, который зарезервирован "
+                        "для будущего DB-режима и пока не поддерживается"
+                    ),
+                    page_name=page_name,
+                    page_url=page_url,
+                    file_rel=file_rel,
+                    line=_node_line(source_node),
+                    node_path=source_path,
+                )
+            )
+            return diagnostics
+
+        skipped_empty_rows = 0
+        for line_index, raw_line in enumerate(str(source_value or "").splitlines()):
+            line_text = str(raw_line or "").strip()
+            if not line_text:
+                skipped_empty_rows += 1
+                continue
+            cells = [part.strip() for part in str(raw_line).split(";")]
+            if len(cells) != column_count:
+                add_row_width_error(
+                    line=_table_attr_ref_line(source_node, line_index),
+                    row_index=line_index,
+                    actual_count=len(cells),
+                )
+        if skipped_empty_rows:
+            diagnostics.append(
+                _attr_option_diagnostic(
+                    "warning",
+                    "voc_source_empty_rows_skipped",
+                    (
+                        f"attrs '{source_path}' содержит пустые строки, которые были "
+                        "пропущены при разборе"
+                    ),
+                    page_name=page_name,
+                    page_url=page_url,
+                    file_rel=file_rel,
+                    line=_node_line(source_node),
+                    node_path=source_path,
+                )
+            )
+        return diagnostics
+
+    if isinstance(source_value, list):
+        item_nodes = source_node.value if isinstance(source_node, SequenceNode) else []
+        for row_index, item in enumerate(source_value):
+            if isinstance(item, list):
+                actual_count = len(item)
+            else:
+                actual_count = 1
+            if actual_count == column_count:
+                continue
+            item_node = item_nodes[row_index] if row_index < len(item_nodes) else source_node
+            add_row_width_error(
+                line=_node_line(item_node),
+                row_index=row_index,
+                actual_count=actual_count,
+            )
+
+    return diagnostics
+
+
+def _voc_source_is_unsupported_scalar(source_value: Any, source_node: Any) -> bool:
+    if not isinstance(source_value, str):
+        return False
+    if not isinstance(source_node, ScalarNode):
+        return False
+    return getattr(source_node, "style", None) not in TABLE_ATTR_BLOCK_SCALAR_STYLES
 
 
 def _build_duplicate_scalar_list_source_warning(
@@ -627,6 +864,51 @@ def _validate_attr_config(
         )
         if duplicate_warning:
             diagnostics.append(duplicate_warning)
+
+    if widget_type == "voc":
+        columns_node = node_items.get("columns", (None, None))[1]
+        source_node = node_items.get("source", (None, None))[1]
+        if "columns" not in normalized_config:
+            diagnostics.append(
+                _attr_option_diagnostic(
+                    "error",
+                    "voc_columns_required",
+                    f"attrs '{attr_name}' для widget 'voc' требует опцию 'columns'",
+                    page_name=page_name,
+                    page_url=page_url,
+                    file_rel=file_rel,
+                    line=_node_line(attr_node),
+                    node_path=f"{attr_name}.columns",
+                )
+            )
+        else:
+            diagnostics.extend(
+                _validate_voc_columns_config(
+                    attr_name,
+                    normalized_config.get("columns"),
+                    page_name=page_name,
+                    page_url=page_url,
+                    file_rel=file_rel,
+                    line=_node_line(columns_node) or _node_line(attr_node),
+                )
+            )
+        if "source" in normalized_config:
+            diagnostics.extend(
+                _validate_voc_source_config(
+                    attr_name,
+                    normalized_config.get("columns"),
+                    normalized_config.get("source"),
+                    source_node,
+                    page_name=page_name,
+                    page_url=page_url,
+                    file_rel=file_rel,
+                )
+            )
+            if _voc_source_is_unsupported_scalar(
+                normalized_config.get("source"),
+                source_node,
+            ):
+                normalized_config["source"] = []
 
     return normalized_config, diagnostics
 
@@ -1317,12 +1599,13 @@ def _build_missing_attr_diagnostics(
 
 
 def _build_duplicate_attr_diagnostics(attr_definitions: list[dict[str, Any]]) -> list[Diagnostic]:
-    grouped: dict[str, list[dict[str, Any]]] = {}
+    grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for item in attr_definitions:
-        grouped.setdefault(item["name"], []).append(item)
+        key = (str(item.get("page") or ""), str(item.get("name") or ""))
+        grouped.setdefault(key, []).append(item)
 
     diagnostics: list[Diagnostic] = []
-    for attr_name, items in sorted(grouped.items()):
+    for (_page_name, attr_name), items in sorted(grouped.items()):
         if len(items) < 2:
             continue
         locations = "; ".join(
@@ -1355,6 +1638,10 @@ def _build_unused_attr_diagnostics(
 
     for entry in attr_definitions:
         page_name = entry["page"]
+        local_page_prefix = f"pages/{page_name}/"
+        entry_file = str(entry.get("file") or "")
+        if entry_file and not entry_file.startswith(local_page_prefix):
+            continue
         if entry["name"] in used_names_by_page.get(page_name, set()):
             continue
         diagnostics.append(
@@ -1372,24 +1659,152 @@ def _build_unused_attr_diagnostics(
     return diagnostics
 
 
+def page_name_from_path(page_path: str, pages_dir: str = PAGES_DIR) -> str:
+    rel_path = os.path.relpath(page_path, pages_dir)
+    if rel_path in {"", "."}:
+        return os.path.basename(os.path.abspath(page_path))
+    return rel_path.replace(os.sep, "/")
+
+
+def split_page_yaml_files(yaml_files: list[str]) -> tuple[list[str], list[str], list[str]]:
+    gui_files: list[str] = []
+    attr_files: list[str] = []
+    modal_files: list[str] = []
+
+    for path in yaml_files:
+        filename = os.path.basename(path)
+        if filename in GUI_FILENAMES:
+            gui_files.append(path)
+        elif is_modal_gui_filename(filename):
+            modal_files.append(path)
+        else:
+            attr_files.append(path)
+
+    return gui_files, attr_files, modal_files
+
+
+def directory_contains_gui(page_path: str) -> bool:
+    gui_files, _attr_files, _modal_files = split_page_yaml_files(list_yaml_files(page_path))
+    return bool(gui_files)
+
+
+def page_scope_directories(page_path: str, pages_dir: str = PAGES_DIR) -> list[str]:
+    abs_pages_dir = os.path.abspath(pages_dir)
+    abs_page_path = os.path.abspath(page_path)
+    rel_path = os.path.relpath(abs_page_path, abs_pages_dir)
+    if rel_path in {"", "."}:
+        return [abs_page_path]
+
+    directories: list[str] = []
+    current = abs_pages_dir
+    for part in rel_path.split(os.sep):
+        if not part or part == ".":
+            continue
+        current = os.path.join(current, part)
+        directories.append(current)
+    return directories
+
+
+def _unique_paths(paths: list[str]) -> list[str]:
+    result: list[str] = []
+    seen: set[str] = set()
+
+    for path in paths:
+        normalized = os.path.abspath(path)
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        result.append(path)
+
+    return result
+
+
+def _has_page_ancestor(directory: str, pages_dir: str = PAGES_DIR) -> bool:
+    abs_pages_dir = os.path.abspath(pages_dir)
+    current = os.path.abspath(os.path.dirname(directory))
+
+    while current.startswith(abs_pages_dir):
+        if directory_contains_gui(current):
+            return True
+        if current == abs_pages_dir:
+            break
+        current = os.path.dirname(current)
+
+    return False
+
+
+def list_shared_attr_files(pages_dir: str = PAGES_DIR) -> list[str]:
+    """Возвращает attrs-файлы из общих директорий pages/, доступные всем страницам.
+
+    Общими считаются директории:
+    - без собственного gui-файла;
+    - не вложенные внутрь другой page-директории с gui-файлом.
+    """
+    if not os.path.isdir(pages_dir):
+        return []
+
+    shared_attr_files: list[str] = []
+    for root, dirnames, filenames in os.walk(pages_dir):
+        dirnames.sort()
+        if directory_contains_gui(root):
+            continue
+        if _has_page_ancestor(root, pages_dir):
+            continue
+
+        _gui_files, attr_files, _modal_files = split_page_yaml_files(
+            [
+                os.path.join(root, name)
+                for name in sorted(filenames)
+                if name.endswith((".yaml", ".yml"))
+            ]
+        )
+        shared_attr_files.extend(attr_files)
+
+    return _unique_paths(shared_attr_files)
+
+
+def collect_page_scope_files(
+    page_path: str,
+    page_name: str,
+    pages_dir: str = PAGES_DIR,
+) -> tuple[str, list[str], list[str]]:
+    local_yaml_files = list_yaml_files(page_path)
+    gui_file = find_gui_file(local_yaml_files, page_name)
+    _local_gui_files, local_attr_files, local_modal_files = split_page_yaml_files(local_yaml_files)
+
+    inherited_attr_files: list[str] = []
+    inherited_modal_files: list[str] = []
+    for scope_dir in page_scope_directories(page_path, pages_dir)[:-1]:
+        if directory_contains_gui(scope_dir):
+            continue
+        _group_gui_files, group_attr_files, group_modal_files = split_page_yaml_files(
+            list_yaml_files(scope_dir)
+        )
+        inherited_attr_files.extend(group_attr_files)
+        inherited_modal_files.extend(group_modal_files)
+
+    shared_attr_files = list_shared_attr_files(pages_dir)
+
+    return (
+        gui_file,
+        _unique_paths([*shared_attr_files, *inherited_attr_files, *local_attr_files]),
+        [*inherited_modal_files, *local_modal_files],
+    )
+
+
 def _validate_page_documents(
     page_path: str,
     page_name: str,
     page_url: str,
     page_attrs: dict[str, Any],
+    *,
+    pages_dir: str = PAGES_DIR,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[Diagnostic]]:
-    yaml_files = list_yaml_files(page_path)
-    gui_file = find_gui_file(yaml_files, page_name)
-    attr_files = [
-        path
-        for path in yaml_files
-        if path != gui_file and not is_modal_gui_filename(os.path.basename(path))
-    ]
-    modal_files = [
-        path
-        for path in yaml_files
-        if is_modal_gui_filename(os.path.basename(path))
-    ]
+    gui_file, attr_files, modal_files = collect_page_scope_files(
+        page_path,
+        page_name,
+        pages_dir,
+    )
 
     attr_definitions = _collect_attr_definitions(attr_files, page_name)
     attr_refs = _collect_attr_refs(
@@ -1419,11 +1834,13 @@ def list_page_directories(pages_dir: str = PAGES_DIR) -> list[str]:
     if not os.path.isdir(pages_dir):
         return []
 
-    return [
-        os.path.join(pages_dir, name)
-        for name in sorted(os.listdir(pages_dir))
-        if os.path.isdir(os.path.join(pages_dir, name))
-    ]
+    page_paths: list[str] = []
+    for root, dirnames, filenames in os.walk(pages_dir):
+        dirnames.sort()
+        if any(filename in GUI_FILENAMES for filename in filenames):
+            page_paths.append(root)
+
+    return sorted(page_paths, key=lambda path: page_name_from_path(path, pages_dir))
 
 
 def list_yaml_files(page_path: str) -> list[str]:
@@ -1626,15 +2043,16 @@ def _merge_attrs_files(
     return attrs, source_files, diagnostics
 
 
-def _collect_file_modals(page_path: str, page_name: str) -> tuple[dict[str, NormalizedModal], list[SourceFileMeta], list[Diagnostic]]:
+def _collect_file_modals(
+    modal_files: list[str],
+    page_name: str,
+) -> tuple[dict[str, NormalizedModal], list[SourceFileMeta], list[Diagnostic]]:
     modals: dict[str, NormalizedModal] = {}
     source_files: list[SourceFileMeta] = []
     diagnostics: list[Diagnostic] = []
 
-    for modal_id in list_modal_gui_ids(page_path):
-        filepath = os.path.join(page_path, f"{modal_id}.yaml")
-        if not os.path.isfile(filepath):
-            filepath = os.path.join(page_path, f"{modal_id}.yml")
+    for filepath in modal_files:
+        modal_id = os.path.splitext(os.path.basename(filepath))[0]
         source_files.append(_source_file_meta(filepath, "modal"))
         modal = _normalize_modal_document(filepath, modal_id)
         previous = modals.get(modal_id)
@@ -1678,21 +2096,24 @@ def _collect_embedded_modals(gui: dict[str, Any], page_name: str, gui_file: str)
     return modals, diagnostics
 
 
-def load_page_config(page_path: str, page_name: str) -> dict[str, Any]:
+def load_page_config(
+    page_path: str,
+    page_name: str,
+    *,
+    pages_dir: str = PAGES_DIR,
+) -> dict[str, Any]:
     """Загружает одну страницу и возвращает нормализованный snapshot страницы."""
-    yaml_files = list_yaml_files(page_path)
-    gui_file = find_gui_file(yaml_files, page_name)
+    gui_file, attr_files, modal_files = collect_page_scope_files(
+        page_path,
+        page_name,
+        pages_dir,
+    )
     gui = RawGuiDocument.model_validate(load_yaml_dict(gui_file)).root
     page_url = normalize_page_url(gui.get("url"), page_name)
 
-    attr_files = [
-        path
-        for path in yaml_files
-        if path != gui_file and not is_modal_gui_filename(os.path.basename(path))
-    ]
     attrs, attr_sources, diagnostics = _merge_attrs_files(attr_files, page_name, page_url)
 
-    file_modals, modal_sources, modal_diagnostics = _collect_file_modals(page_path, page_name)
+    file_modals, modal_sources, modal_diagnostics = _collect_file_modals(modal_files, page_name)
     embedded_modals, embedded_diagnostics = _collect_embedded_modals(gui, page_name, gui_file)
     diagnostics.extend(modal_diagnostics)
     diagnostics.extend(embedded_diagnostics)
@@ -1739,7 +2160,11 @@ def _snapshot_version(source_files: list[SourceFileMeta], pages_by_url: dict[str
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
-def build_config_snapshot(pages_dir: str = PAGES_DIR) -> dict[str, Any]:
+def build_config_snapshot(
+    pages_dir: str = PAGES_DIR,
+    *,
+    strict: bool = True,
+) -> dict[str, Any]:
     """Строит полный versioned snapshot конфигурации из каталога pages/."""
     pages: dict[str, dict[str, Any]] = {}
     pages_by_url: dict[str, str] = {}
@@ -1750,12 +2175,46 @@ def build_config_snapshot(pages_dir: str = PAGES_DIR) -> dict[str, Any]:
     refs_by_page: dict[str, list[dict[str, Any]]] = {}
 
     for page_path in list_page_directories(pages_dir):
-        page_name = os.path.basename(page_path)
-        page_config = load_page_config(page_path, page_name)
+        page_name = page_name_from_path(page_path, pages_dir)
+        try:
+            page_config = load_page_config(page_path, page_name, pages_dir=pages_dir)
+        except ConfigLoadError as exc:
+            diagnostics.append(
+                _page_load_failure_diagnostic(page_name, page_path, str(exc))
+            )
+            continue
+
         page_diagnostics = [
             Diagnostic.model_validate(item)
             for item in page_config.get("diagnostics") or []
         ]
+        page_attr_definitions, page_refs, page_validation_diagnostics = _validate_page_documents(
+            page_path,
+            page_name,
+            page_config["url"],
+            page_config.get("attrs", {}),
+            pages_dir=pages_dir,
+        )
+        page_all_diagnostics = [
+            *page_diagnostics,
+            *page_validation_diagnostics,
+        ]
+        diagnostics.extend(page_all_diagnostics)
+
+        if _has_error_level_diagnostics(page_all_diagnostics):
+            diagnostics.append(
+                make_diagnostic(
+                    "warning",
+                    "page_skipped_due_to_errors",
+                    f"Страница '{page_name}' не опубликована из-за ошибок в конфигурации",
+                    page=page_name,
+                    file=(page_config.get("sourceFiles") or [{}])[0].get("path")
+                    if page_config.get("sourceFiles")
+                    else _relpath(page_path),
+                    url=page_config.get("url"),
+                )
+            )
+            continue
 
         pages[page_name] = page_config
         page_attrs[page_name] = page_config.get("attrs", {})
@@ -1763,16 +2222,8 @@ def build_config_snapshot(pages_dir: str = PAGES_DIR) -> dict[str, Any]:
             SourceFileMeta.model_validate(item)
             for item in page_config.get("sourceFiles") or []
         )
-        diagnostics.extend(page_diagnostics)
-        page_attr_definitions, page_refs, page_validation_diagnostics = _validate_page_documents(
-            page_path,
-            page_name,
-            page_config["url"],
-            page_attrs[page_name],
-        )
         attr_definitions.extend(page_attr_definitions)
         refs_by_page[page_name] = page_refs
-        diagnostics.extend(page_validation_diagnostics)
 
         page_url = page_config["url"]
         if is_reserved_page_url(page_url):
@@ -1819,7 +2270,7 @@ def build_config_snapshot(pages_dir: str = PAGES_DIR) -> dict[str, Any]:
         page_attrs=page_attrs,
         diagnostics=diagnostics,
     )
-    if any(item.level == "error" for item in diagnostics):
+    if strict and _has_error_level_diagnostics(diagnostics):
         raise SnapshotValidationError(diagnostics)
     return snapshot.model_dump(by_alias=True)
 

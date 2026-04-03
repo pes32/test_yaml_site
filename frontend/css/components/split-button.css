@@ -1,0 +1,96 @@
+/* components/split-button.css — split_button widget */
+
+.widget-split-button__control {
+    --split-button-gap: 2px;
+    --split-button-outer-radius: calc(var(--field-height) / 2);
+    --split-button-primary-inner-radius: calc(var(--field-height) * 0.1);
+    --split-button-toggle-inner-radius: calc(var(--field-height) * 0.2);
+    position: relative;
+    display: inline-flex;
+    align-items: stretch;
+    gap: var(--split-button-gap);
+    max-width: 100%;
+}
+
+.widget-split-button__control .widget-button {
+    margin-bottom: 0;
+}
+
+.widget-split-button__primary {
+    flex: 1 1 auto;
+    min-width: 0;
+    border-radius:
+        var(--split-button-outer-radius)
+        var(--split-button-primary-inner-radius)
+        var(--split-button-primary-inner-radius)
+        var(--split-button-outer-radius);
+    cursor: default;
+    user-select: none;
+}
+
+.widget-split-button__primary:hover {
+    background-color: var(--color-bg-soft);
+    border-color: var(--color-bg-soft);
+}
+
+.widget-split-button__primary.icon-only--ghost:hover {
+    background-color: transparent;
+    border-color: transparent;
+}
+
+.widget-split-button__primary.icon-only {
+    min-height: var(--field-height);
+}
+
+.widget-split-button__label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.widget-split-button__toggle {
+    flex: 0 0 auto;
+    width: var(--field-height);
+    min-width: var(--field-height);
+    padding: 0 var(--space-sm);
+    border-radius:
+        var(--split-button-toggle-inner-radius)
+        var(--split-button-outer-radius)
+        var(--split-button-outer-radius)
+        var(--split-button-toggle-inner-radius);
+}
+
+.widget-split-button__toggle svg {
+    display: block;
+    transform: rotate(180deg);
+    transition: transform calc(var(--anim-ms) * 1ms) ease;
+}
+
+.widget-split-button__control.show .widget-split-button__toggle svg {
+    transform: rotate(0deg);
+}
+
+.dropdown-menu.widget-dd-menu.widget-dd-menu--teleport.widget-split-button__menu {
+    box-sizing: border-box;
+    overflow-x: hidden;
+}
+
+.dropdown-menu.widget-dd-menu.widget-dd-menu--teleport.widget-split-button__menu.widget-split-button__menu--measuring {
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none;
+    transition: none !important;
+    max-height: none !important;
+}
+
+.dropdown-menu.widget-dd-menu.widget-dd-menu--teleport.widget-split-button__menu:not(.show) {
+    max-height: 0;
+}
+
+.dropdown-menu.widget-dd-menu.widget-dd-menu--teleport.widget-split-button__menu.show {
+    max-height: var(--split-menu-max-height, var(--dropdown-max-height));
+}
+
+.widget-split-button--disabled .widget-split-button__primary {
+    opacity: 0.65;
+}

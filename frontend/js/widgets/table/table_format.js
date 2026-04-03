@@ -55,11 +55,21 @@ function formatNumberWithHint(num, hint) {
  */
 function formatCellValue(value, column) {
     if (value === null || value === undefined) return '';
+    if (
+        column &&
+        (column.type === 'list' || column.type === 'voc') &&
+        Array.isArray(value)
+    ) {
+        return value
+            .map((item) => String(item ?? '').trim())
+            .filter((item) => item !== '')
+            .join(', ');
+    }
     if (value === '') return '';
     const asString = String(value);
     if (asString === '') return '';
     if (!column) return asString;
-    if (column.type === 'list') return asString;
+    if (column.type === 'list' || column.type === 'voc') return asString;
 
     if (column.format) {
         const hint = parseNumericFormatHint(column.format);

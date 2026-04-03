@@ -4,10 +4,12 @@ import StringWidget from './string.js';
 import IntWidget from './int.js';
 import FloatWidget from './float.js';
 import ListWidget from './list.js';
+import VocWidget from './voc.js';
 import { IpMaskWidget, IpWidget } from './ip_widgets.js';
 import { DateTimeWidget, DateWidget, TimeWidget } from './datetime_widgets.js';
 import TextWidget from './text.js';
 import ButtonWidget from './button.js';
+import SplitButtonWidget from './split_button.js';
 import ImgWidget from './img.js';
 import TableWidget from './table/index.js';
 
@@ -16,6 +18,7 @@ const DEFAULT_WIDGET_REGISTRY = Object.freeze([
     ['int', IntWidget],
     ['float', FloatWidget],
     ['list', ListWidget],
+    ['voc', VocWidget],
     ['ip', IpWidget],
     ['ip_mask', IpMaskWidget],
     ['datetime', DateTimeWidget],
@@ -23,6 +26,7 @@ const DEFAULT_WIDGET_REGISTRY = Object.freeze([
     ['time', TimeWidget],
     ['text', TextWidget],
     ['button', ButtonWidget],
+    ['split_button', SplitButtonWidget],
     ['img', ImgWidget],
     ['table', TableWidget]
 ]);

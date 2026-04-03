@@ -8,7 +8,8 @@ const STATEFUL_WIDGET_TYPES = new Set([
     'datetime',
     'ip',
     'ip_mask',
-    'list'
+    'list',
+    'voc'
 ]);
 
 function normalizeWidgetType(configOrType) {
@@ -41,6 +42,18 @@ function isListMultiselect(widgetConfig) {
         widgetConfig &&
         widgetConfig.multiselect === true
     );
+}
+
+function isVocMultiselect(widgetConfig) {
+    return (
+        normalizeWidgetType(widgetConfig) === 'voc' &&
+        widgetConfig &&
+        widgetConfig.multiselect === true
+    );
+}
+
+function isChoiceWidgetMultiselect(widgetConfig) {
+    return isListMultiselect(widgetConfig) || isVocMultiselect(widgetConfig);
 }
 
 function padDatePart(value) {
@@ -92,7 +105,7 @@ function normalizeStatefulWidgetValue(widgetConfig, value, options = {}) {
     }
 
     if (rawValue === undefined) {
-        return isListMultiselect(widgetConfig) ? [] : '';
+        return isChoiceWidgetMultiselect(widgetConfig) ? [] : '';
     }
 
     if (
@@ -104,7 +117,7 @@ function normalizeStatefulWidgetValue(widgetConfig, value, options = {}) {
         return formatNowValueForWidgetType(widgetType, now);
     }
 
-    if (isListMultiselect(widgetConfig)) {
+    if (isChoiceWidgetMultiselect(widgetConfig)) {
         return normalizeStringArrayValue(rawValue);
     }
 
@@ -202,9 +215,11 @@ function normalizeListOptions(source) {
 export {
     STATEFUL_WIDGET_TYPES,
     formatNowValueForWidgetType,
+    isChoiceWidgetMultiselect,
     isListMultiselect,
     isStatefulWidgetConfig,
     isStatefulWidgetType,
+    isVocMultiselect,
     normalizeListOption,
     normalizeListOptions,
     normalizeScalarStringValue,
@@ -218,9 +233,11 @@ export {
 export default {
     STATEFUL_WIDGET_TYPES,
     formatNowValueForWidgetType,
+    isChoiceWidgetMultiselect,
     isListMultiselect,
     isStatefulWidgetConfig,
     isStatefulWidgetType,
+    isVocMultiselect,
     normalizeListOption,
     normalizeListOptions,
     normalizeScalarStringValue,

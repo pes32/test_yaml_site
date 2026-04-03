@@ -88,6 +88,26 @@ Frontend normalizes это в `AttrsState`:
 - `diagnostics`
 - `snapshotVersion`
 
+## `GET /api/pages`
+
+`data`:
+
+```json
+{
+  "pages": [
+    {
+      "name": "main",
+      "title": "Main",
+      "url": "/"
+    }
+  ]
+}
+```
+
+Этот endpoint не участвует в backend normalization и не меняет snapshot shape.
+Сейчас frontend использует его как lazy runtime-input для label-resolution у
+`split_button.url`, когда нужно заменить внутренний URL на title опубликованной страницы.
+
 ## `GET /api/modal-gui?page=<name>&id=<modal_id>`
 
 `data`:
@@ -148,6 +168,11 @@ Success `data`:
 ```
 
 Frontend normalizes это в `ExecuteResult`.
+
+Важно:
+
+- `output_attrs` остаётся transport-only полем execute request;
+- `split_button` не вводит отдельный transport format и для command-items использует тот же execute pipeline, что и обычный `button`.
 
 ## Debug API
 

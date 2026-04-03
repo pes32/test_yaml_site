@@ -229,6 +229,13 @@ const Core = tableEngine;
         return cells[cellIndex] ?? '';
     }
 
+    function replaceRowCellValue(row, cellIndex, value) {
+        const cells = getRowCells(row).slice();
+        cells[cellIndex] = value;
+        const id = getRowId(row) || generateTableRowId();
+        return { id, cells };
+    }
+
     function nextLineNumber(rows, tableColumns) {
         const lineNumberIndex = getLineNumberColumnIndex(tableColumns);
         if (lineNumberIndex < 0) return null;
@@ -268,6 +275,7 @@ const Core = tableEngine;
     Core.Utils.cloneCellValueDeep = cloneCellValueDeep;
     Core.Utils.cloneTableRowDeep = cloneTableRowDeep;
     Core.Utils.safeCellValue = safeCellValue;
+    Core.Utils.replaceRowCellValue = replaceRowCellValue;
     Core.Utils.nextLineNumber = nextLineNumber;
     Core.Utils.assignRowLineNumber = assignRowLineNumber;
 
@@ -287,6 +295,7 @@ export {
     normalizeLineNumberValue,
     normalizeRowToDataRow,
     normalizeTableRows,
+    replaceRowCellValue,
     safeCellValue,
     stripTableDataForEmit,
     validateExternalTableRows

@@ -29,6 +29,7 @@ import IntWidget from '../int.js';
 import { IpMaskWidget, IpWidget } from '../ip_widgets.js';
 import ListWidget from '../list.js';
 import StringWidget from '../string.js';
+import VocWidget from '../voc.js';
 
 const TableWidget = {
     inject: {
@@ -346,6 +347,7 @@ const TableWidget = {
             ipCellWidget: markRaw(IpWidget),
             ipMaskCellWidget: markRaw(IpMaskWidget),
             listCellWidget: markRaw(ListWidget),
+            vocCellWidget: markRaw(VocWidget),
             /** true после focus в tbody; без этого не показываем box-shadow выделения (избегаем «фейкового фокуса» при загрузке). */
             _tableFocusWithin: false,
             /** Порядок ссылок на строки до первого клика сортировки в текущем цикле (asc→desc→сброс). */
@@ -660,6 +662,7 @@ const TableWidget = {
             if (key === 'time') return this.timeCellWidget;
             if (key === 'datetime') return this.datetimeCellWidget;
             if (key === 'list') return this.listCellWidget;
+            if (key === 'voc') return this.vocCellWidget;
             if (key === 'ip') return this.ipCellWidget;
             if (key === 'ip_mask') return this.ipMaskCellWidget;
             return null;
@@ -684,11 +687,12 @@ const TableWidget = {
                 type === 'ip' ||
                 type === 'ip_mask' ||
                 type === 'list' ||
+                type === 'voc' ||
                 type === 'date' ||
                 type === 'time' ||
                 type === 'datetime'
             ) {
-                return type;
+                return type === 'voc' ? 'list' : type;
             }
             return '';
         },
@@ -816,7 +820,9 @@ const TableWidget = {
                 ((v) => (Array.isArray(v) ? v.map((row) => (Array.isArray(row) ? row.slice() : [])) : []));
             const normalizeRows = U && U.normalizeTableRows;
             let incoming = [];
-            if (this.widgetConfig.source && typeof this.widgetConfig.source === 'object' && Array.isArray(this.widgetConfig.source)) {
+            if (Array.isArray(this.widgetConfig.value)) {
+                incoming = clone(this.widgetConfig.value);
+            } else if (this.widgetConfig.source && typeof this.widgetConfig.source === 'object' && Array.isArray(this.widgetConfig.source)) {
                 incoming = clone(this.widgetConfig.source);
             } else if (this.widgetConfig.data) {
                 incoming = clone(this.widgetConfig.data);
@@ -1440,7 +1446,10 @@ const TableWidget = {
                 widget: column.type,
                 value: val,
                 default: undefined,
-                label: '',
+                label:
+                    attrCfg && attrCfg.label !== undefined
+                        ? attrCfg.label
+                        : String(column && column.label ? column.label : ''),
                 sup_text: '',
                 table_cell_mode: true,
                 table_consume_keys: this.tableCellConsumeKeys(column),
@@ -1448,6 +1457,9 @@ const TableWidget = {
                     this.onCellWidgetValidation(rowIndex, cellIndex, message),
                 table_cell_tab_handler: (shiftKey) =>
                     this.navigateTableByTabFromCell(rowIndex, cellIndex, !!shiftKey),
+                table_cell_ui_lock_handler: (locked) => {
+                    this.tableUiLocked = !!locked;
+                },
                 readonly
             };
             if (column && column.type === 'list') {
@@ -1460,6 +1472,21 @@ const TableWidget = {
                 config.multiselect = isMulti;
                 if (attrCfg && attrCfg.editable !== undefined) {
                     config.editable = attrCfg.editable;
+                }
+            } else if (column && column.type === 'voc') {
+                config.source =
+                    attrCfg && Object.prototype.hasOwnProperty.call(attrCfg, 'source')
+                        ? attrCfg.source
+                        : options.source;
+                config.columns =
+                    attrCfg && Array.isArray(attrCfg.columns)
+                        ? attrCfg.columns.slice()
+                        : Array.isArray(options.columns)
+                          ? options.columns.slice()
+                          : [];
+                config.multiselect = isMulti;
+                if (attrCfg && attrCfg.placeholder !== undefined) {
+                    config.placeholder = attrCfg.placeholder;
                 }
             }
             return config;
@@ -1505,11 +1532,16 @@ const TableWidget = {
             if (di < 0) return;
             const U = tableEngine.Utils;
             const rowObj = this.tableData[di];
-            const cells = [...(U && U.getRowCells ? U.getRowCells(rowObj) : [])];
-            cells[cellIndex] = payload.value;
             this.applyTableMutation(
                 () => {
-                    this.tableData.splice(di, 1, { id: rowObj.id, cells });
+                    const nextRow =
+                        U && typeof U.replaceRowCellValue === 'function'
+                            ? U.replaceRowCellValue(rowObj, cellIndex, payload.value)
+                            : { id: rowObj.id, cells: [...(U && U.getRowCells ? U.getRowCells(rowObj) : [])] };
+                    if (!(U && typeof U.replaceRowCellValue === 'function')) {
+                        nextRow.cells[cellIndex] = payload.value;
+                    }
+                    this.tableData.splice(di, 1, nextRow);
                 },
                 { skipSort: true, skipGroupingViewRefresh: true }
             );

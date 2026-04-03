@@ -1,6 +1,14 @@
+function isChoiceColumnType(type) {
+    const key = String(type || '').trim();
+    return key === 'list' || key === 'voc';
+}
+
 function getCellDisplayActions(column) {
     if (!column) return [];
-    if (column.type === 'list') {
+    if (String(column.type || '').trim() === 'voc') {
+        return [{ kind: 'list', label: 'Открыть справочник', icon: '' }];
+    }
+    if (isChoiceColumnType(column.type)) {
         return [{ kind: 'list', label: 'Открыть список', icon: '' }];
     }
     if (column.type === 'date') {
@@ -24,12 +32,12 @@ function getCellDisplayKind(column) {
     if (
         type === 'ip' ||
         type === 'ip_mask' ||
-        type === 'list' ||
+        isChoiceColumnType(type) ||
         type === 'date' ||
         type === 'time' ||
         type === 'datetime'
     ) {
-        return type;
+        return isChoiceColumnType(type) ? 'list' : type;
     }
     return '';
 }
@@ -119,7 +127,7 @@ function getColumnAttrConfig(attrsByName, column) {
 }
 
 function isListColumnMultiselect(attrsByName, column) {
-    if (!column || column.type !== 'list') {
+    if (!column || !isChoiceColumnType(column.type)) {
         return false;
     }
 
@@ -137,7 +145,7 @@ function getColumnTableCellOptions(attrsByName, column, sanitizeTableCellOptions
 
 function normalizeCellWidgetValue(column, currentVal, isMulti) {
     if (!column) return currentVal;
-    if (column.type === 'list') {
+    if (isChoiceColumnType(column.type)) {
         if (isMulti) {
             return Array.isArray(currentVal)
                 ? currentVal.slice()
@@ -153,7 +161,7 @@ function normalizeCellWidgetValue(column, currentVal, isMulti) {
 function tableCellConsumeKeys(column) {
     if (!column) return '';
     if (
-        column.type === 'list' ||
+        isChoiceColumnType(column.type) ||
         column.type === 'date' ||
         column.type === 'time' ||
         column.type === 'datetime'
@@ -177,7 +185,7 @@ function defaultCellValueFromColumn(column, options = {}) {
         return options.isListColumnMultiselect === true ? [] : '';
     }
 
-    if (column.type === 'list') {
+    if (isChoiceColumnType(column.type)) {
         if (options.isListColumnMultiselect === true) {
             if (Array.isArray(tableCellOptions.default)) return tableCellOptions.default.slice();
             return tableCellOptions.default ? [tableCellOptions.default] : [];
@@ -215,7 +223,7 @@ function defaultCellValueForColumn(columns, colIndex, options = {}) {
 function blankCellValueForColumn(columns, colIndex, options = {}) {
     const list = Array.isArray(columns) ? columns : [];
     const column = list[colIndex];
-    return options.isListColumnMultiselect === true && column && column.type === 'list'
+    return options.isListColumnMultiselect === true && column && isChoiceColumnType(column.type)
         ? []
         : '';
 }

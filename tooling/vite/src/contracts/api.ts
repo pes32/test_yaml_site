@@ -42,6 +42,18 @@ export interface PageState {
   snapshotVersion: string;
 }
 
+export interface PageListItem {
+  name: string;
+  title: string;
+  url: string;
+}
+
+export interface PagesListState {
+  pages: PageListItem[];
+  diagnostics: Diagnostic[];
+  snapshotVersion: string;
+}
+
 export interface AttrsState {
   page: string;
   attrs: Record<string, unknown>;

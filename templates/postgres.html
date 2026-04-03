@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    {% set page_bundle = vite_entry_assets('src/entry/page.ts') %}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YAML System - Postgres</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    {% if page_bundle and page_bundle.get('css') %}
+        {% for css_file in page_bundle.get('css', []) %}
+    <link href="{{ url_for('static', filename='dist/' ~ css_file) }}" rel="stylesheet">
+        {% endfor %}
+    {% endif %}
+</head>
+<body data-page-name="postgres">
+    {% include "_app_header.html" %}
+
+    <div class="container-fluid mt-3">
+        <div class="page-shell u-wide">
+            <main class="page-content-column u-wide">
+                <div class="page-main-stack">
+                    <div class="page-tab-content u-wide">
+                        <div class="tab-pane active show u-wide">
+                            <div class="page-section page-section--box">
+                                <div class="card page-section-card u-wide">
+                                    <div class="card-header page-section-header">
+                                        <div class="page-section-title">
+                                            <span>SQL Inspect</span>
+                                        </div>
+                                    </div>
+                                    <div class="card-body page-section-body u-wide">
+                                        <div class="row row--section row--text">
+                                            <div class="col-12">
+                                                <span class="page-section-text">Если у вас Mac OS, то можно скачать приложение для анализа данных в Postgres.</span>
+                                            </div>
+                                        </div>
+                                        <div class="row row--section row--text">
+                                            <div class="col-12">
+                                                <span class="page-section-text">В ней можно: сохранять запросы, фильтровать и сортировать из таблицы, именовать столбцы, заменять id вложенными запросами с выводом имени...</span>
+                                            </div>
+                                        </div>
+                                        <div class="row row--section row--text">
+                                            <div class="col-12">
+                                                <span class="page-section-text">Несколько лет назад мы делали его для себя для одного из проектов, но проект заглох, а программа осталась.</span>
+                                            </div>
+                                        </div>
+                                        <div class="row row--section row--text row--before-widgets">
+                                            <div class="col-12">
+                                                <span class="page-section-text">Пересобирать её для Windows и Linux мне лениво, как и доделывать до уровня pgAdmin, но пригождается каждый раз при работе с БД.</span>
+                                            </div>
+                                        </div>
+                                        <div class="row row--section">
+                                            <div class="col-12">
+                                                <a class="widget-button inline-flex-center" href="{{ download_url }}">Скачать</a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+</body>
+</html>

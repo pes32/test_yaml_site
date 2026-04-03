@@ -1,0 +1,23 @@
+<header class="page-header">
+    <a class="page-header-brand" href="/">YAML System</a>
+    <nav class="page-header-actions" aria-label="Основная навигация">
+        <a class="page-header-icon-link{% if header_active == 'postgres' %} is-active{% endif %}"
+           href="/postgres"
+           aria-label="Postgres"
+           title="Postgres"
+           {% if header_active == 'postgres' %}aria-current="page"{% endif %}>
+            <img src="{{ url_for('serve_icon', filename='postgres.svg') }}" alt="">
+        </a>
+        <a class="page-header-icon-link"
+           href="https://github.com/pes32/test_yaml_site"
+           target="_blank"
+           rel="noopener noreferrer"
+           aria-label="GitHub-репозиторий"
+           title="GitHub-репозиторий">
+            <img src="{{ url_for('serve_icon', filename='github.svg') }}" alt="">
+        </a>
+        {% if debug_tooling_enabled %}
+        <a class="page-header-link" href="/debug" target="_blank" rel="noopener noreferrer">Debug</a>
+        {% endif %}
+    </nav>
+</header>

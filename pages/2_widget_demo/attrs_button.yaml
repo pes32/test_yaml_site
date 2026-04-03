@@ -1,4 +1,4 @@
-# Виджет кнопки (button)
+# Виджеты кнопок (`button` и `split_button`)
 
 # <name_attr>:                # Имя атрибута (обязательно)
 #   widget: button            # Тип виджета (обязательно)
@@ -20,6 +20,24 @@
 #     text: "Текст"
 #     accept: "Да"
 #     cancel: "Отмена"
+#
+# split_button использует те же визуальные attrs, но умеет показывать dropdown
+# из нескольких действий. Действия задаются через multiline-string:
+#
+# <name_attr>:
+#   widget: split_button
+#   label: "Сплит-кнопка"
+#   icon: "file.svg"
+#   url: |
+#     /page_a | Перейти к A
+#     /page_b
+#   source: |
+#     templates/file.pdf | PDF
+#   command: |
+#     test_command | Тестовая команда
+#     another_command
+#
+# Порядок действий фиксированный: url -> source -> command.
 
 # === Визуальное описание кнопок ===
 
@@ -51,6 +69,15 @@ button_5:
   size: 100
   fon: true
   hint: "ОГРОМНАЯ КНОПКА"
+
+button_6:
+  widget: split_button
+  label: Сплит кнопка
+  icon: test.svg
+  command: |
+    fake_visual_action_1 | Первый пункт
+    fake_visual_action_2 | Второй пункт
+    fake_visual_action_3 | Третий пункт
 
 # === Функциональное описание кнопок ===
 
@@ -88,6 +115,31 @@ func_5:
   widget: button
   label: "Скачать файл"
   source: "templates/mems/mem_1.jpg"
+
+func_6:
+  widget: split_button
+  label: Сплит кнопка с url
+  icon: test.svg
+  url: |
+    /form_1_1
+    /form_1_2
+    /form_1_3
+    /form_1_4
+    /form_1_5
+    /form_1_6
+    /form_1_7
+    /form_1_8
+    /form_1_9
+    https://www.figma.com/design/Jb865lFZRMrDVkc3epZPWG/Material-3-Design-Kit--Community-?node-id=55141-14168&p=f&t=3yxuofdv1kvjGOJb-0 | Дизайн MD3
+
+func_7:
+  widget: split_button
+  label: Сплит кнопка с source
+  icon: test.svg
+  source: |
+    templates/mems/mem_1.jpg | Мем 1
+    templates/mems/mem_2.png | Мем 2
+    templates/mems/mem_3.jpg | Мем 3
 
 # === Модальные окна ===
 

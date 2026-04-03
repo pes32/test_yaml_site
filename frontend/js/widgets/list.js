@@ -31,6 +31,10 @@ const ListWidget = {
                     <input type="text"
                            class="list-combobox-input"
                            data-table-editor-target="true"
+                           role="combobox"
+                           :aria-controls="listMenuId"
+                           :aria-expanded="isDropdownOpen ? 'true' : 'false'"
+                           :aria-activedescendant="highlightedId || undefined"
                            :value="inputDisplayValue"
                            @input="onInputChange"
                            @focus="onInputFocus"
@@ -57,10 +61,10 @@ const ListWidget = {
                 </div>
                 <Teleport to="body">
                     <ul class="dropdown-menu widget-dd-menu widget-dd-menu--teleport"
+                        :id="listMenuId"
                         :class="{ show: isDropdownOpen, scrollable: filteredOptions.length > 10 }"
                         :style="menuPosition"
                         role="listbox"
-                        :aria-activedescendant="highlightedId"
                         tabindex="-1"
                         @keydown="onMenuKeydown"
                         ref="dropdownMenu">
@@ -108,6 +112,9 @@ const ListWidget = {
         isMultiselect() {
             return this.widgetConfig.multiselect === true;
         },
+        isSearchable() {
+            return this.isEditable && !this.isMultiselect;
+        },
         hasValue() {
             if (this.isMultiselect) {
                 return Array.isArray(this.value) && this.value.length > 0;
@@ -125,7 +132,7 @@ const ListWidget = {
             return normalizeListOptions(this.widgetConfig.source);
         },
         filteredOptions() {
-            if (this.isEditable && !this.isMultiselect && this.isDropdownOpen && this.inputValue.trim()) {
+            if (this.isSearchable && this.isDropdownOpen && this.inputValue.trim()) {
                 const query = this.inputValue.trim().toLowerCase();
                 return this.listOptions.filter((option) =>
                     option.label.toLowerCase().includes(query)
@@ -150,6 +157,9 @@ const ListWidget = {
             return this.inputValue !== ''
                 ? this.inputValue
                 : this.getOptionLabelByValue(this.value);
+        },
+        listMenuId() {
+            return `list-menu-${this.listId}`;
         },
         highlightedId() {
             return this.highlightedIndex >= 0 && this.highlightedIndex < this.filteredOptions.length
@@ -241,18 +251,80 @@ const ListWidget = {
             }
             return -1;
         },
+        getInputElement() {
+            return this.$refs.dropdownToggle?.querySelector('.list-combobox-input') || null;
+        },
+        scrollHighlightedItemIntoView() {
+            const items = this.$refs.dropdownMenu?.querySelectorAll('[role="option"]');
+            if (!items || this.highlightedIndex < 0 || this.highlightedIndex >= items.length) {
+                return;
+            }
+
+            const element =
+                items[this.highlightedIndex]?.querySelector('.dropdown-item') ||
+                items[this.highlightedIndex];
+            if (element) {
+                element.scrollIntoView({ block: 'nearest' });
+            }
+        },
+        setHighlightedIndex(index, options = {}) {
+            const scroll = options.scroll !== false;
+            const maxIndex = this.filteredOptions.length - 1;
+            const nextIndex =
+                maxIndex < 0
+                    ? -1
+                    : Math.min(Math.max(index, 0), maxIndex);
+            this.highlightedIndex = nextIndex;
+            if (scroll && nextIndex >= 0) {
+                this.$nextTick(() => this.scrollHighlightedItemIntoView());
+            }
+        },
+        moveHighlightedIndex(delta) {
+            const length = this.filteredOptions.length;
+            if (length === 0) {
+                this.highlightedIndex = -1;
+                return;
+            }
+
+            const nextIndex =
+                this.highlightedIndex < 0
+                    ? delta > 0
+                        ? 0
+                        : length - 1
+                    : (this.highlightedIndex + delta + length) % length;
+            this.setHighlightedIndex(nextIndex);
+        },
+        resetHighlightToFirstFilteredOption() {
+            this.$nextTick(() => {
+                this.setHighlightedIndex(
+                    this.filteredOptions.length > 0 ? 0 : -1
+                );
+            });
+        },
+        getCurrentHighlightedOption() {
+            const options = this.filteredOptions;
+            if (this.highlightedIndex >= 0 && this.highlightedIndex < options.length) {
+                return options[this.highlightedIndex];
+            }
+
+            const resolvedIndex = this.resolveHighlightedIndex();
+            return resolvedIndex >= 0 && resolvedIndex < options.length
+                ? options[resolvedIndex]
+                : null;
+        },
         onInputChange(event) {
-            if (!this.isEditable || this.isMultiselect) {
+            if (!this.isSearchable) {
                 return;
             }
 
             this.inputValue = String(event.target.value || '');
             this.activateDraftController();
             if (!this.isDropdownOpen) {
-                this.openDropdown();
-            } else if (this.highlightedIndex >= this.filteredOptions.length) {
-                this.highlightedIndex = Math.max(0, this.filteredOptions.length - 1);
+                this.openDropdown({ highlightFirstFiltered: true });
+                return;
             }
+
+            this.resetHighlightToFirstFilteredOption();
         },
         onInputFocus() {
             this.isFocused = true;
@@ -263,7 +335,7 @@ const ListWidget = {
         },
         onInputBlur() {
             this.isFocused = false;
-            const input = this.$refs.dropdownToggle?.querySelector('.list-combobox-input');
+            const input = this.getInputElement();
             if (input) {
                 input.scrollLeft = 0;
                 input.setSelectionRange(0, 0);
@@ -313,7 +385,11 @@ const ListWidget = {
                 }
             }
 
-            const expandKeys = (event.altKey || event.metaKey) && event.key === 'ArrowDown';
+            const expandKeys =
+                event.altKey &&
+                !event.ctrlKey &&
+                !event.metaKey &&
+                event.key === 'ArrowDown';
             if (expandKeys) {
                 event.preventDefault();
                 this.openDropdown();
@@ -321,58 +397,36 @@ const ListWidget = {
             }
 
             if (event.key === 'Enter' && !this.isDropdownOpen) {
-                if (!this.isMultiselect && this.isEditable) {
-                    event.preventDefault();
-                    this.commitDraft();
-                    event.target?.blur?.();
-                    return;
-                }
-
                 event.preventDefault();
                 this.openDropdown();
                 return;
             }
 
-            if (this.isDropdownOpen && this.filteredOptions.length > 0) {
+            if (this.isDropdownOpen) {
                 if (event.key === 'ArrowDown') {
                     event.preventDefault();
-                    this.focusMenuItem(this.highlightedIndex >= 0 ? this.highlightedIndex : 0);
+                    this.moveHighlightedIndex(1);
                     return;
                 }
                 if (event.key === 'ArrowUp') {
                     event.preventDefault();
-                    this.focusMenuItem(this.filteredOptions.length - 1);
+                    this.moveHighlightedIndex(-1);
                     return;
                 }
                 if (event.key === 'Enter') {
                     event.preventDefault();
-                    const length = this.filteredOptions.length;
-                    if (this.highlightedIndex >= 0 && this.highlightedIndex < length) {
-                        this.selectOption(this.filteredOptions[this.highlightedIndex], event);
+                    const option = this.getCurrentHighlightedOption();
+                    if (option) {
+                        this.selectOption(option, event);
                     }
                     return;
                 }
                 if (event.key === 'Escape') {
                     event.preventDefault();
                     this.closeDropdown();
-                    this.$refs.dropdownToggle?.querySelector('.list-combobox-input')?.focus();
+                    this.getInputElement()?.focus();
                 }
             }
-        },
-        focusMenuItem(index) {
-            const items = this.$refs.dropdownMenu?.querySelectorAll('[role="option"]');
-            if (!items || index < 0 || index >= items.length) {
-                return;
-            }
-
-            this.highlightedIndex = index;
-            this.$nextTick(() => {
-                const element = items[index]?.querySelector('.dropdown-item') || items[index];
-                if (element) {
-                    element.focus();
-                    element.scrollIntoView({ block: 'nearest' });
-                }
-            });
         },
         onMenuKeydown(event) {
             if (!this.isDropdownOpen) {
@@ -381,42 +435,37 @@ const ListWidget = {
 
             const options = this.filteredOptions;
             const length = options.length;
-            if (length === 0) {
-                return;
-            }
 
             if (event.key === 'ArrowDown') {
                 event.preventDefault();
-                this.highlightedIndex = (this.highlightedIndex + 1) % length;
-                this.$nextTick(() => this.focusMenuItem(this.highlightedIndex));
+                this.moveHighlightedIndex(1);
+                this.getInputElement()?.focus();
                 return;
             }
 
             if (event.key === 'ArrowUp') {
                 event.preventDefault();
-                if (this.highlightedIndex <= 0) {
-                    this.highlightedIndex = -1;
-                    this.$refs.dropdownToggle?.querySelector('.list-combobox-input')?.focus();
-                } else {
-                    this.highlightedIndex -= 1;
-                    this.$nextTick(() => this.focusMenuItem(this.highlightedIndex));
-                }
+                this.moveHighlightedIndex(-1);
+                this.getInputElement()?.focus();
                 return;
             }
 
             if (event.key === 'Enter') {
                 event.preventDefault();
-                if (this.highlightedIndex >= 0 && this.highlightedIndex < length) {
-                    this.selectOption(options[this.highlightedIndex], event);
-                    this.$refs.dropdownToggle?.querySelector('.list-combobox-input')?.focus();
+                if (length > 0) {
+                    const option = this.getCurrentHighlightedOption();
+                    if (option) {
+                        this.selectOption(option, event);
+                    }
                 }
+                this.getInputElement()?.focus();
                 return;
             }
 
             if (event.key === 'Escape') {
                 event.preventDefault();
                 this.closeDropdown();
-                this.$refs.dropdownToggle?.querySelector('.list-combobox-input')?.focus();
+                this.getInputElement()?.focus();
                 return;
             }
 
@@ -441,7 +490,7 @@ const ListWidget = {
                 event.preventDefault();
                 this.removeLastSelected();
                 this.closeDropdown();
-                this.$refs.dropdownToggle?.querySelector('.list-combobox-input')?.focus();
+                this.getInputElement()?.focus();
             }
         },
         onArrowClick() {
@@ -449,7 +498,7 @@ const ListWidget = {
                 return;
             }
 
-            this.$refs.dropdownToggle?.querySelector('.list-combobox-input')?.focus();
+            this.getInputElement()?.focus();
             if (this.isDropdownOpen) {
                 this.closeDropdown();
             } else {
@@ -519,17 +568,24 @@ const ListWidget = {
 
             return this.value === option.value;
         },
-        openDropdown() {
+        openDropdown(options = {}) {
             if (this.widgetConfig.readonly) {
                 return;
             }
 
+            const highlightFirstFiltered =
+                options && options.highlightFirstFiltered === true;
             this.isDropdownOpen = true;
-            this.highlightedIndex = this.resolveHighlightedIndex();
+            this.highlightedIndex = highlightFirstFiltered
+                ? this.filteredOptions.length > 0
+                    ? 0
+                    : -1
+                : this.resolveHighlightedIndex();
             this.$nextTick(() => {
                 this.updateMenuPosition();
                 this.addClickOutsideListener();
                 this.addScrollListener();
+                this.scrollHighlightedItemIntoView();
             });
         },
         updateMenuPosition() {
@@ -673,8 +729,16 @@ const ListWidget = {
             }
         },
         filteredOptions() {
+            if (this.filteredOptions.length === 0) {
+                this.highlightedIndex = -1;
+                return;
+            }
+
             if (this.highlightedIndex >= this.filteredOptions.length) {
-                this.highlightedIndex = Math.max(0, this.filteredOptions.length - 1);
+                this.setHighlightedIndex(
+                    Math.max(0, this.filteredOptions.length - 1),
+                    { scroll: false }
+                );
             }
         },
         listOptions() {
