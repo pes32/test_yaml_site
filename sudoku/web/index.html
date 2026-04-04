@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    {% set page_bundle = vite_entry_assets('src/entry/page.ts') %}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YAML System - Судоку</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    {% if page_bundle and page_bundle.get('css') %}
+        {% for css_file in page_bundle.get('css', []) %}
+    <link href="{{ url_for('static', filename='dist/' ~ css_file) }}" rel="stylesheet">
+        {% endfor %}
+    {% endif %}
+    <link rel="stylesheet" href="{{ url_for('sudoku_asset', filename='style.css') }}">
+</head>
+<body>
+    {% include "_app_header.html" %}
+
+    <main class="sudoku-page">
+        <div id="sudoku-status" class="sudoku-status" hidden></div>
+
+        <section class="sudoku-layout">
+            <aside class="sudoku-sidebar sudoku-sidebar--left">
+                <section class="sudoku-card">
+                    <header class="sudoku-card__header">
+                        <h2>Пользователь</h2>
+                    </header>
+                    <div class="sudoku-card__body">
+                        <label class="sudoku-label" for="sudoku-user-select">Пользователь:</label>
+                        <select id="sudoku-user-select" class="sudoku-select">
+                            <option value="">Без пользователя</option>
+                        </select>
+                        <button id="sudoku-new-user-btn" class="sudoku-button sudoku-button--soft" type="button">Новый пользователь</button>
+
+                        <div class="sudoku-stats">
+                            <div id="sudoku-games-label" class="sudoku-stat">Игр: 0</div>
+                            <div id="sudoku-wins-label" class="sudoku-stat">Побед: 0%</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="sudoku-card">
+                    <header class="sudoku-card__header">
+                        <h2>Подсказки</h2>
+                    </header>
+                    <div class="sudoku-card__body sudoku-card__body--compact">
+                        <label class="sudoku-checkbox">
+                            <input id="toggle-highlight-lines" type="checkbox">
+                            <span>Подсветка линий</span>
+                        </label>
+                        <label class="sudoku-checkbox">
+                            <input id="toggle-show-hints" type="checkbox">
+                            <span>Подсветка значений</span>
+                        </label>
+                        <label class="sudoku-checkbox">
+                            <input id="toggle-highlight-answers" type="checkbox">
+                            <span>Подсветка ответа</span>
+                        </label>
+                    </div>
+                </section>
+
+                <section class="sudoku-card">
+                    <header class="sudoku-card__header">
+                        <h2>Игра</h2>
+                    </header>
+                    <div class="sudoku-card__body">
+                        <label class="sudoku-label" for="sudoku-difficulty-select">Уровень сложности:</label>
+                        <select id="sudoku-difficulty-select" class="sudoku-select"></select>
+                        <button id="sudoku-generate-btn" class="sudoku-button" type="button">Сгенерировать</button>
+                    </div>
+                </section>
+            </aside>
+
+            <section class="sudoku-board-column">
+                <section class="sudoku-card sudoku-board-card">
+                    <header class="sudoku-card__header sudoku-card__header--board">
+                        <h2>Судоку помощник</h2>
+                    </header>
+                    <div class="sudoku-card__body sudoku-card__body--board">
+                        <div id="sudoku-board-stage" class="sudoku-board-stage">
+                            <canvas id="sudoku-canvas" class="sudoku-canvas" aria-label="Поле судоку" tabindex="0"></canvas>
+                        </div>
+                    </div>
+                </section>
+            </section>
+
+            <aside class="sudoku-sidebar sudoku-sidebar--right">
+                <section class="sudoku-card">
+                    <header class="sudoku-card__header">
+                        <h2>Действия</h2>
+                    </header>
+                    <div class="sudoku-card__body sudoku-card__body--compact">
+                        <button id="sudoku-clear-btn" class="sudoku-button sudoku-button--soft" type="button">Очистить</button>
+                        <button id="sudoku-save-btn" class="sudoku-button sudoku-button--soft" type="button">Сохранить</button>
+                        <button id="sudoku-load-btn" class="sudoku-button sudoku-button--soft" type="button">Загрузить</button>
+                        <div class="sudoku-button-row">
+                            <button id="sudoku-hint-btn" class="sudoku-button sudoku-button--soft" type="button">Подсказка</button>
+                            <button id="sudoku-solve-btn" class="sudoku-button sudoku-button--soft" type="button">Решить</button>
+                        </div>
+                        <button id="sudoku-validate-btn" class="sudoku-button sudoku-button--accent" type="button">Валидация</button>
+                    </div>
+                </section>
+            </aside>
+        </section>
+
+        <section id="sudoku-log-card" class="sudoku-card sudoku-log-card">
+            <header class="sudoku-card__header sudoku-card__header--log">
+                <h2>Лог</h2>
+                <div class="sudoku-log-actions">
+                    <button id="sudoku-toggle-log-btn" class="sudoku-button sudoku-button--ghost" type="button">Скрыть лог</button>
+                    <button id="sudoku-clear-log-btn" class="sudoku-button sudoku-button--ghost" type="button">Очистить лог</button>
+                    <button id="sudoku-copy-log-btn" class="sudoku-button sudoku-button--ghost" type="button">Копировать лог</button>
+                    <button id="sudoku-save-log-btn" class="sudoku-button sudoku-button--ghost" type="button">Сохранить лог</button>
+                </div>
+            </header>
+            <div id="sudoku-log" class="sudoku-log" aria-live="polite" aria-atomic="false"></div>
+        </section>
+    </main>
+
+    <dialog id="sudoku-new-user-dialog" class="sudoku-dialog">
+        <form method="dialog" class="sudoku-dialog__form">
+            <h2 class="sudoku-dialog__title">Новый пользователь</h2>
+            <label class="sudoku-label" for="sudoku-new-user-input">Введите имя пользователя:</label>
+            <input id="sudoku-new-user-input" class="sudoku-input" type="text" maxlength="120" autocomplete="off">
+            <div class="sudoku-dialog__actions">
+                <button id="sudoku-dialog-cancel-btn" class="sudoku-button sudoku-button--ghost" type="button">Отмена</button>
+                <button id="sudoku-dialog-confirm-btn" class="sudoku-button" type="button">Сохранить</button>
+            </div>
+        </form>
+    </dialog>
+
+    <script type="module" src="{{ url_for('sudoku_asset', filename='app.js') }}"></script>
+</body>
+</html>

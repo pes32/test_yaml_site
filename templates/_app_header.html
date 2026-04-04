@@ -19,5 +19,10 @@
         {% if debug_tooling_enabled %}
         <a class="page-header-link" href="/debug" target="_blank" rel="noopener noreferrer">Debug</a>
         {% endif %}
+        {% if sudoku_is_available() %}
+        <a class="page-header-link{% if header_active == 'sudoku' %} is-active{% endif %}"
+           href="/sudoku"
+           {% if header_active == 'sudoku' %}aria-current="page"{% endif %}>Судоку</a>
+        {% endif %}
     </nav>
 </header>

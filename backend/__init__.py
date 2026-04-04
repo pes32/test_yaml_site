@@ -107,6 +107,33 @@ def _vite_entry_assets(entry_name: str) -> dict:
     }
 
 
+def _sudoku_is_available() -> bool:
+    try:
+        from sudoku import is_sudoku_available
+    except Exception:
+        return False
+
+    try:
+        return bool(is_sudoku_available())
+    except Exception:
+        return False
+
+
+def _register_optional_sudoku(app: Flask) -> None:
+    if not _sudoku_is_available():
+        return
+
+    try:
+        from sudoku.registrar import register_sudoku
+    except Exception:
+        return
+
+    try:
+        register_sudoku(app)
+    except Exception:
+        return
+
+
 def create_app() -> Flask:
     """Создаёт и настраивает Flask-приложение."""
 
@@ -123,6 +150,7 @@ def create_app() -> Flask:
     app.jinja_env.globals["ASSETS_VERSION"] = int(time.time())
     app.jinja_env.globals["vite_manifest"] = _load_vite_manifest
     app.jinja_env.globals["vite_entry_assets"] = _vite_entry_assets
+    app.jinja_env.globals["sudoku_is_available"] = _sudoku_is_available
 
     LOG_FILE_PATH = setup_logging(app)
 
@@ -138,6 +166,7 @@ def create_app() -> Flask:
 
         register_static_routes(app)
         register_postgres_routes(app)
+        _register_optional_sudoku(app)
         if app.config["DEBUG_TOOLING_ENABLED"]:
             register_debug_routes(app, CONFIG_SERVICE, LOG_FILE_PATH)
         register_page_routes(app, CONFIG_SERVICE)

@@ -1,11 +1,7 @@
 # YAML System
 
-`YAML System` — это UI-система на Flask + Vue 3, где страницы описываются YAML-файлами, backend собирает из них snapshot, а frontend рендерит интерфейс через Vite bundle.
-
-## Важно
-
-Это сознательный breaking change: обратной совместимости по `LOWCODE_*` больше нет.
-Используйте только `YAMLS_*`.
+`YAML System` — это система построенная полностью на YAML-файлах: страницы описываются YAML-файлами, backend собирает из них snapshot, а frontend рендерит интерфейс через Vite bundle. На текущий момент это кликабельный макет.
+Никаких сторонних библиотек не использовалось. Весь интерфейс написан с нейронками. 
 
 ## Что здесь находится
 
@@ -185,12 +181,6 @@ npm --prefix tooling/vite run typecheck
 YAMLS_NGINX_MIME_TYPES=/opt/homebrew/etc/nginx/mime.types ./start.sh
 ```
 
-### Firefox ругается на сертификат
-
-Локальный `ssl/dev.crt` self-signed.
-Это нормально для локальной разработки.
-Если нужен доверенный сертификат, передайте свои `YAMLS_TLS_CERT` и `YAMLS_TLS_KEY`.
-
 ### Не собирается frontend
 
 Проверьте, что установлены `node` и `npm`, а затем выполните:
@@ -199,11 +189,6 @@ YAMLS_NGINX_MIME_TYPES=/opt/homebrew/etc/nginx/mime.types ./start.sh
 npm --prefix tooling/vite install
 npm --prefix tooling/vite run build
 ```
-
-### Не работает скачивание `sql_inspect.app`
-
-Проверьте, что каталог `templates/sql_inspect.app/` существует в рабочем дереве.
-Маршрут `/postgres/download` архивирует именно этот bundle.
 
 ## Дополнительная документация
 

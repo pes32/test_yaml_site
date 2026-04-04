@@ -1,0 +1,1271 @@
+const GRID_SIZE = 9;
+const SQUARE_SIZE = 3;
+const BG_COLOR = "#444444";
+const CELL_BORDER_COLOR = "black";
+const SQUARE_BORDER_COLOR = "white";
+const TEXT_COLOR = "white";
+const HINT_COLOR = "#bbbbbb";
+const HINT_SINGLE_COLOR = "lime";
+const DEFAULT_DIFFICULTIES = ["лёгкий", "средний", "сложный", "мамкино дупло"];
+const FEATURE_GONE_MESSAGE = "Страница Sudoku недоступна.";
+
+const API = Object.freeze({
+  bootstrap: "/sudoku/api/bootstrap",
+  users: "/sudoku/api/users",
+  generate: "/sudoku/api/generate",
+  validate: "/sudoku/api/validate",
+  solve: "/sudoku/api/solve",
+  save: "/sudoku/api/save",
+  load: "/sudoku/api/load"
+});
+
+const state = {
+  cellValues: makeBlankBoard(),
+  cellHints: makeHintGrid(),
+  selected: [0, 0],
+  solvedCache: null,
+  solvedCacheField: null,
+  puzzleSolved: false,
+  errorCells: new Set(),
+  solutionMap: null,
+  solutionMapReady: false,
+  solutionMapField: null,
+  usersData: {},
+  currentUser: null,
+  difficultyVar: "средний",
+  toggleHighlightLines: false,
+  toggleShowHints: false,
+  toggleHighlightAnswers: false,
+  consoleVisible: true,
+  progress: null,
+  canvasRect: { width: 0, height: 0 },
+  initialized: false
+};
+
+const refs = {};
+let boardResizeObserver = null;
+
+document.addEventListener("DOMContentLoaded", () => {
+  void init();
+});
+
+async function init() {
+  captureRefs();
+  bindEvents();
+  applyDifficultyOptions(DEFAULT_DIFFICULTIES);
+  syncToggleInputs();
+  resizeCanvas();
+  const bootstrapped = await bootstrap();
+  updateHints();
+  checkAndUpdateErrors();
+  drawCells();
+  log("Программа запущена.");
+  state.initialized = true;
+  if (!bootstrapped) {
+    setControlsDisabled(true);
+  }
+}
+
+function captureRefs() {
+  refs.status = document.getElementById("sudoku-status");
+  refs.canvas = document.getElementById("sudoku-canvas");
+  refs.boardStage = document.getElementById("sudoku-board-stage");
+  refs.userSelect = document.getElementById("sudoku-user-select");
+  refs.newUserButton = document.getElementById("sudoku-new-user-btn");
+  refs.gamesLabel = document.getElementById("sudoku-games-label");
+  refs.winsLabel = document.getElementById("sudoku-wins-label");
+  refs.highlightLines = document.getElementById("toggle-highlight-lines");
+  refs.showHints = document.getElementById("toggle-show-hints");
+  refs.highlightAnswers = document.getElementById("toggle-highlight-answers");
+  refs.difficultySelect = document.getElementById("sudoku-difficulty-select");
+  refs.generateButton = document.getElementById("sudoku-generate-btn");
+  refs.clearButton = document.getElementById("sudoku-clear-btn");
+  refs.saveButton = document.getElementById("sudoku-save-btn");
+  refs.loadButton = document.getElementById("sudoku-load-btn");
+  refs.hintButton = document.getElementById("sudoku-hint-btn");
+  refs.solveButton = document.getElementById("sudoku-solve-btn");
+  refs.validateButton = document.getElementById("sudoku-validate-btn");
+  refs.logCard = document.getElementById("sudoku-log-card");
+  refs.log = document.getElementById("sudoku-log");
+  refs.toggleLogButton = document.getElementById("sudoku-toggle-log-btn");
+  refs.clearLogButton = document.getElementById("sudoku-clear-log-btn");
+  refs.copyLogButton = document.getElementById("sudoku-copy-log-btn");
+  refs.saveLogButton = document.getElementById("sudoku-save-log-btn");
+  refs.newUserDialog = document.getElementById("sudoku-new-user-dialog");
+  refs.newUserInput = document.getElementById("sudoku-new-user-input");
+  refs.dialogCancelButton = document.getElementById("sudoku-dialog-cancel-btn");
+  refs.dialogConfirmButton = document.getElementById("sudoku-dialog-confirm-btn");
+}
+
+function bindEvents() {
+  refs.canvas.addEventListener("click", onCanvasClick);
+  refs.userSelect.addEventListener("change", onUserChange);
+  refs.newUserButton.addEventListener("click", openNewUserDialog);
+  refs.difficultySelect.addEventListener("change", () => {
+    state.difficultyVar = refs.difficultySelect.value || "средний";
+  });
+  refs.highlightLines.addEventListener("change", () => {
+    state.toggleHighlightLines = refs.highlightLines.checked;
+    drawCells();
+  });
+  refs.showHints.addEventListener("change", () => {
+    state.toggleShowHints = refs.showHints.checked;
+    drawCells();
+  });
+  refs.highlightAnswers.addEventListener("change", () => {
+    state.toggleHighlightAnswers = refs.highlightAnswers.checked;
+    updateHints();
+    checkAndUpdateErrors();
+    drawCells();
+  });
+  refs.generateButton.addEventListener("click", () => {
+    void generatePuzzle();
+  });
+  refs.clearButton.addEventListener("click", clearAll);
+  refs.saveButton.addEventListener("click", () => {
+    void saveGame();
+  });
+  refs.loadButton.addEventListener("click", () => {
+    void loadGame();
+  });
+  refs.hintButton.addEventListener("click", hintCell);
+  refs.solveButton.addEventListener("click", () => {
+    void solvePuzzle();
+  });
+  refs.validateButton.addEventListener("click", () => {
+    void validateUserInput();
+  });
+  refs.toggleLogButton.addEventListener("click", toggleConsole);
+  refs.clearLogButton.addEventListener("click", clearLog);
+  refs.copyLogButton.addEventListener("click", () => {
+    void copyLog();
+  });
+  refs.saveLogButton.addEventListener("click", saveLog);
+  refs.dialogCancelButton.addEventListener("click", closeNewUserDialog);
+  refs.dialogConfirmButton.addEventListener("click", () => {
+    void submitNewUser();
+  });
+  refs.newUserDialog.addEventListener("close", () => {
+    refs.newUserInput.value = "";
+  });
+  window.addEventListener("resize", resizeCanvas);
+  document.addEventListener("keydown", onKeyDown);
+
+  if (typeof ResizeObserver !== "undefined") {
+    boardResizeObserver = new ResizeObserver(() => {
+      resizeCanvas();
+    });
+    boardResizeObserver.observe(refs.boardStage);
+  }
+}
+
+async function bootstrap() {
+  const result = await apiRequest(API.bootstrap);
+  if (!result.ok) {
+    handleApiFailure(result, FEATURE_GONE_MESSAGE);
+    return false;
+  }
+
+  hideStatus();
+  const data = result.data || {};
+  const toggles = data.toggles || {};
+  state.usersData = normalizeUsersData(data.usersData);
+  state.difficultyVar = typeof data.initialDifficulty === "string" ? data.initialDifficulty : "средний";
+  state.toggleHighlightLines = Boolean(toggles.highlightLines);
+  state.toggleShowHints = Boolean(toggles.showHints);
+  state.toggleHighlightAnswers = Boolean(toggles.highlightAnswers);
+  state.consoleVisible = data.consoleVisible !== false;
+
+  applyDifficultyOptions(Array.isArray(data.difficultyOptions) ? data.difficultyOptions : DEFAULT_DIFFICULTIES);
+  refs.difficultySelect.value = state.difficultyVar;
+  syncToggleInputs();
+  updateUsersList();
+  updateUserStats();
+  applyConsoleVisibility();
+  return true;
+}
+
+function applyDifficultyOptions(options) {
+  const values = Array.isArray(options) && options.length ? options : DEFAULT_DIFFICULTIES;
+  refs.difficultySelect.innerHTML = "";
+  values.forEach((item) => {
+    const option = document.createElement("option");
+    option.value = item;
+    option.textContent = item;
+    refs.difficultySelect.append(option);
+  });
+}
+
+function syncToggleInputs() {
+  refs.highlightLines.checked = state.toggleHighlightLines;
+  refs.showHints.checked = state.toggleShowHints;
+  refs.highlightAnswers.checked = state.toggleHighlightAnswers;
+}
+
+function setControlsDisabled(disabled) {
+  document.querySelectorAll(".sudoku-page button, .sudoku-page select, .sudoku-page input").forEach((node) => {
+    node.disabled = disabled;
+  });
+}
+
+function showStatus(message) {
+  refs.status.hidden = false;
+  refs.status.textContent = message;
+}
+
+function hideStatus() {
+  refs.status.hidden = true;
+  refs.status.textContent = "";
+}
+
+function makeBlankBoard() {
+  return Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(0));
+}
+
+function makeHintGrid() {
+  return Array.from({ length: GRID_SIZE }, () =>
+    Array.from({ length: GRID_SIZE }, () => new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]))
+  );
+}
+
+function normalizeBoard(value) {
+  if (!Array.isArray(value) || value.length !== GRID_SIZE) {
+    return makeBlankBoard();
+  }
+
+  return value.map((row) => {
+    if (!Array.isArray(row) || row.length !== GRID_SIZE) {
+      return Array(GRID_SIZE).fill(0);
+    }
+    return row.map((cell) => {
+      const number = Number.parseInt(cell, 10);
+      if (!Number.isInteger(number) || number < 0 || number > GRID_SIZE) {
+        return 0;
+      }
+      return number;
+    });
+  });
+}
+
+function copyBoard(board) {
+  return normalizeBoard(board).map((row) => row.slice());
+}
+
+function normalizeUsersData(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  const normalized = {};
+  Object.entries(value).forEach(([key, record]) => {
+    if (typeof key !== "string" || !key.trim()) {
+      return;
+    }
+    const games = clampToNonNegativeInteger(record?.games);
+    const wins = clampToNonNegativeInteger(record?.wins);
+    normalized[key.trim()] = {
+      games,
+      wins,
+      win_rate: games > 0 ? (wins / games) * 100 : 0
+    };
+  });
+  return normalized;
+}
+
+function clampToNonNegativeInteger(value) {
+  const number = Number.parseInt(value, 10);
+  if (!Number.isInteger(number) || number < 0) {
+    return 0;
+  }
+  return number;
+}
+
+function boardCellKey(row, col) {
+  return `${row}:${col}`;
+}
+
+function hasErrorCell(row, col) {
+  return state.errorCells.has(boardCellKey(row, col));
+}
+
+function updateHints() {
+  state.cellHints = makeHintGrid();
+
+  for (let row = 0; row < GRID_SIZE; row += 1) {
+    for (let col = 0; col < GRID_SIZE; col += 1) {
+      if (state.cellValues[row][col]) {
+        state.cellHints[row][col] = new Set();
+        continue;
+      }
+
+      const used = new Set(state.cellValues[row]);
+      for (let index = 0; index < GRID_SIZE; index += 1) {
+        used.add(state.cellValues[index][col]);
+      }
+
+      const blockRow = Math.floor(row / SQUARE_SIZE) * SQUARE_SIZE;
+      const blockCol = Math.floor(col / SQUARE_SIZE) * SQUARE_SIZE;
+      for (let deltaRow = 0; deltaRow < SQUARE_SIZE; deltaRow += 1) {
+        for (let deltaCol = 0; deltaCol < SQUARE_SIZE; deltaCol += 1) {
+          used.add(state.cellValues[blockRow + deltaRow][blockCol + deltaCol]);
+        }
+      }
+
+      const hints = new Set();
+      for (let number = 1; number <= 9; number += 1) {
+        if (!used.has(number)) {
+          hints.add(number);
+        }
+      }
+      state.cellHints[row][col] = hints;
+    }
+  }
+
+  if (!state.toggleHighlightAnswers) {
+    return;
+  }
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let row = 0; row < GRID_SIZE; row += 1) {
+      for (let col = 0; col < GRID_SIZE; col += 1) {
+        if (state.cellValues[row][col] || state.cellHints[row][col].size !== 1) {
+          continue;
+        }
+
+        const [greenNumber] = Array.from(state.cellHints[row][col]);
+        for (let nextRow = 0; nextRow < GRID_SIZE; nextRow += 1) {
+          for (let nextCol = 0; nextCol < GRID_SIZE; nextCol += 1) {
+            if ((nextRow === row && nextCol === col) || state.cellValues[nextRow][nextCol]) {
+              continue;
+            }
+            const sameSquare =
+              Math.floor(nextRow / SQUARE_SIZE) === Math.floor(row / SQUARE_SIZE) &&
+              Math.floor(nextCol / SQUARE_SIZE) === Math.floor(col / SQUARE_SIZE);
+            if (nextRow === row || nextCol === col || sameSquare) {
+              if (state.cellHints[nextRow][nextCol].has(greenNumber)) {
+                state.cellHints[nextRow][nextCol].delete(greenNumber);
+                changed = true;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+function isSingleInSquare(row, col, value) {
+  if (!state.cellHints[row][col].has(value)) {
+    return false;
+  }
+
+  const blockRow = Math.floor(row / SQUARE_SIZE) * SQUARE_SIZE;
+  const blockCol = Math.floor(col / SQUARE_SIZE) * SQUARE_SIZE;
+  let count = 0;
+
+  for (let deltaRow = 0; deltaRow < SQUARE_SIZE; deltaRow += 1) {
+    for (let deltaCol = 0; deltaCol < SQUARE_SIZE; deltaCol += 1) {
+      const nextRow = blockRow + deltaRow;
+      const nextCol = blockCol + deltaCol;
+      if (state.cellHints[nextRow][nextCol].has(value)) {
+        count += 1;
+      }
+    }
+  }
+  return count === 1;
+}
+
+function checkAndUpdateErrors() {
+  const errors = new Set();
+
+  for (let index = 0; index < GRID_SIZE; index += 1) {
+    const rowValues = new Map();
+    const colValues = new Map();
+    for (let offset = 0; offset < GRID_SIZE; offset += 1) {
+      const rowValue = state.cellValues[index][offset];
+      if (rowValue) {
+        if (rowValues.has(rowValue)) {
+          errors.add(boardCellKey(index, offset));
+          errors.add(boardCellKey(index, rowValues.get(rowValue)));
+        } else {
+          rowValues.set(rowValue, offset);
+        }
+      }
+
+      const colValue = state.cellValues[offset][index];
+      if (colValue) {
+        if (colValues.has(colValue)) {
+          errors.add(boardCellKey(offset, index));
+          errors.add(boardCellKey(colValues.get(colValue), index));
+        } else {
+          colValues.set(colValue, offset);
+        }
+      }
+    }
+  }
+
+  for (let blockRow = 0; blockRow < GRID_SIZE; blockRow += SQUARE_SIZE) {
+    for (let blockCol = 0; blockCol < GRID_SIZE; blockCol += SQUARE_SIZE) {
+      const squareValues = new Map();
+      for (let deltaRow = 0; deltaRow < SQUARE_SIZE; deltaRow += 1) {
+        for (let deltaCol = 0; deltaCol < SQUARE_SIZE; deltaCol += 1) {
+          const row = blockRow + deltaRow;
+          const col = blockCol + deltaCol;
+          const value = state.cellValues[row][col];
+          if (!value) {
+            continue;
+          }
+          if (squareValues.has(value)) {
+            const [prevRow, prevCol] = squareValues.get(value);
+            errors.add(boardCellKey(row, col));
+            errors.add(boardCellKey(prevRow, prevCol));
+          } else {
+            squareValues.set(value, [row, col]);
+          }
+        }
+      }
+    }
+  }
+
+  if (state.solutionMapReady && state.solutionMap) {
+    for (let row = 0; row < GRID_SIZE; row += 1) {
+      for (let col = 0; col < GRID_SIZE; col += 1) {
+        const value = state.cellValues[row][col];
+        if (value && state.solutionMap[row][col] !== value) {
+          errors.add(boardCellKey(row, col));
+        }
+      }
+    }
+  }
+
+  state.errorCells = errors;
+}
+
+function resizeCanvas() {
+  const rect = refs.canvas.getBoundingClientRect();
+  const width = Math.max(1, Math.floor(rect.width));
+  const height = Math.max(1, Math.floor(rect.height));
+  const dpr = window.devicePixelRatio || 1;
+  refs.canvas.width = Math.floor(width * dpr);
+  refs.canvas.height = Math.floor(height * dpr);
+  const ctx = refs.canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  state.canvasRect = { width, height };
+  drawCells();
+}
+
+function getBoardMetrics() {
+  const width = state.canvasRect.width || refs.canvas.clientWidth;
+  const height = state.canvasRect.height || refs.canvas.clientHeight;
+  const innerPadding = Math.max(18, Math.floor(Math.min(width, height) * 0.045));
+  const usableSize = Math.max(0, Math.min(width, height) - innerPadding * 2);
+  const cellSize = Math.floor(usableSize / GRID_SIZE);
+  if (!cellSize) {
+    return null;
+  }
+  const boardSize = cellSize * GRID_SIZE;
+  return {
+    width,
+    height,
+    cellSize,
+    boardSize,
+    offsetX: Math.floor((width - boardSize) / 2),
+    offsetY: Math.floor((height - boardSize) / 2)
+  };
+}
+
+function drawGrid(ctx, metrics) {
+  for (let index = 0; index <= GRID_SIZE; index += 1) {
+    const width = index % SQUARE_SIZE === 0 ? 4 : 2;
+    const color = index % SQUARE_SIZE === 0 ? SQUARE_BORDER_COLOR : CELL_BORDER_COLOR;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+
+    const x = metrics.offsetX + index * metrics.cellSize;
+    ctx.beginPath();
+    ctx.moveTo(x, metrics.offsetY);
+    ctx.lineTo(x, metrics.offsetY + metrics.boardSize);
+    ctx.stroke();
+
+    const y = metrics.offsetY + index * metrics.cellSize;
+    ctx.beginPath();
+    ctx.moveTo(metrics.offsetX, y);
+    ctx.lineTo(metrics.offsetX + metrics.boardSize, y);
+    ctx.stroke();
+  }
+}
+
+function drawCells() {
+  const metrics = getBoardMetrics();
+  if (!metrics) {
+    return;
+  }
+
+  const ctx = refs.canvas.getContext("2d");
+  ctx.clearRect(0, 0, metrics.width, metrics.height);
+
+  ctx.fillStyle = "#3d3d3d";
+  ctx.fillRect(0, 0, metrics.width, metrics.height);
+
+  ctx.fillStyle = BG_COLOR;
+  ctx.fillRect(metrics.offsetX, metrics.offsetY, metrics.boardSize, metrics.boardSize);
+
+  const [selectedRow, selectedCol] = state.selected;
+  const selectedValue = state.cellValues[selectedRow][selectedCol];
+
+  if (selectedValue && state.toggleHighlightLines) {
+    const sameValueCells = [];
+    for (let row = 0; row < GRID_SIZE; row += 1) {
+      for (let col = 0; col < GRID_SIZE; col += 1) {
+        if (state.cellValues[row][col] === selectedValue) {
+          sameValueCells.push([row, col]);
+        }
+      }
+    }
+
+    ctx.fillStyle = "rgba(0, 51, 102, 0.28)";
+    sameValueCells.forEach(([row, col]) => {
+      ctx.fillRect(
+        metrics.offsetX + col * metrics.cellSize,
+        metrics.offsetY,
+        metrics.cellSize,
+        metrics.boardSize
+      );
+      ctx.fillRect(
+        metrics.offsetX,
+        metrics.offsetY + row * metrics.cellSize,
+        metrics.boardSize,
+        metrics.cellSize
+      );
+      const blockRow = Math.floor(row / SQUARE_SIZE) * SQUARE_SIZE;
+      const blockCol = Math.floor(col / SQUARE_SIZE) * SQUARE_SIZE;
+      ctx.fillRect(
+        metrics.offsetX + blockCol * metrics.cellSize,
+        metrics.offsetY + blockRow * metrics.cellSize,
+        metrics.cellSize * SQUARE_SIZE,
+        metrics.cellSize * SQUARE_SIZE
+      );
+    });
+  }
+
+  drawGrid(ctx, metrics);
+
+  for (let row = 0; row < GRID_SIZE; row += 1) {
+    for (let col = 0; col < GRID_SIZE; col += 1) {
+      const x1 = metrics.offsetX + col * metrics.cellSize;
+      const y1 = metrics.offsetY + row * metrics.cellSize;
+      const x2 = x1 + metrics.cellSize;
+      const y2 = y1 + metrics.cellSize;
+      const highlight =
+        selectedValue && state.toggleHighlightLines && state.cellValues[row][col] === selectedValue;
+
+      if (row === selectedRow && col === selectedCol) {
+        ctx.strokeStyle = "yellow";
+        ctx.lineWidth = 4;
+        ctx.strokeRect(x1 + 2, y1 + 2, metrics.cellSize - 4, metrics.cellSize - 4);
+      } else if (highlight) {
+        ctx.strokeStyle = "#00bfff";
+        ctx.lineWidth = 4;
+        ctx.strokeRect(x1 + 2, y1 + 2, metrics.cellSize - 4, metrics.cellSize - 4);
+      }
+
+      const value = state.cellValues[row][col];
+      if (value) {
+        ctx.fillStyle = hasErrorCell(row, col) ? "red" : TEXT_COLOR;
+        ctx.font = `700 ${Math.max(24, Math.floor(metrics.cellSize * 0.42))}px "JetBrains Mono", monospace`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(String(value), (x1 + x2) / 2, (y1 + y2) / 2 + 1);
+        continue;
+      }
+
+      if (!state.toggleShowHints) {
+        continue;
+      }
+
+      ctx.font = `${Math.max(11, Math.floor(metrics.cellSize * 0.18))}px "JetBrains Mono", monospace`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      for (let number = 1; number <= 9; number += 1) {
+        if (!state.cellHints[row][col].has(number)) {
+          continue;
+        }
+        const hintRow = Math.floor((number - 1) / 3);
+        const hintCol = (number - 1) % 3;
+        const centerX = x1 + ((hintCol + 0.5) * metrics.cellSize) / 3;
+        const centerY = y1 + ((hintRow + 0.5) * metrics.cellSize) / 3;
+        let color = HINT_COLOR;
+        if (state.toggleHighlightAnswers) {
+          if (state.cellHints[row][col].size === 1 || isSingleInSquare(row, col, number)) {
+            color = HINT_SINGLE_COLOR;
+          }
+        }
+        ctx.fillStyle = color;
+        ctx.fillText(String(number), centerX, centerY);
+      }
+    }
+  }
+}
+
+function onCanvasClick(event) {
+  const metrics = getBoardMetrics();
+  if (!metrics) {
+    return;
+  }
+
+  const rect = refs.canvas.getBoundingClientRect();
+  const x = event.clientX - rect.left - metrics.offsetX;
+  const y = event.clientY - rect.top - metrics.offsetY;
+
+  if (x < 0 || y < 0 || x >= metrics.boardSize || y >= metrics.boardSize) {
+    return;
+  }
+
+  const col = Math.floor(x / metrics.cellSize);
+  const row = Math.floor(y / metrics.cellSize);
+  state.selected = [row, col];
+  refs.canvas.focus();
+  drawCells();
+}
+
+function onUserChange() {
+  const nextUser = refs.userSelect.value.trim();
+  state.currentUser = nextUser || null;
+  updateUserStats();
+  if (state.currentUser) {
+    log(`Выбран пользователь: ${state.currentUser}`);
+  }
+}
+
+function updateUsersList() {
+  const users = Object.keys(state.usersData);
+  refs.userSelect.innerHTML = "";
+
+  const emptyOption = document.createElement("option");
+  emptyOption.value = "";
+  emptyOption.textContent = "Без пользователя";
+  refs.userSelect.append(emptyOption);
+
+  users.forEach((user) => {
+    const option = document.createElement("option");
+    option.value = user;
+    option.textContent = user;
+    refs.userSelect.append(option);
+  });
+
+  if (users.length > 0 && (!state.currentUser || !state.usersData[state.currentUser])) {
+    state.currentUser = users[0];
+  }
+  if (state.currentUser && !state.usersData[state.currentUser]) {
+    state.currentUser = null;
+  }
+  refs.userSelect.value = state.currentUser || "";
+}
+
+function updateUserStats() {
+  const record = state.currentUser ? state.usersData[state.currentUser] : null;
+  refs.gamesLabel.textContent = `Игр: ${record?.games ?? 0}`;
+  refs.winsLabel.textContent = `Побед: ${(record?.win_rate ?? 0).toFixed(1)}%`;
+}
+
+function ensureCurrentUserRecord() {
+  if (!state.currentUser) {
+    return null;
+  }
+  if (!state.usersData[state.currentUser]) {
+    state.usersData[state.currentUser] = { games: 0, wins: 0, win_rate: 0 };
+  }
+  return state.usersData[state.currentUser];
+}
+
+function recalculateCurrentUserStats() {
+  const record = ensureCurrentUserRecord();
+  if (!record) {
+    return;
+  }
+  record.win_rate = record.games > 0 ? (record.wins / record.games) * 100 : 0;
+}
+
+function clearAll() {
+  state.cellValues = makeBlankBoard();
+  state.solvedCache = null;
+  state.solvedCacheField = null;
+  state.puzzleSolved = false;
+  state.errorCells = new Set();
+  state.solutionMap = null;
+  state.solutionMapReady = false;
+  state.solutionMapField = null;
+  updateHints();
+  drawCells();
+  log("Очищено!");
+
+  if (state.currentUser) {
+    const record = ensureCurrentUserRecord();
+    record.games += 1;
+    recalculateCurrentUserStats();
+    updateUserStats();
+    void syncUsersData();
+    log(`Новая игра для пользователя ${state.currentUser}`);
+  }
+}
+
+async function saveGame() {
+  const result = await apiRequest(API.save, {
+    method: "POST",
+    body: { board: state.cellValues }
+  });
+  if (!result.ok) {
+    handleApiFailure(result, "Не удалось сохранить игру.");
+    return;
+  }
+  log(result.message || "Сохранено!");
+}
+
+async function loadGame() {
+  const result = await apiRequest(API.load);
+  if (!result.ok) {
+    handleApiFailure(result, "Ошибка загрузки.");
+    return;
+  }
+
+  state.cellValues = normalizeBoard(result.data?.cellValues);
+  state.solvedCache = null;
+  state.solvedCacheField = null;
+  state.puzzleSolved = false;
+  state.solutionMap = null;
+  state.solutionMapReady = false;
+  state.solutionMapField = null;
+  state.errorCells = new Set();
+  updateHints();
+  checkAndUpdateErrors();
+  drawCells();
+  log(result.message || "Загружено!");
+}
+
+function openNewUserDialog() {
+  if (typeof refs.newUserDialog.showModal === "function") {
+    refs.newUserDialog.showModal();
+    refs.newUserInput.focus();
+    return;
+  }
+
+  const username = window.prompt("Введите имя пользователя:", "");
+  if (username === null) {
+    return;
+  }
+  refs.newUserInput.value = username;
+  void submitNewUser();
+}
+
+function closeNewUserDialog() {
+  if (refs.newUserDialog.open) {
+    refs.newUserDialog.close();
+  }
+  refs.newUserInput.value = "";
+}
+
+async function submitNewUser() {
+  const username = refs.newUserInput.value.trim();
+  closeNewUserDialog();
+  if (!username) {
+    return;
+  }
+
+  const result = await apiRequest(API.users, {
+    method: "POST",
+    body: { action: "create", username }
+  });
+  if (!result.ok) {
+    handleApiFailure(result, "Не удалось создать пользователя.");
+    return;
+  }
+
+  state.usersData = normalizeUsersData(result.data?.usersData);
+  state.currentUser = result.data?.currentUser || state.currentUser;
+  updateUsersList();
+  updateUserStats();
+  if (result.message) {
+    log(result.message);
+  }
+}
+
+async function syncUsersData() {
+  const result = await apiRequest(API.users, {
+    method: "POST",
+    body: {
+      action: "sync",
+      usersData: state.usersData,
+      currentUser: state.currentUser
+    }
+  });
+  if (!result.ok) {
+    return result;
+  }
+  state.usersData = normalizeUsersData(result.data?.usersData);
+  state.currentUser = result.data?.currentUser || state.currentUser;
+  updateUsersList();
+  updateUserStats();
+  return result;
+}
+
+async function generatePuzzle() {
+  const result = await executeTimedOperation(
+    "Генерация уровня",
+    API.generate,
+    {
+      difficulty: state.difficultyVar,
+      currentUser: state.currentUser
+    },
+    true
+  );
+  if (!result.ok) {
+    handleApiFailure(result, "Не удалось сгенерировать головоломку.");
+    return;
+  }
+
+  state.cellValues = normalizeBoard(result.data?.cellValues);
+  state.solvedCache = normalizeBoard(result.data?.solvedCache);
+  state.solvedCacheField = normalizeBoard(result.data?.solvedCacheField);
+  state.solutionMap = normalizeBoard(result.data?.solutionMap);
+  state.solutionMapReady = Boolean(result.data?.solutionMapReady);
+  state.solutionMapField = normalizeBoard(result.data?.solutionMapField);
+  state.usersData = normalizeUsersData(result.data?.usersData);
+  state.puzzleSolved = Boolean(result.data?.puzzleSolved);
+  state.errorCells = new Set();
+  updateUsersList();
+  updateUserStats();
+  updateHints();
+  checkAndUpdateErrors();
+  drawCells();
+  logMultiline(result.message);
+}
+
+async function validateUserInput() {
+  const result = await executeTimedOperation(
+    "Валидация",
+    API.validate,
+    { board: state.cellValues },
+    true
+  );
+  if (!result.ok) {
+    state.solutionMap = null;
+    state.solutionMapReady = false;
+    state.solutionMapField = null;
+    state.errorCells = new Set();
+    drawCells();
+    handleApiFailure(result, "Не удалось выполнить валидацию.");
+    return;
+  }
+
+  state.solutionMap = normalizeBoard(result.data?.solutionMap);
+  state.solutionMapReady = Boolean(result.data?.solutionMapReady);
+  state.solutionMapField = copyBoard(state.cellValues);
+  checkAndUpdateErrors();
+  drawCells();
+  logMultiline(result.message);
+}
+
+async function solvePuzzle() {
+  const useCache = Boolean(state.solutionMapReady && state.solutionMap);
+  const result = await executeTimedOperation(
+    "Решение судоку",
+    API.solve,
+    {
+      board: state.cellValues,
+      currentUser: state.currentUser,
+      solutionMap: state.solutionMap,
+      solutionMapReady: state.solutionMapReady
+    },
+    !useCache
+  );
+  if (!result.ok) {
+    handleApiFailure(result, "Решение не найдено.");
+    return;
+  }
+
+  state.cellValues = normalizeBoard(result.data?.cellValues);
+  state.solvedCache = normalizeBoard(result.data?.solvedCache);
+  state.solvedCacheField = normalizeBoard(result.data?.solvedCacheField);
+  state.puzzleSolved = Boolean(result.data?.puzzleSolved);
+  updateHints();
+  checkAndUpdateErrors();
+  drawCells();
+  logMultiline(result.message);
+}
+
+function hintCell() {
+  const [row, col] = state.selected;
+  if (state.cellValues[row][col]) {
+    log(`Клетка (${row + 1},${col + 1}) уже заполнена`);
+    return;
+  }
+  if (!state.solutionMapReady || !state.solutionMap) {
+    log("Сначала запусти валидацию, пёс!");
+    return;
+  }
+
+  const value = state.solutionMap[row][col];
+  state.cellValues[row][col] = value;
+  updateHints();
+  checkAndUpdateErrors();
+  drawCells();
+  log(`Подсказка: для клетки (${row + 1},${col + 1}) значение - ${value}`);
+}
+
+function onKeyDown(event) {
+  if (!state.initialized) {
+    return;
+  }
+  if (refs.newUserDialog.open) {
+    return;
+  }
+  if (shouldIgnoreKeydown(event)) {
+    return;
+  }
+
+  const [row, col] = state.selected;
+
+  if (state.puzzleSolved) {
+    log("лох, гей, нет друзей. Не смог судоку решить...");
+    return;
+  }
+
+  if (event.key === "Backspace" || event.key === "Delete" || event.key === "0" || event.key === " ") {
+    event.preventDefault();
+    state.cellValues[row][col] = 0;
+    updateHints();
+    checkAndUpdateErrors();
+    drawCells();
+    log(`Удалено значение в клетке (${row + 1},${col + 1})`);
+    return;
+  }
+
+  if (/^[1-9]$/.test(event.key)) {
+    event.preventDefault();
+    state.cellValues[row][col] = Number.parseInt(event.key, 10);
+    updateHints();
+    checkAndUpdateErrors();
+    drawCells();
+    log(`Введено значение ${event.key} в клетку (${row + 1},${col + 1})`);
+    if (checkWinCondition()) {
+      log("🎉 ПОБЕДА! Обновляем статистику...");
+      if (state.currentUser) {
+        const record = ensureCurrentUserRecord();
+        record.wins += 1;
+        recalculateCurrentUserStats();
+        updateUserStats();
+        void syncUsersData();
+        log(
+          `Статистика обновлена: ${record.wins} побед из ${record.games} игр (${record.win_rate.toFixed(1)}%)`
+        );
+      }
+      log("🎉 Поздравляем! Головоломка решена!");
+    }
+    return;
+  }
+
+  if (event.key === "ArrowUp") {
+    event.preventDefault();
+    state.selected = [(row - 1 + GRID_SIZE) % GRID_SIZE, col];
+    drawCells();
+  } else if (event.key === "ArrowDown") {
+    event.preventDefault();
+    state.selected = [(row + 1) % GRID_SIZE, col];
+    drawCells();
+  } else if (event.key === "ArrowLeft") {
+    event.preventDefault();
+    state.selected = [row, (col - 1 + GRID_SIZE) % GRID_SIZE];
+    drawCells();
+  } else if (event.key === "ArrowRight") {
+    event.preventDefault();
+    state.selected = [row, (col + 1) % GRID_SIZE];
+    drawCells();
+  }
+}
+
+function shouldIgnoreKeydown(event) {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  return ["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(target.tagName);
+}
+
+function checkWinCondition() {
+  if (!state.currentUser) {
+    return false;
+  }
+
+  let emptyCells = 0;
+  for (let row = 0; row < GRID_SIZE; row += 1) {
+    for (let col = 0; col < GRID_SIZE; col += 1) {
+      if (state.cellValues[row][col] === 0) {
+        emptyCells += 1;
+      }
+    }
+  }
+  if (emptyCells > 0) {
+    return false;
+  }
+
+  for (let row = 0; row < GRID_SIZE; row += 1) {
+    for (let col = 0; col < GRID_SIZE; col += 1) {
+      const value = state.cellValues[row][col];
+      if (value === 0) {
+        return false;
+      }
+
+      for (let nextCol = 0; nextCol < GRID_SIZE; nextCol += 1) {
+        if (nextCol !== col && state.cellValues[row][nextCol] === value) {
+          log(`Дублирование ${value} в строке ${row + 1}`);
+          return false;
+        }
+      }
+
+      for (let nextRow = 0; nextRow < GRID_SIZE; nextRow += 1) {
+        if (nextRow !== row && state.cellValues[nextRow][col] === value) {
+          log(`Дублирование ${value} в столбце ${col + 1}`);
+          return false;
+        }
+      }
+
+      const blockRow = Math.floor(row / SQUARE_SIZE) * SQUARE_SIZE;
+      const blockCol = Math.floor(col / SQUARE_SIZE) * SQUARE_SIZE;
+      for (let deltaRow = 0; deltaRow < SQUARE_SIZE; deltaRow += 1) {
+        for (let deltaCol = 0; deltaCol < SQUARE_SIZE; deltaCol += 1) {
+          const nextRow = blockRow + deltaRow;
+          const nextCol = blockCol + deltaCol;
+          if ((nextRow !== row || nextCol !== col) && state.cellValues[nextRow][nextCol] === value) {
+            log(`Дублирование ${value} в квадрате (${Math.floor(blockRow / 3) + 1},${Math.floor(blockCol / 3) + 1})`);
+            return false;
+          }
+        }
+      }
+    }
+  }
+
+  log("Проверка победы: все клетки заполнены корректно!");
+  return true;
+}
+
+function clearLog() {
+  refs.log.textContent = "";
+}
+
+async function copyLog() {
+  const logText = Array.from(refs.log.querySelectorAll(".sudoku-log-line"))
+    .map((line) => line.textContent ?? "")
+    .join("\n");
+
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(logText);
+    } else {
+      const helper = document.createElement("textarea");
+      helper.value = logText;
+      helper.setAttribute("readonly", "");
+      helper.style.position = "absolute";
+      helper.style.left = "-9999px";
+      document.body.append(helper);
+      helper.select();
+      document.execCommand("copy");
+      helper.remove();
+    }
+    log("Лог скопирован в буфер обмена.");
+  } catch (_error) {
+    log("Не удалось скопировать лог.");
+  }
+}
+
+function saveLog() {
+  const logText = Array.from(refs.log.querySelectorAll(".sudoku-log-line"))
+    .map((line) => line.textContent ?? "")
+    .join("\n");
+  const fileName = "sudoku-log.txt";
+  const blob = new Blob([logText], { type: "text/plain;charset=utf-8" });
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = fileName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(objectUrl);
+  log(`Лог сохранён в файл: ${fileName}`);
+}
+
+function toggleConsole() {
+  state.consoleVisible = !state.consoleVisible;
+  applyConsoleVisibility();
+}
+
+function applyConsoleVisibility() {
+  refs.log.classList.toggle("is-hidden", !state.consoleVisible);
+  refs.toggleLogButton.textContent = state.consoleVisible ? "Скрыть лог" : "Показать лог";
+}
+
+function log(message) {
+  const line = document.createElement("div");
+  line.className = "sudoku-log-line";
+
+  const time = document.createElement("span");
+  time.className = "sudoku-log-time";
+  time.textContent = `[${formatTime(new Date())}]`;
+
+  const text = document.createElement("span");
+  text.textContent = message;
+
+  line.append(time, text);
+  refs.log.append(line);
+  refs.log.scrollTop = refs.log.scrollHeight;
+}
+
+function logMultiline(message) {
+  if (!message) {
+    return;
+  }
+  String(message)
+    .split("\n")
+    .forEach((line) => log(line));
+}
+
+function formatTime(date) {
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  return `${hours}:${minutes}:${seconds}`;
+}
+
+function startProgress(taskName) {
+  stopProgress();
+  const startedAt = performance.now();
+  state.progress = {
+    taskName,
+    startedAt,
+    intervalId: window.setInterval(() => {
+      const elapsed = performance.now() - startedAt;
+      const ms = Math.max(0, Math.floor(elapsed));
+      const filled = (Math.floor(elapsed / 1000) % 10) + 1;
+      const bar = `${"■".repeat(filled)}${" ".repeat(Math.max(0, 10 - filled))}`;
+      log(`${taskName}: [${bar}] ${ms} мс`);
+    }, 100)
+  };
+}
+
+function stopProgress() {
+  if (!state.progress) {
+    return;
+  }
+  window.clearInterval(state.progress.intervalId);
+  state.progress = null;
+}
+
+async function executeTimedOperation(taskName, url, body, showProgress) {
+  const controller = new AbortController();
+  let timeoutId = null;
+
+  if (showProgress) {
+    startProgress(taskName);
+    timeoutId = window.setTimeout(() => {
+      controller.abort();
+    }, 10500);
+  }
+
+  const result = await apiRequest(url, {
+    method: "POST",
+    body,
+    signal: controller.signal
+  });
+
+  if (timeoutId !== null) {
+    window.clearTimeout(timeoutId);
+  }
+  if (showProgress) {
+    stopProgress();
+  }
+
+  if (result.aborted) {
+    log(`Операция "${taskName}" прервана по таймауту!`);
+  }
+  return result;
+}
+
+function handleApiFailure(result, fallbackMessage) {
+  const message = result?.message || fallbackMessage;
+  if (result?.status === 404) {
+    showStatus(message || FEATURE_GONE_MESSAGE);
+    setControlsDisabled(true);
+  }
+  if (message) {
+    logMultiline(message);
+  }
+}
+
+async function apiRequest(url, options = {}) {
+  const fetchOptions = {
+    method: options.method || "GET",
+    signal: options.signal,
+    headers: {}
+  };
+
+  if (options.body !== undefined) {
+    fetchOptions.body = JSON.stringify(options.body);
+    fetchOptions.headers["Content-Type"] = "application/json";
+  }
+
+  try {
+    const response = await fetch(url, fetchOptions);
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch (_error) {
+      payload = null;
+    }
+
+    if (response.status === 404) {
+      return {
+        ok: false,
+        status: 404,
+        message: payload?.message || FEATURE_GONE_MESSAGE
+      };
+    }
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        message: payload?.message || "Ошибка Sudoku."
+      };
+    }
+
+    if (!payload || typeof payload !== "object") {
+      return {
+        ok: false,
+        status: response.status,
+        message: "Не удалось получить ответ от Sudoku."
+      };
+    }
+
+    return {
+      ok: Boolean(payload.ok),
+      status: response.status,
+      data: payload.data || null,
+      message: payload.message || ""
+    };
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      return {
+        ok: false,
+        aborted: true,
+        message: ""
+      };
+    }
+    return {
+      ok: false,
+      status: 0,
+      message: "Не удалось связаться с Sudoku."
+    };
+  }
+}
