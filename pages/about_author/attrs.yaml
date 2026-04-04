@@ -149,11 +149,15 @@ release_notes:
   source: "templates/files/release_1_19.pdf"
 
 drive2_button:
-  widget: button
+  widget: split_button
   label: "Drive2"
   icon: "drive2.svg"
   width: 200
-  url: "https://www.drive2.ru/l/703220425286486413/"
+  url: |
+    https://www.drive2.ru/l/703220425286486413/ | 1) Текст о бнв
+    https://youtu.be/isUCUoMP3ms | 2) Видео о бнв
+    https://www.drive2.ru/l/729978964893765552/ | 3) Тойота!
+
 
 youtube_button:
   widget: button

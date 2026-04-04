@@ -5,6 +5,14 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
+DEFAULT_ENV_FILE="$ROOT_DIR/production.defaults.env"
+if [ -f "$DEFAULT_ENV_FILE" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$DEFAULT_ENV_FILE"
+    set +a
+fi
+
 ENV_FILE="${YAMLS_ENV_FILE:-$ROOT_DIR/production.env}"
 if [ -f "$ENV_FILE" ]; then
     set -a

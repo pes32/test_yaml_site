@@ -11,12 +11,9 @@ const FEATURE_GONE_MESSAGE = "Страница Sudoku недоступна.";
 
 const API = Object.freeze({
   bootstrap: "/sudoku/api/bootstrap",
-  users: "/sudoku/api/users",
   generate: "/sudoku/api/generate",
   validate: "/sudoku/api/validate",
-  solve: "/sudoku/api/solve",
-  save: "/sudoku/api/save",
-  load: "/sudoku/api/load"
+  solve: "/sudoku/api/solve"
 });
 
 const state = {
@@ -30,8 +27,6 @@ const state = {
   solutionMap: null,
   solutionMapReady: false,
   solutionMapField: null,
-  usersData: {},
-  currentUser: null,
   difficultyVar: "средний",
   toggleHighlightLines: false,
   toggleShowHints: false,
@@ -70,37 +65,28 @@ function captureRefs() {
   refs.status = document.getElementById("sudoku-status");
   refs.canvas = document.getElementById("sudoku-canvas");
   refs.boardStage = document.getElementById("sudoku-board-stage");
-  refs.userSelect = document.getElementById("sudoku-user-select");
-  refs.newUserButton = document.getElementById("sudoku-new-user-btn");
-  refs.gamesLabel = document.getElementById("sudoku-games-label");
-  refs.winsLabel = document.getElementById("sudoku-wins-label");
   refs.highlightLines = document.getElementById("toggle-highlight-lines");
   refs.showHints = document.getElementById("toggle-show-hints");
   refs.highlightAnswers = document.getElementById("toggle-highlight-answers");
   refs.difficultySelect = document.getElementById("sudoku-difficulty-select");
   refs.generateButton = document.getElementById("sudoku-generate-btn");
   refs.clearButton = document.getElementById("sudoku-clear-btn");
-  refs.saveButton = document.getElementById("sudoku-save-btn");
-  refs.loadButton = document.getElementById("sudoku-load-btn");
   refs.hintButton = document.getElementById("sudoku-hint-btn");
   refs.solveButton = document.getElementById("sudoku-solve-btn");
   refs.validateButton = document.getElementById("sudoku-validate-btn");
+  refs.infoButton = document.getElementById("sudoku-info-btn");
   refs.logCard = document.getElementById("sudoku-log-card");
   refs.log = document.getElementById("sudoku-log");
   refs.toggleLogButton = document.getElementById("sudoku-toggle-log-btn");
   refs.clearLogButton = document.getElementById("sudoku-clear-log-btn");
   refs.copyLogButton = document.getElementById("sudoku-copy-log-btn");
   refs.saveLogButton = document.getElementById("sudoku-save-log-btn");
-  refs.newUserDialog = document.getElementById("sudoku-new-user-dialog");
-  refs.newUserInput = document.getElementById("sudoku-new-user-input");
-  refs.dialogCancelButton = document.getElementById("sudoku-dialog-cancel-btn");
-  refs.dialogConfirmButton = document.getElementById("sudoku-dialog-confirm-btn");
+  refs.infoDialog = document.getElementById("sudoku-info-dialog");
+  refs.infoCloseButton = document.getElementById("sudoku-info-close-btn");
 }
 
 function bindEvents() {
   refs.canvas.addEventListener("click", onCanvasClick);
-  refs.userSelect.addEventListener("change", onUserChange);
-  refs.newUserButton.addEventListener("click", openNewUserDialog);
   refs.difficultySelect.addEventListener("change", () => {
     state.difficultyVar = refs.difficultySelect.value || "средний";
   });
@@ -122,12 +108,6 @@ function bindEvents() {
     void generatePuzzle();
   });
   refs.clearButton.addEventListener("click", clearAll);
-  refs.saveButton.addEventListener("click", () => {
-    void saveGame();
-  });
-  refs.loadButton.addEventListener("click", () => {
-    void loadGame();
-  });
   refs.hintButton.addEventListener("click", hintCell);
   refs.solveButton.addEventListener("click", () => {
     void solvePuzzle();
@@ -135,18 +115,18 @@ function bindEvents() {
   refs.validateButton.addEventListener("click", () => {
     void validateUserInput();
   });
+  refs.infoButton.addEventListener("click", openInfoDialog);
   refs.toggleLogButton.addEventListener("click", toggleConsole);
   refs.clearLogButton.addEventListener("click", clearLog);
   refs.copyLogButton.addEventListener("click", () => {
     void copyLog();
   });
   refs.saveLogButton.addEventListener("click", saveLog);
-  refs.dialogCancelButton.addEventListener("click", closeNewUserDialog);
-  refs.dialogConfirmButton.addEventListener("click", () => {
-    void submitNewUser();
-  });
-  refs.newUserDialog.addEventListener("close", () => {
-    refs.newUserInput.value = "";
+  refs.infoCloseButton.addEventListener("click", closeInfoDialog);
+  refs.infoDialog.addEventListener("click", (event) => {
+    if (event.target === refs.infoDialog) {
+      closeInfoDialog();
+    }
   });
   window.addEventListener("resize", resizeCanvas);
   document.addEventListener("keydown", onKeyDown);
@@ -169,7 +149,6 @@ async function bootstrap() {
   hideStatus();
   const data = result.data || {};
   const toggles = data.toggles || {};
-  state.usersData = normalizeUsersData(data.usersData);
   state.difficultyVar = typeof data.initialDifficulty === "string" ? data.initialDifficulty : "средний";
   state.toggleHighlightLines = Boolean(toggles.highlightLines);
   state.toggleShowHints = Boolean(toggles.showHints);
@@ -179,8 +158,6 @@ async function bootstrap() {
   applyDifficultyOptions(Array.isArray(data.difficultyOptions) ? data.difficultyOptions : DEFAULT_DIFFICULTIES);
   refs.difficultySelect.value = state.difficultyVar;
   syncToggleInputs();
-  updateUsersList();
-  updateUserStats();
   applyConsoleVisibility();
   return true;
 }
@@ -249,35 +226,6 @@ function normalizeBoard(value) {
 
 function copyBoard(board) {
   return normalizeBoard(board).map((row) => row.slice());
-}
-
-function normalizeUsersData(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-
-  const normalized = {};
-  Object.entries(value).forEach(([key, record]) => {
-    if (typeof key !== "string" || !key.trim()) {
-      return;
-    }
-    const games = clampToNonNegativeInteger(record?.games);
-    const wins = clampToNonNegativeInteger(record?.wins);
-    normalized[key.trim()] = {
-      games,
-      wins,
-      win_rate: games > 0 ? (wins / games) * 100 : 0
-    };
-  });
-  return normalized;
-}
-
-function clampToNonNegativeInteger(value) {
-  const number = Number.parseInt(value, 10);
-  if (!Number.isInteger(number) || number < 0) {
-    return 0;
-  }
-  return number;
 }
 
 function boardCellKey(row, col) {
@@ -630,64 +578,6 @@ function onCanvasClick(event) {
   drawCells();
 }
 
-function onUserChange() {
-  const nextUser = refs.userSelect.value.trim();
-  state.currentUser = nextUser || null;
-  updateUserStats();
-  if (state.currentUser) {
-    log(`Выбран пользователь: ${state.currentUser}`);
-  }
-}
-
-function updateUsersList() {
-  const users = Object.keys(state.usersData);
-  refs.userSelect.innerHTML = "";
-
-  const emptyOption = document.createElement("option");
-  emptyOption.value = "";
-  emptyOption.textContent = "Без пользователя";
-  refs.userSelect.append(emptyOption);
-
-  users.forEach((user) => {
-    const option = document.createElement("option");
-    option.value = user;
-    option.textContent = user;
-    refs.userSelect.append(option);
-  });
-
-  if (users.length > 0 && (!state.currentUser || !state.usersData[state.currentUser])) {
-    state.currentUser = users[0];
-  }
-  if (state.currentUser && !state.usersData[state.currentUser]) {
-    state.currentUser = null;
-  }
-  refs.userSelect.value = state.currentUser || "";
-}
-
-function updateUserStats() {
-  const record = state.currentUser ? state.usersData[state.currentUser] : null;
-  refs.gamesLabel.textContent = `Игр: ${record?.games ?? 0}`;
-  refs.winsLabel.textContent = `Побед: ${(record?.win_rate ?? 0).toFixed(1)}%`;
-}
-
-function ensureCurrentUserRecord() {
-  if (!state.currentUser) {
-    return null;
-  }
-  if (!state.usersData[state.currentUser]) {
-    state.usersData[state.currentUser] = { games: 0, wins: 0, win_rate: 0 };
-  }
-  return state.usersData[state.currentUser];
-}
-
-function recalculateCurrentUserStats() {
-  const record = ensureCurrentUserRecord();
-  if (!record) {
-    return;
-  }
-  record.win_rate = record.games > 0 ? (record.wins / record.games) * 100 : 0;
-}
-
 function clearAll() {
   state.cellValues = makeBlankBoard();
   state.solvedCache = null;
@@ -698,116 +588,23 @@ function clearAll() {
   state.solutionMapReady = false;
   state.solutionMapField = null;
   updateHints();
-  drawCells();
-  log("Очищено!");
-
-  if (state.currentUser) {
-    const record = ensureCurrentUserRecord();
-    record.games += 1;
-    recalculateCurrentUserStats();
-    updateUserStats();
-    void syncUsersData();
-    log(`Новая игра для пользователя ${state.currentUser}`);
-  }
-}
-
-async function saveGame() {
-  const result = await apiRequest(API.save, {
-    method: "POST",
-    body: { board: state.cellValues }
-  });
-  if (!result.ok) {
-    handleApiFailure(result, "Не удалось сохранить игру.");
-    return;
-  }
-  log(result.message || "Сохранено!");
-}
-
-async function loadGame() {
-  const result = await apiRequest(API.load);
-  if (!result.ok) {
-    handleApiFailure(result, "Ошибка загрузки.");
-    return;
-  }
-
-  state.cellValues = normalizeBoard(result.data?.cellValues);
-  state.solvedCache = null;
-  state.solvedCacheField = null;
-  state.puzzleSolved = false;
-  state.solutionMap = null;
-  state.solutionMapReady = false;
-  state.solutionMapField = null;
-  state.errorCells = new Set();
-  updateHints();
   checkAndUpdateErrors();
   drawCells();
-  log(result.message || "Загружено!");
+  log("Очищено!");
 }
 
-function openNewUserDialog() {
-  if (typeof refs.newUserDialog.showModal === "function") {
-    refs.newUserDialog.showModal();
-    refs.newUserInput.focus();
+function openInfoDialog() {
+  if (typeof refs.infoDialog.showModal === "function") {
+    refs.infoDialog.showModal();
     return;
   }
-
-  const username = window.prompt("Введите имя пользователя:", "");
-  if (username === null) {
-    return;
-  }
-  refs.newUserInput.value = username;
-  void submitNewUser();
+  refs.infoDialog.setAttribute("open", "");
 }
 
-function closeNewUserDialog() {
-  if (refs.newUserDialog.open) {
-    refs.newUserDialog.close();
+function closeInfoDialog() {
+  if (refs.infoDialog.open) {
+    refs.infoDialog.close();
   }
-  refs.newUserInput.value = "";
-}
-
-async function submitNewUser() {
-  const username = refs.newUserInput.value.trim();
-  closeNewUserDialog();
-  if (!username) {
-    return;
-  }
-
-  const result = await apiRequest(API.users, {
-    method: "POST",
-    body: { action: "create", username }
-  });
-  if (!result.ok) {
-    handleApiFailure(result, "Не удалось создать пользователя.");
-    return;
-  }
-
-  state.usersData = normalizeUsersData(result.data?.usersData);
-  state.currentUser = result.data?.currentUser || state.currentUser;
-  updateUsersList();
-  updateUserStats();
-  if (result.message) {
-    log(result.message);
-  }
-}
-
-async function syncUsersData() {
-  const result = await apiRequest(API.users, {
-    method: "POST",
-    body: {
-      action: "sync",
-      usersData: state.usersData,
-      currentUser: state.currentUser
-    }
-  });
-  if (!result.ok) {
-    return result;
-  }
-  state.usersData = normalizeUsersData(result.data?.usersData);
-  state.currentUser = result.data?.currentUser || state.currentUser;
-  updateUsersList();
-  updateUserStats();
-  return result;
 }
 
 async function generatePuzzle() {
@@ -815,8 +612,7 @@ async function generatePuzzle() {
     "Генерация уровня",
     API.generate,
     {
-      difficulty: state.difficultyVar,
-      currentUser: state.currentUser
+      difficulty: state.difficultyVar
     },
     true
   );
@@ -831,11 +627,8 @@ async function generatePuzzle() {
   state.solutionMap = normalizeBoard(result.data?.solutionMap);
   state.solutionMapReady = Boolean(result.data?.solutionMapReady);
   state.solutionMapField = normalizeBoard(result.data?.solutionMapField);
-  state.usersData = normalizeUsersData(result.data?.usersData);
   state.puzzleSolved = Boolean(result.data?.puzzleSolved);
   state.errorCells = new Set();
-  updateUsersList();
-  updateUserStats();
   updateHints();
   checkAndUpdateErrors();
   drawCells();
@@ -874,7 +667,6 @@ async function solvePuzzle() {
     API.solve,
     {
       board: state.cellValues,
-      currentUser: state.currentUser,
       solutionMap: state.solutionMap,
       solutionMapReady: state.solutionMapReady
     },
@@ -918,7 +710,7 @@ function onKeyDown(event) {
   if (!state.initialized) {
     return;
   }
-  if (refs.newUserDialog.open) {
+  if (refs.infoDialog.open) {
     return;
   }
   if (shouldIgnoreKeydown(event)) {
@@ -938,7 +730,6 @@ function onKeyDown(event) {
     updateHints();
     checkAndUpdateErrors();
     drawCells();
-    log(`Удалено значение в клетке (${row + 1},${col + 1})`);
     return;
   }
 
@@ -948,19 +739,8 @@ function onKeyDown(event) {
     updateHints();
     checkAndUpdateErrors();
     drawCells();
-    log(`Введено значение ${event.key} в клетку (${row + 1},${col + 1})`);
     if (checkWinCondition()) {
-      log("🎉 ПОБЕДА! Обновляем статистику...");
-      if (state.currentUser) {
-        const record = ensureCurrentUserRecord();
-        record.wins += 1;
-        recalculateCurrentUserStats();
-        updateUserStats();
-        void syncUsersData();
-        log(
-          `Статистика обновлена: ${record.wins} побед из ${record.games} игр (${record.win_rate.toFixed(1)}%)`
-        );
-      }
+      state.puzzleSolved = true;
       log("🎉 Поздравляем! Головоломка решена!");
     }
     return;
@@ -994,10 +774,6 @@ function shouldIgnoreKeydown(event) {
 }
 
 function checkWinCondition() {
-  if (!state.currentUser) {
-    return false;
-  }
-
   let emptyCells = 0;
   for (let row = 0; row < GRID_SIZE; row += 1) {
     for (let col = 0; col < GRID_SIZE; col += 1) {

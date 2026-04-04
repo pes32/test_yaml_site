@@ -23,24 +23,6 @@
             <aside class="sudoku-sidebar sudoku-sidebar--left">
                 <section class="sudoku-card">
                     <header class="sudoku-card__header">
-                        <h2>Пользователь</h2>
-                    </header>
-                    <div class="sudoku-card__body">
-                        <label class="sudoku-label" for="sudoku-user-select">Пользователь:</label>
-                        <select id="sudoku-user-select" class="sudoku-select">
-                            <option value="">Без пользователя</option>
-                        </select>
-                        <button id="sudoku-new-user-btn" class="sudoku-button sudoku-button--soft" type="button">Новый пользователь</button>
-
-                        <div class="sudoku-stats">
-                            <div id="sudoku-games-label" class="sudoku-stat">Игр: 0</div>
-                            <div id="sudoku-wins-label" class="sudoku-stat">Побед: 0%</div>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="sudoku-card">
-                    <header class="sudoku-card__header">
                         <h2>Подсказки</h2>
                     </header>
                     <div class="sudoku-card__body sudoku-card__body--compact">
@@ -91,13 +73,12 @@
                     </header>
                     <div class="sudoku-card__body sudoku-card__body--compact">
                         <button id="sudoku-clear-btn" class="sudoku-button sudoku-button--soft" type="button">Очистить</button>
-                        <button id="sudoku-save-btn" class="sudoku-button sudoku-button--soft" type="button">Сохранить</button>
-                        <button id="sudoku-load-btn" class="sudoku-button sudoku-button--soft" type="button">Загрузить</button>
                         <div class="sudoku-button-row">
                             <button id="sudoku-hint-btn" class="sudoku-button sudoku-button--soft" type="button">Подсказка</button>
                             <button id="sudoku-solve-btn" class="sudoku-button sudoku-button--soft" type="button">Решить</button>
                         </div>
                         <button id="sudoku-validate-btn" class="sudoku-button sudoku-button--accent" type="button">Валидация</button>
+                        <button id="sudoku-info-btn" class="sudoku-button sudoku-button--ghost" type="button">Инфо</button>
                     </div>
                 </section>
             </aside>
@@ -117,16 +98,42 @@
         </section>
     </main>
 
-    <dialog id="sudoku-new-user-dialog" class="sudoku-dialog">
-        <form method="dialog" class="sudoku-dialog__form">
-            <h2 class="sudoku-dialog__title">Новый пользователь</h2>
-            <label class="sudoku-label" for="sudoku-new-user-input">Введите имя пользователя:</label>
-            <input id="sudoku-new-user-input" class="sudoku-input" type="text" maxlength="120" autocomplete="off">
-            <div class="sudoku-dialog__actions">
-                <button id="sudoku-dialog-cancel-btn" class="sudoku-button sudoku-button--ghost" type="button">Отмена</button>
-                <button id="sudoku-dialog-confirm-btn" class="sudoku-button" type="button">Сохранить</button>
+    <dialog id="sudoku-info-dialog" class="sudoku-dialog sudoku-dialog--info">
+        <div class="sudoku-dialog__form sudoku-dialog__form--info">
+            <h2 class="sudoku-dialog__title">Инфо</h2>
+            <div class="sudoku-dialog__content">
+                <p>Шалом, землянин!<br>Изначально эта штука задумывалась как решатель судоку на ивент в Т-банке. К сожалению, я доделал её на прохождение последнего уровня... А теперь она доступна всем!</p>
+
+                <p>Как пользоваться:</p>
+                <p>Если нужно решить чужой судоку, то следует очистить поле и ввести нужные значения.</p>
+                <p>Затем следует включить требуемые подсказки:</p>
+
+                <ul class="sudoku-dialog__list">
+                    <li>Подсветка линий - это подсветка ячеек и строк с числом в фокусе. Если вам лениво искать возможные места глазами - это ваш вариант.</li>
+                    <li>Подсветка значений - это вывод на экран всех возможных чисел в ячейках. Облегчает поиск нужного для ячейки.</li>
+                    <li>Подсветка ответа - работает только с подсветкой значений. Самый ленивый вариант. Если по введённым значениям остаётся одно и только одно число, оно подсветится зелёным.</li>
+                </ul>
+
+                <p>Если игра была введена вручную (нужно найти решение), то после ввода следует нажать кнопку "валидация". Она рассчитает возможные варианты и можно будет использовать самые брутальные подсказки. Можно и не нажимать, если хватит визуальных подсказок.</p>
+                <p>После валидации (или запуска новой игры), любое введённое значение будет проверено. Ошибочные значения будут подсвечены.</p>
+                <p>Кнопка "подсказка" - вставит значение в ячейку, если решение известно. Если подсказка запрошена для поля из ручного ввода без валидации, в логе кнопка выскажет своё мнение об внимательном чтеце данной инструкции.</p>
+                <p>Кнопка "решить" - сделает то, что делают все остальные решатели судоку - проставит все значения в ячейки и выдаст конечный ответ, а в консоли выскажет своё мнение о нажимателе кнопки.</p>
+
+                <p>Для тестов была прикручена новая игра. Уровни сложности:</p>
+                <ul class="sudoku-dialog__list">
+                    <li>Лёгкий - 29-31 чисел.</li>
+                    <li>Средний - 25-26 чисел.</li>
+                    <li>Сложный - 21-23 числа.</li>
+                    <li>Мамкино дупло - 16-19 чисел.</li>
+                </ul>
+            <p>######</p>
+            <p>Защиты от дурака тут нет. Валидацию можно проверси и с пустым полем, и для головоломок с несколькими решенями.</p>
+            <p>Программа делалась для поиска решений к уже готовым судоку, которые имеют 1 и только 1 решение.</p>
             </div>
-        </form>
+            <div class="sudoku-dialog__actions sudoku-dialog__actions--start">
+                <button id="sudoku-info-close-btn" class="sudoku-button" type="button">Закрыть</button>
+            </div>
+        </div>
     </dialog>
 
     <script type="module" src="{{ url_for('sudoku_asset', filename='app.js') }}"></script>

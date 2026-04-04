@@ -23,6 +23,7 @@
     align-items: center;
     justify-content: center;
 }
+.flex-wrap { flex-wrap: wrap; }
 .align-items-center { align-items: center; }
 .justify-content-between { justify-content: space-between; }
 .justify-content-end { justify-content: flex-end; }

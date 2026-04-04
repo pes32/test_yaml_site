@@ -4,7 +4,6 @@ big_table:
   widget: table
   line_numbers: true
   label: "Таблица ввода данных"
-  source: proc_name #я так понимаю, это пока заглушка. Пусть будет. Потом поправим. 
   sticky_header: true
   table_attrs: |
     attr_1 /Строка 1 №1

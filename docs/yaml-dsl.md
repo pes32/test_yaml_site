@@ -192,7 +192,7 @@ operation_code:
 - пустой или некорректный `columns` — `error`;
 - структурно неверная строка `source` — `error`;
 - строка `source` с неправильным числом колонок — `error`;
-- scalar `source: proc_name` пока считается placeholder для будущего DB-режима, даёт `warning` и публикуется как пустой набор строк;
+- scalar `source` без разделителей строк или ячеек даёт `warning` и публикуется как пустой набор строк;
 - пустые строки в block-scalar `source` пропускаются с `warning`.
 
 Важно:

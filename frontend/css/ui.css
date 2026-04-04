@@ -56,6 +56,13 @@
     gap: var(--space-sm);
     background-color: var(--color-navbar-bg);
 }
+.page-header-brand-wrap {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-2xs);
+    min-width: 0;
+    flex: 0 1 auto;
+}
 .page-header-brand {
     flex: 0 1 auto;
     min-width: 0;
@@ -68,6 +75,15 @@
     text-overflow: ellipsis;
 }
 .page-header-brand:hover { color: var(--color-bg); }
+.page-header-version {
+    flex: 0 0 auto;
+    color: var(--color-navbar-text);
+    font-size: var(--text-sm);
+    font-weight: var(--fw-medium);
+    opacity: 0.78;
+    white-space: nowrap;
+    cursor: help;
+}
 .page-header-actions {
     display: flex;
     align-items: center;
@@ -127,6 +143,10 @@
 
     .page-header-brand {
         font-size: var(--text-md);
+    }
+
+    .page-header-version {
+        font-size: var(--text-xs);
     }
 
     .page-header-link {

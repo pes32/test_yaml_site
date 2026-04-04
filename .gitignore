@@ -43,6 +43,7 @@ run/
 production.env
 debug.env
 templates/files/
+templates/Документация/
 
 # Локальные файлы
 templates/mems/

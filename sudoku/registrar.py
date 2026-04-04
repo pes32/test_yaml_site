@@ -8,7 +8,6 @@ from flask import abort, jsonify, render_template_string, request, send_from_dir
 
 from . import WEB_DIR, is_sudoku_available
 from .engine import DIFFICULTY_HINTS, blank_board, copy_board, generate_puzzle, solve_puzzle, validate_puzzle
-from .storage import load_saved_board, load_users_data, normalize_users_data, save_saved_board, save_users_data
 
 
 def register_sudoku(app) -> None:
@@ -64,8 +63,6 @@ def register_sudoku(app) -> None:
         try:
             return json_success(
                 {
-                    "usersData": load_users_data(),
-                    "savedBoard": load_saved_board(),
                     "board": blank_board(),
                     "difficultyOptions": list(DIFFICULTY_HINTS.keys()),
                     "difficultyHints": DIFFICULTY_HINTS,
@@ -81,65 +78,14 @@ def register_sudoku(app) -> None:
         except Exception:
             return json_error("Не удалось подготовить Sudoku.")
 
-    @app.route("/sudoku/api/users", methods=["POST"])
-    def sudoku_api_users():
-        ensure_available_or_404()
-        try:
-            payload = payload_json()
-            action = str(payload.get("action") or "").strip().lower()
-            users_data = load_users_data()
-
-            if action == "create":
-                username = str(payload.get("username") or "").strip()
-                if not username:
-                    return json_success({"usersData": users_data, "currentUser": None})
-                if username not in users_data:
-                    users_data[username] = {"games": 0, "wins": 0, "win_rate": 0.0}
-                    users_data = save_users_data(users_data)
-                    return json_success(
-                        {"usersData": users_data, "currentUser": username},
-                        f"Создан новый пользователь: {username}",
-                    )
-                return json_success(
-                    {"usersData": users_data, "currentUser": username},
-                    f'Пользователь "{username}" уже существует!',
-                )
-
-            if action == "sync":
-                normalized_users = save_users_data(payload.get("usersData"))
-                current_user_raw = payload.get("currentUser")
-                current_user = str(current_user_raw).strip() if current_user_raw is not None else ""
-                if current_user and current_user not in normalized_users:
-                    current_user = ""
-                return json_success(
-                    {
-                        "usersData": normalized_users,
-                        "currentUser": current_user or None,
-                    }
-                )
-
-            return json_error("Неизвестная операция с пользователями.")
-        except Exception:
-            return json_error("Не удалось обработать пользователей.")
-
     @app.route("/sudoku/api/generate", methods=["POST"])
     def sudoku_api_generate():
         ensure_available_or_404()
         try:
             payload = payload_json()
-            current_user_raw = payload.get("currentUser")
-            current_user = str(current_user_raw).strip() if current_user_raw is not None else ""
-            result = generate_puzzle(
-                str(payload.get("difficulty") or ""),
-                current_user=current_user or None,
-                users_data=load_users_data(),
-            )
+            result = generate_puzzle(str(payload.get("difficulty") or ""))
             if not result.get("ok"):
                 return json_error(str(result.get("message") or "Не удалось сгенерировать головоломку."))
-
-            users_data = normalize_users_data(result.get("users_data"))
-            if current_user:
-                users_data = save_users_data(users_data)
 
             return json_success(
                 {
@@ -149,7 +95,6 @@ def register_sudoku(app) -> None:
                     "solutionMap": result.get("solution_map"),
                     "solutionMapReady": result.get("solution_map_ready"),
                     "solutionMapField": result.get("solution_map_field"),
-                    "usersData": users_data,
                     "puzzleSolved": result.get("puzzle_solved"),
                 },
                 str(result.get("message") or ""),
@@ -180,11 +125,8 @@ def register_sudoku(app) -> None:
         ensure_available_or_404()
         try:
             payload = payload_json()
-            current_user_raw = payload.get("currentUser")
-            current_user = str(current_user_raw).strip() if current_user_raw is not None else ""
             result = solve_puzzle(
                 payload.get("board"),
-                current_user=current_user or None,
                 solution_map=payload.get("solutionMap"),
                 solution_map_ready=bool(payload.get("solutionMapReady")),
             )
@@ -202,22 +144,3 @@ def register_sudoku(app) -> None:
             )
         except Exception:
             return json_error("Не удалось решить Sudoku.")
-
-    @app.route("/sudoku/api/save", methods=["POST"])
-    def sudoku_api_save():
-        ensure_available_or_404()
-        try:
-            payload = payload_json()
-            saved_board = save_saved_board(payload.get("board"))
-            return json_success({"cellValues": saved_board}, "Сохранено!")
-        except Exception:
-            return json_error("Не удалось сохранить игру.")
-
-    @app.route("/sudoku/api/load")
-    def sudoku_api_load():
-        ensure_available_or_404()
-        try:
-            saved_board = load_saved_board()
-            return json_success({"cellValues": saved_board}, "Загружено!")
-        except Exception as exc:
-            return json_error(f"Ошибка загрузки: {exc}")

@@ -16,7 +16,7 @@ DIFFICULTY_HINTS: dict[str, tuple[int, int]] = {
     "лёгкий": (29, 31),
     "средний": (25, 26),
     "сложный": (21, 23),
-    "мамкино дупло": (17, 19),
+    "мамкино дупло": (16, 19),
 }
 
 
@@ -47,39 +47,6 @@ def coerce_board(value: Any) -> list[list[int]]:
 
 def copy_board(board: Any) -> list[list[int]]:
     return [row[:] for row in coerce_board(board)]
-
-
-def _recalculate_win_rate(record: dict[str, Any]) -> dict[str, Any]:
-    games = max(0, int(record.get("games", 0)))
-    wins = max(0, int(record.get("wins", 0)))
-    win_rate = (wins / games) * 100 if games > 0 else 0.0
-    return {
-        "games": games,
-        "wins": wins,
-        "win_rate": win_rate,
-    }
-
-
-def increment_games(users_data: dict[str, Any], current_user: str | None) -> dict[str, Any]:
-    updated = copy.deepcopy(users_data if isinstance(users_data, dict) else {})
-    if not current_user:
-        return updated
-
-    record = dict(updated.get(current_user) or {"games": 0, "wins": 0, "win_rate": 0.0})
-    record["games"] = int(record.get("games", 0)) + 1
-    updated[current_user] = _recalculate_win_rate(record)
-    return updated
-
-
-def increment_wins(users_data: dict[str, Any], current_user: str | None) -> dict[str, Any]:
-    updated = copy.deepcopy(users_data if isinstance(users_data, dict) else {})
-    if not current_user:
-        return updated
-
-    record = dict(updated.get(current_user) or {"games": 0, "wins": 0, "win_rate": 0.0})
-    record["wins"] = int(record.get("wins", 0)) + 1
-    updated[current_user] = _recalculate_win_rate(record)
-    return updated
 
 
 def sudoku_solver_worker(board: list[list[int]], queue) -> None:
@@ -225,11 +192,7 @@ def generate_solved_board() -> list[list[int]]:
     return board
 
 
-def generate_puzzle(
-    difficulty: str | None,
-    current_user: str | None = None,
-    users_data: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+def generate_puzzle(difficulty: str | None) -> dict[str, Any]:
     difficulty_name = difficulty if difficulty in DIFFICULTY_HINTS else "средний"
     min_hints, max_hints = DIFFICULTY_HINTS[difficulty_name]
 
@@ -262,13 +225,10 @@ def generate_puzzle(
 
         canonical_solution = copy_board(solution_map)
         actual_hints = sum(1 for row in range(GRID_SIZE) for col in range(GRID_SIZE) if puzzle_board[row][col] != 0)
-        updated_users = increment_games(users_data or {}, current_user)
         message = (
             f'Сгенерирована головоломка уровня "{difficulty_name}" '
             f"с {actual_hints} подсказками (диапазон: {min_hints}-{max_hints})"
         )
-        if current_user:
-            message += f"\nНовая игра для пользователя {current_user}"
 
         return {
             "ok": True,
@@ -279,7 +239,6 @@ def generate_puzzle(
             "solution_map": canonical_solution,
             "solution_map_ready": True,
             "solution_map_field": copy_board(puzzle_board),
-            "users_data": updated_users,
             "puzzle_solved": False,
         }
 
@@ -311,7 +270,6 @@ def validate_puzzle(board: Any) -> dict[str, Any]:
 
 def solve_puzzle(
     board: Any,
-    current_user: str | None = None,
     solution_map: Any | None = None,
     solution_map_ready: bool = False,
 ) -> dict[str, Any]:
@@ -319,11 +277,7 @@ def solve_puzzle(
     if solution_map_ready:
         cached_solution = copy_board(solution_map)
         if cached_solution != blank_board():
-            message = (
-                f"Лох, гей, нет друзей. Пользователь {current_user} не смог судоку решить..."
-                if current_user
-                else "Решение взято из кэша"
-            )
+            message = "Лох, гей, нет друзей. Не смог судоку решить..."
             return {
                 "ok": True,
                 "message": message,
@@ -335,11 +289,7 @@ def solve_puzzle(
 
     solved, solved_board, reason = solve_sudoku_with_timeout(board, SOLVER_TIMEOUT_SECONDS)
     if solved and solved_board is not None:
-        message = (
-            f"Лох, гей, нет друзей. Пользователь {current_user} не смог судоку решить..."
-            if current_user
-            else "Судоку решено."
-        )
+        message = "Лох, гей, нет друзей. Не смог судоку решить..."
         return {
             "ok": True,
             "message": message,
@@ -368,8 +318,6 @@ __all__ = [
     "copy_board",
     "generate_puzzle",
     "generate_solved_board",
-    "increment_games",
-    "increment_wins",
     "is_valid",
     "solve_puzzle",
     "solve_sudoku",

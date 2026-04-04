@@ -1,0 +1,36 @@
+# Roadmap
+
+[Русская версия](ROADMAP.md)
+
+## Current state
+
+- The YAML DSL and snapshot assembly already support working interface pages.
+- The baseline set of widgets, modals, menus, action runtime, and the table/voc/datetime subsystems already form a clickable mockup.
+- A production-like `waitress + nginx` startup flow exists.
+- Debug tooling and a read-only PostgreSQL SQL helper are already available.
+
+## Partially done
+
+### DB integration
+
+What exists today:
+
+- `backend/database.py` and debug SQL tooling;
+- a PostgreSQL landing page and related materials;
+- signs of the planned flow in the DSL, including `select_attrs`.
+
+What is still missing:
+
+- a full bind/save flow between YAML forms and a database;
+- data sources for YAML widgets as a finished public contract;
+- a completed validation/error model for DB-backed actions;
+- a production-ready story for multi-user data entry.
+
+The honest reading of the current status is: DB work has started and has useful pieces already, but it is still roadmap work rather than a finished feature.
+
+## Next
+
+- Finish the data-source model for YAML widgets.
+- Add a careful save/update flow without breaking current contracts.
+- Formalize `select_attrs` or replace it with a clearer mechanism.
+- Continue stabilizing the frontend runtime and the documentation set.

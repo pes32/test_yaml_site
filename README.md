@@ -1,60 +1,76 @@
-# YAML System
+# Yamls - YAML System
 
-`YAML System` — это система построенная полностью на YAML-файлах: страницы описываются YAML-файлами, backend собирает из них snapshot, а frontend рендерит интерфейс через Vite bundle. На текущий момент это кликабельный макет.
-Никаких сторонних библиотек не использовалось. Весь интерфейс написан с нейронками. 
+[English version](README_en.md)
 
-## Что здесь находится
+# Вкратце от автора
 
-- `backend/` — Flask-приложение, API, сборка snapshot, debug routes, CLI-инструменты.
-- `pages/` — YAML-страницы, из которых собирается интерфейс.
-- `frontend/` — стили, JS-виджеты и собранный bundle.
-- `tooling/vite/` — Vite/TypeScript-конфиг и frontend-сборка.
-- `templates/` — HTML-шаблоны, иконки и macOS bundle `sql_inspect.app`.
-- `deploy/` — примеры deploy-конфигурации, включая `systemd`.
-- `docs/` — техническая документация по архитектуре и контрактам.
+- Это кликабельный макет системы на ямлах. Ямлы как описание атрибутов и интерфейса выбраны мной в силу простоты описания кем угодно. Мы (я и моя прошлая команда) пришли к ним после разработки бесчётного количества учётных систем. Сейчас в системе готовы самые популярные виджеты ввода, которых хватит в большинстве задач.
+- Рекомендую "потыкать" все виджеты руками, многие из них получились хорошо, особенно таблица (а вот text/textarea не очень).
+- Текущая система гипертрофирована и сделана на ямлах целиком. Это не повод так делать всегда, но задуматься можно.
+- В планах реализация базы данных. Вообще база уже прикручена, но пока не работает. Основная проблема: как её прикрутить? Если следовать текущей логике, то описание функций и бизнес-логики следует выносить в postgres, как наиболее простому языку, а вызов сделать в текущих атрибутах ямлов. Не уверен, что это хорошая идея, а пилить свой полноценный бэк - бессмыслено, это зря потраченное время.
+- Может быть, когда-нибудь прикручу диаграммы и какие-нибудь интеграции. Или ещё какие-то виджеты и функционал. Пока не знаю.
+- Судоку добавлен for fun (он у меня уже был готов на питоне), его можно безболезнено выкинуть из системы. 
+- Общий бюджет написания системы: не более 100$ (скорее всего, где-то 40-60$). По времени - где-то месяц. 
+- Дальше идёт нейросетевой текст. Хотите ли вы его читать - дело ваше. Я предупредил.
 
-## Что нужно для запуска
+## О системе
+
+Yamls - YAML System — это YAML-driven UI-движок для кликабельных порталов и интерфейсных прототипов: страницы описываются YAML-файлами, backend собирает из них snapshot, а frontend рендерит готовый интерфейс через Vite bundle. Текущая версия проекта — рабочий кликабельный макет.
+
+В отличие от типичного form builder или admin generator, здесь первичен не database schema и не визуальный редактор, а декларативное описание страниц, атрибутов, меню, модалок и действий в YAML. Backend отвечает за сборку и валидацию snapshot-конфига, а frontend runtime уже исполняет согласованный контракт.
+
+## Статус проекта
+
+- Рабочее имя и публичная подача: `Yamls - YAML System`.
+- Текущий релиз: `v.0.2 л.`.
+- Текущее состояние: кликабельный макет без встроенной DB-интеграции в основной YAML flow.
+- Что уже стабильно: snapshot-сборка, YAML DSL, базовый widget runtime, production-like запуск через `waitress + nginx`.
+- Что ещё roadmap: DB-backed forms, сохранение данных, полноценные data sources для YAML-виджетов, завершение `select_attrs`.
+
+## Что это даёт
+
+- Описание UI через YAML вместо ручной верстки каждой страницы.
+- Backend snapshot pipeline с валидацией и диагностикой конфигурации.
+- Frontend runtime с виджетами `str`, `text`, `int`, `float`, `date`, `time`, `datetime`, `ip`, `ip_mask`, `list`, `voc`, `img`, `button`, `split_button`, `table`.
+- Встроенную debug-панель и отдельный read-only SQL debug tooling.
+- Production-like локальный запуск, приближенный к серверной схеме `public nginx -> waitress on 127.0.0.1`.
+
+## Где демо, а где личные материалы автора
+
+- Движок и основные примеры лежат в [pages/2_widget_demo](pages/2_widget_demo) и в документации из [docs/yaml-dsl.md](docs/yaml-dsl.md).
+- Архитектурные детали описаны в [docs/runtime-architecture.md](docs/runtime-architecture.md), [docs/api-contracts.md](docs/api-contracts.md) и [docs/table-subsystem.md](docs/table-subsystem.md).
+- Страница `about_author` и hardcoded Postgres-раздел нужны как демонстрационные и авторские материалы. Это не “ядро движка” и не обязательная часть будущей продуктовой сборки.
+
+## Структура репозитория
+
+- `backend/` — Flask backend, snapshot builder, validation, API, debug tooling.
+- `pages/` — YAML-страницы и атрибуты.
+- `frontend/` — стили, виджеты, runtime и собранный bundle.
+- `tooling/vite/` — frontend toolchain и typecheck/build.
+- `templates/` — HTML-шаблоны, иконки и связанные статические материалы.
+- `deploy/` — примеры deployment-конфигурации, включая `systemd`.
+- `docs/` — архитектурная и эксплуатационная документация.
+
+## Быстрый старт
+
+### Требования
 
 - `python3`
 - `node` и `npm`
 - `nginx` в `PATH` для `./start.sh` и `./start_debug.sh`
 - `openssl` для локального self-signed сертификата
 
-## Первый запуск с нуля
-
-1. Создайте виртуальное окружение:
+### Первый запуск
 
 ```bash
 python3 -m venv .venv
-```
-
-2. Активируйте его:
-
-```bash
 source .venv/bin/activate
-```
-
-3. Установите Python-зависимости:
-
-```bash
 python3 -m pip install --upgrade pip
 python3 -m pip install -r requirements.txt
+npm --prefix tooling/vite ci
 ```
 
-4. Установите frontend-зависимости:
-
-```bash
-npm --prefix tooling/vite install
-```
-
-5. При необходимости создайте env-файлы:
-
-```bash
-cp debug.env.example debug.env
-cp production.env.example production.env
-```
-
-## Как запускать
+Если нужны локальные переопределения env-переменных, создайте вручную `production.env` и/или `debug.env` в корне проекта. Базовые значения уже лежат в `production.defaults.env` и `debug.defaults.env`.
 
 ### Debug-режим
 
@@ -62,31 +78,11 @@ cp production.env.example production.env
 ./start_debug.sh
 ```
 
-Что делает скрипт:
-
-- читает `debug.env`, если файл есть;
-- использует `YAMLS_ENV=development`;
-- включает debug routes;
-- при необходимости ставит frontend-зависимости;
-- собирает Vite bundle;
-- поднимает `waitress` и локальный `nginx`.
-
 ### Production-like локально
 
 ```bash
 ./start.sh
 ```
-
-Что делает скрипт:
-
-- читает `production.env`, если файл есть;
-- использует `YAMLS_ENV=production`;
-- выключает debug routes;
-- собирает frontend;
-- валидирует `frontend/dist/.vite/manifest.json`;
-- запускает `waitress` на `127.0.0.1:8080`;
-- запускает локальный `nginx` на `https://localhost:8443`;
-- пишет логи в `run/`.
 
 ### Остановка
 
@@ -94,109 +90,56 @@ cp production.env.example production.env
 ./stop.sh
 ```
 
-## Если нужен другой env-файл
-
-```bash
-YAMLS_ENV_FILE=/path/to/production.env ./start.sh
-YAMLS_ENV_FILE=/path/to/debug.env ./start_debug.sh
-YAMLS_ENV_FILE=/path/to/production.env ./stop.sh
-```
-
-## Основные `YAMLS_*` переменные
-
-- `YAMLS_ENV` — режим (`development` или `production`).
-- `YAMLS_ENABLE_DEBUG_ROUTES` — включает или выключает `/debug` и `/api/debug/*`.
-- `YAMLS_CONFIG_LIVE_RELOAD` — live reload YAML-конфигурации.
-- `YAMLS_CONFIG_SCAN_INTERVAL` — интервал сканирования YAML-файлов.
-- `YAMLS_WAITRESS_HOST`, `YAMLS_WAITRESS_PORT` — где слушает `waitress`.
-- `YAMLS_NGINX_BIND_HOST`, `YAMLS_NGINX_PORT` — где слушает локальный `nginx`.
-- `YAMLS_SERVER_NAME` — server name для `nginx`.
-- `YAMLS_HEALTHCHECK_CONNECT_HOST` — host для healthcheck.
-- `YAMLS_TRUST_PROXY`, `YAMLS_TRUSTED_PROXY`, `YAMLS_TRUSTED_PROXY_COUNT`, `YAMLS_TRUSTED_PROXY_HEADERS` — доверие proxy-заголовкам.
-- `YAMLS_TLS_CERT`, `YAMLS_TLS_KEY` — свои TLS-сертификаты вместо локальных.
-- `YAMLS_NGINX_MIME_TYPES` — путь к `mime.types`, если `nginx` установлен нестандартно.
-- `YAMLS_SKIP_VITE_BUILD=1` — пропустить сборку frontend, только если bundle уже собран и валиден.
-- `YAMLS_FLASK_HOST`, `YAMLS_FLASK_PORT`, `YAMLS_FLASK_DEBUG`, `YAMLS_FLASK_RELOADER` — прямой запуск через `python3 app.py`.
-
 ## Полезные команды
 
-Проверить YAML-конфигурацию без запуска UI:
+Проверка YAML-конфигурации:
 
 ```bash
 python3 -m backend.tools.validate_config
 python3 -m backend.tools.validate_config --json
 ```
 
-Собрать frontend вручную:
-
-```bash
-npm --prefix tooling/vite run build
-```
-
-Проверить типы frontend:
+Typecheck frontend:
 
 ```bash
 npm --prefix tooling/vite run typecheck
 ```
 
-## Какие маршруты есть
-
-- `/` — основная YAML-страница.
-- `/page/<name>` — открытие страницы по имени.
-- `/debug` — debug-панель, если включены debug routes.
-- `/postgres` — hardcoded страница с кнопкой скачивания PostgreSQL-инструмента.
-- `/postgres/download` — скачивание `sql_inspect.app.zip`.
-
-## Где что редактировать
-
-- Хотите менять UI-страницы системы — идите в `pages/`.
-- Хотите менять backend-логику — идите в `backend/`.
-- Хотите менять шапку, hardcoded страницы или иконки — идите в `templates/`.
-- Хотите менять стили или поведение виджетов — идите в `frontend/css/` и `frontend/js/`.
-- Хотите менять способ запуска — смотрите `start.sh`, `start_debug.sh`, `stop.sh`, `scripts/runtime_common.sh`.
-
-## PostgreSQL-страница
-
-В шапке есть кнопка Postgres.
-Она открывает `/postgres`, где расположена кнопка `Скачать`.
-Кнопка отдаёт архив `sql_inspect.app.zip`, внутри которого лежит macOS bundle `sql_inspect.app`.
-
-## Типовые проблемы
-
-### Не найдено `.venv`
-
-Скрипты запуска ожидают виртуальное окружение в корне проекта.
-Создайте его через `python3 -m venv .venv` и поставьте зависимости.
-
-### Не найден `nginx`
-
-`./start.sh` и `./start_debug.sh` запускают локальный `nginx`.
-Если команда `nginx` не находится, установите `nginx` и проверьте, что он есть в `PATH`.
-
-### Не найден `mime.types`
-
-Если helper не может найти `mime.types`, укажите путь явно:
+Сборка frontend:
 
 ```bash
-YAMLS_NGINX_MIME_TYPES=/opt/homebrew/etc/nginx/mime.types ./start.sh
-```
-
-### Не собирается frontend
-
-Проверьте, что установлены `node` и `npm`, а затем выполните:
-
-```bash
-npm --prefix tooling/vite install
 npm --prefix tooling/vite run build
 ```
 
-## Дополнительная документация
+## Production и безопасность
 
-- [docs/runtime-architecture.md](docs/runtime-architecture.md)
-- [docs/api-contracts.md](docs/api-contracts.md)
-- [docs/table-subsystem.md](docs/table-subsystem.md)
-- [docs/yaml-dsl.md](docs/yaml-dsl.md)
+- Production-like стек уже есть, но проект пока честнее воспринимать как demo/runtime prototype, а не как готовую multi-user платформу.
+- Debug routes в production по умолчанию выключены.
+- Полноценной auth/permission-модели пока нет.
+- Основная YAML-часть сейчас не делает DB persistence.
+- Для реального Linux-сервера используйте схему `public nginx -> waitress on 127.0.0.1`, описанную в [docs/deploy-linux.md](docs/deploy-linux.md).
 
-## Пример deploy
+## Ограничения
 
-Пример `systemd` unit лежит в `deploy/systemd/yamls-waitress.service.example`.
+- DB integration частичная: есть PostgreSQL tooling и debug SQL, но нет завершенного data-entry контура для YAML-форм.
+- `select_attrs` зарезервирован в DSL, но ещё не реализует обещанный механизм заполнения.
+- Это не визуальный редактор и не self-service builder для конечных пользователей.
+- Публичные контракты движка ещё формируются; для внешних интеграций лучше считать проект evolving.
+
+## Roadmap
+
+Краткая дорожная карта вынесена в [ROADMAP.md](ROADMAP.md). Главное направление после `v.0.2 л.`:
+
+- аккуратная DB-интеграция без ломки YAML-контрактов;
+- формализация data sources и save flow;
+- дальнейшая стабилизация runtime и документации;
+- постепенное расширение demo-примеров.
+
+## Для участников
+
+- Правила для вкладов: [CONTRIBUTING.md](CONTRIBUTING.md)
+- История изменений: [CHANGELOG.md](CHANGELOG.md)
+
+## Лицензия
+
+Проект распространяется по лицензии MIT. См. [LICENSE](LICENSE).
