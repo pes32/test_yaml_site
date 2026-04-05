@@ -5,7 +5,10 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
-DEFAULT_ENV_FILE="$ROOT_DIR/production.defaults.env"
+DEFAULT_ENV_FILE="${YAMLS_DEFAULT_ENV_FILE:-$ROOT_DIR/settings/production.defaults.env}"
+if [ "$DEFAULT_ENV_FILE" = "$ROOT_DIR/settings/production.defaults.env" ] && [ ! -f "$DEFAULT_ENV_FILE" ]; then
+    DEFAULT_ENV_FILE="$ROOT_DIR/production.defaults.env"
+fi
 if [ -f "$DEFAULT_ENV_FILE" ]; then
     set -a
     # shellcheck disable=SC1090
@@ -13,7 +16,10 @@ if [ -f "$DEFAULT_ENV_FILE" ]; then
     set +a
 fi
 
-ENV_FILE="${YAMLS_ENV_FILE:-$ROOT_DIR/production.env}"
+ENV_FILE="${YAMLS_ENV_FILE:-$ROOT_DIR/settings/production.env}"
+if [ "$ENV_FILE" = "$ROOT_DIR/settings/production.env" ] && [ ! -f "$ENV_FILE" ] && [ -f "$ROOT_DIR/production.env" ]; then
+    ENV_FILE="$ROOT_DIR/production.env"
+fi
 if [ -f "$ENV_FILE" ]; then
     set -a
     # shellcheck disable=SC1090

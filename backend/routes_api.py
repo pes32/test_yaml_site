@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable
+from typing import Any, Callable, Dict, List
 
 from flask import jsonify, make_response, request
 from pydantic import ValidationError
@@ -14,8 +14,8 @@ from .contracts import ExecuteRequest, ExecuteResponse
 
 logger = logging.getLogger(__name__)
 META_KEYS = frozenset({"url", "title", "description"})
-CommandHandler = Callable[[dict[str, Any]], Any]
-COMMAND_HANDLERS: dict[str, CommandHandler] = {}
+CommandHandler = Callable[[Dict[str, Any]], Any]
+COMMAND_HANDLERS: Dict[str, CommandHandler] = {}
 
 
 def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG001
@@ -30,16 +30,16 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
             pass
         return resp
 
-    def _json_response(payload: dict[str, Any], status: int = 200):
+    def _json_response(payload: Dict[str, Any], status: int = 200):
         return _no_cache(make_response(jsonify(payload), status))
 
     def _snapshot():
         return config_service.get_snapshot()
 
-    def _page_diagnostics(page_config: dict[str, Any]) -> list[dict[str, Any]]:
+    def _page_diagnostics(page_config: Dict[str, Any]) -> List[Dict[str, Any]]:
         return list(page_config.get("diagnostics") or [])
 
-    def _public_page_config(page_config: dict[str, Any]) -> dict[str, Any]:
+    def _public_page_config(page_config: Dict[str, Any]) -> Dict[str, Any]:
         gui = page_config.get("gui") or {}
         root_keys = page_config.get("guiMenuKeys")
         if not isinstance(root_keys, list):
@@ -54,7 +54,7 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
             "modalGuiIds": page_config.get("modalGuiIds") or [],
         }
 
-    def _page_payload(page_config: dict[str, Any]) -> dict[str, Any]:
+    def _page_payload(page_config: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "page": _public_page_config(page_config),
             "attrs": page_config.get("attrs") or {},

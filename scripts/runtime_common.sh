@@ -334,6 +334,7 @@ truncate_logs() {
 
 start_waitress_process() {
     local -a waitress_args
+    local wsgi_app="${YAMLS_WSGI_APP:-settings.wsgi:app}"
     waitress_args=(
         "--host=$WAITRESS_HOST"
         "--port=$WAITRESS_PORT"
@@ -351,7 +352,7 @@ start_waitress_process() {
     (
         cd "$ROOT_DIR"
         nohup env PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" \
-            waitress-serve "${waitress_args[@]}" wsgi:app \
+            waitress-serve "${waitress_args[@]}" "$wsgi_app" \
             >>"$WAITRESS_LOG" 2>&1 </dev/null &
         echo "$!" >"$WAITRESS_PID_FILE"
     )

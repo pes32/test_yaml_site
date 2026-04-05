@@ -1,8 +1,9 @@
 # backend/routes_static.py
 """Раздача вспомогательных статических файлов, не попадающих под стандартный /static."""
 
-from flask import jsonify, request, send_from_directory
+from flask import jsonify, request, send_file, send_from_directory
 import logging
+import mimetypes
 import os
 from werkzeug.exceptions import NotFound
 
@@ -11,6 +12,21 @@ logger = logging.getLogger(__name__)
 
 def register_static_routes(app):
     """Регистрирует вспомогательные статические маршруты."""
+
+    def iter_favicon_candidates():
+        configured_name = os.getenv("YAMLS_FAVICON_FILE", "").strip().strip("/\\")
+        root_dir = os.path.dirname(app.template_folder)
+        if configured_name:
+            if configured_name.startswith("templates/") or configured_name.startswith("frontend/"):
+                yield os.path.join(root_dir, configured_name)
+            else:
+                yield os.path.join(app.template_folder, configured_name)
+                yield os.path.join(app.static_folder, configured_name)
+
+        yield os.path.join(app.template_folder, "favicon.ico")
+        yield os.path.join(app.template_folder, "favicon.png")
+        yield os.path.join(app.template_folder, "лого_МД.png")
+        yield os.path.join(app.static_folder, "favicon.ico")
 
     @app.route("/healthz")
     def healthz():  # noqa: D401
@@ -51,10 +67,17 @@ def register_static_routes(app):
             logger.exception("Ошибка при загрузке файла %s", filename)
             return f"Ошибка загрузки: {exc}", 500
 
-    # favicon в корне — переброс к файлу во frontend
+    # favicon в корне — единая точка выдачи для frontend/templates
     @app.route("/favicon.ico")
     def favicon():  # noqa: D401
-        return send_from_directory(app.static_folder, "favicon.ico", mimetype="image/x-icon")
+        for favicon_path in iter_favicon_candidates():
+            if not os.path.isfile(favicon_path):
+                continue
+
+            mime_type = mimetypes.guess_type(favicon_path)[0] or "application/octet-stream"
+            return send_file(favicon_path, mimetype=mime_type)
+
+        raise NotFound()
 
     # webfonts — шрифты с явным MIME-типом (важно для @font-face)
     webfonts_dir = os.path.join(app.static_folder, "webfonts")

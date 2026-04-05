@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Debug</title>
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="icon" href="{{ url_for('favicon') }}">
     {% if debug_bundle and debug_bundle.get('css') %}
         {% for css_file in debug_bundle.get('css', []) %}
     <link href="{{ url_for('static', filename='dist/' ~ css_file) }}" rel="stylesheet">

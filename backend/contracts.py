@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator
 
 
-JsonDict = dict[str, Any]
+JsonDict = Dict[str, Any]
 
 
 def utc_now_iso() -> str:
@@ -50,7 +50,7 @@ class SnapshotMeta(BaseModel):
     version: str
     created_at: str
     page_count: int = 0
-    source_files: list[SourceFileMeta] = Field(default_factory=list)
+    source_files: List[SourceFileMeta] = Field(default_factory=list)
     last_build_error: Optional[str] = None
     last_successful_build_at: Optional[str] = None
 
@@ -63,7 +63,7 @@ class RawAttrsFragment(RootModel[JsonDict]):
     """Raw attrs-фрагмент страницы."""
 
 
-class RawModalDocument(RootModel[Union[list[Any], JsonDict]]):
+class RawModalDocument(RootModel[Union[List[Any], JsonDict]]):
     """Raw YAML-документ модалки."""
 
 
@@ -76,10 +76,10 @@ class NormalizedModal(BaseModel):
     name: str
     title: Optional[str] = None
     icon: Optional[str] = None
-    tabs: list[JsonDict] = Field(default_factory=list)
-    content: list[JsonDict] = Field(default_factory=list)
-    buttons: list[str] = Field(default_factory=list)
-    widget_names: list[str] = Field(default_factory=list, alias="widgetNames")
+    tabs: List[JsonDict] = Field(default_factory=list)
+    content: List[JsonDict] = Field(default_factory=list)
+    buttons: List[str] = Field(default_factory=list)
+    widget_names: List[str] = Field(default_factory=list, alias="widgetNames")
     source: Literal["embedded", "file"]
     source_file: Optional[str] = Field(default=None, alias="sourceFile")
 
@@ -110,11 +110,11 @@ class PageSnapshot(BaseModel):
     title: str
     gui: JsonDict
     attrs: JsonDict = Field(default_factory=dict)
-    modals: dict[str, NormalizedModal] = Field(default_factory=dict)
-    gui_root_keys: list[str] = Field(default_factory=list, alias="guiMenuKeys")
-    modal_gui_ids: list[str] = Field(default_factory=list, alias="modalGuiIds")
-    source_files: list[SourceFileMeta] = Field(default_factory=list, alias="sourceFiles")
-    diagnostics: list[Diagnostic] = Field(default_factory=list)
+    modals: Dict[str, NormalizedModal] = Field(default_factory=dict)
+    gui_root_keys: List[str] = Field(default_factory=list, alias="guiMenuKeys")
+    modal_gui_ids: List[str] = Field(default_factory=list, alias="modalGuiIds")
+    source_files: List[SourceFileMeta] = Field(default_factory=list, alias="sourceFiles")
+    diagnostics: List[Diagnostic] = Field(default_factory=list)
 
 
 class AppSnapshot(BaseModel):
@@ -123,10 +123,10 @@ class AppSnapshot(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     meta: SnapshotMeta
-    pages: dict[str, PageSnapshot] = Field(default_factory=dict)
-    pages_by_url: dict[str, str] = Field(default_factory=dict)
-    page_attrs: dict[str, JsonDict] = Field(default_factory=dict)
-    diagnostics: list[Diagnostic] = Field(default_factory=list)
+    pages: Dict[str, PageSnapshot] = Field(default_factory=dict)
+    pages_by_url: Dict[str, str] = Field(default_factory=dict)
+    page_attrs: Dict[str, JsonDict] = Field(default_factory=dict)
+    diagnostics: List[Diagnostic] = Field(default_factory=list)
 
 
 class ApiError(BaseModel):
@@ -147,7 +147,7 @@ class ExecuteRequest(BaseModel):
     params: JsonDict = Field(default_factory=dict)
     page: Optional[str] = None
     widget: Optional[str] = None
-    output_attrs: list[str] = Field(default_factory=list, alias="output_attrs")
+    output_attrs: List[str] = Field(default_factory=list, alias="output_attrs")
 
     @field_validator("command")
     @classmethod

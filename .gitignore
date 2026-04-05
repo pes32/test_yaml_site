@@ -58,3 +58,6 @@ npm-debug.log*
 
 # Local TLS
 ssl/
+
+# Local deploy helpers
+deploy_yamls.sh

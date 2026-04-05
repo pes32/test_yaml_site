@@ -4,6 +4,8 @@
 
 # From the author
 
+yamls.ru
+
 - This is a clickable mockup of a system built on YAMLs. I chose YAMLs as the way to describe attributes and the interface because they are simple enough for almost anyone to write. My previous team and I arrived at this approach after building countless line-of-business systems. At this point, the system already includes the most common input widgets, which should cover most typical tasks.
 - I recommend clicking through all the widgets by hand. Many of them turned out quite well, especially the table widget, though text/textarea is not that great yet.
 - The current system is intentionally exaggerated and implemented entirely in YAML. That does not mean this is always the right way to do things, but it is at least something worth thinking about.
@@ -11,6 +13,7 @@
 - Maybe one day I will add diagrams and some integrations. Or more widgets and other functionality. I do not know yet.
 - Sudoku was added just for fun, since I already had it written in Python. It can be removed from the system without any pain.
 - The total budget for building this system was no more than $100, and probably closer to $40-60. In terms of time, it took about a month.
+- I was not aiming to build a multilingual product, and I did not expect an audience outside the Russian-speaking segment. Sorry, but you will have to use a translator on the demo pages. I hope the widgets turned out expressive enough for their purpose to be understood even without translation.
 - What follows after this is AI-generated text. Whether you want to read it is up to you. You have been warned.
 
 ## About
@@ -55,7 +58,7 @@ Unlike a typical form builder or admin generator, this project is driven by decl
 
 ### Requirements
 
-- `python3`
+- `python3` 3.8+
 - `node` and `npm`
 - `nginx` in `PATH` for `./start.sh` and `./start_debug.sh`
 - `openssl` for the local self-signed certificate
@@ -70,7 +73,9 @@ python3 -m pip install -r requirements.txt
 npm --prefix tooling/vite ci
 ```
 
-If you need local overrides, create `production.env` and/or `debug.env` manually in the repository root. Default values already live in `production.defaults.env` and `debug.defaults.env`.
+If `pip install -r requirements.txt` fails with errors such as `No matching distribution found for waitress==3.0.0` or `Werkzeug==3.0.6`, the virtualenv was most likely created with an older Python. Use `Python 3.8+` for this repository.
+
+If you need local overrides, create `settings/production.env` and/or `settings/debug.env`. Default values now live in `settings/production.defaults.env` and `settings/debug.defaults.env`. The legacy root-level paths are still accepted as a fallback.
 
 ### Debug mode
 

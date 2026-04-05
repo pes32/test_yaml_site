@@ -8,16 +8,26 @@ cd "$ROOT_DIR"
 ENV_FILE="${YAMLS_ENV_FILE:-}"
 DEFAULT_ENV_FILE=""
 
-if [ -z "$ENV_FILE" ] && [ -f "$ROOT_DIR/production.env" ]; then
+if [ -z "$ENV_FILE" ] && [ -f "$ROOT_DIR/settings/production.env" ]; then
+    ENV_FILE="$ROOT_DIR/settings/production.env"
+elif [ -z "$ENV_FILE" ] && [ -f "$ROOT_DIR/production.env" ]; then
     ENV_FILE="$ROOT_DIR/production.env"
+elif [ -z "$ENV_FILE" ] && [ -f "$ROOT_DIR/settings/debug.env" ]; then
+    ENV_FILE="$ROOT_DIR/settings/debug.env"
 elif [ -z "$ENV_FILE" ] && [ -f "$ROOT_DIR/debug.env" ]; then
     ENV_FILE="$ROOT_DIR/debug.env"
 fi
 
 if [ -n "$ENV_FILE" ] && [[ "$(basename "$ENV_FILE")" == *debug* ]]; then
-    DEFAULT_ENV_FILE="$ROOT_DIR/debug.defaults.env"
+    DEFAULT_ENV_FILE="$ROOT_DIR/settings/debug.defaults.env"
+    if [ ! -f "$DEFAULT_ENV_FILE" ]; then
+        DEFAULT_ENV_FILE="$ROOT_DIR/debug.defaults.env"
+    fi
 else
-    DEFAULT_ENV_FILE="$ROOT_DIR/production.defaults.env"
+    DEFAULT_ENV_FILE="$ROOT_DIR/settings/production.defaults.env"
+    if [ ! -f "$DEFAULT_ENV_FILE" ]; then
+        DEFAULT_ENV_FILE="$ROOT_DIR/production.defaults.env"
+    fi
 fi
 
 if [ -n "$DEFAULT_ENV_FILE" ] && [ -f "$DEFAULT_ENV_FILE" ]; then

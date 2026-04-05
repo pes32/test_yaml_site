@@ -8,7 +8,7 @@
 
 ## 1. Что подготовить
 
-- Linux-хост с `python3`, `python3-venv`, `nginx`, `node`, `npm`
+- Linux-хост с `python3` 3.8+, `python3-venv`, `nginx`, `node`, `npm`
 - доменное имя
 - TLS-сертификат
 - открытые порты `80/tcp` и `443/tcp`
@@ -32,9 +32,11 @@ npm --prefix tooling/vite run build
 python3 -m backend.tools.validate_config --json
 ```
 
-## 3. Создать `production.env`
+Если `pip` не находит `waitress==3.0.0` или `Werkzeug==3.0.6`, проверьте версию интерпретатора, которым создано окружение. Для текущих зависимостей и runtime type hints проекта нужен `Python 3.8+`.
 
-В репозитории уже есть `production.defaults.env`. На сервере обычно достаточно создать рядом свой `/opt/yamls-portal/production.env` только с переопределениями:
+## 3. Создать `settings/production.env`
+
+В репозитории уже есть `settings/production.defaults.env`. На сервере обычно достаточно создать рядом свой `/opt/yamls-portal/settings/production.env` только с переопределениями:
 
 ```dotenv
 YAMLS_ENV=production
@@ -82,8 +84,8 @@ Type=simple
 User=www-data
 Group=www-data
 WorkingDirectory=/opt/yamls-portal
-EnvironmentFile=/opt/yamls-portal/production.env
-ExecStart=/opt/yamls-portal/.venv/bin/waitress-serve --host=127.0.0.1 --port=8080 wsgi:app
+EnvironmentFile=/opt/yamls-portal/settings/production.env
+ExecStart=/opt/yamls-portal/.venv/bin/waitress-serve --host=127.0.0.1 --port=8080 settings.wsgi:app
 Restart=always
 RestartSec=2
 
