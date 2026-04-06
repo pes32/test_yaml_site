@@ -163,9 +163,12 @@ body {
 }
 
 .sudoku-board-stage {
+    position: relative;
     width: min(650px, 100%);
     margin: 0 auto;
     aspect-ratio: 1 / 1;
+    overflow: hidden;
+    border-radius: 24px;
 }
 
 .sudoku-canvas {
@@ -177,6 +180,172 @@ body {
     box-shadow:
         inset 0 0 0 1px rgba(255, 255, 255, 0.12),
         0 18px 40px rgba(0, 0, 0, 0.28);
+}
+
+.sudoku-celebration {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+}
+
+.sudoku-celebration.is-visible {
+    animation: sudoku-celebration-fade 2.5s ease forwards;
+}
+
+.sudoku-celebration__label {
+    padding: 14px 22px;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    border-radius: 999px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.03)),
+        rgba(20, 24, 31, 0.78);
+    box-shadow:
+        0 22px 46px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    color: #fff7dc;
+    font-size: clamp(1.15rem, 3vw, 1.9rem);
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0;
+    transform: translateY(18px) scale(0.9);
+}
+
+.sudoku-celebration.is-visible .sudoku-celebration__label {
+    animation: sudoku-celebration-label 2.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.sudoku-celebration__burst {
+    position: absolute;
+    width: 0;
+    height: 0;
+}
+
+.sudoku-celebration__burst--left {
+    left: 23%;
+    top: 68%;
+}
+
+.sudoku-celebration__burst--right {
+    left: 77%;
+    top: 34%;
+}
+
+.sudoku-celebration__burst span {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: var(--size, 12px);
+    height: var(--size, 12px);
+    border-radius: 999px;
+    background: var(--color, var(--sudoku-accent-strong));
+    opacity: 0;
+    box-shadow: 0 0 16px rgba(255, 255, 255, 0.35);
+    transform: translate(-50%, -50%) scale(0.2);
+}
+
+.sudoku-celebration.is-visible .sudoku-celebration__burst span {
+    animation: sudoku-celebration-particle 1.15s ease-out forwards;
+    animation-delay: var(--delay, 0s);
+}
+
+.sudoku-celebration__burst--left span:nth-child(1) {
+    --dx: -112px;
+    --dy: -108px;
+    --delay: 0.02s;
+    --size: 11px;
+    --color: #ffd166;
+}
+
+.sudoku-celebration__burst--left span:nth-child(2) {
+    --dx: -30px;
+    --dy: -142px;
+    --delay: 0.06s;
+    --size: 8px;
+    --color: #ff7b72;
+}
+
+.sudoku-celebration__burst--left span:nth-child(3) {
+    --dx: 88px;
+    --dy: -122px;
+    --delay: 0.1s;
+    --size: 10px;
+    --color: #80ff72;
+}
+
+.sudoku-celebration__burst--left span:nth-child(4) {
+    --dx: 126px;
+    --dy: -36px;
+    --delay: 0.16s;
+    --size: 9px;
+    --color: #7cd8ff;
+}
+
+.sudoku-celebration__burst--left span:nth-child(5) {
+    --dx: 42px;
+    --dy: 54px;
+    --delay: 0.2s;
+    --size: 7px;
+    --color: #ffc6ff;
+}
+
+.sudoku-celebration__burst--left span:nth-child(6) {
+    --dx: -92px;
+    --dy: 34px;
+    --delay: 0.24s;
+    --size: 10px;
+    --color: #f7c766;
+}
+
+.sudoku-celebration__burst--right span:nth-child(1) {
+    --dx: -122px;
+    --dy: -28px;
+    --delay: 0.04s;
+    --size: 11px;
+    --color: #7cd8ff;
+}
+
+.sudoku-celebration__burst--right span:nth-child(2) {
+    --dx: -62px;
+    --dy: -132px;
+    --delay: 0.09s;
+    --size: 8px;
+    --color: #ffd166;
+}
+
+.sudoku-celebration__burst--right span:nth-child(3) {
+    --dx: 26px;
+    --dy: -146px;
+    --delay: 0.14s;
+    --size: 10px;
+    --color: #80ff72;
+}
+
+.sudoku-celebration__burst--right span:nth-child(4) {
+    --dx: 120px;
+    --dy: -66px;
+    --delay: 0.19s;
+    --size: 9px;
+    --color: #ff7b72;
+}
+
+.sudoku-celebration__burst--right span:nth-child(5) {
+    --dx: 94px;
+    --dy: 22px;
+    --delay: 0.24s;
+    --size: 8px;
+    --color: #ffc6ff;
+}
+
+.sudoku-celebration__burst--right span:nth-child(6) {
+    --dx: -18px;
+    --dy: 78px;
+    --delay: 0.28s;
+    --size: 11px;
+    --color: #f7c766;
 }
 
 .sudoku-label {
@@ -407,6 +576,56 @@ body {
 
 .sudoku-dialog__actions--start {
     justify-content: flex-start;
+}
+
+@keyframes sudoku-celebration-fade {
+    0% {
+        opacity: 0;
+    }
+
+    10%,
+    72% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+@keyframes sudoku-celebration-label {
+    0% {
+        opacity: 0;
+        transform: translateY(18px) scale(0.86);
+    }
+
+    18%,
+    70% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.96);
+    }
+}
+
+@keyframes sudoku-celebration-particle {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.2);
+    }
+
+    18% {
+        opacity: 1;
+        transform: translate(calc(-50% + (var(--dx) * 0.2)), calc(-50% + (var(--dy) * 0.2))) scale(0.7);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.1);
+    }
 }
 
 @media (min-width: 1121px) {

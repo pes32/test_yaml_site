@@ -8,6 +8,15 @@ const HINT_COLOR = "#bbbbbb";
 const HINT_SINGLE_COLOR = "lime";
 const DEFAULT_DIFFICULTIES = ["лёгкий", "средний", "сложный", "мамкино дупло"];
 const FEATURE_GONE_MESSAGE = "Страница Sudoku недоступна.";
+const AUTO_SOLVE_INSULT_MESSAGE = "лох, гей, нет друзей. Не смог судоку решить...";
+const MANUAL_WIN_MESSAGE = "🎉 Поздравляем! Головоломка решена!";
+const CELEBRATION_DURATION_MS = 2500;
+
+const COMPLETION_STATE = Object.freeze({
+  IN_PROGRESS: "in_progress",
+  MANUAL_WIN: "manual_win",
+  AUTO_SOLVE: "auto_solve"
+});
 
 const API = Object.freeze({
   bootstrap: "/sudoku/api/bootstrap",
@@ -22,7 +31,7 @@ const state = {
   selected: [0, 0],
   solvedCache: null,
   solvedCacheField: null,
-  puzzleSolved: false,
+  completionState: COMPLETION_STATE.IN_PROGRESS,
   errorCells: new Set(),
   solutionMap: null,
   solutionMapReady: false,
@@ -34,6 +43,7 @@ const state = {
   consoleVisible: true,
   progress: null,
   canvasRect: { width: 0, height: 0 },
+  celebrationHideTimerId: 0,
   initialized: false
 };
 
@@ -83,6 +93,7 @@ function captureRefs() {
   refs.saveLogButton = document.getElementById("sudoku-save-log-btn");
   refs.infoDialog = document.getElementById("sudoku-info-dialog");
   refs.infoCloseButton = document.getElementById("sudoku-info-close-btn");
+  refs.celebration = document.getElementById("sudoku-celebration");
 }
 
 function bindEvents() {
@@ -193,6 +204,53 @@ function showStatus(message) {
 function hideStatus() {
   refs.status.hidden = true;
   refs.status.textContent = "";
+}
+
+function setCompletionState(nextState) {
+  state.completionState = Object.values(COMPLETION_STATE).includes(nextState)
+    ? nextState
+    : COMPLETION_STATE.IN_PROGRESS;
+}
+
+function isEraseKey(key) {
+  return key === "Backspace" || key === "Delete" || key === "0" || key === " ";
+}
+
+function clearCelebrationTimer() {
+  if (!state.celebrationHideTimerId) {
+    return;
+  }
+  window.clearTimeout(state.celebrationHideTimerId);
+  state.celebrationHideTimerId = 0;
+}
+
+function hideCelebration() {
+  clearCelebrationTimer();
+  if (!refs.celebration) {
+    return;
+  }
+  refs.celebration.hidden = true;
+  refs.celebration.classList.remove("is-visible");
+}
+
+function showCelebration() {
+  if (!refs.celebration) {
+    return;
+  }
+
+  hideCelebration();
+  refs.celebration.hidden = false;
+  void refs.celebration.offsetWidth;
+  refs.celebration.classList.add("is-visible");
+  state.celebrationHideTimerId = window.setTimeout(() => {
+    hideCelebration();
+  }, CELEBRATION_DURATION_MS);
+}
+
+function completeManualWin() {
+  setCompletionState(COMPLETION_STATE.MANUAL_WIN);
+  log(MANUAL_WIN_MESSAGE);
+  showCelebration();
 }
 
 function makeBlankBoard() {
@@ -582,11 +640,12 @@ function clearAll() {
   state.cellValues = makeBlankBoard();
   state.solvedCache = null;
   state.solvedCacheField = null;
-  state.puzzleSolved = false;
+  setCompletionState(COMPLETION_STATE.IN_PROGRESS);
   state.errorCells = new Set();
   state.solutionMap = null;
   state.solutionMapReady = false;
   state.solutionMapField = null;
+  hideCelebration();
   updateHints();
   checkAndUpdateErrors();
   drawCells();
@@ -627,8 +686,9 @@ async function generatePuzzle() {
   state.solutionMap = normalizeBoard(result.data?.solutionMap);
   state.solutionMapReady = Boolean(result.data?.solutionMapReady);
   state.solutionMapField = normalizeBoard(result.data?.solutionMapField);
-  state.puzzleSolved = Boolean(result.data?.puzzleSolved);
+  setCompletionState(COMPLETION_STATE.IN_PROGRESS);
   state.errorCells = new Set();
+  hideCelebration();
   updateHints();
   checkAndUpdateErrors();
   drawCells();
@@ -680,7 +740,8 @@ async function solvePuzzle() {
   state.cellValues = normalizeBoard(result.data?.cellValues);
   state.solvedCache = normalizeBoard(result.data?.solvedCache);
   state.solvedCacheField = normalizeBoard(result.data?.solvedCacheField);
-  state.puzzleSolved = Boolean(result.data?.puzzleSolved);
+  setCompletionState(COMPLETION_STATE.AUTO_SOLVE);
+  hideCelebration();
   updateHints();
   checkAndUpdateErrors();
   drawCells();
@@ -719,13 +780,17 @@ function onKeyDown(event) {
 
   const [row, col] = state.selected;
 
-  if (state.puzzleSolved) {
-    log("лох, гей, нет друзей. Не смог судоку решить...");
-    return;
-  }
-
-  if (event.key === "Backspace" || event.key === "Delete" || event.key === "0" || event.key === " ") {
+  if (isEraseKey(event.key)) {
     event.preventDefault();
+    if (state.completionState === COMPLETION_STATE.AUTO_SOLVE) {
+      log(AUTO_SOLVE_INSULT_MESSAGE);
+      return;
+    }
+
+    if (state.completionState === COMPLETION_STATE.MANUAL_WIN) {
+      setCompletionState(COMPLETION_STATE.IN_PROGRESS);
+      hideCelebration();
+    }
     state.cellValues[row][col] = 0;
     updateHints();
     checkAndUpdateErrors();
@@ -735,13 +800,26 @@ function onKeyDown(event) {
 
   if (/^[1-9]$/.test(event.key)) {
     event.preventDefault();
-    state.cellValues[row][col] = Number.parseInt(event.key, 10);
+    if (state.completionState === COMPLETION_STATE.AUTO_SOLVE) {
+      return;
+    }
+
+    const nextValue = Number.parseInt(event.key, 10);
+    if (state.cellValues[row][col] === nextValue) {
+      return;
+    }
+
+    if (state.completionState === COMPLETION_STATE.MANUAL_WIN) {
+      setCompletionState(COMPLETION_STATE.IN_PROGRESS);
+      hideCelebration();
+    }
+
+    state.cellValues[row][col] = nextValue;
     updateHints();
     checkAndUpdateErrors();
     drawCells();
     if (checkWinCondition()) {
-      state.puzzleSolved = true;
-      log("🎉 Поздравляем! Головоломка решена!");
+      completeManualWin();
     }
     return;
   }
@@ -822,7 +900,6 @@ function checkWinCondition() {
     }
   }
 
-  log("Проверка победы: все клетки заполнены корректно!");
   return true;
 }
 
