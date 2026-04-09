@@ -101,13 +101,6 @@ step_2_5:
   width: 200
   source: "templates/files/step_2_5.pdf"
 
-database_1:
-  widget: button
-  label: "Скрипт БД"
-  icon: "postgres.svg"
-  width: 200
-  source: "templates/files/db_vcstudio.sql"
-
 database_2:
   widget: button
   label: "Процедуры"
@@ -121,12 +114,6 @@ database_3:
   icon: "postgres.svg"
   width: 200
   source: "templates/files/settings_db.sql"
-
-database_4:
-  widget: button
-  label: "ERD full"
-  width: 200
-  source: "templates/files/erd_full.svg"
 
 database_5:
   widget: button

@@ -19,7 +19,8 @@ collapse "Материалы автора":
   - row: doc_1_button, doc_2_button, doc_3_button
 
   - "База данных:"
-  - row: database_1, database_2, database_3, database_4, database_5
+  - row: database_2, database_3, database_5
+  - "UPD: полную базу и ERD можно посмотреть только по запросу."
 
   - "Руководства пользователя:"
   - row: user_guide_1_button, user_guide_2_button
