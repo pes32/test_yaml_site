@@ -22,7 +22,7 @@ import './table_clipboard_runtime.js';
 
 import { createStore, getListOptions, resolveDependencies } from './table_api.js';
 import tableEngine from './table_core.js';
-import TableWidget from './table_widget.js';
+import TableWidget from './TableWidget.vue';
 
 export {
     createStore,

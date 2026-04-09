@@ -1,7 +1,5 @@
 // Страница с виджетами YAML System
 
-import { createApp } from 'vue';
-import { getIconSrc, isFontIcon, onIconError } from './gui_parser.js';
 import { normalizePageResponse } from './runtime/api_client.js';
 import { ensureAttrsLoaded as ensureAttrsLoadedFlow, fetchActiveViewAttrs as fetchActiveViewAttrsFlow } from './runtime/attrs_loader.js';
 import readPageBootstrap from './runtime/bootstrap.js';
@@ -10,17 +8,12 @@ import {
     FRONTEND_ERROR_SCOPES,
     normalizeFrontendError,
     presentFrontendError
-} from './runtime/error_model.js';
+} from './runtime/error_model.ts';
 import { executeCommand as executeCommandFlow } from './runtime/execute_flow.js';
 import {
-    closeModal as closeModalRuntime,
     createEmptyModalRuntimeState,
-    getModalSectionCollapseId,
-    isModalSectionCollapsed,
-    openModal as openModalRuntime,
-    setActiveModalTab,
-    toggleModalSectionCollapse
-} from './runtime/modal_runtime_service.js';
+    createModalRuntimeController
+} from './runtime/modal_runtime_service.ts';
 import {
     applyPagePayload as applyPagePayloadFlow,
     loadPageConfig as loadPageConfigFlow,
@@ -41,18 +34,28 @@ import {
 } from './runtime/page_selectors.js';
 import PageSessionStore from './runtime/page_session_store.js';
 import PageRuntimeStore from './runtime/page_store.js';
-import { ConfirmModal } from './widgets/confirm_modal.js';
-import ModalManager from './widgets/modal_manager.js';
 import {
-    ContentRows,
-    ItemIcon,
-    ModalButtons,
-    SectionCard,
-    WidgetRenderer
-} from './widgets.js';
-import { ErrorPanel } from './widgets/feedback.js';
+    finishInitialViewActivation as finishInitialViewActivationFlow,
+    getActiveViewId as getActiveViewIdFlow,
+    getSectionCollapseId as getSectionCollapseIdFlow,
+    handleHashChange as handleHashChangeFlow,
+    handleMenuClick as handleMenuClickFlow,
+    handleTabClick as handleTabClickFlow,
+    isSectionCollapsed as isSectionCollapsedFlow,
+    normalizeActiveState as normalizeActiveStateFlow,
+    prefetchActiveViewWidgets as prefetchActiveViewWidgetsFlow,
+    prefetchWidgetsByNames as prefetchWidgetsByNamesFlow,
+    refreshActiveViewAfterNavigation as refreshActiveViewAfterNavigationFlow,
+    registerHashListener as registerHashListenerFlow,
+    rememberActiveViewScroll as rememberActiveViewScrollFlow,
+    restoreActiveViewScroll as restoreActiveViewScrollFlow,
+    setActiveViewFromHash as setActiveViewFromHashFlow,
+    toggleSectionCollapse as toggleSectionCollapseFlow,
+    unregisterHashListener as unregisterHashListenerFlow,
+    updateHash as updateHashFlow
+} from './runtime/page_view_runtime.js';
 
-const app = createApp({
+const pageAppOptions = {
     provide() {
         return {
             getConfirmModal: () => this.$refs.confirmModal,
@@ -110,17 +113,7 @@ const app = createApp({
     },
 
     created() {
-        this.modalRuntimeController = {
-            closeModal: () => closeModalRuntime(this.modalRuntimeState),
-            getModalSectionCollapseId: (tabIndex, sectionIndex) =>
-                getModalSectionCollapseId(this.modalRuntimeState, tabIndex, sectionIndex),
-            isModalSectionCollapsed: (tabIndex, sectionIndex) =>
-                isModalSectionCollapsed(this.modalRuntimeState, tabIndex, sectionIndex),
-            openModal: (modalName) => openModalRuntime(this, this.modalRuntimeState, modalName),
-            setActiveTab: (index) => setActiveModalTab(this.modalRuntimeState, index),
-            toggleModalSectionCollapse: (tabIndex, sectionIndex) =>
-                toggleModalSectionCollapse(this.modalRuntimeState, tabIndex, sectionIndex)
-        };
+        this.modalRuntimeController = createModalRuntimeController(this, this.modalRuntimeState);
     },
 
     computed: {
@@ -357,19 +350,11 @@ const app = createApp({
         },
 
         registerHashListener() {
-            if (this.uiState.hashListenerBound) {
-                return;
-            }
-            window.addEventListener('hashchange', this.onHashChange);
-            this.uiState.hashListenerBound = true;
+            registerHashListenerFlow(this);
         },
 
         unregisterHashListener() {
-            if (!this.uiState.hashListenerBound) {
-                return;
-            }
-            window.removeEventListener('hashchange', this.onHashChange);
-            this.uiState.hashListenerBound = false;
+            unregisterHashListenerFlow(this);
         },
 
         async bootstrapPage() {
@@ -398,109 +383,43 @@ const app = createApp({
         },
 
         async finishInitialViewActivation() {
-            this.setActiveViewFromHash();
-            await this.waitForViewUpdate();
-            this.restoreActiveViewScroll();
-            await this.fetchActiveViewAttrs();
-            this.registerHashListener();
+            await finishInitialViewActivationFlow(this);
         },
 
         normalizeActiveState() {
-            if (!this.menus.length) {
-                this.activeMenuIndex = 0;
-                this.activeTabIndex = 0;
-                return;
-            }
-
-            if (this.activeMenuIndex < 0 || this.activeMenuIndex >= this.menus.length) {
-                this.activeMenuIndex = 0;
-            }
-
-            const tabs = this.activeTabs;
-            if (!tabs.length) {
-                this.activeTabIndex = 0;
-                return;
-            }
-
-            if (this.activeTabIndex < 0 || this.activeTabIndex >= tabs.length) {
-                this.activeTabIndex = 0;
-            }
+            normalizeActiveStateFlow(this);
         },
 
         setActiveViewFromHash() {
-            const hash = window.location.hash || '';
-            const match = hash.match(/^#menu-(\d+)(?:-tab-(\d+))?$/);
-
-            if (!match) {
-                this.activeMenuIndex = 0;
-                this.activeTabIndex = 0;
-                this.normalizeActiveState();
-                return;
-            }
-
-            const menuIndex = parseInt(match[1], 10);
-            const tabIndex = match[2] !== undefined ? parseInt(match[2], 10) : 0;
-
-            this.activeMenuIndex = Number.isNaN(menuIndex) ? 0 : menuIndex;
-            this.activeTabIndex = Number.isNaN(tabIndex) ? 0 : tabIndex;
-            this.normalizeActiveState();
+            setActiveViewFromHashFlow(this);
         },
 
         updateHash() {
-            if (!this.activeMenu) {
-                return;
-            }
-
-            let nextHash = `#menu-${this.activeMenuIndex}`;
-            if (this.activeTabs.length) {
-                nextHash += `-tab-${this.activeTabIndex}`;
-            }
-
-            if (window.location.hash !== nextHash) {
-                history.replaceState(null, '', nextHash);
-            }
+            updateHashFlow(this);
         },
 
         async onHashChange() {
-            this.commitActiveDraftWidget();
-            this.rememberActiveViewScroll();
-            this.setActiveViewFromHash();
-            await this.waitForViewUpdate();
-            this.restoreActiveViewScroll();
-            await this.fetchActiveViewAttrs();
+            await handleHashChangeFlow(this);
         },
 
         onMenuClick(index) {
-            if (index < 0 || index >= this.menus.length) {
-                return;
-            }
-
-            this.commitActiveDraftWidget();
-            this.rememberActiveViewScroll();
-            this.activeMenuIndex = index;
-            this.activeTabIndex = 0;
-            this.normalizeActiveState();
-            this.updateHash();
-            void this.refreshActiveViewAfterNavigation();
+            handleMenuClickFlow(this, index);
         },
 
         onTabClick(index) {
-            if (!this.activeTabs.length || index < 0 || index >= this.activeTabs.length) {
-                return;
-            }
-
-            this.commitActiveDraftWidget();
-            this.rememberActiveViewScroll();
-            this.activeTabIndex = index;
-            this.normalizeActiveState();
-            this.updateHash();
-            void this.refreshActiveViewAfterNavigation();
+            handleTabClickFlow(this, index);
         },
 
         async refreshActiveViewAfterNavigation() {
-            await this.waitForViewUpdate();
-            this.restoreActiveViewScroll();
-            await this.fetchActiveViewAttrs();
+            await refreshActiveViewAfterNavigationFlow(this);
+        },
+
+        async prefetchWidgetsByNames(names) {
+            await prefetchWidgetsByNamesFlow(this, names);
+        },
+
+        async prefetchActiveViewWidgets() {
+            await prefetchActiveViewWidgetsFlow(this);
         },
 
         getCurrentPageName() {
@@ -580,12 +499,7 @@ const app = createApp({
         },
 
         getActiveViewId() {
-            if (!this.activeMenu) {
-                return '';
-            }
-
-            const tabPart = this.activeTabs.length ? `tab-${this.activeTabIndex}` : 'content';
-            return `menu-${this.activeMenuIndex}-${tabPart}`;
+            return getActiveViewIdFlow(this);
         },
 
         getPageScrollRoot() {
@@ -593,60 +507,23 @@ const app = createApp({
         },
 
         rememberActiveViewScroll() {
-            const viewId = this.getActiveViewId();
-            const scrollRoot = this.getPageScrollRoot();
-            if (!viewId || !scrollRoot) {
-                return;
-            }
-
-            this.viewScrollTopById = {
-                ...this.viewScrollTopById,
-                [viewId]: scrollRoot.scrollTop || 0
-            };
+            rememberActiveViewScrollFlow(this);
         },
 
         restoreActiveViewScroll(viewId = this.getActiveViewId()) {
-            this.$nextTick(() => {
-                if (!viewId || viewId !== this.getActiveViewId()) {
-                    return;
-                }
-
-                const scrollRoot = this.getPageScrollRoot();
-                if (!scrollRoot) {
-                    return;
-                }
-
-                const top = Object.prototype.hasOwnProperty.call(this.viewScrollTopById, viewId)
-                    ? this.viewScrollTopById[viewId]
-                    : 0;
-
-                if (typeof scrollRoot.scrollTo === 'function') {
-                    scrollRoot.scrollTo({ top, left: 0, behavior: 'auto' });
-                } else {
-                    scrollRoot.scrollTop = top;
-                }
-
-                if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
-                    window.scrollTo(0, 0);
-                }
-            });
+            restoreActiveViewScrollFlow(this, viewId);
         },
 
         getSectionCollapseId(sectionIndex) {
-            const tabPart = this.activeTabs.length ? this.activeTabIndex : 'content';
-            return `page-section-${this.activeMenuIndex}-${tabPart}-${sectionIndex}`;
+            return getSectionCollapseIdFlow(this, sectionIndex);
         },
 
         isSectionCollapsed(sectionIndex) {
-            return Boolean(this.collapsedSections[this.getSectionCollapseId(sectionIndex)]);
+            return isSectionCollapsedFlow(this, sectionIndex);
         },
 
         toggleSectionCollapse(sectionIndex) {
-            const sectionId = this.getSectionCollapseId(sectionIndex);
-            this.collapsedSections = {
-                ...this.collapsedSections,
-                [sectionId]: !this.collapsedSections[sectionId]
-            };
+            toggleSectionCollapseFlow(this, sectionIndex);
         },
 
         async executeCommand(commandData) {
@@ -701,18 +578,7 @@ const app = createApp({
             }, this.snackbar.duration);
         }
     }
-});
+};
 
-app.config.globalProperties.$isFontIcon = (icon) => isFontIcon(icon);
-app.config.globalProperties.$getIconSrc = (icon) => getIconSrc(icon);
-app.config.globalProperties.$onIconError = (event) => onIconError(event);
-
-app.component('widget-renderer', WidgetRenderer);
-app.component('item-icon', ItemIcon);
-app.component('section-card', SectionCard);
-app.component('content-rows', ContentRows);
-app.component('modal-manager', ModalManager);
-app.component('modal-buttons', ModalButtons);
-app.component('confirm-modal', ConfirmModal);
-app.component('error-panel', ErrorPanel);
-app.mount('#app');
+export { pageAppOptions };
+export default pageAppOptions;

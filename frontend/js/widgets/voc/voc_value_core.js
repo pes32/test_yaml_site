@@ -9,7 +9,7 @@ import {
     restoreVocRowIdsByValues,
     rowsToSourceOrderValues,
     serializeVocValues
-} from '../../runtime/voc_contract.js';
+} from '../../runtime/voc_contract.ts';
 
 function sortVocRows(rows, columnIndex, direction) {
     const list = Array.isArray(rows) ? rows.slice() : [];

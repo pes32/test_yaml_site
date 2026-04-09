@@ -216,7 +216,7 @@ Typed transport/domain reference лежит в:
 
 После transport normalization ошибка не должна ходить по UI как raw `fetch`/HTTP object.
 
-Единый runtime contract живёт в `frontend/js/runtime/error_model.js` и нормализует ошибки в:
+Единый runtime contract живёт в `frontend/js/runtime/error_model.ts` и нормализует ошибки в:
 
 - `kind`
 - `scope`

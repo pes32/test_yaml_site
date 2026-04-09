@@ -3,7 +3,7 @@ import { resolveAttrConfig } from './attrs_resolver.js';
 import {
     isStatefulWidgetConfig,
     resolveInitialWidgetValue
-} from './widget_contract.js';
+} from './widget_contract.ts';
 
 const EMPTY_PARSED_GUI = Object.freeze({
     menus: [],

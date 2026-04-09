@@ -3,23 +3,25 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    "baseUrl": ".",
     "strict": true,
     "allowJs": true,
+    "allowImportingTsExtensions": true,
     "checkJs": false,
     "noEmit": true,
     "isolatedModules": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": []
+    "paths": {
+      "vue": ["node_modules/vue"]
+    },
+    "types": ["vite/client"]
   },
-  "files": [
-    "src/entry/page.ts",
-    "src/entry/debug.ts",
-    "src/contracts/api.ts",
-    "src/contracts/table.ts"
-  ],
   "include": [
-    "src/**/*.d.ts"
+    "src/**/*.ts",
+    "src/**/*.d.ts",
+    "src/**/*.vue",
+    "../../frontend/js/**/*.ts"
   ]
 }

@@ -1,6 +1,6 @@
 /**
  * Чистые хелперы для table_widget: автоширина заголовков, геометрия меню/вставки, путь к иконке ПКМ.
- * Загрузка: после table_keyboard.js, до table_widget.js.
+ * Загрузка: после table_keyboard.js, до TableWidget.vue.
  */
 import tableEngine from './table_core.js';
 

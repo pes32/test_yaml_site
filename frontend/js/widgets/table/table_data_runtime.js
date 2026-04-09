@@ -1,4 +1,4 @@
-import { FRONTEND_ERROR_SCOPES } from '../../runtime/error_model.js';
+import { FRONTEND_ERROR_SCOPES } from '../../runtime/error_model.ts';
 import {
     blankCellValueForColumn as selectBlankCellValueForColumn,
     defaultCellValueForColumn as selectDefaultCellValueForColumn,

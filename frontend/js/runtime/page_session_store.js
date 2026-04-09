@@ -6,7 +6,7 @@ import {
     normalizeStatefulWidgetValue,
     normalizedStatefulValueEquals,
     resolveInitialWidgetValue
-} from './widget_contract.js';
+} from './widget_contract.ts';
 
 /**
  * Session/runtime state that is not derived directly from snapshot payload.

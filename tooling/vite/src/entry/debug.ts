@@ -1,3 +1,6 @@
 import '../../../../frontend/css/fonts.css';
 import '../../../../frontend/css/style.css';
-import '../../../../frontend/js/debug.js';
+import { createApp } from 'vue';
+import DebugApp from '../apps/debug/DebugApp.vue';
+
+createApp(DebugApp).mount('#debugApp');

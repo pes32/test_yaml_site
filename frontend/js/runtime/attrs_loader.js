@@ -3,7 +3,7 @@ import PageRuntimeStore from './page_store.js';
 import PageSessionStore from './page_session_store.js';
 import { logDiagnosticsToConsole } from './diagnostics.js';
 import { collectActiveWidgetNames } from './page_selectors.js';
-import { resolveDependencies as resolveTableDependencies } from '../widgets/table/index.js';
+import { resolveDependencies as resolveTableDependencies } from '../widgets/table/table_api.js';
 
 function fetchAttrsSubset(vm, names) {
     if (!Array.isArray(names) || names.length === 0) {

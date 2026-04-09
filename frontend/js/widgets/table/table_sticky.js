@@ -1,6 +1,6 @@
 /**
  * Sticky-header helpers for TableWidget.
- * Loaded after table_widget_helpers.js and before table_widget.js.
+ * Loaded after table_widget_helpers.js and before TableWidget.vue.
  */
 import tableEngine from './table_core.js';
 

@@ -1,34 +1,27 @@
 # Tech Debt
 
-Остаточный техдолг после завершения frontend-refactor.
+Актуальный остаточный техдолг после frontend-refactor.
 
 ## Frontend
 
 - `frontend/js/page.js`
-  Composition root уже намного чище, но всё ещё крупный. Следующий безопасный шаг — вынести navigation/hash/scroll orchestration в отдельный runtime-module, если страница продолжит расти.
+  Корневой runtime страницы уже стал тоньше после выноса view orchestration в `page_view_runtime.js`, но page shell всё ещё держит bootstrap, notifications, draft commit, attrs loading и execute-path в одном месте.
 
-- `frontend/js/widgets/factory.js`
-  Widget registry пока остаётся мягким `type -> component` контрактом без capability metadata и формального lifecycle-интерфейса.
+- `frontend/js/widgets/factory.ts`
+  Widget registry уже поддерживает async-loading, но контракт всё ещё остаётся мягким `type -> component` маппингом без capability metadata и формального lifecycle-интерфейса.
 
-- `frontend/js/runtime/modal_runtime_service.js`
-  Modal runtime уже выделен в subsystem, но его state пока хранится внутри page app, а не в отдельном dedicated modal store module.
-
-- `frontend/js/runtime/error_model.js`
-  Единый error contract уже введён, но не весь код ещё типизирован вокруг него. Сейчас это архитектурная норма, но не максимальная защита от регрессов.
-
-- `frontend/js/runtime/action_runtime.js`
-  Общий action-runtime для `button` / `split_button` уже вынесен, но command-catalog для human-readable labels пока сознательно не введён. Если появится реестр backend-команд, его лучше добавлять как отдельный runtime-source, а не внутрь widget-компонентов.
+- `frontend/js/runtime/modal_runtime_service.ts`
+  Controller boundary уже вынесен из `page.js`, но state модалок по-прежнему живёт внутри page app, а не в отдельном dedicated modal store module.
 
 - `frontend/js/widgets/table/`
-  Table больше не legacy-остров, но остаётся самой сложной feature-подсистемой проекта. Там ещё есть локальные debug-warnings и большой объём interaction-кода.
+  Table уже переведена на SFC как UI-root, но table-runtime остаётся самой сложной feature-подсистемой проекта: много interaction-кода, keyboard/selection/editing logic и локальных runtime-модулей.
 
 ## Typing
 
-- `tooling/vite/src/contracts/*.ts`
-  Канонические типы границ уже есть, но runtime в основном остаётся на `.js` + JSDoc. Полный TS-переход сознательно не добивался в этом цикле.
+- `frontend/js/runtime/page*.js`, `frontend/js/widgets/*_shared.js`, `frontend/js/widgets/table/*.js`
+  `error_model` и `modal_runtime_service` уже переведены на TypeScript, но большая часть runtime/shared/table-helper слоя всё ещё остаётся на `.js`.
 
-## Backend / next stage
+## Testing
 
-- backend compatibility/cleanup можно продолжать уже отдельно от frontend;
-- database/data-layer ещё не начат и остаётся следующим большим этапом;
-- автоматические тесты по-прежнему не введены и остаются отдельным решением на следующий цикл, когда API/data-model стабилизируются.
+- browser smoke для `page` / `debug` / `list` / `voc` / `datetime` / `table`
+  Автоматизированного browser smoke/e2e-контура в репозитории всё ещё нет, поэтому UI-проверка после крупных runtime-изменений остаётся в основном ручной.

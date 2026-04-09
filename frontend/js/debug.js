@@ -1,13 +1,11 @@
-import { createApp } from 'vue';
 import frontendApiClient from './runtime/api_client.js';
 import {
     FRONTEND_ERROR_SCOPES,
     normalizeFrontendError,
     presentFrontendError
-} from './runtime/error_model.js';
-import { DiagnosticsPanel, ErrorPanel } from './widgets/feedback.js';
+} from './runtime/error_model.ts';
 
-createApp({
+const debugAppOptions = {
     data() {
         return {
             activeTab: 0,
@@ -15,7 +13,7 @@ createApp({
             apiLoading: false,
             logLines: [],
             logsLoading: false,
-            pages: [],
+            pages: /** @type {Array<{ name: string, title?: string, url: string }>} */ ([]),
             pagesLoading: false,
             sqlQuery: '',
             sqlLoading: false,
@@ -204,7 +202,7 @@ createApp({
             }
         }
     }
-})
-    .component('diagnostics-panel', DiagnosticsPanel)
-    .component('error-panel', ErrorPanel)
-    .mount('#debugApp');
+};
+
+export { debugAppOptions };
+export default debugAppOptions;
