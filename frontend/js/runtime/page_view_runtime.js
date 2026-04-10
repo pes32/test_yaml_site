@@ -165,13 +165,15 @@ async function refreshActiveViewAfterNavigation(vm) {
 }
 
 async function handleHashChange(vm) {
-    vm.commitActiveDraftWidget();
-    rememberActiveViewScroll(vm);
-    setActiveViewFromHash(vm);
-    void prefetchActiveViewWidgets(vm);
-    await vm.waitForViewUpdate();
-    restoreActiveViewScroll(vm);
-    await vm.fetchActiveViewAttrs();
+    await vm.runBoundaryAction('navigation', async () => {
+        rememberActiveViewScroll(vm);
+        setActiveViewFromHash(vm);
+        void prefetchActiveViewWidgets(vm);
+        await vm.waitForViewUpdate();
+        restoreActiveViewScroll(vm);
+        await vm.fetchActiveViewAttrs();
+        return null;
+    });
 }
 
 function handleMenuClick(vm, index) {
@@ -179,13 +181,15 @@ function handleMenuClick(vm, index) {
         return;
     }
 
-    vm.commitActiveDraftWidget();
-    rememberActiveViewScroll(vm);
-    vm.activeMenuIndex = index;
-    vm.activeTabIndex = 0;
-    normalizeActiveState(vm);
-    updateHash(vm);
-    void refreshActiveViewAfterNavigation(vm);
+    void vm.runBoundaryAction('navigation', async () => {
+        rememberActiveViewScroll(vm);
+        vm.activeMenuIndex = index;
+        vm.activeTabIndex = 0;
+        normalizeActiveState(vm);
+        updateHash(vm);
+        await refreshActiveViewAfterNavigation(vm);
+        return null;
+    });
 }
 
 function handleTabClick(vm, index) {
@@ -193,12 +197,14 @@ function handleTabClick(vm, index) {
         return;
     }
 
-    vm.commitActiveDraftWidget();
-    rememberActiveViewScroll(vm);
-    vm.activeTabIndex = index;
-    normalizeActiveState(vm);
-    updateHash(vm);
-    void refreshActiveViewAfterNavigation(vm);
+    void vm.runBoundaryAction('navigation', async () => {
+        rememberActiveViewScroll(vm);
+        vm.activeTabIndex = index;
+        normalizeActiveState(vm);
+        updateHash(vm);
+        await refreshActiveViewAfterNavigation(vm);
+        return null;
+    });
 }
 
 function getSectionCollapseId(vm, sectionIndex) {

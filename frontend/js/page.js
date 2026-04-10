@@ -14,6 +14,21 @@ import {
     createEmptyModalRuntimeState,
     createModalRuntimeController
 } from './runtime/modal_runtime_service.ts';
+import { resetModalRuntimeState } from './runtime/modal_runtime_store.ts';
+import {
+    createEmptyDraftRuntimeState,
+    resetDraftRuntime,
+    runBoundaryAction as runBoundaryActionFlow,
+    setActiveWidgetLifecycle as setActiveWidgetLifecycleFlow,
+    clearActiveWidgetLifecycle as clearActiveWidgetLifecycleFlow
+} from './runtime/page_draft_runtime.ts';
+import {
+    clearNotificationTimer as clearNotificationTimerFlow,
+    closeNotification as closeNotificationFlow,
+    createEmptyNotificationState,
+    resetNotifications as resetNotificationsFlow,
+    showNotification as showNotificationFlow
+} from './runtime/page_notification_store.ts';
 import {
     applyPagePayload as applyPagePayloadFlow,
     loadPageConfig as loadPageConfigFlow,
@@ -54,34 +69,32 @@ import {
     unregisterHashListener as unregisterHashListenerFlow,
     updateHash as updateHashFlow
 } from './runtime/page_view_runtime.js';
+import { PAGE_HOST_RUNTIME_SERVICES_KEY } from './runtime/widget_runtime_bridge.ts';
+
+function buildPageHostRuntimeServices(vm) {
+    return {
+        clearActiveWidgetLifecycle: (handle) => vm.clearActiveWidgetLifecycle(handle),
+        closeUiModal: () => vm.closeUiModal(),
+        getAllAttrsMap: () => vm.allAttrs,
+        getConfirmModal: () => vm.$refs.confirmModal,
+        getCurrentPageNameFromRuntime: () => vm.getCurrentPageName(),
+        getModalRuntimeController: () => vm.modalRuntimeController,
+        getModalRuntimeState: () => vm.modalRuntimeState,
+        getWidgetAttrsByName: (widgetName) => vm.getWidgetAttrs(widgetName),
+        getWidgetRuntimeValueByName: (widgetName) => vm.getWidgetRuntimeValue(widgetName),
+        handleRecoverableAppError: (error, options) => vm.handleRecoverableError(error, options),
+        openUiModal: (modalName) => vm.openUiModal(modalName),
+        reportAppError: (error, options) => vm.reportDiagnosticError(error, options),
+        runBoundaryAction: (kind, action) => vm.runBoundaryAction(kind, action),
+        setActiveWidgetLifecycle: (handle) => vm.setActiveWidgetLifecycle(handle),
+        showAppNotification: (message, type) => vm.showNotification(message, type)
+    };
+}
 
 const pageAppOptions = {
     provide() {
         return {
-            getConfirmModal: () => this.$refs.confirmModal,
-            openUiModal: (modalName) => this.modalRuntimeController
-                ? this.modalRuntimeController.openModal(modalName)
-                : Promise.resolve(null),
-            closeUiModal: () => {
-                this.commitActiveDraftWidget();
-                if (this.modalRuntimeController) {
-                    this.modalRuntimeController.closeModal();
-                }
-            },
-            getWidgetConfigByName: (widgetName) => this.getWidgetConfig(widgetName),
-            getWidgetAttrsByName: (widgetName) => this.getWidgetAttrs(widgetName),
-            getWidgetRuntimeValueByName: (widgetName) => this.getWidgetRuntimeValue(widgetName),
-            getModalRuntimeState: () => this.modalRuntimeState,
-            getModalRuntimeController: () => this.modalRuntimeController,
-            getCurrentPageNameFromRuntime: () => this.getCurrentPageName(),
-            getAllAttrsMap: () => this.allAttrs,
-            showAppNotification: (message, type) => this.showNotification(message, type),
-            reportAppError: (error, options) => this.reportDiagnosticError(error, options),
-            handleRecoverableAppError: (error, options) => this.handleRecoverableError(error, options),
-            setActiveDraftWidgetController: (controller) =>
-                this.setActiveDraftWidgetController(controller),
-            clearActiveDraftWidgetController: (controller) =>
-                this.clearActiveDraftWidgetController(controller)
+            [PAGE_HOST_RUNTIME_SERVICES_KEY]: buildPageHostRuntimeServices(this)
         };
     },
 
@@ -91,18 +104,14 @@ const pageAppOptions = {
             sessionState: PageSessionStore.createEmptyStore(),
             modalRuntimeState: createEmptyModalRuntimeState(),
             modalRuntimeController: null,
-            draftState: {
-                activeController: null
-            },
+            draftRuntimeState: createEmptyDraftRuntimeState(),
+            notificationState: createEmptyNotificationState(),
             uiState: {
                 activeMenuIndex: 0,
                 activeTabIndex: 0,
                 collapsedSections: {},
                 viewScrollTopById: {},
                 tabsFocused: false,
-                snackbar: null,
-                snackbarHideTimerId: 0,
-                snackbarSeq: 0,
                 hashListenerBound: false
             },
             asyncState: {
@@ -228,28 +237,28 @@ const pageAppOptions = {
 
         snackbar: {
             get() {
-                return this.uiState.snackbar;
+                return this.notificationState.snackbar;
             },
             set(value) {
-                this.uiState.snackbar = value;
+                this.notificationState.snackbar = value;
             }
         },
 
         snackbarHideTimerId: {
             get() {
-                return Number(this.uiState.snackbarHideTimerId) || 0;
+                return Number(this.notificationState.snackbarHideTimerId) || 0;
             },
             set(value) {
-                this.uiState.snackbarHideTimerId = Number(value) || 0;
+                this.notificationState.snackbarHideTimerId = Number(value) || 0;
             }
         },
 
         snackbarSeq: {
             get() {
-                return Number(this.uiState.snackbarSeq) || 0;
+                return Number(this.notificationState.snackbarSeq) || 0;
             },
             set(value) {
-                this.uiState.snackbarSeq = Number(value) || 0;
+                this.notificationState.snackbarSeq = Number(value) || 0;
             }
         },
 
@@ -295,7 +304,9 @@ const pageAppOptions = {
 
     beforeUnmount() {
         this.unregisterHashListener();
-        this.clearSnackbarTimer();
+        resetNotificationsFlow(this.notificationState);
+        resetDraftRuntime(this.draftRuntimeState);
+        resetModalRuntimeState(this.modalRuntimeState);
     },
 
     methods: {
@@ -452,21 +463,48 @@ const pageAppOptions = {
             }
         },
 
-        setActiveDraftWidgetController(controller) {
-            this.draftState.activeController = controller || null;
+        setActiveWidgetLifecycle(handle) {
+            return setActiveWidgetLifecycleFlow(this.draftRuntimeState, handle);
         },
 
-        clearActiveDraftWidgetController(controller) {
-            if (!controller || this.draftState.activeController === controller) {
-                this.draftState.activeController = null;
-            }
+        clearActiveWidgetLifecycle(handle) {
+            return clearActiveWidgetLifecycleFlow(this.draftRuntimeState, handle);
         },
 
-        commitActiveDraftWidget() {
-            const controller = this.draftState.activeController;
-            if (controller && typeof controller.commitDraft === 'function') {
-                controller.commitDraft();
-            }
+        async runBoundaryAction(kind, action) {
+            return runBoundaryActionFlow(this.draftRuntimeState, kind, action, {
+                onFatalError: (error) => {
+                    this.reportFatalError(error, {
+                        scope: FRONTEND_ERROR_SCOPES.page,
+                        message: 'Критическая ошибка boundary commit',
+                        asPageError: true
+                    });
+                },
+                onRecoverableError: (error) => {
+                    this.handleRecoverableError(error, {
+                        scope: FRONTEND_ERROR_SCOPES.page,
+                        message: error && error.message
+                            ? error.message
+                            : 'Не удалось зафиксировать изменения перед выполнением действия'
+                    });
+                }
+            });
+        },
+
+        openUiModal(modalName) {
+            return this.modalRuntimeController
+                ? this.modalRuntimeController.openModal(modalName)
+                : Promise.resolve(null);
+        },
+
+        async closeUiModal() {
+            return this.runBoundaryAction('modal-close', async () => {
+                if (this.modalRuntimeController) {
+                    this.modalRuntimeController.closeModal();
+                }
+
+                return null;
+            });
         },
 
         getWidgetAttrs(widgetName) {
@@ -547,35 +585,15 @@ const pageAppOptions = {
         },
 
         clearSnackbarTimer() {
-            if (!this.snackbarHideTimerId) {
-                return;
-            }
-            clearTimeout(this.snackbarHideTimerId);
-            this.snackbarHideTimerId = 0;
+            clearNotificationTimerFlow(this.notificationState);
         },
 
         closeNotification() {
-            this.clearSnackbarTimer();
-            this.snackbar = null;
+            closeNotificationFlow(this.notificationState);
         },
 
         showNotification(message, type = 'info') {
-            const notificationId = this.snackbarSeq + 1;
-            this.snackbarSeq = notificationId;
-            this.clearSnackbarTimer();
-            this.snackbar = {
-                id: notificationId,
-                type,
-                message: String(message || ''),
-                duration: 5000
-            };
-
-            this.snackbarHideTimerId = window.setTimeout(() => {
-                if (this.snackbar && this.snackbar.id === notificationId) {
-                    this.snackbar = null;
-                }
-                this.snackbarHideTimerId = 0;
-            }, this.snackbar.duration);
+            showNotificationFlow(this.notificationState, message, type);
         }
     }
 };

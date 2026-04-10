@@ -80,14 +80,17 @@
 </template>
 
 <script setup>
-import { computed, getCurrentInstance, inject, nextTick, onUpdated, ref } from 'vue';
+import { computed, nextTick, onUpdated, ref } from 'vue';
 import {
   getModalTabs,
   getModalTitle,
+  isModalOpen,
   rememberActiveModalScroll,
   restoreActiveModalScroll,
   sectionsForTab
 } from '../../runtime/modal_runtime_service.ts';
+import { consumeRestoreTargetViewId } from '../../runtime/modal_runtime_store.ts';
+import { injectPageHostRuntimeServices } from '../../runtime/widget_runtime_bridge.ts';
 import ItemIcon from './ItemIcon.vue';
 import ModalButtons from './ModalButtons.vue';
 import SectionCard from './SectionCard.vue';
@@ -98,39 +101,31 @@ defineOptions({
 
 const emit = defineEmits(['execute', 'input']);
 
-const getModalRuntimeController = inject('getModalRuntimeController', null);
-const getModalRuntimeState = inject('getModalRuntimeState', null);
-const getWidgetAttrsByName = inject('getWidgetAttrsByName', null);
-const getWidgetRuntimeValueByName = inject('getWidgetRuntimeValueByName', null);
+const hostServices = injectPageHostRuntimeServices();
 
 const modalScrollRoot = ref(null);
-const instance = getCurrentInstance();
 
 const modalRuntimeState = computed(() => {
-  if (typeof getModalRuntimeState !== 'function') {
+  if (typeof hostServices?.getModalRuntimeState !== 'function') {
     return {};
   }
 
-  return getModalRuntimeState() || {};
+  return hostServices.getModalRuntimeState() || {};
 });
 
 const modalRuntimeController = computed(() => {
-  if (typeof getModalRuntimeController !== 'function') {
+  if (typeof hostServices?.getModalRuntimeController !== 'function') {
     return null;
   }
 
-  return getModalRuntimeController();
+  return hostServices.getModalRuntimeController();
 });
 
-const showModal = computed(() => Boolean(modalRuntimeState.value.showModal));
+const showModal = computed(() => isModalOpen(modalRuntimeState.value));
 const modalConfig = computed(() => modalRuntimeState.value.modalConfig || null);
 const activeTabIndex = computed(() => Number(modalRuntimeState.value.activeTabIndex) || 0);
 const modalTitle = computed(() => getModalTitle(modalRuntimeState.value));
 const modalTabs = computed(() => getModalTabs(modalRuntimeState.value));
-
-function commitActiveDraftWidget() {
-  instance?.proxy?.$root?.commitActiveDraftWidget?.();
-}
 
 function getModalScrollRoot() {
   return modalScrollRoot.value || null;
@@ -141,20 +136,38 @@ function rememberCurrentModalScroll() {
 }
 
 function restoreCurrentModalScroll() {
-  restoreActiveModalScroll(
-    modalRuntimeState.value,
-    (callback) => nextTick(callback),
-    () => getModalScrollRoot()
-  );
+  const restoreTargetViewId = consumeRestoreTargetViewId(modalRuntimeState.value);
+  if (!restoreTargetViewId) {
+    return;
+  }
+
+  nextTick(() => {
+    restoreActiveModalScroll(
+      modalRuntimeState.value,
+      getModalScrollRoot(),
+      restoreTargetViewId
+    );
+  });
+}
+
+function runModalBoundaryAction(kind, action) {
+  if (typeof hostServices?.runBoundaryAction === 'function') {
+    return hostServices.runBoundaryAction(kind, action);
+  }
+
+  return Promise.resolve(action());
 }
 
 function closeModal() {
-  commitActiveDraftWidget();
-  rememberCurrentModalScroll();
-
-  if (modalRuntimeController.value && typeof modalRuntimeController.value.closeModal === 'function') {
-    modalRuntimeController.value.closeModal();
+  if (!modalRuntimeController.value || typeof modalRuntimeController.value.closeModal !== 'function') {
+    return;
   }
+
+  void runModalBoundaryAction('modal-close', async () => {
+    rememberCurrentModalScroll();
+    modalRuntimeController.value.closeModal();
+    return null;
+  });
 }
 
 function setActiveTab(index) {
@@ -162,10 +175,13 @@ function setActiveTab(index) {
     return;
   }
 
-  commitActiveDraftWidget();
-  rememberCurrentModalScroll();
-  modalRuntimeController.value.setActiveTab(index);
-  restoreCurrentModalScroll();
+  void runModalBoundaryAction('navigation', async () => {
+    rememberCurrentModalScroll();
+    modalRuntimeController.value.setActiveTab(index);
+    return null;
+  }).finally(() => {
+    restoreCurrentModalScroll();
+  });
 }
 
 function getModalSectionCollapseId(tabIndex, sectionIndex) {
@@ -202,8 +218,8 @@ function getSectionsForTab(tabIndex) {
 }
 
 function getWidgetAttrs(widgetName) {
-  if (typeof getWidgetAttrsByName === 'function') {
-    return getWidgetAttrsByName(widgetName);
+  if (typeof hostServices?.getWidgetAttrsByName === 'function') {
+    return hostServices.getWidgetAttrsByName(widgetName);
   }
 
   return {
@@ -213,8 +229,8 @@ function getWidgetAttrs(widgetName) {
 }
 
 function getWidgetValue(widgetName) {
-  return typeof getWidgetRuntimeValueByName === 'function'
-    ? getWidgetRuntimeValueByName(widgetName)
+  return typeof hostServices?.getWidgetRuntimeValueByName === 'function'
+    ? hostServices.getWidgetRuntimeValueByName(widgetName)
     : undefined;
 }
 

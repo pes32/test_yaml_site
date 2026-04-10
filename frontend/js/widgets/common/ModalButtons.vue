@@ -20,7 +20,7 @@
 </template>
 
 <script setup>
-import { inject } from 'vue';
+import { injectPageHostRuntimeServices } from '../../runtime/widget_runtime_bridge.ts';
 import WidgetRenderer from './WidgetRenderer.vue';
 
 defineOptions({
@@ -42,16 +42,15 @@ defineProps({
 
 const emit = defineEmits(['close', 'execute']);
 
-const getWidgetAttrsByName = inject('getWidgetAttrsByName', null);
-const getWidgetRuntimeValueByName = inject('getWidgetRuntimeValueByName', null);
+const hostServices = injectPageHostRuntimeServices();
 
 function getCloseButtonConfig() {
   return CLOSE_BUTTON_CONFIG;
 }
 
 function getWidgetAttrs(widgetName) {
-  if (typeof getWidgetAttrsByName === 'function') {
-    return getWidgetAttrsByName(widgetName);
+  if (typeof hostServices?.getWidgetAttrsByName === 'function') {
+    return hostServices.getWidgetAttrsByName(widgetName);
   }
 
   return {
@@ -61,8 +60,8 @@ function getWidgetAttrs(widgetName) {
 }
 
 function getWidgetValue(widgetName) {
-  return typeof getWidgetRuntimeValueByName === 'function'
-    ? getWidgetRuntimeValueByName(widgetName)
+  return typeof hostServices?.getWidgetRuntimeValueByName === 'function'
+    ? hostServices.getWidgetRuntimeValueByName(widgetName)
     : undefined;
 }
 </script>

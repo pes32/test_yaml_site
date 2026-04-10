@@ -23,7 +23,21 @@ type WidgetInputPayload = {
 type WidgetFieldEmit = (event: 'input', payload: WidgetInputPayload) => void;
 
 type NotificationHandler = ((message: string, type?: string) => void) | null;
-type DraftControllerHandler = ((controller: WidgetProxy | null) => void) | null;
+type DraftLifecycleHandler = (() => void) | null;
+
+type DraftCommitContext = {
+  kind?: string;
+};
+
+type DraftCommitResult =
+  | {
+      status: 'noop' | 'committed';
+    }
+  | {
+      status: 'blocked';
+      severity: 'recoverable' | 'fatal';
+      error: unknown;
+    };
 
 type WidgetRoot = {
   showNotification?: (message: string, type?: string) => void;
@@ -50,12 +64,12 @@ export default function useWidgetField(
 ) {
   const instance = getCurrentInstance();
   const showAppNotification = inject<NotificationHandler>('showAppNotification', null);
-  const setActiveDraftWidgetController = inject<DraftControllerHandler>(
-    'setActiveDraftWidgetController',
+  const setActiveWidgetLifecycle = inject<DraftLifecycleHandler>(
+    'setActiveWidgetLifecycle',
     null
   );
-  const clearActiveDraftWidgetController = inject<DraftControllerHandler>(
-    'clearActiveDraftWidgetController',
+  const clearActiveWidgetLifecycle = inject<DraftLifecycleHandler>(
+    'clearActiveWidgetLifecycle',
     null
   );
 
@@ -146,9 +160,8 @@ export default function useWidgetField(
     }
 
     isDraftEditing.value = true;
-    const vm = resolveWidgetProxy(instance);
-    if (vm && typeof setActiveDraftWidgetController === 'function') {
-      setActiveDraftWidgetController(vm);
+    if (typeof setActiveWidgetLifecycle === 'function') {
+      setActiveWidgetLifecycle();
     }
   }
 
@@ -158,9 +171,8 @@ export default function useWidgetField(
     }
 
     isDraftEditing.value = false;
-    const vm = resolveWidgetProxy(instance);
-    if (vm && typeof clearActiveDraftWidgetController === 'function') {
-      clearActiveDraftWidgetController(vm);
+    if (typeof clearActiveWidgetLifecycle === 'function') {
+      clearActiveWidgetLifecycle();
     }
   }
 
@@ -205,6 +217,44 @@ export default function useWidgetField(
     return errorMessage === '';
   }
 
+  function isBoundaryCommitContext(context: unknown): boolean {
+    if (!context || typeof context !== 'object') {
+      return false;
+    }
+
+    const kind = (context as DraftCommitContext).kind;
+    return typeof kind === 'string' && kind.trim() !== '';
+  }
+
+  function createDraftCommitResult(status: 'noop' | 'committed'): DraftCommitResult {
+    return { status };
+  }
+
+  function createRecoverableBlockedResult(error: unknown): DraftCommitResult {
+    return {
+      status: 'blocked',
+      severity: 'recoverable',
+      error
+    };
+  }
+
+  function commitDraftValue(
+    value: unknown,
+    validationMessage: string,
+    context?: DraftCommitContext
+  ): DraftCommitResult {
+    const errorMessage = String(validationMessage || '').trim();
+    const isValid = handleTableCellCommitValidation(errorMessage);
+    if (!isValid && isBoundaryCommitContext(context)) {
+      return createRecoverableBlockedResult(
+        new Error(errorMessage || 'Черновик виджета не прошёл проверку')
+      );
+    }
+
+    emitInput(value);
+    return createDraftCommitResult('committed');
+  }
+
   onBeforeUnmount(() => {
     deactivateDraftController();
   });
@@ -216,9 +266,13 @@ export default function useWidgetField(
     tableCellMode,
     tableCellRootAttrs,
     activateDraftController,
+    commitDraftValue,
+    createDraftCommitResult,
+    createRecoverableBlockedResult,
     deactivateDraftController,
     emitInput,
     handleTableCellCommitValidation,
+    isBoundaryCommitContext,
     showWidgetNotification,
     syncCommittedValue,
     syncTableCellValidationState,

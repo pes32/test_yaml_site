@@ -21,6 +21,12 @@ Yamls - YAML System — это YAML-driven UI-движок для кликабе
 
 В отличие от типичного form builder или admin generator, здесь первичен не database schema и не визуальный редактор, а декларативное описание страниц, атрибутов, меню, модалок и действий в YAML. Backend отвечает за сборку и валидацию snapshot-конфига, а frontend runtime уже исполняет согласованный контракт.
 
+Frontend runtime сейчас формализован вокруг трёх основных границ:
+
+- `page_store` хранит только snapshot-derived state;
+- `page_session_store` хранит только committed page/session state;
+- widget tree работает через `WidgetDefinitionRegistry`, lifecycle handles и host runtime bridge, а не через прямой доступ к `$root`.
+
 ## Что это даёт
 
 - Описание UI через YAML вместо ручной верстки каждой страницы.
@@ -32,7 +38,7 @@ Yamls - YAML System — это YAML-driven UI-движок для кликабе
 ## Где демо, а где личные материалы автора
 
 - Движок и основные примеры лежат в [pages/2_widget_demo](pages/2_widget_demo) и в документации из [docs/yaml-dsl.md](docs/yaml-dsl.md).
-- Архитектурные детали описаны в [docs/runtime-architecture.md](docs/runtime-architecture.md), [docs/api-contracts.md](docs/api-contracts.md) и [docs/table-subsystem.md](docs/table-subsystem.md).
+- Архитектурные детали описаны в [docs/runtime-architecture.md](docs/runtime-architecture.md), [docs/widget-registry-contract.md](docs/widget-registry-contract.md), [docs/api-contracts.md](docs/api-contracts.md) и [docs/table-subsystem.md](docs/table-subsystem.md).
 - Страница `about_author` и hardcoded Postgres-раздел нужны как демонстрационные и авторские материалы. Это не “ядро движка” и не обязательная часть будущей продуктовой сборки.
 
 ## Структура репозитория
