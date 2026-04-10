@@ -217,7 +217,7 @@ const DEFAULT_WIDGET_DEFINITIONS: ReadonlyArray<WidgetDefinitionRecord> = Object
   },
   {
     type: 'table',
-    loader: () => import('./table/index.js'),
+    loader: () => import('./table/index.ts'),
     capabilities: TABLE_CAPABILITIES
   }
 ]);

@@ -30,7 +30,7 @@
 </template>
 
 <script>
-import { IP_MASK_TEMPLATE, createIpLikeWidgetOptions, validateIPv4 } from './ip_like_shared.js';
+import { IP_MASK_TEMPLATE, createIpLikeWidgetOptions, validateIPv4 } from './ip_like_shared.ts';
 
 export default {
   name: 'IpWidget',

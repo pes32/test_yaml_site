@@ -212,14 +212,14 @@ import {
   vocModalComputed,
   vocModalMethods,
   vocModalWatch
-} from './voc_modal_shared.js';
+} from './voc_modal_shared.ts';
 import {
   beforeUnmountVocWidget,
   createVocWidgetState,
   vocComputed,
   vocMethods,
   vocWatch
-} from './voc_shared.js';
+} from './voc_shared.ts';
 
 export default {
   name: 'VocWidget',

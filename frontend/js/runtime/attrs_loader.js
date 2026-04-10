@@ -1,9 +1,9 @@
 import frontendApiClient from './api_client.js';
-import PageRuntimeStore from './page_store.js';
-import PageSessionStore from './page_session_store.js';
+import { resolveTableDependencies } from '../shared/table_attr_dependencies.ts';
+import PageRuntimeStore from './page_store.ts';
+import PageSessionStore from './page_session_store.ts';
 import { logDiagnosticsToConsole } from './diagnostics.js';
-import { collectActiveWidgetNames } from './page_selectors.js';
-import { resolveDependencies as resolveTableDependencies } from '../widgets/table/table_api.js';
+import { collectActiveWidgetNames } from './page_selectors.ts';
 
 function fetchAttrsSubset(vm, names) {
     if (!Array.isArray(names) || names.length === 0) {

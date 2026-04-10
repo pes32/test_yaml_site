@@ -3,9 +3,8 @@
 [English version](CHANGELOG_en.md)
 
 ## v.0.25 л.
-- Переезд на vue sfc
-- Тех. долг. Много рефакторинга
-
+- Переезд ключевых frontend-частей на Vue SFC и TypeScript-модули.
+- Очень много рефакторинга
 
 
 ## v.0.2 л.

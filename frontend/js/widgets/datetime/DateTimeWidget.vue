@@ -192,7 +192,7 @@ import {
   splitDateTimeValue,
   syncTimePickerState,
   updateFloatingPopover
-} from './datetime_shared.js';
+} from './datetime_shared.ts';
 
 const CALENDAR_ICON_SRC = '/templates/icons/calendar.svg';
 const CLOCK_ICON_SRC = '/templates/icons/clock.svg';

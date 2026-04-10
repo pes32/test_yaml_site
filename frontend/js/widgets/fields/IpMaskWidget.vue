@@ -30,7 +30,7 @@
 </template>
 
 <script>
-import { IP_CIDR_TEMPLATE, createIpLikeWidgetOptions, validateIPv4Cidr } from './ip_like_shared.js';
+import { IP_CIDR_TEMPLATE, createIpLikeWidgetOptions, validateIPv4Cidr } from './ip_like_shared.ts';
 
 export default {
   name: 'IpMaskWidget',

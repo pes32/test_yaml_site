@@ -1,8 +1,8 @@
 import frontendApiClient from './api_client.js';
-import PageRuntimeStore from './page_store.js';
-import PageSessionStore from './page_session_store.js';
+import PageRuntimeStore from './page_store.ts';
+import PageSessionStore from './page_session_store.ts';
 import { logDiagnosticsToConsole } from './diagnostics.js';
-import { getModalMap, getParsedGuiState } from './page_selectors.js';
+import { getModalMap, getParsedGuiState } from './page_selectors.ts';
 
 async function ensureModalDefinition(vm, modalName) {
     const parsedGui = getParsedGuiState(vm.sessionState);

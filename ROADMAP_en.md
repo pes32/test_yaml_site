@@ -28,9 +28,33 @@ What is still missing:
 
 The honest reading of the current status is: DB work has started and has useful pieces already, but it is still roadmap work rather than a finished feature.
 
+### Frontend/table quality gate
+
+What is already done:
+
+- the legacy table runtime has been replaced with explicit TS modules;
+- Vite build remains the primary green frontend gate;
+- stale wrappers, broken scripts, and outdated docs are removed during cleanup passes.
+
+What is still open:
+
+- strict `typecheck` and `typecheck:table` still need a dedicated table runtime typing pass;
+- `TableWidgetVm` is still too wide as a VM boundary;
+- browser/E2E smoke coverage for table interactions does not exist yet.
+
+### Ideas Merged From Old Drafts
+
+Old root-level drafts were condensed here to avoid keeping several competing plans in the repository root.
+
+- Table ideas that remain on the roadmap: fill/drag values, paste into selected range, filters/views, and highlighting fresh changes.
+- Test automation should come back as a real browser smoke/E2E runner, not as a placeholder script.
+- DB integration needs a separate bind/save/update flow design.
+
 ## Next
 
 - Finish the data-source model for YAML widgets.
 - Add a careful save/update flow without breaking current contracts.
 - Formalize `select_attrs` or replace it with a clearer mechanism.
 - Continue stabilizing the frontend runtime and the documentation set.
+- Close the strict typing debt in the table runtime.
+- Add real browser smoke coverage for key flows if the project needs an automated regression gate.

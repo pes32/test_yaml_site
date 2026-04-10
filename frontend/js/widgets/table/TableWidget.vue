@@ -318,8 +318,8 @@
   </div>
 </template>
 
-<script>
-import { markRaw } from 'vue';
+<script lang="ts">
+import { defineComponent, markRaw } from 'vue';
 
 import DateTimeWidget from '../datetime/DateTimeWidget.vue';
 import DateWidget from '../datetime/DateWidget.vue';
@@ -331,25 +331,10 @@ import IpWidget from '../fields/IpWidget.vue';
 import StringWidget from '../fields/StringWidget.vue';
 import ListWidget from '../ListWidget.vue';
 import VocWidget from '../voc/VocWidget.vue';
-import { createStore as createTableStore } from './table_api.js';
-import tableEngine from './table_core.js';
+import { useTableRuntime } from './useTableRuntime.ts';
 
-export default {
+export default defineComponent({
   name: 'TableWidget',
-  inject: {
-    getAllAttrsMapFromRuntime: {
-      from: 'getAllAttrsMap',
-      default: null
-    },
-    handleRecoverableAppErrorFromRuntime: {
-      from: 'handleRecoverableAppError',
-      default: null
-    },
-    showAppNotificationFromRuntime: {
-      from: 'showAppNotification',
-      default: null
-    }
-  },
   props: {
     widgetConfig: {
       type: Object,
@@ -361,296 +346,23 @@ export default {
     }
   },
   emits: ['input'],
-  data() {
-    const tableStore = createTableStore({
-      stickyHeaderEnabled: !!(this.widgetConfig && this.widgetConfig.sticky_header === true)
+  setup(props, { emit }) {
+    return useTableRuntime({
+      props,
+      emit,
+      cellWidgets: {
+        stringCellWidget: markRaw(StringWidget),
+        intCellWidget: markRaw(IntWidget),
+        floatCellWidget: markRaw(FloatWidget),
+        dateCellWidget: markRaw(DateWidget),
+        timeCellWidget: markRaw(TimeWidget),
+        datetimeCellWidget: markRaw(DateTimeWidget),
+        ipCellWidget: markRaw(IpWidget),
+        ipMaskCellWidget: markRaw(IpMaskWidget),
+        listCellWidget: markRaw(ListWidget),
+        vocCellWidget: markRaw(VocWidget)
+      }
     });
-    return {
-      value: [],
-      tableSchema: null,
-      headerRows: [],
-      tableColumns: [],
-      tableData: [],
-      tableStore,
-      contextMenuOpen: false,
-      contextMenuPosition: { x: 0, y: 0 },
-      contextMenuTarget: null,
-      contextMenuContext: null,
-      contextMenuSessionId: 0,
-      _pasteInProgress: false,
-      selectedRowIndex: -1,
-      selAnchor: { r: 0, c: 0 },
-      selFocus: { r: 0, c: 0 },
-      selFullWidthRows: null,
-      _tableProgrammaticFocus: false,
-      _shiftSelectGesture: false,
-      _shiftAnchorLocked: false,
-      _contextMenuClickHandler: null,
-      _contextMenuKeydownHandler: null,
-      editingCell: null,
-      stringCellWidget: markRaw(StringWidget),
-      intCellWidget: markRaw(IntWidget),
-      floatCellWidget: markRaw(FloatWidget),
-      dateCellWidget: markRaw(DateWidget),
-      timeCellWidget: markRaw(TimeWidget),
-      datetimeCellWidget: markRaw(DateTimeWidget),
-      ipCellWidget: markRaw(IpWidget),
-      ipMaskCellWidget: markRaw(IpMaskWidget),
-      listCellWidget: markRaw(ListWidget),
-      vocCellWidget: markRaw(VocWidget),
-      _tableFocusWithin: false,
-      _sortCycleRowOrder: null,
-      cellValidationErrors: {},
-      _lazyObserver: null,
-      _lazyDebounceTimer: null,
-      _tableContextMenuMouseDown: false,
-      _stickyTheadPinned: false,
-      _stickyScrollRoot: null,
-      _stickyRaf: 0,
-      _stickyOnScroll: null,
-      _stickyRo: null
-    };
-  },
-  computed: {
-    sortKeys: {
-      get() {
-        return this.tableStore.sorting.sortKeys;
-      },
-      set(value) {
-        this.tableStore.sorting.sortKeys = Array.isArray(value) ? value : [];
-      }
-    },
-    groupingState: {
-      get() {
-        return this.tableStore.grouping.state;
-      },
-      set(value) {
-        this.tableStore.grouping.state = value && typeof value === 'object'
-          ? value
-          : { levels: [], expanded: new Set() };
-      }
-    },
-    groupingViewCache: {
-      get() {
-        return this.tableStore.grouping.viewCache;
-      },
-      set(value) {
-        this.tableStore.grouping.viewCache = value || null;
-      }
-    },
-    isFullyLoaded: {
-      get() {
-        return !!this.tableStore.loading.isFullyLoaded;
-      },
-      set(value) {
-        this.tableStore.loading.isFullyLoaded = !!value;
-      }
-    },
-    lazySessionId: {
-      get() {
-        return this.tableStore.loading.lazySessionId || 0;
-      },
-      set(value) {
-        this.tableStore.loading.lazySessionId = Number(value) || 0;
-      }
-    },
-    isLoadingChunk: {
-      get() {
-        return !!this.tableStore.loading.isLoadingChunk;
-      },
-      set(value) {
-        this.tableStore.loading.isLoadingChunk = !!value;
-      }
-    },
-    tableUiLocked: {
-      get() {
-        return !!this.tableStore.loading.tableUiLocked;
-      },
-      set(value) {
-        this.tableStore.loading.tableUiLocked = !!value;
-      }
-    },
-    lazyEnabled: {
-      get() {
-        return !!this.tableStore.loading.lazyEnabled;
-      },
-      set(value) {
-        this.tableStore.loading.lazyEnabled = !!value;
-      }
-    },
-    _lazyPendingRows: {
-      get() {
-        return this.tableStore.loading.lazyPendingRows;
-      },
-      set(value) {
-        this.tableStore.loading.lazyPendingRows = Array.isArray(value) ? value : [];
-      }
-    },
-    stickyHeaderRuntimeEnabled: {
-      get() {
-        return !!this.tableStore.preferences.stickyHeaderRuntimeEnabled;
-      },
-      set(value) {
-        this.tableStore.preferences.stickyHeaderRuntimeEnabled = !!value;
-      }
-    },
-    wordWrapRuntimeEnabled: {
-      get() {
-        return !!this.tableStore.preferences.wordWrapRuntimeEnabled;
-      },
-      set(value) {
-        this.tableStore.preferences.wordWrapRuntimeEnabled = !!value;
-      }
-    },
-    isEditable() {
-      return !(this.widgetConfig && this.widgetConfig.readonly === true);
-    },
-    tableZebra() {
-      const z = this.widgetConfig && this.widgetConfig.zebra;
-      if (z === false) return false;
-      return true;
-    },
-    hasColumnNumbers() {
-      return Array.isArray(this.tableColumns) && this.tableColumns.some((column) => column && column.number != null);
-    },
-    hasExplicitTableWidth() {
-      const w = this.widgetConfig && this.widgetConfig.width;
-      return w != null && String(w).trim() !== '';
-    },
-    tableInlineStyle() {
-      const style = {
-        marginBottom: 0,
-        tableLayout: 'fixed'
-      };
-      const Measure = tableEngine.WidgetMeasure;
-      const sumWidths =
-        Measure && typeof Measure.sumColumnWidthsPx === 'function'
-          ? Measure.sumColumnWidthsPx(this.tableColumns)
-          : null;
-      if (!this.hasExplicitTableWidth) {
-        if (sumWidths) {
-          style.width = sumWidths;
-          style.minWidth = sumWidths;
-        }
-        return style;
-      }
-      const width = this.widgetConfig.width;
-      style.width = typeof width === 'number' ? `${width}px` : String(width);
-      style.tableLayout = 'fixed';
-      return style;
-    },
-    headerSortEnabled() {
-      return !(this.widgetConfig && this.widgetConfig.sort === false);
-    },
-    tableMinRowCount() {
-      const row = this.widgetConfig && this.widgetConfig.row;
-      if (row == null || row === '') return 0;
-      const parsed = typeof row === 'number' ? row : parseInt(String(row).trim(), 10);
-      if (!Number.isFinite(parsed) || parsed < 1) return 0;
-      return Math.floor(parsed);
-    },
-    contextMenuItems() {
-      const ContextMenu = tableEngine.ContextMenu;
-      const build = ContextMenu && ContextMenu.buildMenuItems;
-      if (!build || !this.contextMenuOpen || !this.contextMenuTarget || !this.contextMenuContext) {
-        return [];
-      }
-      const Grouping = tableEngine.Grouping;
-      const numCols = this.tableColumns.length;
-      const groupingLevelsLen = this.groupingState.levels.length;
-      const canAdd =
-        Grouping && typeof Grouping.canAddGroupingLevel === 'function'
-          ? Grouping.canAddGroupingLevel(numCols, groupingLevelsLen)
-          : false;
-      return build({
-        target: this.contextMenuTarget,
-        snapshot: this.contextMenuContext,
-        isApple: ContextMenu.isApplePlatform && ContextMenu.isApplePlatform(),
-        tableDataLength: this.tableData.length,
-        numCols: this.tableColumns.length,
-        headerSortEnabled: this.headerSortEnabled,
-        isEditable: this.isEditable,
-        isEditingCell: !!this.editingCell,
-        groupingActive: this.groupingActive,
-        tableUiLocked: this.tableUiLocked,
-        isFullyLoaded: this.isFullyLoaded,
-        groupingLevelsLen,
-        groupingCanAddLevel: canAdd,
-        stickyHeaderEnabled: this.stickyHeaderEnabled,
-        wordWrapEnabled: this.wordWrapEnabled,
-        headerColumn:
-          this.contextMenuTarget &&
-          this.contextMenuTarget.kind === 'header'
-            ? this.tableColumns[this.contextMenuTarget.col] || null
-            : null
-      });
-    },
-    groupingActive() {
-      return this.groupingState.levels.length > 0;
-    },
-    displayRows() {
-      if (!this.groupingActive) return [];
-      const cache = this.groupingViewCache;
-      return cache && Array.isArray(cache.displayRows) ? cache.displayRows : [];
-    },
-    tableLazyUiActive() {
-      return this.lazyEnabled && !this.isFullyLoaded && !this.groupingActive;
-    },
-    stickyHeaderEnabled() {
-      return !!this.stickyHeaderRuntimeEnabled;
-    },
-    wordWrapEnabled() {
-      return !!this.wordWrapRuntimeEnabled;
-    },
-    sortColumnIndex() {
-      const key = this.sortKeys[0];
-      return key ? key.col : null;
-    },
-    sortDirection() {
-      const key = this.sortKeys[0];
-      return key && key.dir === 'desc' ? 'desc' : 'asc';
-    }
-  },
-  watch: {
-    widgetName() {
-      this.initializeTable();
-    },
-    widgetConfig() {
-      this.initializeTable();
-    },
-    tableLazyUiActive(value) {
-      this.$nextTick(() => {
-        if (value) this._setupLazyObserver();
-        else this._teardownLazyObserver();
-      });
-    },
-    stickyHeaderEnabled(value) {
-      this.$nextTick(() => {
-        this._unbindStickyThead();
-        if (value) this._bindStickyThead();
-      });
-    }
-  },
-  methods: Object.assign(
-    {},
-    tableEngine.SelectionMethods || {},
-    tableEngine.ViewRuntimeMethods || {},
-    tableEngine.DataRuntimeMethods || {},
-    tableEngine.DataViewRuntimeMethods || {},
-    tableEngine.CellRuntimeMethods || {},
-    tableEngine.RowRuntimeMethods || {},
-    tableEngine.EditingRuntimeMethods || {},
-    tableEngine.InteractionRuntimeMethods || {},
-    tableEngine.MenuRuntimeMethods || {},
-    tableEngine.ClipboardRuntimeMethods || {}
-  ),
-  mounted() {
-    this.initializeTable();
-  },
-  beforeUnmount() {
-    this._unbindStickyThead();
-    this._detachContextMenuGlobalListeners();
-    this._teardownLazyObserver();
   }
-};
+});
 </script>

@@ -41,7 +41,7 @@ Unlike a typical form builder or admin generator, this project is driven by decl
 ## Demo vs author-specific territory
 
 - Engine-focused examples live in [pages/2_widget_demo](pages/2_widget_demo) and in [docs/yaml-dsl.md](docs/yaml-dsl.md).
-- Architecture and contracts are documented in [docs/runtime-architecture.md](docs/runtime-architecture.md), [docs/api-contracts.md](docs/api-contracts.md), and [docs/table-subsystem.md](docs/table-subsystem.md).
+- Architecture and contracts are documented in [docs/runtime-architecture.md](docs/runtime-architecture.md), [docs/server-runtime.md](docs/server-runtime.md), [docs/api-contracts.md](docs/api-contracts.md), and [docs/table-subsystem.md](docs/table-subsystem.md).
 - The `about_author` page and the hardcoded Postgres section are demo/author materials, not the core engine API.
 
 ## Repository layout
@@ -51,7 +51,7 @@ Unlike a typical form builder or admin generator, this project is driven by decl
 - `frontend/` — styles, widgets, runtime, and built bundle.
 - `tooling/vite/` — frontend toolchain, build, and typecheck.
 - `templates/` — HTML templates, icons, and related static assets.
-- `deploy/` — deployment examples, including `systemd`.
+- `scripts/`, `settings/`, `nginx/`, `run/`, `logs/`, `ssl/` — local server/runtime startup and generated runtime files.
 - `docs/` — architecture and operations documentation.
 
 ## Quick start
@@ -108,6 +108,7 @@ Frontend typecheck:
 
 ```bash
 npm --prefix tooling/vite run typecheck
+npm --prefix tooling/vite run typecheck:table
 ```
 
 Frontend build:
@@ -122,7 +123,7 @@ npm --prefix tooling/vite run build
 - Debug routes are disabled by default in production mode.
 - There is no complete auth/permission model yet.
 - The main YAML flow does not provide DB persistence yet.
-- For real Linux deployment, use the `public nginx -> waitress on 127.0.0.1` setup described in [docs/deploy-linux.md](docs/deploy-linux.md) (guide currently written in Russian).
+- The current server/runtime environment is documented in [docs/server-runtime.md](docs/server-runtime.md). For a public server, the target topology is still `public nginx -> waitress on 127.0.0.1`, but deployment instructions should be written for the actual infrastructure.
 
 ## Current limitations
 
@@ -140,10 +141,9 @@ See [ROADMAP_en.md](ROADMAP_en.md). The main direction after `v.0.2 л.` is:
 - continue runtime stabilization and documentation cleanup;
 - expand demo coverage gradually.
 
-## For contributors
+## Changelog
 
-- Contribution guide: [CONTRIBUTING_en.md](CONTRIBUTING_en.md)
-- Changelog: [CHANGELOG_en.md](CHANGELOG_en.md)
+Changelog: [CHANGELOG_en.md](CHANGELOG_en.md).
 
 ## License
 

@@ -33,7 +33,7 @@ import {
     applyPagePayload as applyPagePayloadFlow,
     loadPageConfig as loadPageConfigFlow,
     parseConfiguration as parseConfigurationFlow
-} from './runtime/page_bootstrap_flow.js';
+} from './runtime/page_bootstrap_flow.ts';
 import {
     getActiveMenu,
     getActiveSections,
@@ -46,9 +46,9 @@ import {
     selectWidgetRuntimeValue,
     getWidgetConfig as selectWidgetConfig,
     getWidgetValue as selectWidgetValue
-} from './runtime/page_selectors.js';
-import PageSessionStore from './runtime/page_session_store.js';
-import PageRuntimeStore from './runtime/page_store.js';
+} from './runtime/page_selectors.ts';
+import PageSessionStore from './runtime/page_session_store.ts';
+import PageRuntimeStore from './runtime/page_store.ts';
 import {
     finishInitialViewActivation as finishInitialViewActivationFlow,
     getActiveViewId as getActiveViewIdFlow,
@@ -68,7 +68,7 @@ import {
     toggleSectionCollapse as toggleSectionCollapseFlow,
     unregisterHashListener as unregisterHashListenerFlow,
     updateHash as updateHashFlow
-} from './runtime/page_view_runtime.js';
+} from './runtime/page_view_runtime.ts';
 import { PAGE_HOST_RUNTIME_SERVICES_KEY } from './runtime/widget_runtime_bridge.ts';
 
 function buildPageHostRuntimeServices(vm) {

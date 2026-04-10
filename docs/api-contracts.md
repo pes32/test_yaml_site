@@ -203,14 +203,18 @@ Debug routes используют тот же envelope:
 
 Их raw transport тоже проходит через `frontend/js/runtime/api_client.js`.
 
-## Канонические контракты
+## Contract Files
 
-Typed transport/domain reference лежит в:
+Актуальные contract files находятся рядом с владельцами runtime:
 
-- `tooling/vite/src/contracts/api.ts`
-- `tooling/vite/src/contracts/table.ts`
+- `backend/contracts.py` — backend-side Pydantic contracts for pages, attrs, modals, diagnostics and API envelope data.
+- `frontend/js/runtime/page_contract.ts` — frontend page/runtime domain boundary.
+- `frontend/js/runtime/widget_contract.ts` — stateful widget value/list normalization helpers.
+- `frontend/js/widgets/widget_shared_contracts.ts` — widget-facing VM/shared contracts.
+- `frontend/js/widgets/table/table_contract.ts` — internal table runtime/schema/state/service contracts.
+- `frontend/js/runtime/voc_contract.ts` — voc widget source/value contract.
 
-Это справочные типы для границ между backend transport, runtime store и feature-модулями.
+Это не публичный SDK. Сейчас contracts служат для согласования backend transport, frontend stores и feature modules внутри проекта.
 
 ## Frontend error normalization
 

@@ -120,7 +120,7 @@ import {
   setHiddenPopover,
   syncTimePickerState,
   updateFloatingPopover
-} from './datetime_shared.js';
+} from './datetime_shared.ts';
 
 const CLOCK_ICON_SRC = '/templates/icons/clock.svg';
 

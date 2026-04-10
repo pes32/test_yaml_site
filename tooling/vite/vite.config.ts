@@ -7,12 +7,6 @@ const WIDGET_FIELD_CORE_MATCHERS = [
   /\/frontend\/js\/widgets\/composables\/useWidgetField\.(js|ts)$/
 ];
 
-const APP_RUNTIME_MATCHERS = [
-  '/frontend/js/widgets/table/table_api.js',
-  '/frontend/js/widgets/table/table_core.js',
-  '/frontend/js/widgets/table/table_parse_attrs.js'
-];
-
 function matchesChunkMatcher(id: string, matcher: string | RegExp) {
   if (typeof matcher === 'string') {
     return id.endsWith(matcher);
@@ -20,7 +14,6 @@ function matchesChunkMatcher(id: string, matcher: string | RegExp) {
 
   return matcher.test(id);
 }
-
 function matchesAnyChunkMatcher(id: string, matchers: Array<string | RegExp>) {
   return matchers.some((matcher) => matchesChunkMatcher(id, matcher));
 }
@@ -62,11 +55,6 @@ export default defineConfig({
           if (normalized.includes('/frontend/js/runtime/')) {
             return 'app-runtime';
           }
-
-          if (matchesAnyChunkMatcher(normalized, APP_RUNTIME_MATCHERS)) {
-            return 'app-runtime';
-          }
-
           if (normalized.includes('/frontend/js/widgets/table/')) {
             return 'widget-table';
           }
