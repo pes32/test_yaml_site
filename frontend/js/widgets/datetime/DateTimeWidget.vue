@@ -296,7 +296,7 @@ export default {
     syncValue(shouldEmit = true) {
       this.value = this.composeValue();
       if (shouldEmit) {
-        this.emit(this.value);
+        this.emitInput(this.value);
       }
     },
     onSegmentFocus() {
@@ -305,22 +305,30 @@ export default {
     },
     finalizeSegmentBlur(commitHandler) {
       this.isFocused = false;
-      if (typeof commitHandler === 'function') {
-        commitHandler();
-      }
+      const shouldScheduleDeactivation = !this.tableCellMode;
 
-      if (this.tableCellMode) {
-        return;
-      }
-
-      window.setTimeout(() => {
-        const root = this.resolveRefElement('pickerHost');
-        const active = document.activeElement;
-        if (root && active && root.contains(active)) {
-          return;
+      try {
+        if (typeof commitHandler === 'function') {
+          commitHandler();
         }
-        this.deactivateDraftController();
-      }, 0);
+      } finally {
+        if (shouldScheduleDeactivation) {
+          window.setTimeout(() => {
+            let shouldDeactivate = true;
+            try {
+              const root = this.resolveRefElement('pickerHost');
+              const active = document.activeElement;
+              if (root && active && root.contains(active)) {
+                shouldDeactivate = false;
+              }
+            } finally {
+              if (shouldDeactivate) {
+                this.deactivateDraftController();
+              }
+            }
+          }, 0);
+        }
+      }
     },
     onTimePickerPartInput(part, max, event) {
       const digits = String(event.target.value || '').replace(/\D+/g, '').slice(0, 2);
@@ -365,8 +373,11 @@ export default {
       }
 
       event.preventDefault();
-      this.commitDateInput();
-      event.target?.blur?.();
+      try {
+        this.commitDateInput();
+      } finally {
+        event.target?.blur?.();
+      }
     },
     onTimeEnterCommit(event) {
       if (this.tableCellMode) {
@@ -374,8 +385,11 @@ export default {
       }
 
       event.preventDefault();
-      this.commitTimeInput();
-      event.target?.blur?.();
+      try {
+        this.commitTimeInput();
+      } finally {
+        event.target?.blur?.();
+      }
     },
     commitDateInput() {
       if (!this.dateValue) {

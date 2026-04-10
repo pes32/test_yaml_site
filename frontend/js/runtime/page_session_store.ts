@@ -42,6 +42,65 @@ function asObject<T extends UnknownRecord>(value: unknown): T | null {
         : null;
 }
 
+function asPlainObject<T extends UnknownRecord>(value: unknown): T | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return null;
+    }
+
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null
+        ? (value as T)
+        : null;
+}
+
+function plainValueEquals(left: unknown, right: unknown, depth = 0): boolean {
+    if (Object.is(left, right)) {
+        return true;
+    }
+
+    if (depth > 20) {
+        return false;
+    }
+
+    if (Array.isArray(left) || Array.isArray(right)) {
+        if (!Array.isArray(left) || !Array.isArray(right)) {
+            return false;
+        }
+        if (left.length !== right.length) {
+            return false;
+        }
+        for (let index = 0; index < left.length; index += 1) {
+            if (!plainValueEquals(left[index], right[index], depth + 1)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    const leftObject = asPlainObject<Record<string, unknown>>(left);
+    const rightObject = asPlainObject<Record<string, unknown>>(right);
+    if (!leftObject || !rightObject) {
+        return false;
+    }
+
+    const leftKeys = Object.keys(leftObject);
+    const rightKeys = Object.keys(rightObject);
+    if (leftKeys.length !== rightKeys.length) {
+        return false;
+    }
+
+    for (const key of leftKeys) {
+        if (!Object.prototype.hasOwnProperty.call(rightObject, key)) {
+            return false;
+        }
+        if (!plainValueEquals(leftObject[key], rightObject[key], depth + 1)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 function createEmptyStore(): PageSessionState {
     return {
         widgetValues: {},
@@ -154,7 +213,7 @@ function setWidgetValue(
             previousValue as NormalizedStatefulWidgetValue | undefined,
             normalizedValue as NormalizedStatefulWidgetValue | undefined
         )
-        : previousValue === normalizedValue;
+        : plainValueEquals(previousValue, normalizedValue);
 
     if (isEqual) {
         return store.widgetValues;

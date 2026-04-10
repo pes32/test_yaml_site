@@ -181,7 +181,7 @@ export default {
     },
     onInput() {
       if (this.tableCellMode) {
-        this.emit(this.value);
+        this.emitInput(this.value);
         return;
       }
 
@@ -189,8 +189,11 @@ export default {
     },
     onBlur() {
       this.isFocused = false;
-      this.commitDraft();
-      this.deactivateDraftController();
+      try {
+        this.commitDraft();
+      } finally {
+        this.deactivateDraftController();
+      }
     },
     onEnterCommit(event) {
       if (this.tableCellMode) {
@@ -198,13 +201,16 @@ export default {
       }
 
       event.preventDefault();
-      this.commitDraft();
-      event.target?.blur?.();
+      try {
+        this.commitDraft();
+      } finally {
+        event.target?.blur?.();
+      }
     },
     commitInput() {
       if (!this.value) {
         this.handleTableCellCommitValidation('');
-        this.emit(this.value);
+        this.emitInput(this.value);
         return;
       }
 
@@ -212,7 +218,7 @@ export default {
       this.value = value;
       this.setCalendarViewFromDate(parsedDate);
       this.handleTableCellCommitValidation(parsedDate ? '' : 'Неверный формат даты');
-      this.emit(this.value);
+      this.emitInput(this.value);
     },
     commitDraft() {
       this.commitInput();
@@ -242,7 +248,7 @@ export default {
     selectDate(date) {
       this.value = this.formatDate(date);
       this.calendarView = this.monthStart(date);
-      this.emit(this.value);
+      this.emitInput(this.value);
       this.closePopovers();
     },
     setValue(v) {

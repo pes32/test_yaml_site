@@ -183,7 +183,7 @@ export default {
     },
     applyPickedTime(shouldClose = false) {
       this.value = this.composePickerTimeValue();
-      this.emit(this.value);
+      this.emitInput(this.value);
       if (shouldClose) {
         this.closePopovers();
       }
@@ -209,7 +209,7 @@ export default {
     },
     onInput() {
       if (this.tableCellMode) {
-        this.emit(this.value);
+        this.emitInput(this.value);
         return;
       }
 
@@ -217,8 +217,11 @@ export default {
     },
     onBlur() {
       this.isFocused = false;
-      this.commitDraft();
-      this.deactivateDraftController();
+      try {
+        this.commitDraft();
+      } finally {
+        this.deactivateDraftController();
+      }
     },
     onEnterCommit(event) {
       if (this.tableCellMode) {
@@ -226,13 +229,16 @@ export default {
       }
 
       event.preventDefault();
-      this.commitDraft();
-      event.target?.blur?.();
+      try {
+        this.commitDraft();
+      } finally {
+        event.target?.blur?.();
+      }
     },
     commitInput() {
       if (!this.value) {
         this.handleTableCellCommitValidation('');
-        this.emit(this.value);
+        this.emitInput(this.value);
         return;
       }
 
@@ -240,7 +246,7 @@ export default {
       this.value = value;
       this.applyTimePickerState(parsedTime);
       this.handleTableCellCommitValidation(parsedTime ? '' : 'Неверный формат времени');
-      this.emit(this.value);
+      this.emitInput(this.value);
     },
     commitDraft() {
       this.commitInput();

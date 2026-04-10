@@ -11,6 +11,7 @@ import {
     watch
 } from 'vue';
 import type { ComponentPublicInstance } from 'vue';
+import { resolveTableDependencies } from '../../shared/table_attr_dependencies.ts';
 import type { TableWidgetVm } from './table_contract.ts';
 import { createTablePageBridge } from './table_page_bridge.ts';
 import {
@@ -50,6 +51,65 @@ type UseTableRuntimeOptions = {
 
 type AnyFn = (...args: unknown[]) => unknown;
 type ComputedLike = { value: unknown };
+
+const TABLE_CONFIG_WATCH_KEYS = [
+    'data',
+    'label',
+    'lazy_chunk_size',
+    'lazy_fail_full_load',
+    'line_numbers',
+    'readonly',
+    'row',
+    'sort',
+    'source',
+    'sticky_header',
+    'sup_text',
+    'table_attrs',
+    'table_lazy',
+    'value',
+    'width',
+    'zebra'
+] as const;
+
+function readWidgetConfigValue(
+    config: Record<string, unknown> | null | undefined,
+    key: string
+): unknown {
+    return config && typeof config === 'object' ? config[key] : undefined;
+}
+
+function tableDependencySignature(
+    config: Record<string, unknown> | null | undefined,
+    getAllAttrsMap: (() => Record<string, unknown>) | null
+): string {
+    const deps = resolveTableDependencies(config || {});
+    if (!deps.length || typeof getAllAttrsMap !== 'function') {
+        return '';
+    }
+
+    const attrs = getAllAttrsMap() || {};
+    return deps
+        .map((name) => {
+            const attrConfig = attrs && typeof attrs === 'object' ? attrs[name] : null;
+            if (!attrConfig || typeof attrConfig !== 'object') {
+                return `${name}:missing`;
+            }
+
+            const attr = attrConfig as Record<string, unknown>;
+            const columns = Array.isArray(attr.columns)
+                ? attr.columns.map((item) => String(item ?? '')).join(',')
+                : '';
+            return [
+                name,
+                String(attr.widget || ''),
+                attr.readonly === true ? 'readonly' : '',
+                attr.editable === false ? 'not-editable' : '',
+                attr.multiselect === true ? 'multi' : '',
+                columns
+            ].join(':');
+        })
+        .join('|');
+}
 
 function useTableRuntime(options: UseTableRuntimeOptions): TableWidgetVm {
     const { cellWidgets, emit, props } = options;
@@ -204,7 +264,16 @@ function useTableRuntime(options: UseTableRuntimeOptions): TableWidgetVm {
 
     Object.entries(tableRuntimeWatch).forEach(([name, handler]) => {
         if (name === 'widgetConfig') {
-            watch(() => props.widgetConfig, () => (handler as AnyFn).call(vm));
+            watch(
+                TABLE_CONFIG_WATCH_KEYS.map((key) => () =>
+                    readWidgetConfigValue(props.widgetConfig, key)
+                ),
+                () => (handler as AnyFn).call(vm)
+            );
+            watch(
+                () => tableDependencySignature(props.widgetConfig, getAllAttrsMapFromRuntime),
+                () => (handler as AnyFn).call(vm)
+            );
             return;
         }
         if (name === 'widgetName') {
