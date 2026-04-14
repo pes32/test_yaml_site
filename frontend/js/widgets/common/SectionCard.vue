@@ -1,5 +1,10 @@
 <template>
-  <div :class="wrapperClass">
+  <div
+    :class="wrapperClass"
+    :data-section-index="sectionIndex"
+    :data-section-name="section.name || ''"
+    :data-section-collapsible="section.collapsible ? 'true' : 'false'"
+  >
     <div class="card page-section-card u-wide">
       <div
         v-if="section.showHeader"

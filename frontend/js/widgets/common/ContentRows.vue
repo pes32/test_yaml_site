@@ -9,7 +9,13 @@
       </div>
       <div v-else-if="isWidgetRow(row)" class="col-12">
         <div class="row">
-          <div v-for="(item, itemIndex) in row.widgets" :key="itemIndex" class="col-auto">
+          <div
+            v-for="(item, itemIndex) in row.widgets"
+            :key="itemIndex"
+            class="col-auto"
+            :data-widget-name="item"
+            :data-widget-type="getWidgetType(item)"
+          >
             <WidgetRenderer
               :widget-attrs="getWidgetAttrs(item)"
               :widget-value="getWidgetValue(item)"
@@ -58,5 +64,11 @@ function isWidgetRow(row) {
 
 function nextRowHasWidgets(rowIndex) {
   return isWidgetRow(props.rows[rowIndex + 1]);
+}
+
+function getWidgetType(widgetName) {
+  const attrs = props.getWidgetAttrs(widgetName) || {};
+  const widgetType = typeof attrs.widget === 'string' ? attrs.widget.trim() : '';
+  return widgetType || 'str';
 }
 </script>

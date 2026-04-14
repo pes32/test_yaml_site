@@ -12,6 +12,8 @@
             type="button"
             class="menu-card"
             :class="{ active: index === activeMenuIndex }"
+            :data-menu-index="index"
+            :data-menu-name="menu.name || ('Меню ' + (Number(index) + 1))"
             @click="onMenuClick(index)"
           >
             <span class="menu-card-icon-shell inline-flex-center">
@@ -50,6 +52,8 @@
                 :class="{ active: index === activeTabIndex }"
                 href="#"
                 role="tab"
+                :data-tab-index="index"
+                :data-tab-name="tab.name || ('Вкладка ' + (Number(index) + 1))"
                 @click.prevent="onTabClick(index)"
               >
                 <item-icon v-if="tab.icon" :icon="tab.icon"></item-icon>
