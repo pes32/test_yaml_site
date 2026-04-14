@@ -120,7 +120,7 @@ function buildMenuItems(options: BuildMenuItemsOptions): TableContextMenuItem[] 
     const isEditingCell = Boolean(options.isEditingCell);
     const groupingActive = Boolean(options.groupingActive);
     const tableUiLocked = Boolean(options.tableUiLocked);
-    const groupingLevelsLen = options.groupingLevelsLen | 0;
+    const groupingLevelsLen = options.groupingLevelsLen ?? 0;
     const stickyHeaderEnabled = Boolean(options.stickyHeaderEnabled);
     const wordWrapEnabled = Boolean(options.wordWrapEnabled);
     const headerColumn = options.headerColumn || null;
@@ -287,7 +287,7 @@ function buildMenuItems(options: BuildMenuItemsOptions): TableContextMenuItem[] 
         });
     }
 
-    const anchorRow = snapshot.anchorRow | 0;
+    const anchorRow = snapshot.anchorRow ?? 0;
     const rowMoveOk = !groupingActive && !tableUiLocked && rowMoveDuplicateOpsAllowed({
         isEditable: options.isEditable,
         tableDataLength: len,

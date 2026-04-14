@@ -6,15 +6,19 @@ import type {
     TableHeaderCell,
     TableLeafMeta,
     TableRuntimeColumn,
+    TableRuntimeVm,
     TableSchema,
-    TableWidgetVm,
     UnknownRecord
 } from './table_contract.ts';
 import { WidgetMeasure } from './table_widget_helpers.ts';
 
 type AnyRecord = Record<string, unknown>;
-type TableParseVm = TableWidgetVm & AnyRecord;
+type TableParseVm = TableRuntimeVm;
 type ParsedLeafColumn = TableRuntimeColumn & AnyRecord;
+type ColonTokenMeta =
+    | { kind: 'builtin'; value: string; widgetType: string }
+    | { kind: 'widget_ref'; config: AnyRecord | null; value: string; widgetType: string }
+    | { kind: 'width'; value: string };
 type HeaderNode = AnyRecord & {
     children?: HeaderNode[];
     label: string;
@@ -118,7 +122,7 @@ type HeaderNode = AnyRecord & {
         token: unknown,
         allAttrs: UnknownRecord,
         dependencies: string[]
-    ): AnyRecord | null {
+    ): ColonTokenMeta | null {
         const key = String(token || '').trim();
         if (!key) return null;
         if (/^\d+$/.test(key)) return { kind: 'width', value: `${key}px` };
@@ -158,12 +162,12 @@ type HeaderNode = AnyRecord & {
         dependencies: string[]
     ): ParsedLeafColumn {
         let label = (remainder || attrName || '').trim();
-        let width = null;
+        let width: string | null = null;
         let type = 'str';
-        let format = null;
-        let source = null;
-        let number = null;
-        let widgetRef = null;
+        let format: string | null = null;
+        let source: string | null = null;
+        let number: number | null = null;
+        let widgetRef: string | null = null;
         let widgetConfig: AnyRecord | null = null;
         let readonly = false;
 
@@ -195,7 +199,7 @@ type HeaderNode = AnyRecord & {
         });
 
         if (hashTokens.length > 0) {
-            format = hashTokens[0];
+            format = hashTokens[0] || null;
             if (type === 'str') type = 'float';
         }
 

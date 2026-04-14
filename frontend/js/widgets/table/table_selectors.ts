@@ -1,9 +1,38 @@
-function isChoiceColumnType(type) {
+import type {
+    TableCellDisplayAction,
+    TableCellOptions,
+    TableColumnAttrConfig,
+    TableRuntimeColumn,
+    TableWidgetConfig
+} from './table_contract.ts';
+
+type ClassMap = Record<string, boolean>;
+type CssStyleMap = Record<string, string>;
+
+type DefaultCellValueOptions = {
+    isLineNumberColumn?: (column: TableRuntimeColumn) => boolean;
+    isListColumnMultiselect?: boolean;
+    now?: Date;
+    tableCellOptions?: TableCellOptions | null;
+};
+
+type SanitizeTableCellOptions = (
+    type: unknown,
+    widgetConfig: TableColumnAttrConfig | null | undefined
+) => TableCellOptions;
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isChoiceColumnType(type: unknown): boolean {
     const key = String(type || '').trim();
     return key === 'list' || key === 'voc';
 }
 
-function getCellDisplayActions(column) {
+function getCellDisplayActions(
+    column: TableRuntimeColumn | null | undefined
+): TableCellDisplayAction[] {
     if (!column) return [];
     if (String(column.type || '').trim() === 'voc') {
         return [{ kind: 'list', label: 'Открыть справочник', icon: '' }];
@@ -26,7 +55,7 @@ function getCellDisplayActions(column) {
     return [];
 }
 
-function getCellDisplayKind(column) {
+function getCellDisplayKind(column: TableRuntimeColumn | null | undefined): string {
     if (!column) return '';
     const type = String(column.type || '').trim();
     if (
@@ -42,10 +71,10 @@ function getCellDisplayKind(column) {
     return '';
 }
 
-function getCellDisplayClass(column) {
+function getCellDisplayClass(column: TableRuntimeColumn | null | undefined): ClassMap {
     const kind = getCellDisplayKind(column);
     if (!kind) return {};
-    const classMap = {
+    const classMap: ClassMap = {
         [`widget-table__cell-display--${kind}`]: true
     };
     if (kind === 'list' || kind === 'date' || kind === 'time' || kind === 'datetime') {
@@ -54,12 +83,12 @@ function getCellDisplayClass(column) {
     return classMap;
 }
 
-function getCellDisplayTextClass(column) {
+function getCellDisplayTextClass(column: TableRuntimeColumn | null | undefined): string[] {
     const kind = getCellDisplayKind(column);
     return kind ? [`widget-table__cell-display-text--${kind}`] : [];
 }
 
-function getCellDisplayTextStyle(column) {
+function getCellDisplayTextStyle(column: TableRuntimeColumn | null | undefined): CssStyleMap {
     const kind = getCellDisplayKind(column);
     if (kind === 'list') {
         return {
@@ -91,42 +120,54 @@ function getCellDisplayTextStyle(column) {
     return {};
 }
 
-function getCellDisplayActionsClass(column) {
+function getCellDisplayActionsClass(column: TableRuntimeColumn | null | undefined): string[] {
     const kind = getCellDisplayKind(column);
     return kind ? [`widget-table__cell-actions--${kind}`] : [];
 }
 
-function getCellDisplayActionClass(action) {
+function getCellDisplayActionClass(action: TableCellDisplayAction | null | undefined): string[] {
     const kind = action && action.kind ? String(action.kind).trim() : '';
     return kind ? [`widget-table__cell-action--${kind}`] : [];
 }
 
-function resolveTableLazyEnabled(widgetConfig, rowCount, threshold = 100) {
+function resolveTableLazyEnabled(
+    widgetConfig: TableWidgetConfig | null | undefined,
+    rowCount: number,
+    threshold = 100
+): boolean {
     const flag = widgetConfig && widgetConfig.table_lazy;
     if (flag === true) return true;
     if (flag === false) return false;
     return rowCount > threshold;
 }
 
-function padDatePart(value) {
+function padDatePart(value: number | string): string {
     return String(value).padStart(2, '0');
 }
 
-function getColumnAttrConfig(attrsByName, column) {
-    const attrs = attrsByName && typeof attrsByName === 'object' ? attrsByName : {};
-    if (column && column.widgetRef && attrs[column.widgetRef]) {
-        return attrs[column.widgetRef] || {};
+function getColumnAttrConfig(
+    attrsByName: Record<string, unknown> | null | undefined,
+    column: TableRuntimeColumn | null | undefined
+): TableColumnAttrConfig {
+    const attrs = isObjectRecord(attrsByName) ? attrsByName : {};
+    const keys = [column?.widgetRef, column?.source, column?.attr];
+
+    for (const rawKey of keys) {
+        const key = typeof rawKey === 'string' ? rawKey.trim() : '';
+        if (key && isObjectRecord(attrs[key])) {
+            return attrs[key] as TableColumnAttrConfig;
+        }
     }
-    if (column && column.source && attrs[column.source]) {
-        return attrs[column.source] || {};
-    }
-    if (column && column.attr && attrs[column.attr]) {
-        return attrs[column.attr] || {};
-    }
-    return (column && column.widgetConfig) || {};
+
+    return isObjectRecord(column?.widgetConfig)
+        ? (column.widgetConfig as TableColumnAttrConfig)
+        : {};
 }
 
-function isListColumnMultiselect(attrsByName, column) {
+function isListColumnMultiselect(
+    attrsByName: Record<string, unknown> | null | undefined,
+    column: TableRuntimeColumn | null | undefined
+): boolean {
     if (!column || !isChoiceColumnType(column.type)) {
         return false;
     }
@@ -135,15 +176,23 @@ function isListColumnMultiselect(attrsByName, column) {
     return !!(attrCfg.multiselect || column.multiselect);
 }
 
-function getColumnTableCellOptions(attrsByName, column, sanitizeTableCellOptions) {
+function getColumnTableCellOptions(
+    attrsByName: Record<string, unknown> | null | undefined,
+    column: TableRuntimeColumn | null | undefined,
+    sanitizeTableCellOptions?: SanitizeTableCellOptions
+): TableCellOptions {
     const sourceCfg = getColumnAttrConfig(attrsByName, column);
     if (typeof sanitizeTableCellOptions === 'function') {
         return sanitizeTableCellOptions(column && column.type, sourceCfg);
     }
-    return (column && column.tableCellOptions) || {};
+    return column && column.tableCellOptions ? column.tableCellOptions : {};
 }
 
-function normalizeCellWidgetValue(column, currentVal, isMulti) {
+function normalizeCellWidgetValue(
+    column: TableRuntimeColumn | null | undefined,
+    currentVal: unknown,
+    isMulti: boolean
+): unknown {
     if (!column) return currentVal;
     if (isChoiceColumnType(column.type)) {
         if (isMulti) {
@@ -158,7 +207,7 @@ function normalizeCellWidgetValue(column, currentVal, isMulti) {
     return currentVal == null ? '' : currentVal;
 }
 
-function tableCellConsumeKeys(column) {
+function tableCellConsumeKeys(column: TableRuntimeColumn | null | undefined): string {
     if (!column) return '';
     if (
         isChoiceColumnType(column.type) ||
@@ -171,13 +220,16 @@ function tableCellConsumeKeys(column) {
     return '';
 }
 
-function defaultCellValueFromColumn(column, options = {}) {
+function defaultCellValueFromColumn(
+    column: TableRuntimeColumn | null | undefined,
+    options: DefaultCellValueOptions = {}
+): unknown {
     if (!column) return '';
     if (typeof options.isLineNumberColumn === 'function' && options.isLineNumberColumn(column)) {
         return '';
     }
 
-    const tableCellOptions = options.tableCellOptions && typeof options.tableCellOptions === 'object'
+    const tableCellOptions = options.tableCellOptions && isObjectRecord(options.tableCellOptions)
         ? options.tableCellOptions
         : {};
 
@@ -212,7 +264,11 @@ function defaultCellValueFromColumn(column, options = {}) {
     return tableCellOptions.default;
 }
 
-function defaultCellValueForColumn(columns, colIndex, options = {}) {
+function defaultCellValueForColumn(
+    columns: TableRuntimeColumn[],
+    colIndex: number,
+    options: DefaultCellValueOptions = {}
+): unknown {
     const list = Array.isArray(columns) ? columns : [];
     const column = list[colIndex];
     const value = defaultCellValueFromColumn(column, options);
@@ -220,7 +276,11 @@ function defaultCellValueForColumn(columns, colIndex, options = {}) {
     return value == null ? '' : value;
 }
 
-function blankCellValueForColumn(columns, colIndex, options = {}) {
+function blankCellValueForColumn(
+    columns: TableRuntimeColumn[],
+    colIndex: number,
+    options: DefaultCellValueOptions = {}
+): unknown {
     const list = Array.isArray(columns) ? columns : [];
     const column = list[colIndex];
     return options.isListColumnMultiselect === true && column && isChoiceColumnType(column.type)

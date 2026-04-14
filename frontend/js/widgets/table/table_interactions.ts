@@ -157,6 +157,11 @@ const InteractionRuntimeMethods = {
                         this.endProgrammaticFocusSoon();
                         return;
                     }
+                    if (!(editor instanceof HTMLInputElement)) {
+                        editor.focus();
+                        this.endProgrammaticFocusSoon();
+                        return;
+                    }
                     editor.focus();
                     editor.value = character;
                     try {

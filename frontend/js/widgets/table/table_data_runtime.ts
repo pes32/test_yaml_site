@@ -4,6 +4,7 @@ import {
     defaultCellValueFromColumn as selectDefaultCellValueFromColumn,
     resolveTableLazyEnabled as selectResolveTableLazyEnabled
 } from './table_selectors.ts';
+import type { TableDataRow } from './table_contract.ts';
 import { defineTableRuntimeModule } from './table_method_helpers.ts';
 import { TABLE_LAZY_THRESHOLD } from './table_grouping.ts';
 import {
@@ -233,10 +234,11 @@ const DataRuntimeMethods = defineTableRuntimeModule({
             : [];
         const cols = this.tableColumns.length;
         const lazyThreshold = TABLE_LAZY_THRESHOLD;
-        let normalized = null;
+        let normalized: TableDataRow[] = [];
         if (cols > 0) {
-            normalized = this.normalizeExternalRowsOrWarn(incoming);
-            if (normalized == null) return;
+            const nextRows = this.normalizeExternalRowsOrWarn(incoming);
+            if (nextRows == null) return;
+            normalized = nextRows;
         }
         this.sortKeys = [];
         this._sortCycleRowOrder = null;

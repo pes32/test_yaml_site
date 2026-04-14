@@ -101,7 +101,7 @@ const MenuRuntimeMethods = defineTableRuntimeModule({
         this._detachContextMenuGlobalListeners();
         this._contextMenuClickHandler = (event) => {
             const element = this.$refs.contextMenuEl;
-            if (element && element.contains(event.target)) return;
+            if (element && event.target instanceof Node && element.contains(event.target)) return;
             this.hideContextMenu();
         };
         this._contextMenuKeydownHandler = (event) => {
@@ -214,17 +214,17 @@ const MenuRuntimeMethods = defineTableRuntimeModule({
     },
 
     runContextMenuAction(id, snapshot) {
-        const sortIds = { sort_asc: 1, sort_desc: 1, sort_reset: 1 };
-        const groupIds = { group_add_level: 1, group_clear: 1 };
-        const stickyIds = { toggle_sticky_header: 1 };
-        const wrapIds = { toggle_word_wrap: 1 };
+        const sortIds = new Set(['sort_asc', 'sort_desc', 'sort_reset']);
+        const groupIds = new Set(['group_add_level', 'group_clear']);
+        const stickyIds = new Set(['toggle_sticky_header']);
+        const wrapIds = new Set(['toggle_word_wrap']);
         if (
             !this.isEditable &&
             id !== 'copy' &&
-            !sortIds[id] &&
-            !groupIds[id] &&
-            !stickyIds[id] &&
-            !wrapIds[id]
+            !sortIds.has(id) &&
+            !groupIds.has(id) &&
+            !stickyIds.has(id) &&
+            !wrapIds.has(id)
         ) {
             return;
         }
@@ -277,13 +277,13 @@ const MenuRuntimeMethods = defineTableRuntimeModule({
                 this.onGroupAddLevelFromSnapshot(snapshot);
                 break;
             case 'group_clear':
-                this.onGroupClearFromSnapshot(snapshot);
+                this.onGroupClearFromSnapshot();
                 break;
             case 'toggle_sticky_header':
-                this.toggleStickyHeaderFromSnapshot(snapshot);
+                this.toggleStickyHeaderFromSnapshot();
                 break;
             case 'toggle_word_wrap':
-                this.toggleWordWrapFromSnapshot(snapshot);
+                this.toggleWordWrapFromSnapshot();
                 break;
             case 'recalculate_line_numbers':
                 this.recalculateLineNumbersFromSnapshot(snapshot);

@@ -4,7 +4,7 @@ import { getRowCells, normalizeRowToDataRow } from './table_utils.ts';
 
 const ClipboardRuntimeMethods = defineTableRuntimeModule({
     listMultiFn() {
-        return (col) => this.listColumnIsMultiselect(this.tableColumns[col]);
+        return (col: number) => this.listColumnIsMultiselect(this.tableColumns[col]);
     },
 
     async writeClipboardText(text) {
@@ -60,7 +60,7 @@ const ClipboardRuntimeMethods = defineTableRuntimeModule({
             if (row && typeof row === 'object' && row.id != null && !Array.isArray(row)) {
                 this.tableData.splice(rowIndex, 1, { id: row.id, cells: base });
             } else {
-                this.tableData.splice(rowIndex, 1, base);
+                this.tableData.splice(rowIndex, 1, { id: `row_${rowIndex}`, cells: base });
             }
         }
     },
@@ -107,7 +107,7 @@ const ClipboardRuntimeMethods = defineTableRuntimeModule({
             if (previous && typeof previous === 'object' && previous.id != null && !Array.isArray(previous)) {
                 this.tableData.splice(rowIndex, 1, { id: previous.id, cells: row });
             } else {
-                this.tableData.splice(rowIndex, 1, row);
+                this.tableData.splice(rowIndex, 1, { id: `row_${rowIndex}`, cells: row });
             }
         }
         this.onInput();

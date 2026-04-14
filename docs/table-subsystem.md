@@ -27,15 +27,17 @@ Companion docs:
 
 ## Runtime Controller Contract
 
-Legacy-архитектура на `table_core`, `tableEngine.*Methods`, import-order registration и `Object.assign(...Methods)` удалена.
-
 Актуальный contract:
 
+- `table_contract.ts` разделяет `TableRuntimeState`, `TableRuntimeComputed`, `TableRuntimeMethods`, `TableRuntimeDomSurface`, `TableRuntimeVm` и `TableWidgetSetupBindings`;
+- runtime state содержит обязательные поля loading/grouping/sorting/display/menu/sticky/word-wrap path, а не loose `Record<string, unknown>`;
 - каждый helper экспортирует явный module interface;
 - `createTableRuntime.ts` собирает computed/watch/method groups в одном месте;
 - `TableWidget.vue` работает через `useTableRuntime()` и controller, а не через разрозненные method-mixins;
 - порядок импортов больше не является частью поведения runtime;
 - table modules импортируют друг друга напрямую или получают host services через bridge.
+
+`table_method_helpers.ts` не использует broad string-index для runtime modules. `this` внутри module methods типизируется как полный `TableRuntimeVm` плюс методы текущего модуля, поэтому state fields больше не схлопываются в generic runtime method.
 
 ## External Contract
 
@@ -73,7 +75,7 @@ Page runtime отдаёт таблице входные данные и догр
 Главное правило после рефакторинга:
 
 - `TableWidget.vue` отвечает за template, refs, props/emits и подключение runtime controller;
-- `table_selectors.ts` и pure helpers отвечают за derived data;
+- `table_selectors.ts` и pure helpers отвечают за typed derived data;
 - runtime modules отвечают за поведение, browser events и host integration.
 
 Это уменьшает смешение UI-поведения, data-shaping и DOM side effects внутри Vue component.
@@ -104,8 +106,8 @@ Embedded cell widgets живут внутри table feature, но их runtime b
 - committed page state не хранится внутри таблицы;
 - table cell editors не получают прямой доступ к page host.
 
-## Known Remaining Debt
+## Current Typing Status
 
-Cleanup не закрывает strict typing долг table runtime. `npm --prefix tooling/vite run build` должен проходить, но `typecheck` и `typecheck:table` сейчас всё ещё могут падать на известных table typing gaps.
+Strict typing debt table runtime закрыт на уровне обязательного project gate: `npm --prefix tooling/vite run typecheck` и `npm --prefix tooling/vite run typecheck:table` должны проходить без table diagnostics.
 
-Самый важный архитектурный остаток: `TableWidgetVm` пока остаётся loose VM-boundary вокруг Vue instance, и его нужно сужать отдельным проходом, не смешивая это с удалением legacy.
+Оставшийся долг не в loose VM-boundary, а в качестве будущей детализации: часть runtime method signatures пока намеренно широкая на внешних event/widget границах и должна сужаться только вместе с покрытием соответствующего поведения smoke/unit tests.

@@ -1,13 +1,13 @@
 /**
  * Клавиатура редактируемой таблицы: цепочка обработчиков + диспетчер.
  */
-import type { TableWidgetVm } from './table_contract.ts';
+import type { TableRuntimeVm } from './table_contract.ts';
 import { rowMoveDuplicateOpsAllowed } from './table_context_menu.ts';
 import { tableLog } from './table_debug.ts';
 import { getCellFromEvent } from './table_dom.ts';
 import { buildJumpOpts, jumpTarget } from './table_jump.ts';
 
-    type KeyboardVm = TableWidgetVm & Record<string, unknown>;
+    type KeyboardVm = TableRuntimeVm;
     type KeyboardCtx = {
         col: number;
         dropdownOpen?: Element | null;

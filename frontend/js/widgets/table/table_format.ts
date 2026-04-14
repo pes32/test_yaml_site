@@ -1,13 +1,20 @@
 /**
  * Парсинг форматов и отображение значений ячеек (чистые функции, без DOM).
  */
+import type { TableRuntimeColumn } from './table_contract.ts';
 
-function addThousands(s) {
+type NumericFormatHint = {
+    hasThousands: boolean;
+    kind?: string;
+    precision?: number;
+};
+
+function addThousands(s: string): string {
     return s.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
 /** Разбор строки формата вида #,.3f (упрощённо, как в formatCellValue). */
-function parseNumericFormatHint(fmt) {
+function parseNumericFormatHint(fmt: unknown): NumericFormatHint {
     const s = String(fmt || '');
     const hasThousands = /#,/.test(s) || /,/.test(s.replace(/^#/, ''));
     const precMatch = s.match(/\.([0-9]+)/);
@@ -17,7 +24,7 @@ function parseNumericFormatHint(fmt) {
     return { hasThousands, precision, kind };
 }
 
-function formatNumberWithHint(num, hint) {
+function formatNumberWithHint(num: number, hint: NumericFormatHint): string {
     const { hasThousands, precision, kind } = hint;
     if (kind === 'e') {
         const p = precision !== undefined ? precision : 6;
@@ -31,7 +38,7 @@ function formatNumberWithHint(num, hint) {
         const fixed = num.toFixed(precision);
         if (hasThousands) {
             const [intPart, fracPart = ''] = fixed.split('.');
-            const withSep = addThousands(intPart);
+            const withSep = addThousands(intPart || '');
             return fracPart ? `${withSep}.${fracPart}` : withSep;
         }
         return fixed;
@@ -39,17 +46,13 @@ function formatNumberWithHint(num, hint) {
     const plain = String(num);
     if (hasThousands) {
         const [intPart, fracPart = ''] = plain.split('.');
-        const withSep = addThousands(intPart);
+        const withSep = addThousands(intPart || '');
         return fracPart ? `${withSep}.${fracPart}` : withSep;
     }
     return plain;
 }
 
-/**
- * @param {*} value
- * @param {{ type?: string, format?: string }} column
- */
-function formatCellValue(value, column) {
+function formatCellValue(value: unknown, column: TableRuntimeColumn | null | undefined): string {
     if (value === null || value === undefined) return '';
     if (
         column &&

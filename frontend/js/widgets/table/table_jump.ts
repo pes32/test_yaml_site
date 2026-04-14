@@ -2,15 +2,39 @@
  * Прыжок по стрелкам с Cmd/Ctrl как в Excel: вдоль строки/столбца
  * по непрерывному блоку заполненных или пустых ячеек.
  */
+import type {
+    TableCellAddress,
+    TableDataRow,
+    TableRuntimeColumn,
+    TableRuntimeVm
+} from './table_contract.ts';
 import { clamp, getRowCells } from './table_utils.ts';
 
-    function cellValue(tableData, row, col) {
+type JumpListMultiselect = (column: TableRuntimeColumn | null | undefined) => boolean;
+
+type JumpOptions = {
+    col: number;
+    dc: number;
+    dr: number;
+    listColumnIsMultiselect?: JumpListMultiselect;
+    row: number;
+    tableColumns: TableRuntimeColumn[];
+    tableData: TableDataRow[];
+};
+
+function cellValue(tableData: TableDataRow[], row: number, col: number): unknown {
         const r = tableData[row];
         const cells = getRowCells(r);
         return cells[col];
     }
 
-    function isEmpty(tableData, tableColumns, row, col, listMultiFn) {
+    function isEmpty(
+        tableData: TableDataRow[],
+        tableColumns: TableRuntimeColumn[],
+        row: number,
+        col: number,
+        listMultiFn: JumpListMultiselect
+    ): boolean {
         const column = tableColumns[col];
         const v = cellValue(tableData, row, col);
         if (column && (column.type === 'list' || column.type === 'voc') && listMultiFn(column)) {
@@ -20,18 +44,7 @@ import { clamp, getRowCells } from './table_utils.ts';
         return String(v).trim() === '';
     }
 
-    /**
-     * @param {object} opts
-     * @param {Array} opts.tableData
-     * @param {Array} opts.tableColumns
-     * @param {number} opts.row
-     * @param {number} opts.col
-     * @param {number} opts.dr -1|0|1
-     * @param {number} opts.dc -1|0|1
-     * @param {function} opts.listColumnIsMultiselect
-     * @returns {{ r: number, c: number }|null}
-     */
-    function jumpTarget(opts) {
+    function jumpTarget(opts: JumpOptions): TableCellAddress | null {
         const {
             tableData,
             tableColumns,
@@ -49,7 +62,7 @@ import { clamp, getRowCells } from './table_utils.ts';
         const c0 = clamp(col, 0, maxC);
         const lm = listColumnIsMultiselect || (() => false);
 
-        const empty = (r, c) => isEmpty(tableData, tableColumns, r, c, lm);
+        const empty = (r: number, c: number) => isEmpty(tableData, tableColumns, r, c, lm);
 
         // Как в Excel (Ctrl/Cmd+стрелка) для заполненной ячейки:
         // 1) если не на краю блока непрерывных non-empty в этом направлении — прыжок к этому краю;
@@ -125,7 +138,13 @@ import { clamp, getRowCells } from './table_utils.ts';
     /**
      * Чистые опции для jumpTarget из экземпляра виджета (граница VM ↔ логика).
      */
-    function buildJumpOpts(vm, row, col, dr, dc) {
+    function buildJumpOpts(
+        vm: TableRuntimeVm,
+        row: number,
+        col: number,
+        dr: number,
+        dc: number
+    ): JumpOptions {
         return {
             tableData: vm.tableData,
             tableColumns: vm.tableColumns,
@@ -133,7 +152,8 @@ import { clamp, getRowCells } from './table_utils.ts';
             col,
             dr,
             dc,
-            listColumnIsMultiselect: (column) => vm.listColumnIsMultiselect(column)
+            listColumnIsMultiselect: (column: TableRuntimeColumn | null | undefined) =>
+                vm.listColumnIsMultiselect(column)
         };
     }
 

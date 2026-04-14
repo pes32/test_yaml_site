@@ -16,7 +16,7 @@
       :placeholder="showPlaceholder ? widgetConfig.placeholder : ''"
       :disabled="widgetConfig.readonly"
       :tabindex="widgetConfig.readonly ? -1 : null"
-      @input="onFloatInput"
+      @input="onInput"
       @focus="onFocus"
       @blur="onBlur"
       @keydown.enter="onEnterCommit"
@@ -28,105 +28,46 @@
   </md3-field>
 </template>
 
-<script>
+<script setup lang="ts">
 import Md3Field from '../common/Md3Field.vue';
-import useWidgetField from '../composables/useWidgetField.ts';
+import useSimpleFieldWidget, {
+  type SimpleFieldEmit,
+  type SimpleFieldWidgetProps
+} from '../composables/useSimpleFieldWidget.ts';
 
-export default {
-  name: 'FloatWidget',
-  components: { Md3Field },
-  props: {
-    widgetConfig: { type: Object, required: true },
-    widgetName: { type: String, required: true }
-  },
-  emits: ['input'],
-  setup(props, { emit }) {
-    return useWidgetField(props, emit);
-  },
-  data() {
-    return { value: '', regexError: '', floatError: '', isFocused: false };
-  },
-  computed: {
-    hasValue() { return Boolean(this.value); },
-    labelFloats() { return this.hasValue || this.isFocused; },
-    showPlaceholder() { return !this.hasValue && this.isFocused && this.widgetConfig.placeholder; }
-  },
-  methods: {
-    onFocus() {
-      this.isFocused = true;
-      this.activateDraftController();
-    },
-    onFloatInput() {
-      let input = this.value.replace(/,/g, '.').replace(/[^0-9.-]/g, '');
-      if (input.startsWith('-')) {
-        input = '-' + input.substring(1).replace(/-/g, '');
-      } else {
-        input = input.replace(/-/g, '');
-      }
+defineOptions({
+  name: 'FloatWidget'
+});
 
-      const dotCount = (input.match(/\./g) || []).length;
-      if (dotCount > 1) {
-        const parts = input.split('.');
-        input = parts[0] + '.' + parts.slice(1).join('');
-      }
+const props = defineProps<SimpleFieldWidgetProps>();
+const emit = defineEmits<SimpleFieldEmit>();
 
-      this.value = input;
-      if (input === '' || input === '-' || input === '.' || input === '-.') {
-        this.floatError = '';
-      } else if (input.endsWith('.') || input.endsWith('-')) {
-        this.floatError = '';
-      } else {
-        const num = parseFloat(input);
-        this.floatError = isNaN(num) ? 'Введите корректное дробное число' : '';
-      }
+const {
+  commitDraft,
+  commitPendingState,
+  fieldError,
+  getValue,
+  hasValue,
+  isDraftEditing,
+  isFocused,
+  labelFloats,
+  onBlur,
+  onEnterCommit,
+  onFocus,
+  onInput,
+  setValue,
+  showPlaceholder,
+  tableCellRootAttrs,
+  value
+} = useSimpleFieldWidget(props, emit, { kind: 'float' });
 
-      this.validateRegex();
-      if (this.tableCellMode) {
-        this.emitInput(this.value);
-        return;
-      }
-
-      this.activateDraftController();
-    },
-    onBlur() {
-      this.isFocused = false;
-      this.commitDraft();
-      this.deactivateDraftController();
-    },
-    onEnterCommit(event) {
-      if (this.tableCellMode) {
-        return;
-      }
-
-      event.preventDefault();
-      this.commitDraft();
-      event.target?.blur?.();
-    },
-    commitDraft() {
-      this.validateRegex();
-      this.handleTableCellCommitValidation(this.fieldError);
-      this.emitInput(this.value);
-    },
-    setValue(value) {
-      this.value = value == null ? '' : String(value);
-      this.floatError = '';
-      this.validateRegex();
-    },
-    getValue() {
-      return this.value;
-    }
-  },
-  watch: {
-    'widgetConfig.value': {
-      immediate: true,
-      handler(value) {
-        if (value === undefined) return;
-        this.syncCommittedValue(value, (nextValue) => this.setValue(nextValue));
-      }
-    }
-  },
-  mounted() {
-    this.validateRegex();
-  }
-};
+defineExpose({
+  commitDraft,
+  commitPendingState,
+  fieldError,
+  getValue,
+  isDraftEditing,
+  setValue,
+  value
+});
 </script>

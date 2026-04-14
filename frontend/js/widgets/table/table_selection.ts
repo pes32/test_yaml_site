@@ -1,11 +1,11 @@
 /**
  * Методы выделения ячеек для TableWidget (подмешиваются в methods).
  */
-import type { TableWidgetVm } from './table_contract.ts';
+import type { TableRuntimeVm } from './table_contract.ts';
 import { defineTableRuntimeModule } from './table_method_helpers.ts';
 import { clamp, getRowCells } from './table_utils.ts';
 
-type SelectionVm = TableWidgetVm & Record<string, unknown>;
+type SelectionVm = TableRuntimeVm;
 
 function getSelectionAnchor(vm: SelectionVm) {
     return vm.selAnchor || { r: 0, c: 0 };

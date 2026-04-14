@@ -42,6 +42,18 @@ What is still open:
 - `TableWidgetVm` is still too wide as a VM boundary;
 - browser/E2E smoke coverage for table interactions does not exist yet.
 
+### Frontend widget refactor
+
+Already migrated to Composition API + TypeScript:
+
+- core fields `str`, `text`, `int`, `float`.
+
+Still planned as separate steps:
+
+- simple but DOM/action-heavy widgets: `button`, `date`, `time`, `datetime`, `ip`, `ip_mask`;
+- dropdown/lookup widgets: `list`, `voc`, `split_button`;
+- larger subsystems: `img`, `table`.
+
 ### Ideas Merged From Old Drafts
 
 Old root-level drafts were condensed here to avoid keeping several competing plans in the repository root.
@@ -56,5 +68,6 @@ Old root-level drafts were condensed here to avoid keeping several competing pla
 - Add a careful save/update flow without breaking current contracts.
 - Formalize `select_attrs` or replace it with a clearer mechanism.
 - Continue stabilizing the frontend runtime and the documentation set.
+- Continue the staged Composition API + TypeScript refactor for the remaining widgets.
 - Close the strict typing debt in the table runtime.
 - Add real browser smoke coverage for key flows if the project needs an automated regression gate.

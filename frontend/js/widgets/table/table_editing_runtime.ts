@@ -1,11 +1,26 @@
 import { getRowCells } from './table_utils.ts';
 import { tableDebugState, tableLog } from './table_debug.ts';
 import { defineTableRuntimeModule } from './table_method_helpers.ts';
+import type { TableRuntimeColumn } from './table_contract.ts';
+
+function readEventValue(event: Event | { target?: { value?: unknown } } | unknown): unknown {
+    if (event instanceof Event) {
+        const target = event.target;
+        return target && 'value' in target ? (target as { value?: unknown }).value : event;
+    }
+    if (event && typeof event === 'object' && 'target' in event) {
+        const target = (event as { target?: unknown }).target;
+        if (target && typeof target === 'object' && 'value' in target) {
+            return (target as { value?: unknown }).value;
+        }
+    }
+    return event;
+}
 
 const EditingRuntimeMethods = defineTableRuntimeModule({
-    onCellInput(rowIndex, cellIndex, event) {
+    onCellInput(rowIndex: number, cellIndex: number, event: Event | { target?: { value?: unknown } } | unknown) {
         if (!this.canMutateColumnIndex(cellIndex)) return;
-        const newValue = event.target ? event.target.value : event;
+        const newValue = readEventValue(event);
         const dataIndex = this.resolveDataRowIndex(rowIndex);
         if (dataIndex < 0) return;
         const rowObject = this.tableData[dataIndex];
@@ -20,14 +35,14 @@ const EditingRuntimeMethods = defineTableRuntimeModule({
         tableLog('cell input', dataIndex, cellIndex);
     },
 
-    onIpInput(rowIndex, cellIndex, event) {
+    onIpInput(rowIndex: number, cellIndex: number, event: Event | { target?: { value?: unknown } } | unknown) {
         if (!this.canMutateColumnIndex(cellIndex)) return;
-        const raw = event.target.value || '';
+        const raw = String(readEventValue(event) || '');
         let filtered = raw.replace(/[^\d.]/g, '');
         const parts = filtered
             .split('.')
             .slice(0, 4)
-            .map((part) => part.replace(/\D/g, '').slice(0, 3));
+            .map((part: string) => part.replace(/\D/g, '').slice(0, 3));
         filtered = parts.join('.');
         const dataIndex = this.resolveDataRowIndex(rowIndex);
         if (dataIndex < 0) return;
@@ -43,7 +58,7 @@ const EditingRuntimeMethods = defineTableRuntimeModule({
         tableLog('cell ip input', dataIndex, cellIndex);
     },
 
-    onCellFormat(rowIndex, cellIndex, column) {
+    onCellFormat(rowIndex: number, cellIndex: number, column: TableRuntimeColumn | null | undefined) {
         try {
             if (!column) return;
             if (!column.format && column.type !== 'int' && column.type !== 'float') return;
@@ -94,11 +109,11 @@ const EditingRuntimeMethods = defineTableRuntimeModule({
                 ? tableEl.querySelector(`tbody td[data-row="${this.normRow(row)}"][data-col="${this.normCol(col)}"]`)
                 : null;
             if (
-                active &&
-                cell &&
-                active !== cell &&
-                cell.contains(active) &&
-                typeof active.blur === 'function'
+            active instanceof HTMLElement &&
+            cell &&
+            active !== cell &&
+            cell.contains(active) &&
+            typeof active.blur === 'function'
             ) {
                 active.blur();
             }
@@ -114,7 +129,7 @@ const EditingRuntimeMethods = defineTableRuntimeModule({
         if (!column) return;
         if (this.cellUsesEmbeddedWidget(column)) return;
         const editor = this.getCellEditorElement(row, col);
-        if (!editor || editor.tagName !== 'INPUT') return;
+        if (!(editor instanceof HTMLInputElement)) return;
         const raw = String(editor.value ?? '');
         const trimmed = raw.trim();
         if (trimmed === raw) return;
@@ -180,7 +195,7 @@ const EditingRuntimeMethods = defineTableRuntimeModule({
         const td = tableEl.querySelector(
             `tbody td[data-row="${normalizedRow}"][data-col="${normalizedCol}"]`
         );
-        if (!td || typeof td.focus !== 'function') return;
+        if (!(td instanceof HTMLElement)) return;
         this._tableProgrammaticFocus = true;
         td.focus();
         this.endProgrammaticFocusSoon();
@@ -196,7 +211,7 @@ const EditingRuntimeMethods = defineTableRuntimeModule({
             const td = tableEl.querySelector(
                 `tbody td[data-row="${normalizedRow}"][data-col="${normalizedCol}"]`
             );
-            if (!td || typeof td.focus !== 'function') return false;
+            if (!(td instanceof HTMLElement)) return false;
             this._tableProgrammaticFocus = true;
             td.focus();
             this.endProgrammaticFocusSoon();
@@ -235,7 +250,7 @@ const EditingRuntimeMethods = defineTableRuntimeModule({
                 return;
             }
             editor.focus();
-            if (editor.setSelectionRange) {
+            if (editor instanceof HTMLInputElement && typeof editor.setSelectionRange === 'function') {
                 const length = (editor.value != null ? String(editor.value) : '').length;
                 if (normalizedOptions.caretEnd === false) {
                     editor.setSelectionRange(0, 0);
@@ -281,10 +296,11 @@ const EditingRuntimeMethods = defineTableRuntimeModule({
                       ? 'openPicker'
                       : '';
         }
-        if (!methodName || typeof widget[methodName] !== 'function') {
+        const action = methodName ? widget[methodName] : null;
+        if (typeof action !== 'function') {
             return false;
         }
-        widget[methodName]();
+        action.call(widget);
         return true;
     },
 

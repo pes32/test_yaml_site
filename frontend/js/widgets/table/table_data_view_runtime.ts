@@ -9,13 +9,15 @@ import { defineTableRuntimeModule } from './table_method_helpers.ts';
 import { SelectionMethods } from './table_selection.ts';
 import { assignRowLineNumber, clamp, normalizeRowToDataRow } from './table_utils.ts';
 import { compareRowsComposite } from './table_sort.ts';
+import type { TableDataRow, TableRuntimeColumn } from './table_contract.ts';
 
 const DataViewRuntimeMethods = defineTableRuntimeModule({
     sortTableDataInPlace() {
         if (!this.sortKeys.length) {
             return;
         }
-        const listMulti = (column) => this.listColumnIsMultiselect(column);
+        const listMulti = (column: TableRuntimeColumn | null | undefined) =>
+            this.listColumnIsMultiselect(column);
         const sorted = [...this.tableData].sort((rowA, rowB) =>
             compareRowsComposite(rowA, rowB, this.sortKeys, this.tableColumns, listMulti)
         );
@@ -235,6 +237,7 @@ const DataViewRuntimeMethods = defineTableRuntimeModule({
 
     onHeaderSortClick(colIdx, event) {
         if (!this.headerSortEnabled || this.tableUiLocked) return;
+        if (colIdx == null) return;
         if (colIdx < 0 || colIdx >= this.tableColumns.length) return;
         const normalizedEvent = event || {};
         const shift = !!normalizedEvent.shiftKey;
@@ -375,13 +378,23 @@ const DataViewRuntimeMethods = defineTableRuntimeModule({
                 if (!row || row.id == null) return;
                 nextNumbers.set(String(row.id), index + 1);
             });
-            const updated = this.tableData.map((row) =>
-                assignRowLineNumber(
+            const updated = this.tableData.map((row): TableDataRow => {
+                const nextRow = assignRowLineNumber(
                     row,
                     this.tableColumns,
                     nextNumbers.get(String(row.id))
-                )
-            );
+                );
+                return nextRow &&
+                    typeof nextRow === 'object' &&
+                    !Array.isArray(nextRow) &&
+                    Array.isArray((nextRow as { cells?: unknown[] }).cells) &&
+                    (nextRow as { id?: unknown }).id != null
+                    ? {
+                          id: String((nextRow as { id: unknown }).id),
+                          cells: (nextRow as { cells: unknown[] }).cells
+                      }
+                    : row;
+            });
             this.tableData.splice(0, this.tableData.length, ...updated);
             this.sortKeys = [];
             this._sortCycleRowOrder = null;

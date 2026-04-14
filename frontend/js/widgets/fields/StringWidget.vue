@@ -29,81 +29,46 @@
   </md3-field>
 </template>
 
-<script>
+<script setup lang="ts">
 import Md3Field from '../common/Md3Field.vue';
-import useWidgetField from '../composables/useWidgetField.ts';
+import useSimpleFieldWidget, {
+  type SimpleFieldEmit,
+  type SimpleFieldWidgetProps
+} from '../composables/useSimpleFieldWidget.ts';
 
-export default {
-  name: 'StringWidget',
-  components: { Md3Field },
-  props: {
-    widgetConfig: { type: Object, required: true },
-    widgetName: { type: String, required: true }
-  },
-  emits: ['input'],
-  setup(props, { emit }) {
-    return useWidgetField(props, emit);
-  },
-  data() {
-    return { value: '', regexError: '', isFocused: false };
-  },
-  computed: {
-    hasValue() { return Boolean(this.value); },
-    labelFloats() { return this.hasValue || this.isFocused; },
-    showPlaceholder() { return !this.hasValue && this.isFocused && this.widgetConfig.placeholder; }
-  },
-  methods: {
-    onFocus() {
-      this.isFocused = true;
-      this.activateDraftController();
-    },
-    onInput() {
-      this.validateRegex();
-      if (this.tableCellMode) {
-        this.emitInput(this.value);
-        return;
-      }
+defineOptions({
+  name: 'StringWidget'
+});
 
-      this.activateDraftController();
-    },
-    onBlur() {
-      this.isFocused = false;
-      this.commitDraft();
-      this.deactivateDraftController();
-    },
-    onEnterCommit(event) {
-      if (this.tableCellMode) {
-        return;
-      }
+const props = defineProps<SimpleFieldWidgetProps>();
+const emit = defineEmits<SimpleFieldEmit>();
 
-      event.preventDefault();
-      this.commitDraft();
-      event.target?.blur?.();
-    },
-    commitDraft() {
-      this.validateRegex();
-      this.handleTableCellCommitValidation(this.fieldError);
-      this.emitInput(this.value);
-    },
-    setValue(value) {
-      this.value = value == null ? '' : String(value);
-      this.validateRegex();
-    },
-    getValue() {
-      return this.value;
-    }
-  },
-  watch: {
-    'widgetConfig.value': {
-      immediate: true,
-      handler(value) {
-        if (value === undefined) return;
-        this.syncCommittedValue(value, (nextValue) => this.setValue(nextValue));
-      }
-    }
-  },
-  mounted() {
-    this.validateRegex();
-  }
-};
+const {
+  commitDraft,
+  commitPendingState,
+  fieldError,
+  getValue,
+  hasValue,
+  isDraftEditing,
+  isFocused,
+  labelFloats,
+  onBlur,
+  onEnterCommit,
+  onFocus,
+  onInput,
+  setValue,
+  showPlaceholder,
+  tableCellRootAttrs,
+  value
+} = useSimpleFieldWidget(props, emit, { kind: 'string' });
+
+defineExpose({
+  commitDraft,
+  commitPendingState,
+  fieldError,
+  getValue,
+  isDraftEditing,
+  setValue,
+  value
+});
 </script>

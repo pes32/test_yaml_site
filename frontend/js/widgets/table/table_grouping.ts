@@ -1,6 +1,11 @@
 /**
  * Table grouping helpers: display tree, path keys, expanded state pruning.
  */
+import type {
+    TableDataRow,
+    TableDisplayRow,
+    TableRuntimeColumn
+} from './table_contract.ts';
 
 const TABLE_LAZY_THRESHOLD = 100;
 
@@ -52,12 +57,12 @@ function canAddGroupingLevel(totalCols: number, levelsLen: number): boolean {
 }
 
 function buildDisplayRows(
-    tableData: Array<{ id?: string; cells?: unknown[] }>,
+    tableData: TableDataRow[],
     levels: number[],
     expandedSet: Set<string>,
-    columns: Array<Record<string, unknown>>
-) {
-    const displayRows: Array<Record<string, unknown>> = [];
+    columns: TableRuntimeColumn[]
+): { displayRows: TableDisplayRow[]; rowMap: Map<string, number>; validPathKeys: Set<string> } {
+    const displayRows: TableDisplayRow[] = [];
     const rowMap = new Map<string, number>();
     const validPathKeys = new Set<string>();
 
@@ -151,9 +156,9 @@ function buildDisplayRows(
 }
 
 function buildGroupedDataOrder(
-    tableData: Array<{ cells?: unknown[] }>,
+    tableData: TableDataRow[],
     levels: number[],
-    columns: Array<Record<string, unknown>>
+    columns: TableRuntimeColumn[]
 ): number[] {
     const data = Array.isArray(tableData) ? tableData : [];
     const cols = Array.isArray(columns) ? columns : [];

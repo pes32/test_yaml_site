@@ -85,6 +85,29 @@ Backend валидирует:
 - разрешённые ключи для этого widget;
 - форму значений для `dialog`, `rows`, boolean flags, `source`, `select_attrs`.
 
+### Core field widgets
+
+`str`, `text`, `int` и `float` — базовые stateful widgets с единым draft/commit
+контрактом во frontend runtime.
+
+Общее поведение:
+
+- значение хранится и публикуется как строка;
+- `default` задаёт начальное значение, если committed value ещё не появлялся;
+- `readonly: true` блокирует ввод и убирает поле из tab-order;
+- `placeholder` показывается только во время фокуса и при пустом значении;
+- `sup_text` показывается как supporting text, пока нет validation error;
+- `regex` и `err_text` применяются на live input и commit, кроме readonly режима;
+- вне table-cell режима ввод держится как draft и публикуется при blur/commit;
+- в table-cell режиме значение публикуется на input, а commit validation синхронизируется с таблицей.
+
+Особенности:
+
+- `str` — однострочное текстовое поле;
+- `text` — textarea, `rows` задаёт высоту, по умолчанию используется `3`;
+- `int` принимает только целое число в строковом формате, пустое значение валидно;
+- `float` принимает дробное число в строковом формате, запятая при вводе нормализуется в точку, пустое значение валидно.
+
 ### `button` и `split_button`
 
 Публичный YAML-контракт:

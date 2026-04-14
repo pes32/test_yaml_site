@@ -7,7 +7,7 @@
 yamls.ru
 
 - This is a clickable mockup of a system built on YAMLs. I chose YAMLs as the way to describe attributes and the interface because they are simple enough for almost anyone to write. My previous team and I arrived at this approach after building countless line-of-business systems. At this point, the system already includes the most common input widgets, which should cover most typical tasks.
-- I recommend clicking through all the widgets by hand. Many of them turned out quite well, especially the table widget, though text/textarea is not that great yet.
+- I recommend clicking through all the widgets by hand. The core fields and table are already quite usable, and the remaining widgets are being moved toward the newer frontend runtime step by step.
 - The current system is intentionally exaggerated and implemented entirely in YAML. That does not mean this is always the right way to do things, but it is at least something worth thinking about.
 - Database support is planned. In fact, the database layer is already partially wired in, but it does not work yet. The main question is how exactly to integrate it. If I follow the current logic, then functions and business logic should probably be described in PostgreSQL, as the simplest available language for this purpose, and invoked from the current YAML attributes. I am not sure that is a good idea, but building a full custom backend of my own also feels pointless and like wasted time.
 - Maybe one day I will add diagrams and some integrations. Or more widgets and other functionality. I do not know yet.

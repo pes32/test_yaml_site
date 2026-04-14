@@ -55,7 +55,7 @@ const ViewRuntimeMethods = defineTableRuntimeModule({
         return this.sortDirection === 'asc' ? 'ascending' : 'descending';
     },
 
-    sortControlClass(colIdx: number) {
+    sortControlClass(colIdx: number | null) {
         return {
             'widget-table__sort-icons--active': this.sortColumnIndex === colIdx,
             'widget-table__sort-icons--asc':
@@ -65,7 +65,8 @@ const ViewRuntimeMethods = defineTableRuntimeModule({
         };
     },
 
-    sortAriaLabel(colIdx: number) {
+    sortAriaLabel(colIdx: number | null) {
+        if (colIdx == null || colIdx < 0) return 'Сортировка недоступна.';
         const col = this.tableColumns[colIdx];
         const name = col && col.label ? String(col.label) : String(colIdx + 1);
         if (this.sortColumnIndex !== colIdx) {
@@ -78,10 +79,10 @@ const ViewRuntimeMethods = defineTableRuntimeModule({
     },
 
     getTableEl() {
-        const refs = (this.$refs || {}) as Record<string, unknown>;
-        const root = refs.tableRoot as Element | null | undefined;
-        if (root && root.nodeType === 1) return root;
-        return this.$el && this.$el.querySelector('.widget-table');
+        const root = this.$refs.tableRoot;
+        if (root instanceof HTMLTableElement) return root;
+        const table = this.$el?.querySelector('.widget-table');
+        return table instanceof HTMLTableElement ? table : null;
     },
 
     headerSortAffordancePx() {

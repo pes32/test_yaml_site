@@ -7,8 +7,8 @@ import {
 import { findVerticalScrollRoot, scheduleUpdate } from './table_scroll.ts';
 
 type StickyRuntimeVm = TableRuntimeVm & {
-    _stickyCloneClickHandler?: ((event: Event) => void) | null;
-    _stickyCloneContextMenuHandler?: ((event: Event) => void) | null;
+    _stickyCloneClickHandler?: ((event: MouseEvent) => void) | null;
+    _stickyCloneContextMenuHandler?: ((event: MouseEvent) => void) | null;
     _stickyCloneKeydownHandler?: ((event: KeyboardEvent) => void) | null;
     _stickyCloneSignature?: string;
     _stickyCloneTableEl?: HTMLTableElement | null;
@@ -99,7 +99,7 @@ function parseRuntimeColIndex(th: Element | null | undefined): number | null {
 function bindStickyCloneEvents(vm: StickyRuntimeVm, overlay: HTMLTableElement): void {
     if (overlay === vm._stickyCloneTableEl) return;
 
-    vm._stickyCloneClickHandler = (event: Event) => {
+    vm._stickyCloneClickHandler = (event: MouseEvent) => {
         const target = event.target as HTMLElement | null;
         const trigger = target?.closest('.widget-table__th-inner');
         if (!trigger || !overlay.contains(trigger)) return;
@@ -122,7 +122,7 @@ function bindStickyCloneEvents(vm: StickyRuntimeVm, overlay: HTMLTableElement): 
         vm.onHeaderSortClick(runtimeColIndex, event);
     };
 
-    vm._stickyCloneContextMenuHandler = (event: Event) => {
+    vm._stickyCloneContextMenuHandler = (event: MouseEvent) => {
         const target = event.target as HTMLElement | null;
         const th = target?.closest('th');
         if (!th || !overlay.contains(th)) return;

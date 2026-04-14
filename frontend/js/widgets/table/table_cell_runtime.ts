@@ -17,6 +17,7 @@ import { tableLog } from './table_debug.ts';
 import { defineTableRuntimeModule } from './table_method_helpers.ts';
 import { sanitizeTableCellOptions } from './table_parse_attrs.ts';
 import { replaceRowCellValue } from './table_utils.ts';
+import type { TableCellWidgetConfig } from './table_contract.ts';
 
 const CellRuntimeMethods = defineTableRuntimeModule({
     canMutateColumnIndex(colIndex) {
@@ -142,7 +143,7 @@ const CellRuntimeMethods = defineTableRuntimeModule({
         const value = this.normalizeCellWidgetValue(column, currentValue);
         const isMulti = this.listColumnIsMultiselect(column);
         const readonly = !this.cellAllowsEditing(rowIndex, cellIndex) || !isEditing;
-        const config = {
+        const config: TableCellWidgetConfig = {
             ...options,
             widget: column.type,
             value,
@@ -154,20 +155,21 @@ const CellRuntimeMethods = defineTableRuntimeModule({
             sup_text: '',
             table_cell_mode: true,
             table_consume_keys: this.tableCellConsumeKeys(column),
-            table_cell_validation_handler: (message) =>
+            table_cell_validation_handler: (message: unknown) =>
                 this.onCellWidgetValidation(rowIndex, cellIndex, message),
-            table_cell_tab_handler: (shiftKey) =>
+            table_cell_tab_handler: (shiftKey?: boolean) =>
                 this.navigateTableByTabFromCell(rowIndex, cellIndex, !!shiftKey),
-            table_cell_ui_lock_handler: (locked) => {
+            table_cell_ui_lock_handler: (locked: boolean) => {
                 this.tableUiLocked = !!locked;
             },
             readonly
         };
         if (column && column.type === 'list') {
-            config.source = this.getListOptions(
+            const listSource = this.getListOptions(
                 column && column.source ? column.source : column && column.widgetRef
             );
-            if ((!config.source || !config.source.length) && Array.isArray(options.source)) {
+            config.source = listSource;
+            if (listSource.length === 0 && Array.isArray(options.source)) {
                 config.source = options.source.slice();
             }
             config.multiselect = isMulti;

@@ -36,6 +36,18 @@
 - `TableWidgetVm` пока остаётся слишком широким VM-boundary;
 - browser/E2E smoke для table interactions ещё не заведён.
 
+### Frontend widget refactor
+
+Что уже переведено на Composition API + TypeScript:
+
+- базовые поля `str`, `text`, `int`, `float`.
+
+Что остаётся отдельными этапами:
+
+- простые, но более завязанные на DOM/actions виджеты: `button`, `date`, `time`, `datetime`, `ip`, `ip_mask`;
+- dropdown/lookup виджеты: `list`, `voc`, `split_button`;
+- крупные подсистемы: `img`, `table`.
+
 ### Идеи из старых черновиков
 
 Старые root-черновики сжаты сюда, чтобы не держать в корне несколько конкурирующих планов.
@@ -50,5 +62,6 @@
 - Добавить аккуратный save/update flow без поломки текущих контрактов.
 - Формализовать поведение `select_attrs` или заменить его более явным механизмом.
 - Продолжить стабилизацию frontend runtime и документации.
+- Продолжить поэтапный Composition API + TypeScript refactor оставшихся виджетов.
 - Закрыть strict typing debt в table runtime.
 - Завести реальный browser smoke для ключевых flows, если проекту нужен автоматический regression gate.

@@ -11,6 +11,10 @@
 - Sticky/measurement/scroll flow живёт в `table_sticky_header.ts`, `table_measurement.ts`, `table_scroll.ts`.
 - Page integration идёт через registry/runtime bridge, а не через `$root` и raw global state.
 - Broken table-only npm script удалён, потому что runner отсутствовал.
+- Strict typing debt table runtime закрыт: `typecheck` и `typecheck:table` должны быть зелёными.
+- `TableWidgetVm` больше не является loose `Record<string, unknown>` boundary; runtime contract разделён на state/computed/methods/dom/setup bindings.
+- `table_method_helpers.ts` больше не отравляет `this` broad string-index signature, поэтому state fields не типизируются как runtime methods.
+- Pure helpers (`table_selectors.ts`, `table_widget_helpers.ts`, `table_jump.ts`, `table_format.ts`, `table_grouping.ts`) получили явные table-типы.
 
 ## What Must Not Return
 
@@ -20,10 +24,11 @@
 - прямой доступ table feature к `$root` вместо bridge/services contract
 - table `.js` modules alongside the current `.ts` runtime
 - placeholder scripts that point to missing runners
+- `@ts-ignore` / `@ts-expect-error` для table runtime typing debt
+- broad `Record<string, unknown>` as VM contract
 
 ## Remaining Work
 
-- Закрыть strict typing debt в table runtime.
-- Сузить `TableWidgetVm`, чтобы убрать loose VM-boundary вокруг Vue instance.
 - Завести реальный browser/E2E smoke для table interactions, если проекту нужен автоматический regression gate.
 - После typing pass повторно пройти API map и решить, какие helper modules можно сделать ещё уже или объединить.
+- Сужать runtime method signatures дальше только вместе с тестами на соответствующие interactions.

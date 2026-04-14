@@ -12,7 +12,12 @@ import {
 } from 'vue';
 import type { ComponentPublicInstance } from 'vue';
 import { resolveTableDependencies } from '../../shared/table_attr_dependencies.ts';
-import type { TableWidgetVm } from './table_contract.ts';
+import type {
+    TableRuntimeState,
+    TableRuntimeVm,
+    TableWidgetConfig,
+    TableWidgetSetupBindings
+} from './table_contract.ts';
 import { createTablePageBridge } from './table_page_bridge.ts';
 import {
     mountTableRuntime,
@@ -24,7 +29,7 @@ import {
 import { createTableStore } from './table_store.ts';
 
 type TableWidgetProps = {
-    widgetConfig: Record<string, unknown>;
+    widgetConfig: TableWidgetConfig;
     widgetName: string;
 };
 
@@ -79,7 +84,7 @@ function readWidgetConfigValue(
 }
 
 function tableDependencySignature(
-    config: Record<string, unknown> | null | undefined,
+    config: TableWidgetConfig | null | undefined,
     getAllAttrsMap: (() => Record<string, unknown>) | null
 ): string {
     const deps = resolveTableDependencies(config || {});
@@ -111,31 +116,17 @@ function tableDependencySignature(
         .join('|');
 }
 
-function useTableRuntime(options: UseTableRuntimeOptions): TableWidgetVm {
-    const { cellWidgets, emit, props } = options;
-
-    const instance = getCurrentInstance();
-
-    const getAllAttrsMapFromRuntime = inject<(() => Record<string, unknown>) | null>('getAllAttrsMap', null);
-    const handleRecoverableAppErrorFromRuntime = inject<
-        ((error: unknown, context?: Record<string, unknown>) => void) | null
-    >('handleRecoverableAppError', null);
-    const showAppNotificationFromRuntime = inject<((message: string, type?: string) => void) | null>(
-        'showAppNotification',
-        null
-    );
-    const tablePageBridge = createTablePageBridge({
-        getAllAttrsMap: getAllAttrsMapFromRuntime,
-        handleRecoverableAppError: handleRecoverableAppErrorFromRuntime,
-        showAppNotification: showAppNotificationFromRuntime
-    });
-
-    const state = reactive({
-        value: [] as unknown[],
+function createInitialTableRuntimeState(
+    cellWidgets: CellWidgetRegistry,
+    props: TableWidgetProps,
+    tablePageBridge: ReturnType<typeof createTablePageBridge>
+): TableRuntimeState {
+    return {
+        value: [],
         tableSchema: null,
-        headerRows: [] as unknown[],
-        tableColumns: [] as unknown[],
-        tableData: [] as unknown[],
+        headerRows: [],
+        tableColumns: [],
+        tableData: [],
         tableStore: reactive(
             createTableStore({
                 stickyHeaderEnabled: !!(props.widgetConfig && props.widgetConfig.sticky_header === true)
@@ -169,12 +160,15 @@ function useTableRuntime(options: UseTableRuntimeOptions): TableWidgetVm {
         vocCellWidget: cellWidgets.vocCellWidget,
         _tableFocusWithin: false,
         _sortCycleRowOrder: null,
-        cellValidationErrors: {} as Record<string, string>,
+        cellValidationErrors: {},
         _lazyObserver: null,
         _lazyDebounceTimer: null,
         _tableContextMenuMouseDown: false,
         _stickyTheadPinned: false,
         _stickyScrollRoot: null,
+        _stickyPinnedRowCount: 0,
+        _stickyPinnedTableWidth: 0,
+        _stickyPinnedWidthsByRow: null,
         _stickyRaf: 0,
         _stickyOnScroll: null,
         _stickyRo: null,
@@ -191,7 +185,29 @@ function useTableRuntime(options: UseTableRuntimeOptions): TableWidgetVm {
             });
         },
         showAppNotificationFromRuntime: tablePageBridge.notify
+    };
+}
+
+function useTableRuntime(options: UseTableRuntimeOptions): TableWidgetSetupBindings {
+    const { cellWidgets, emit, props } = options;
+
+    const instance = getCurrentInstance();
+
+    const getAllAttrsMapFromRuntime = inject<(() => Record<string, unknown>) | null>('getAllAttrsMap', null);
+    const handleRecoverableAppErrorFromRuntime = inject<
+        ((error: unknown, context?: Record<string, unknown>) => void) | null
+    >('handleRecoverableAppError', null);
+    const showAppNotificationFromRuntime = inject<((message: string, type?: string) => void) | null>(
+        'showAppNotification',
+        null
+    );
+    const tablePageBridge = createTablePageBridge({
+        getAllAttrsMap: getAllAttrsMapFromRuntime,
+        handleRecoverableAppError: handleRecoverableAppErrorFromRuntime,
+        showAppNotification: showAppNotificationFromRuntime
     });
+
+    const state = reactive(createInitialTableRuntimeState(cellWidgets, props, tablePageBridge)) as TableRuntimeState;
 
     const computedRefs = {} as Record<string, ComputedLike>;
     const boundMethods = {} as Record<string, AnyFn>;
@@ -239,7 +255,7 @@ function useTableRuntime(options: UseTableRuntimeOptions): TableWidgetVm {
             }
             return Reflect.set(_target, key, value);
         }
-    }) as TableWidgetVm & ComponentPublicInstance;
+    }) as unknown as TableRuntimeVm & ComponentPublicInstance;
 
     Object.entries(tableRuntimeMethods).forEach(([name, fn]) => {
         boundMethods[name] = (...args: unknown[]) => (fn as AnyFn).apply(vm, args);
@@ -299,7 +315,7 @@ function useTableRuntime(options: UseTableRuntimeOptions): TableWidgetVm {
         widgetName: toRef(props, 'widgetName'),
         ...computedRefs,
         ...boundMethods
-    } as unknown as TableWidgetVm;
+    } as unknown as TableWidgetSetupBindings;
 }
 
 export { useTableRuntime };

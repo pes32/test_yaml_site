@@ -18,7 +18,7 @@
 
 ## Contract And State Layer
 
-- `table_contract.ts` — внутренние типы table runtime, schema, rows, selection, services и VM-boundary.
+- `table_contract.ts` — внутренние типы table runtime: `TableRuntimeState`, `TableRuntimeComputed`, `TableRuntimeMethods`, `TableRuntimeDomSurface`, `TableRuntimeVm`, `TableWidgetSetupBindings`, schema/rows/selection/context-menu/cell-widget contracts.
 - `table_errors.ts` — recoverable table errors.
 - `table_store.ts` — создание table-specific runtime store.
 - `table_runtime_state.ts` — начальные slices runtime state.
@@ -32,17 +32,17 @@
 
 - `table_parse_attrs.ts` — canonical parser `table_attrs` и shared attr helpers.
 - `table_schema_parse.ts` — разбор schema/header rows из table attrs.
-- `table_selectors.ts` — pure derived cell/table helpers.
+- `table_selectors.ts` — typed pure derived cell/table helpers для display actions, cell options, defaults и lazy flag.
 - `table_clipboard.ts` — TSV serialization/deserialization и clipboard data helpers.
 - `table_format.ts` — value formatting.
 - `table_sort.ts` — sort helpers.
-- `table_grouping.ts` — grouping/display rows helpers.
+- `table_grouping.ts` — typed grouping/display rows helpers.
 - `table_utils.ts` — низкоуровневые row/column helpers.
 
 ## Runtime Modules
 
 - `createTableRuntime.ts` — orchestration entrypoint, который собирает runtime controller.
-- `useTableRuntime.ts` — Composition API bridge для `TableWidget.vue`.
+- `useTableRuntime.ts` — typed Composition API bridge для `TableWidget.vue`; возвращает setup bindings по table contract.
 - `table_cell_runtime.ts` — embedded cell value/editor flow.
 - `table_clipboard_runtime.ts` — browser clipboard integration.
 - `table_context_menu.ts` — context menu behavior.
@@ -67,7 +67,7 @@
 - `table_page_bridge.ts` — page/runtime bridge helpers.
 - `table_notifications.ts` — user-facing table notifications.
 - `table_debug.ts` — debug-only table helpers.
-- `table_method_helpers.ts` — controller method binding helpers.
+- `table_method_helpers.ts` — controller method binding helpers без broad string-index на runtime modules.
 
 ## Removed Legacy Surface
 

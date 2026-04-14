@@ -2,26 +2,30 @@
  * Чистые хелперы для table_widget: автоширина заголовков, геометрия меню/вставки, путь к иконке ПКМ.
  * Загрузка: после table_keyboard.ts, до TableWidget.vue.
  */
+import type {
+    TableCellAddress,
+    TableRuntimeColumn,
+    TableSelectionRect,
+    TableWidgetConfig
+} from './table_contract.ts';
 
-const globalScope = typeof window !== 'undefined' ? window : globalThis;
+let _measureCanvas: HTMLCanvasElement | null = null;
+let _measureCtx: CanvasRenderingContext2D | null = null;
 
-    let _measureCanvas = null;
-    let _measureCtx = null;
-
-    function getMeasureCtx() {
-        if (_measureCtx) return _measureCtx;
-        if (typeof document === 'undefined') return null;
-        _measureCanvas = document.createElement('canvas');
-        _measureCtx = _measureCanvas.getContext('2d');
-        return _measureCtx;
-    }
+function getMeasureCtx(): CanvasRenderingContext2D | null {
+    if (_measureCtx) return _measureCtx;
+    if (typeof document === 'undefined') return null;
+    _measureCanvas = document.createElement('canvas');
+    _measureCtx = _measureCanvas.getContext('2d');
+    return _measureCtx;
+}
 
 const WidgetMeasure = {
-        headerSortAffordancePx(widgetConfig) {
+        headerSortAffordancePx(widgetConfig: TableWidgetConfig | null | undefined): number {
             return widgetConfig && widgetConfig.sort === false ? 0 : 26;
         },
 
-        normalizeWidthToPx(width) {
+        normalizeWidthToPx(width: unknown): number | null {
             const raw = String(width == null ? '' : width).trim();
             if (!raw) return null;
             const match = raw.match(/^(\d+(?:\.\d+)?)(px)?$/i);
@@ -30,7 +34,7 @@ const WidgetMeasure = {
             return Number.isFinite(value) ? value : null;
         },
 
-        sumColumnWidthsPx(columns) {
+        sumColumnWidthsPx(columns: TableRuntimeColumn[]): string | null {
             if (!Array.isArray(columns) || !columns.length) return null;
             let total = 0;
             for (const column of columns) {
@@ -41,7 +45,11 @@ const WidgetMeasure = {
             return total > 0 ? `${Math.ceil(total)}px` : null;
         },
 
-        computeAutoWidth(label, sortExtra, tableEl) {
+        computeAutoWidth(
+            label: unknown,
+            sortExtra: number | null | undefined,
+            tableEl: Element | null | undefined
+        ): string {
             const se = sortExtra == null ? 26 : sortExtra;
             try {
                 const ctx = getMeasureCtx();
@@ -74,7 +82,7 @@ const WidgetMeasure = {
     };
 
 const WidgetUiCoords = {
-        cloneRect(rect) {
+        cloneRect(rect: TableSelectionRect): TableSelectionRect {
             return {
                 r0: rect.r0,
                 r1: rect.r1,
@@ -83,7 +91,7 @@ const WidgetUiCoords = {
             };
         },
 
-        computePasteAnchorRect(rect, selFocus) {
+        computePasteAnchorRect(rect: TableSelectionRect, selFocus: TableCellAddress): TableCellAddress {
             const { r0, r1, c0, c1 } = rect;
             if (r0 === r1 && c0 === c1) {
                 return { r: selFocus.r, c: selFocus.c };
@@ -91,12 +99,14 @@ const WidgetUiCoords = {
             return { r: r0, c: c0 };
         },
 
-        clampMenuPosition(event) {
-            const x = (event.clientX || 0) + (globalScope.scrollX || 0);
-            const y = (event.clientY || 0) + (globalScope.scrollY || 0);
+        clampMenuPosition(event: MouseEvent): { x: number; y: number } {
+            const scrollX = typeof window !== 'undefined' ? window.scrollX || 0 : 0;
+            const scrollY = typeof window !== 'undefined' ? window.scrollY || 0 : 0;
+            const x = (event.clientX || 0) + scrollX;
+            const y = (event.clientY || 0) + scrollY;
             const pad = 8;
-            const w = typeof globalScope.innerWidth === 'number' ? globalScope.innerWidth : 800;
-            const h = typeof globalScope.innerHeight === 'number' ? globalScope.innerHeight : 600;
+            const w = typeof window !== 'undefined' && typeof window.innerWidth === 'number' ? window.innerWidth : 800;
+            const h = typeof window !== 'undefined' && typeof window.innerHeight === 'number' ? window.innerHeight : 600;
             const mw = 280;
             const mh = 400;
             return {
@@ -105,7 +115,7 @@ const WidgetUiCoords = {
             };
         },
 
-        contextMenuIconSrc(name) {
+        contextMenuIconSrc(name: unknown): string {
             const n = String(name || '').trim();
             if (!n) return '';
             return '/templates/icons/' + n;

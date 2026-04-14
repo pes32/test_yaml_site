@@ -33,17 +33,15 @@ run/
 
 # Database
 *.db
-*.sqlite3
 
-# Config (если есть секретные данные)
-# config.yaml
-# secrets.yaml
+# Config
 .env
 .env.*
 production.env
 debug.env
 templates/files/
 templates/Документация/
+z_plans/
 
 # Локальные файлы
 templates/mems/

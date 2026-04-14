@@ -9,13 +9,13 @@
 - `npm --prefix tooling/vite run typecheck`
 - `npm --prefix tooling/vite run typecheck:table`
 
-Отдельной table-only npm-команды сейчас нет: прежний placeholder script ссылался на отсутствующий runner и был удалён из `tooling/vite/package.json`.
+`typecheck` и `typecheck:table` являются обязательным gate для table runtime изменений. Ошибки в этих командах нельзя переводить в suppressions или weakening strictness.
 
 ## Expected Status Today
 
 - YAML validator должен проходить без diagnostics.
 - Vite build должен проходить без circular chunk warning.
-- `typecheck` и `typecheck:table` могут оставаться красными только по известному strict typing debt внутри table runtime.
+- `typecheck` и `typecheck:table` должны проходить без TS diagnostics.
 - Failures по удалённым файлам, отсутствующим scripts или stale docs считаются regression и должны исправляться сразу.
 
 ## Manual Smoke Scope
