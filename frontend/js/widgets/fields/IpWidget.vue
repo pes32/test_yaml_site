@@ -8,6 +8,7 @@
     :has-supporting="!!(widgetConfig.sup_text || displayError)"
   >
     <input
+      ref="inputRef"
       v-model="inputValue"
       type="text"
       class="form-control widget-ip"
@@ -29,11 +30,55 @@
   </md3-field>
 </template>
 
-<script>
-import { IP_MASK_TEMPLATE, createIpLikeWidgetOptions, validateIPv4 } from './ip_like_shared.ts';
+<script setup lang="ts">
+import Md3Field from '../common/Md3Field.vue';
+import {
+  IP_MASK_TEMPLATE,
+  useIpLikeField,
+  validateIPv4,
+  type IpLikeWidgetEmit,
+  type IpLikeWidgetProps
+} from './useIpLikeField.ts';
 
-export default {
-  name: 'IpWidget',
-  ...createIpLikeWidgetOptions(IP_MASK_TEMPLATE, validateIPv4, false)
-};
+defineOptions({
+  name: 'IpWidget'
+});
+
+const props = defineProps<IpLikeWidgetProps>();
+const emit = defineEmits<IpLikeWidgetEmit>();
+
+const {
+  commitDraft,
+  commitPendingState,
+  displayError,
+  error,
+  getValue,
+  hasValue,
+  inputRef,
+  inputValue,
+  isFocused,
+  labelFloats,
+  maxLength,
+  onFocus,
+  onInputHandler,
+  onKeyDown,
+  handleBlur,
+  setValue,
+  showPlaceholder,
+  tableCellRootAttrs
+} = useIpLikeField(props, emit, {
+  allowMask: false,
+  maskTemplate: IP_MASK_TEMPLATE,
+  validate: validateIPv4
+});
+
+defineExpose({
+  commitDraft,
+  commitPendingState,
+  displayError,
+  error,
+  getValue,
+  setValue,
+  value: inputValue
+});
 </script>

@@ -45,6 +45,12 @@ Baseline-страница для ручной проверки: [pages/2_widget_
 - explicit and generated row ids;
 - recoverable error normalization.
 
-## Missing Automation
+## Browser/E2E Automation
 
-Browser/E2E smoke suite пока не заведён. Это осознанный roadmap item: когда появится runner, он должен покрыть table interactions через реальный DOM, а не возвращать broken placeholder script.
+Browser smoke живёт в `tests/specs/tables/table-widgets.spec.ts` и запускается через общий Playwright runner:
+
+```bash
+tests/run.sh specs/tables/table-widgets.spec.ts
+```
+
+Этот suite проверяет render flags, сортировку, lazy sentinel, базовое редактирование и embedded widget actions. Новые table interactions должны расширять этот runner, а не возвращать broken placeholder scripts.

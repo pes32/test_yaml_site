@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "baseUrl": ".",
+    "strict": true,
+    "allowJs": true,
+    "allowImportingTsExtensions": true,
+    "checkJs": false,
+    "noEmit": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "paths": {
+      "vue": ["tooling/vite/node_modules/vue"]
+    },
+    "types": []
+  },
+  "include": [
+    "frontend/js/**/*.ts",
+    "frontend/js/**/*.vue",
+    "tooling/vite/src/**/*.ts",
+    "tooling/vite/src/**/*.d.ts",
+    "tooling/vite/src/**/*.vue"
+  ],
+  "exclude": [
+    "frontend/dist",
+    "tooling/vite/node_modules",
+    "tests/node_modules"
+  ]
+}

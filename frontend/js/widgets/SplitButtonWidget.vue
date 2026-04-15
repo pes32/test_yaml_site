@@ -13,16 +13,12 @@
         :title="buttonTitle"
         aria-hidden="true"
       >
-        <img
-          v-if="widgetConfig.icon && !isFontIcon(widgetConfig.icon)"
-          class="button-icon"
-          :src="getIconSrc(widgetConfig.icon)"
-          :style="iconStyle"
-          alt=""
-          @error="onIconError"
-        >
-        <i v-else-if="widgetConfig.icon && isFontIcon(widgetConfig.icon)" :class="widgetConfig.icon"></i>
-        <span v-if="widgetConfig.label" class="widget-split-button__label" v-text="widgetConfig.label"></span>
+        <action-button-content
+          :icon-name="iconName"
+          :icon-style="iconStyle"
+          :label="buttonLabel"
+          label-class="widget-split-button__label"
+        ></action-button-content>
       </div>
 
       <button
@@ -64,7 +60,6 @@
           role="presentation"
         >
           <a
-            ref="menuItems"
             class="dropdown-item"
             href="#"
             role="menuitem"
@@ -77,842 +72,364 @@
             @mousedown.prevent="highlightedIndex = index"
             @keydown="onItemKeydown($event, index)"
           >
-            <span v-text="action.displayLabel"></span>
+            <span>{{ action.displayLabel }}</span>
           </a>
         </li>
       </ul>
     </Teleport>
 
-    <div v-if="widgetConfig.sup_text" class="widget-info">
-      <span v-text="widgetConfig.sup_text"></span>
+    <div v-if="supportingText" class="widget-info">
+      <span>{{ supportingText }}</span>
     </div>
   </div>
 </template>
 
-<script>
-import { getIconSrc, isFontIcon, onIconError } from '../gui_parser.js';
+<script setup lang="ts">
 import {
-  executeAction,
-  getActionFallbackLabel,
-  inspectSplitButtonAttrs,
-  resolveActionLabel
-} from '../runtime/action_runtime.js';
+  computed,
+  inject,
+  nextTick,
+  onBeforeUnmount,
+  ref,
+  watch
+} from 'vue';
+import ActionButtonContent from './action-button/ActionButtonContent.vue';
+import useActionButtonVisual from './action-button/useActionButtonVisual.ts';
+import useActionExecution from './action-button/useActionExecution.ts';
+import type { ActionItem, ActionWidgetEmit, ActionWidgetProps } from './action-button/types.ts';
+import useSplitButtonActions from './split-button/useSplitButtonActions.ts';
+import useSplitButtonKeyboard from './split-button/useSplitButtonKeyboard.ts';
+import useSplitButtonMenuPosition from './split-button/useSplitButtonMenuPosition.ts';
 
-const FOCUSABLE_SELECTOR = [
-  'a[href]',
-  'button:not([disabled])',
-  'input:not([disabled])',
-  'select:not([disabled])',
-  'textarea:not([disabled])',
-  '[tabindex]:not([tabindex="-1"])'
-].join(', ');
+defineOptions({
+  name: 'SplitButtonWidget'
+});
 
-const MAX_VISIBLE_ACTION_ROWS = 10;
+const props = defineProps<ActionWidgetProps>();
+const emit = defineEmits<ActionWidgetEmit>();
 
-function parsePixelValue(value) {
-  const parsed = Number.parseFloat(String(value ?? ''));
-  return Number.isFinite(parsed) ? parsed : 0;
+const getConfirmModal = inject<() => unknown | null>('getConfirmModal', () => null);
+const openUiModal = inject<((modalName: string) => Promise<unknown> | unknown) | null>(
+  'openUiModal',
+  null
+);
+const closeUiModal = inject<(() => Promise<unknown> | unknown) | null>(
+  'closeUiModal',
+  null
+);
+
+const controlRoot = ref<HTMLElement | null>(null);
+const toggleButton = ref<HTMLButtonElement | null>(null);
+const dropdownMenu = ref<HTMLElement | null>(null);
+
+const isDropdownOpen = ref(false);
+const isMenuMeasuring = ref(false);
+const highlightedIndex = ref(-1);
+const openCycleId = ref(0);
+const listId = `split-${Math.random().toString(36).slice(2, 9)}`;
+
+let isComponentUnmounted = false;
+let clickOutsideTimerId = 0;
+let clickOutsideHandler: ((event: MouseEvent) => void) | null = null;
+let scrollHandler: EventListener | null = null;
+let resizeHandler: EventListener | null = null;
+
+const {
+  displayActionKeys,
+  displayActions,
+  ensureActionLabelsResolved,
+  hasActions,
+  pruneResolvedLabels
+} = useSplitButtonActions(props);
+
+const {
+  cancelDeferredWork,
+  isMenuScrollable,
+  menuStyle,
+  resetMenuLayout,
+  scheduleMenuLayout
+} = useSplitButtonMenuPosition(controlRoot, dropdownMenu);
+
+const { executeAction } = useActionExecution(props, emit, {
+  closeUiModal,
+  getConfirmModal,
+  openUiModal
+});
+
+const menuId = computed(() => `split-button-menu-${listId}`);
+const {
+  buttonClasses,
+  buttonLabel,
+  buttonTitle,
+  iconName,
+  iconStyle,
+  splitControlStyle: controlStyle,
+  splitPrimaryStyle: primaryStyle,
+  supportingText
+} = useActionButtonVisual(props, { fallbackTitle: 'Split button' });
+
+const toggleTitle = computed(() =>
+  hasActions.value
+    ? 'Открыть список действий'
+    : 'Нет доступных действий'
+);
+
+function isOpenCycleCurrent(cycleId: number): boolean {
+  return !isComponentUnmounted && isDropdownOpen.value && cycleId === openCycleId.value;
 }
 
-function clamp(value, minValue, maxValue) {
-  const safeMin = Number.isFinite(minValue) ? minValue : 0;
-  const safeMax = Number.isFinite(maxValue) ? maxValue : safeMin;
-  const upperBound = safeMax < safeMin ? safeMin : safeMax;
-  return Math.min(Math.max(value, safeMin), upperBound);
+function isLayoutCycleCurrent(cycleId: number): boolean {
+  return (
+    !isComponentUnmounted &&
+    cycleId === openCycleId.value &&
+    (isDropdownOpen.value || isMenuMeasuring.value)
+  );
 }
 
-function buildActionDescriptors(items) {
-  const seen = new Map();
-  return (Array.isArray(items) ? items : []).map((item) => {
-    const baseKey = [
-      item?.type || '',
-      item?.target || '',
-      item?.label || ''
-    ].join('\u0000');
-    const occurrence = seen.get(baseKey) || 0;
-    seen.set(baseKey, occurrence + 1);
-    return {
-      key: `${baseKey}\u0000${occurrence}`,
-      item
-    };
+function onToggleClick(): void {
+  if (!hasActions.value) {
+    return;
+  }
+
+  if (isDropdownOpen.value) {
+    closeDropdown({ restoreFocus: true });
+    return;
+  }
+
+  openDropdown({ focusIndex: 0 });
+}
+
+function openDropdown(options: { focusIndex?: number } = {}): void {
+  if (!hasActions.value) {
+    return;
+  }
+
+  ensureActionLabelsResolved();
+  openCycleId.value += 1;
+  const currentCycleId = openCycleId.value;
+  const requestedFocusIndex = Number.isInteger(options.focusIndex)
+    ? Number(options.focusIndex)
+    : 0;
+  const focusIndex = getSafeHighlightIndex(requestedFocusIndex);
+
+  isMenuMeasuring.value = true;
+  isDropdownOpen.value = false;
+  highlightedIndex.value = focusIndex;
+  resetMenuLayout();
+
+  void nextTick(() => {
+    if (!isLayoutCycleCurrent(currentCycleId)) {
+      return;
+    }
+
+    if (dropdownMenu.value) {
+      dropdownMenu.value.scrollTop = 0;
+    }
+
+    scheduleMenuLayout({
+      isCurrent: () => isLayoutCycleCurrent(currentCycleId),
+      onAfterLayout: () => {
+        focusMenuItem(focusIndex);
+      },
+      onMeasured: () => {
+        isMenuMeasuring.value = false;
+        isDropdownOpen.value = true;
+        addClickOutsideListener();
+        addViewportListeners();
+      },
+      resetScroll: true
+    });
   });
 }
 
-export default {
-  name: 'SplitButtonWidget',
-  inject: {
-    getConfirmModal: { from: 'getConfirmModal', default: () => null },
-    openUiModal: { from: 'openUiModal', default: null },
-    closeUiModal: { from: 'closeUiModal', default: null }
-  },
-  props: {
-    widgetConfig: {
-      type: Object,
-      required: true
-    },
-    widgetName: {
-      type: String,
-      required: true
+function closeDropdown(options: { restoreFocus?: boolean } = {}): void {
+  openCycleId.value += 1;
+  const shouldRestoreFocus = options.restoreFocus === true;
+  cancelDeferredWork();
+  removeClickOutsideListener();
+  removeViewportListeners();
+
+  if (!isDropdownOpen.value) {
+    isMenuMeasuring.value = false;
+    resetMenuLayout();
+    if (shouldRestoreFocus) {
+      toggleButton.value?.focus();
     }
-  },
-  emits: ['execute'],
-  data() {
-    return {
-      isDropdownOpen: false,
-      isMenuMeasuring: false,
-      highlightedIndex: -1,
-      resolvedLabels: {},
-      warnedFields: new Set(),
-      isComponentUnmounted: false,
-      listId: `split-${Math.random().toString(36).slice(2, 9)}`,
-      menuStyle: {},
-      isMenuScrollable: false,
-      openCycleId: 0,
-      clickOutsideTimerId: 0,
-      clickOutsideHandler: null,
-      scrollHandler: null,
-      resizeHandler: null,
-      layoutFrameId: 0,
-      postLayoutFrameId: 0
-    };
-  },
-  computed: {
-    actionInspection() {
-      return inspectSplitButtonAttrs(this.widgetConfig);
-    },
-    actions() {
-      return this.actionInspection.items || [];
-    },
-    actionDescriptors() {
-      return buildActionDescriptors(this.actions);
-    },
-    displayActionKeys() {
-      return this.actionDescriptors.map((descriptor) => descriptor.key);
-    },
-    hasActions() {
-      return this.actionDescriptors.length > 0;
-    },
-    malformedWarningsKey() {
-      return JSON.stringify(this.actionInspection.malformedByField || {});
-    },
-    displayActions() {
-      return this.actionDescriptors.map((descriptor) => ({
-        key: descriptor.key,
-        item: descriptor.item,
-        displayLabel: this.resolvedLabels[descriptor.key] || getActionFallbackLabel(descriptor.item)
-      }));
-    },
-    menuId() {
-      return `split-button-menu-${this.listId}`;
-    },
-    isIconOnly() {
-      return Boolean(this.widgetConfig.icon && !this.widgetConfig.label);
-    },
-    hasBackground() {
-      return Boolean(this.widgetConfig.fon);
-    },
-    buttonClasses() {
-      return {
-        'icon-only': this.isIconOnly,
-        'icon-only--ghost': this.isIconOnly && !this.hasBackground
-      };
-    },
-    buttonTitle() {
-      if (this.isIconOnly && this.widgetConfig.hint) return this.widgetConfig.hint;
-      if (this.widgetConfig.label) return this.widgetConfig.label;
-      return 'Split button';
-    },
-    toggleTitle() {
-      return this.hasActions
-        ? 'Открыть список действий'
-        : 'Нет доступных действий';
-    },
-    iconStyle() {
-      if (!this.widgetConfig.icon || isFontIcon(this.widgetConfig.icon)) {
-        return {};
-      }
-
-      const size = Number(this.widgetConfig.size) || 24;
-      return {
-        width: `${size}px`,
-        height: `${size}px`
-      };
-    },
-    controlStyle() {
-      const widthValue = this.widgetConfig.width;
-      if (widthValue == null || widthValue === '') {
-        return {};
-      }
-
-      return {
-        width: typeof widthValue === 'number' ? `${widthValue}px` : String(widthValue)
-      };
-    },
-    primaryStyle() {
-      if (this.controlStyle.width) {
-        return {
-          justifyContent: this.widgetConfig.label ? 'flex-start' : 'center',
-          textAlign: 'left'
-        };
-      }
-
-      if (this.isIconOnly) {
-        const iconRef = 24;
-        const outerRef = 40;
-        const borderTotal = 2;
-        const padRef = (outerRef - borderTotal - iconRef) / 2;
-        const iconSize = Number(this.widgetConfig.size) || iconRef;
-        const pad = Math.max(0, Math.round((padRef * iconSize) / iconRef));
-        const widthValue = iconSize + borderTotal + 2 * pad;
-
-        return {
-          width: `${widthValue}px`,
-          minWidth: `${widthValue}px`,
-          padding: `${pad}px`
-        };
-      }
-
-      return {
-        justifyContent: this.widgetConfig.label ? 'flex-start' : 'center',
-        textAlign: 'left'
-      };
-    }
-  },
-  methods: {
-    isFontIcon,
-    getIconSrc,
-    onIconError,
-    emitMalformedWarnings() {
-      const malformedByField = this.actionInspection.malformedByField || {};
-      Object.entries(malformedByField).forEach(([fieldName, lineNumbers]) => {
-        if (this.warnedFields.has(fieldName) || !Array.isArray(lineNumbers) || !lineNumbers.length) {
-          return;
-        }
-
-        this.warnedFields.add(fieldName);
-        console.warn(
-          `[split_button] malformed DSL lines skipped for widget "${this.widgetName}" ` +
-          `field "${fieldName}": ${lineNumbers.join(', ')}`
-        );
-      });
-    },
-    pruneResolvedLabels(validKeys) {
-      const nextLabels = {};
-      (Array.isArray(validKeys) ? validKeys : []).forEach((key) => {
-        if (Object.prototype.hasOwnProperty.call(this.resolvedLabels, key)) {
-          nextLabels[key] = this.resolvedLabels[key];
-        }
-      });
-      this.resolvedLabels = nextLabels;
-    },
-    getViewportPadding() {
-      const rootStyles = window.getComputedStyle(document.documentElement);
-      return parsePixelValue(rootStyles.getPropertyValue('--space-sm')) || 8;
-    },
-    getSafeHighlightIndex(index) {
-      if (!this.displayActions.length) {
-        return -1;
-      }
-
-      if (!Number.isInteger(index)) {
-        return 0;
-      }
-
-      return Math.max(0, Math.min(index, this.displayActions.length - 1));
-    },
-    isOpenCycleCurrent(cycleId) {
-      return !this.isComponentUnmounted && this.isDropdownOpen && cycleId === this.openCycleId;
-    },
-    isLayoutCycleCurrent(cycleId) {
-      return (
-        !this.isComponentUnmounted &&
-        cycleId === this.openCycleId &&
-        (this.isDropdownOpen || this.isMenuMeasuring)
-      );
-    },
-    cancelLayoutFrame() {
-      if (this.layoutFrameId) {
-        window.cancelAnimationFrame(this.layoutFrameId);
-        this.layoutFrameId = 0;
-      }
-    },
-    cancelPostLayoutFrame() {
-      if (this.postLayoutFrameId) {
-        window.cancelAnimationFrame(this.postLayoutFrameId);
-        this.postLayoutFrameId = 0;
-      }
-    },
-    cancelDeferredWork() {
-      this.cancelLayoutFrame();
-      this.cancelPostLayoutFrame();
-    },
-    onToggleClick() {
-      if (!this.hasActions) {
-        return;
-      }
-
-      if (this.isDropdownOpen) {
-        this.closeDropdown({ restoreFocus: true });
-        return;
-      }
-
-      this.openDropdown({ focusIndex: 0 });
-    },
-    onToggleKeydown(event) {
-      if (!this.hasActions) {
-        return;
-      }
-
-      if (event.key === 'ArrowDown') {
-        event.preventDefault();
-        this.openDropdown({ focusIndex: 0 });
-        return;
-      }
-
-      if (event.key === 'ArrowUp') {
-        event.preventDefault();
-        this.openDropdown({ focusIndex: this.displayActions.length - 1 });
-        return;
-      }
-
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        if (this.isDropdownOpen) {
-          this.closeDropdown({ restoreFocus: true });
-        } else {
-          this.openDropdown({ focusIndex: 0 });
-        }
-        return;
-      }
-
-      if (event.key === 'Escape' && this.isDropdownOpen) {
-        event.preventDefault();
-        this.closeDropdown({ restoreFocus: true });
-      }
-    },
-    onItemKeydown(event, index) {
-      if (!this.isDropdownOpen) {
-        return;
-      }
-
-      if (event.key === 'ArrowDown') {
-        event.preventDefault();
-        this.focusMenuItem(index + 1 >= this.displayActions.length ? 0 : index + 1);
-        return;
-      }
-
-      if (event.key === 'ArrowUp') {
-        event.preventDefault();
-        this.focusMenuItem(index - 1 < 0 ? this.displayActions.length - 1 : index - 1);
-        return;
-      }
-
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        const selectedAction = this.displayActions[index]?.item;
-        if (selectedAction) {
-          this.onActionClick(selectedAction);
-        }
-        return;
-      }
-
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        this.closeDropdown({ restoreFocus: true });
-        return;
-      }
-
-      if (event.key === 'Tab') {
-        event.preventDefault();
-        const moveDirection = event.shiftKey ? -1 : 1;
-        this.closeDropdown({ restoreFocus: false });
-        this.$nextTick(() => {
-          this.moveFocusRelativeToToggle(moveDirection);
-        });
-      }
-    },
-    onActionClick(action) {
-      this.closeDropdown({ restoreFocus: true });
-      void executeAction(this, action, {
-        dialog: this.widgetConfig.dialog || null,
-        outputAttrs: this.widgetConfig.output_attrs,
-        widgetName: this.widgetName
-      });
-    },
-    openDropdown(options = {}) {
-      if (!this.hasActions) {
-        return;
-      }
-
-      this.ensureActionLabelsResolved();
-      this.openCycleId += 1;
-      const currentCycleId = this.openCycleId;
-      const focusIndex = this.getSafeHighlightIndex(options.focusIndex);
-
-      this.isMenuMeasuring = true;
-      this.isDropdownOpen = false;
-      this.isMenuScrollable = false;
-      this.highlightedIndex = focusIndex;
-
-      this.$nextTick(() => {
-        if (!this.isLayoutCycleCurrent(currentCycleId)) {
-          return;
-        }
-
-        const menu = this.$refs.dropdownMenu;
-        if (menu) {
-          menu.scrollTop = 0;
-        }
-
-        this.scheduleMenuLayout({
-          cycleId: currentCycleId,
-          focusIndex,
-          openAfterMeasure: true,
-          focusAfterLayout: true,
-          resetScroll: true
-        });
-      });
-    },
-    closeDropdown(options = {}) {
-      this.openCycleId += 1;
-      const shouldRestoreFocus = options.restoreFocus === true;
-      this.cancelDeferredWork();
-      this.removeClickOutsideListener();
-      this.removeViewportListeners();
-
-      if (!this.isDropdownOpen) {
-        this.isMenuMeasuring = false;
-        this.isMenuScrollable = false;
-        if (shouldRestoreFocus) {
-          this.$refs.toggleButton?.focus();
-        }
-        return;
-      }
-
-      this.isDropdownOpen = false;
-      this.isMenuMeasuring = false;
-      this.highlightedIndex = -1;
-      this.isMenuScrollable = false;
-
-      if (shouldRestoreFocus) {
-        this.$nextTick(() => {
-          this.$refs.toggleButton?.focus();
-        });
-      }
-    },
-    getMenuItems() {
-      const menuItems = this.$refs.menuItems;
-      return Array.isArray(menuItems)
-        ? menuItems
-        : menuItems
-          ? [menuItems]
-          : [];
-    },
-    getVisibleMenuItems() {
-      return this.getMenuItems().filter((element) =>
-        element instanceof HTMLElement && element.getClientRects().length > 0
-      );
-    },
-    focusMenuItem(index) {
-      const menuItems = this.getMenuItems();
-      if (!menuItems.length) {
-        return;
-      }
-
-      const safeIndex = this.getSafeHighlightIndex(index);
-      if (safeIndex < 0) {
-        return;
-      }
-
-      this.highlightedIndex = safeIndex;
-      const target = menuItems[safeIndex];
-      if (target && typeof target.focus === 'function') {
-        target.focus();
-      }
-      this.scrollHighlightedItemIntoView();
-    },
-    scrollHighlightedItemIntoView() {
-      const items = this.$refs.dropdownMenu?.querySelectorAll('[role="presentation"]');
-      if (!items || this.highlightedIndex < 0 || this.highlightedIndex >= items.length) {
-        return;
-      }
-
-      const element =
-        items[this.highlightedIndex]?.querySelector('.dropdown-item') ||
-        items[this.highlightedIndex];
-      if (element && typeof element.scrollIntoView === 'function') {
-        element.scrollIntoView({ block: 'nearest' });
-      }
-    },
-    ensureActionLabelsResolved() {
-      this.actionDescriptors.forEach((descriptor) => {
-        if (Object.prototype.hasOwnProperty.call(this.resolvedLabels, descriptor.key)) {
-          return;
-        }
-
-        void resolveActionLabel(descriptor.item)
-          .then((resolvedLabel) => {
-            if (this.isComponentUnmounted) {
-              return;
-            }
-
-            const nextLabel = String(resolvedLabel || '').trim();
-            if (!nextLabel || nextLabel === getActionFallbackLabel(descriptor.item)) {
-              return;
-            }
-
-            this.resolvedLabels = {
-              ...this.resolvedLabels,
-              [descriptor.key]: nextLabel
-            };
-          })
-          .catch(() => {});
-      });
-    },
-    isFocusInsideWidget() {
-      const root = this.$refs.controlRoot;
-      const menu = this.$refs.dropdownMenu;
-      const active = document.activeElement;
-      if (root && active && root.contains(active)) {
-        return true;
-      }
-      return Boolean(menu && active && menu.contains(active));
-    },
-    measureMenuLayout() {
-      const toggle = this.$refs.controlRoot;
-      const menu = this.$refs.dropdownMenu;
-      if (!(toggle instanceof HTMLElement) || !(menu instanceof HTMLElement)) {
-        return null;
-      }
-
-      const visibleMenuItems = this.getVisibleMenuItems();
-      const rowElement = visibleMenuItems[0];
-      if (!(rowElement instanceof HTMLElement)) {
-        return null;
-      }
-
-      const rowRect = rowElement.getBoundingClientRect();
-      const rowStyles = window.getComputedStyle(rowElement);
-      const rowHeight = rowRect.height;
-      const fontSize = parsePixelValue(rowStyles.fontSize);
-      if (
-        !Number.isFinite(rowHeight) ||
-        rowHeight <= 0 ||
-        !Number.isFinite(fontSize) ||
-        rowHeight < fontSize
-      ) {
-        return null;
-      }
-
-      const menuStyles = window.getComputedStyle(menu);
-      const paddingTop = parsePixelValue(menuStyles.paddingTop);
-      const paddingBottom = parsePixelValue(menuStyles.paddingBottom);
-      const borderTopWidth = parsePixelValue(menuStyles.borderTopWidth);
-      const borderBottomWidth = parsePixelValue(menuStyles.borderBottomWidth);
-      const menuChromeHeight =
-        paddingTop +
-        paddingBottom +
-        borderTopWidth +
-        borderBottomWidth;
-
-      const desiredVisibleRowCount = Math.min(visibleMenuItems.length, MAX_VISIBLE_ACTION_ROWS);
-      const desiredMenuHeight = rowHeight * desiredVisibleRowCount + menuChromeHeight;
-
-      const viewportPadding = this.getViewportPadding();
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-      const toggleRect = toggle.getBoundingClientRect();
-      if (!Number.isFinite(toggleRect.width) || toggleRect.width <= 0) {
-        return null;
-      }
-
-      const availableWidth = Math.max(1, viewportWidth - viewportPadding * 2);
-      const menuWidth = Math.min(Math.max(toggleRect.width, 1), availableWidth);
-      const left = clamp(
-        toggleRect.left,
-        viewportPadding,
-        viewportWidth - viewportPadding - menuWidth
-      );
-
-      const availableBelow = Math.max(0, viewportHeight - toggleRect.bottom - viewportPadding);
-      const availableAbove = Math.max(0, toggleRect.top - viewportPadding);
-
-      let placement = 'bottom';
-      let availableHeight = availableBelow;
-      if (availableBelow >= desiredMenuHeight) {
-        placement = 'bottom';
-        availableHeight = availableBelow;
-      } else if (availableAbove >= desiredMenuHeight) {
-        placement = 'top';
-        availableHeight = availableAbove;
-      } else if (availableAbove > availableBelow) {
-        placement = 'top';
-        availableHeight = availableAbove;
-      }
-
-      const targetMaxHeight = Math.max(0, Math.min(desiredMenuHeight, availableHeight));
-      const topBase = placement === 'top'
-        ? toggleRect.top - targetMaxHeight
-        : toggleRect.bottom;
-      const top = clamp(
-        topBase,
-        viewportPadding,
-        viewportHeight - viewportPadding - targetMaxHeight
-      );
-      const isScrollable =
-        visibleMenuItems.length > MAX_VISIBLE_ACTION_ROWS ||
-        targetMaxHeight + 0.5 < desiredMenuHeight;
-
-      return {
-        isScrollable,
-        style: {
-          position: 'fixed',
-          top: `${top}px`,
-          left: `${left}px`,
-          width: `${menuWidth}px`,
-          minWidth: `${menuWidth}px`,
-          '--split-menu-max-height': `${targetMaxHeight}px`
-        }
-      };
-    },
-    schedulePostLayout(cycleId, options = {}) {
-      this.cancelPostLayoutFrame();
-      this.postLayoutFrameId = window.requestAnimationFrame(() => {
-        this.postLayoutFrameId = 0;
-        if (!this.isOpenCycleCurrent(cycleId)) {
-          return;
-        }
-
-        if (options.focusAfterLayout === true) {
-          this.focusMenuItem(options.focusIndex);
-          return;
-        }
-
-        if (this.highlightedIndex >= 0) {
-          this.scrollHighlightedItemIntoView();
-        }
-      });
-    },
-    scheduleMenuLayout(options = {}) {
-      const cycleId = Number.isInteger(options.cycleId)
-        ? options.cycleId
-        : this.openCycleId;
-      const attempt = Number.isInteger(options.attempt) ? options.attempt : 0;
-
-      this.cancelLayoutFrame();
-      this.layoutFrameId = window.requestAnimationFrame(() => {
-        this.layoutFrameId = 0;
-        if (!this.isLayoutCycleCurrent(cycleId)) {
-          return;
-        }
-
-        const menu = this.$refs.dropdownMenu;
-        if (menu && options.resetScroll === true) {
-          menu.scrollTop = 0;
-        }
-
-        const layout = this.measureMenuLayout();
-        if (!layout) {
-          if (attempt < 2) {
-            this.$nextTick(() => {
-              if (this.isLayoutCycleCurrent(cycleId)) {
-                this.scheduleMenuLayout({
-                  ...options,
-                  cycleId,
-                  attempt: attempt + 1,
-                  resetScroll: false
-                });
-              }
-            });
-          }
-          return;
-        }
-
-        if (!this.isLayoutCycleCurrent(cycleId)) {
-          return;
-        }
-
-        this.menuStyle = layout.style;
-        this.isMenuScrollable = layout.isScrollable;
-
-        if (options.openAfterMeasure === true) {
-          this.isMenuMeasuring = false;
-          this.isDropdownOpen = true;
-          this.addClickOutsideListener();
-          this.addViewportListeners();
-
-          this.$nextTick(() => {
-            if (!this.isOpenCycleCurrent(cycleId)) {
-              return;
-            }
-            this.schedulePostLayout(cycleId, options);
-          });
-          return;
-        }
-
-        this.schedulePostLayout(cycleId, options);
-      });
-    },
-    addViewportListeners() {
-      this.removeViewportListeners();
-
-      this.scrollHandler = () => {
-        if (!this.isDropdownOpen) {
-          return;
-        }
-
-        this.scheduleMenuLayout({
-          cycleId: this.openCycleId,
-          focusAfterLayout: false,
-          focusIndex: this.getSafeHighlightIndex(this.highlightedIndex),
-          resetScroll: false
-        });
-      };
-      this.resizeHandler = () => {
-        if (!this.isDropdownOpen) {
-          return;
-        }
-
-        this.scheduleMenuLayout({
-          cycleId: this.openCycleId,
-          focusAfterLayout: false,
-          focusIndex: this.getSafeHighlightIndex(this.highlightedIndex),
-          resetScroll: false
-        });
-      };
-
-      window.addEventListener('scroll', this.scrollHandler, true);
-      window.addEventListener('resize', this.resizeHandler);
-    },
-    removeViewportListeners() {
-      if (this.scrollHandler) {
-        window.removeEventListener('scroll', this.scrollHandler, true);
-        this.scrollHandler = null;
-      }
-
-      if (this.resizeHandler) {
-        window.removeEventListener('resize', this.resizeHandler);
-        this.resizeHandler = null;
-      }
-    },
-    addClickOutsideListener() {
-      this.removeClickOutsideListener();
-      this.clickOutsideHandler = (event) => {
-        const target = event.target;
-        const root = this.$refs.controlRoot;
-        const menu = this.$refs.dropdownMenu;
-        const inRoot = root && target && root.contains(target);
-        const inMenu = menu && target && menu.contains(target);
-        if (!inRoot && !inMenu) {
-          this.closeDropdown({ restoreFocus: false });
-        }
-      };
-
-      this.clickOutsideTimerId = window.setTimeout(() => {
-        this.clickOutsideTimerId = 0;
-        if (this.clickOutsideHandler) {
-          document.addEventListener('click', this.clickOutsideHandler);
-        }
-      }, 0);
-    },
-    removeClickOutsideListener() {
-      if (this.clickOutsideTimerId) {
-        window.clearTimeout(this.clickOutsideTimerId);
-        this.clickOutsideTimerId = 0;
-      }
-
-      if (this.clickOutsideHandler) {
-        document.removeEventListener('click', this.clickOutsideHandler);
-        this.clickOutsideHandler = null;
-      }
-    },
-    moveFocusRelativeToToggle(direction) {
-      const toggleButton = this.$refs.toggleButton;
-      if (!toggleButton || typeof document === 'undefined') {
-        return;
-      }
-
-      const focusableItems = Array.from(document.querySelectorAll(FOCUSABLE_SELECTOR))
-        .filter((element) => {
-          if (!(element instanceof HTMLElement)) {
-            return false;
-          }
-          if (element.hasAttribute('disabled')) {
-            return false;
-          }
-          if (element.getAttribute('aria-hidden') === 'true') {
-            return false;
-          }
-          return element.offsetParent !== null || document.activeElement === element;
-        });
-
-      const currentIndex = focusableItems.indexOf(toggleButton);
-      if (currentIndex === -1) {
-        return;
-      }
-
-      const step = direction < 0 ? -1 : 1;
-      let nextIndex = currentIndex + step;
-      while (nextIndex >= 0 && nextIndex < focusableItems.length) {
-        const candidate = focusableItems[nextIndex];
-        if (candidate && typeof candidate.focus === 'function') {
-          candidate.focus();
-          break;
-        }
-        nextIndex += step;
-      }
-    }
-  },
-  watch: {
-    malformedWarningsKey: {
-      immediate: true,
-      handler() {
-        this.emitMalformedWarnings();
-      }
-    },
-    displayActionKeys(newKeys, oldKeys) {
-      this.pruneResolvedLabels(newKeys);
-
-      if (!this.isDropdownOpen && !this.isMenuMeasuring) {
-        return;
-      }
-
-      if (!newKeys.length) {
-        this.closeDropdown({ restoreFocus: false });
-        return;
-      }
-
-      const currentKey =
-        Array.isArray(oldKeys) &&
-        this.highlightedIndex >= 0 &&
-        this.highlightedIndex < oldKeys.length
-          ? oldKeys[this.highlightedIndex]
-          : null;
-      const nextIndex = currentKey ? newKeys.indexOf(currentKey) : -1;
-      const safeIndex = nextIndex >= 0 ? nextIndex : 0;
-      const shouldRestoreFocus = this.isFocusInsideWidget();
-
-      this.highlightedIndex = safeIndex;
-      this.$nextTick(() => {
-        if (!this.isDropdownOpen) {
-          return;
-        }
-
-        this.scheduleMenuLayout({
-          cycleId: this.openCycleId,
-          focusAfterLayout: shouldRestoreFocus,
-          focusIndex: safeIndex,
-          resetScroll: false
-        });
-      });
-    }
-  },
-  beforeUnmount() {
-    this.isComponentUnmounted = true;
-    this.cancelDeferredWork();
-    this.removeClickOutsideListener();
-    this.removeViewportListeners();
-    this.closeDropdown({ restoreFocus: false });
+    return;
   }
-};
+
+  isDropdownOpen.value = false;
+  isMenuMeasuring.value = false;
+  highlightedIndex.value = -1;
+  resetMenuLayout();
+
+  if (shouldRestoreFocus) {
+    void nextTick(() => {
+      toggleButton.value?.focus();
+    });
+  }
+}
+
+function onActionClick(action: ActionItem): void {
+  closeDropdown({ restoreFocus: true });
+  void executeAction(action);
+}
+
+function isFocusInsideWidget(): boolean {
+  if (typeof document === 'undefined') {
+    return false;
+  }
+
+  const active = document.activeElement;
+  return Boolean(
+    active &&
+    (
+      (controlRoot.value && controlRoot.value.contains(active)) ||
+      (dropdownMenu.value && dropdownMenu.value.contains(active))
+    )
+  );
+}
+
+function scheduleOpenMenuLayout(options: { focusAfterLayout?: boolean; focusIndex?: number } = {}): void {
+  const currentCycleId = openCycleId.value;
+  scheduleMenuLayout({
+    isCurrent: () => isOpenCycleCurrent(currentCycleId),
+    onAfterLayout: () => {
+      if (options.focusAfterLayout === true) {
+        focusMenuItem(options.focusIndex ?? highlightedIndex.value);
+        return;
+      }
+
+      if (highlightedIndex.value >= 0) {
+        scrollHighlightedItemIntoView();
+      }
+    },
+    resetScroll: false
+  });
+}
+
+function addViewportListeners(): void {
+  removeViewportListeners();
+
+  scrollHandler = () => {
+    if (isDropdownOpen.value) {
+      scheduleOpenMenuLayout();
+    }
+  };
+  resizeHandler = () => {
+    if (isDropdownOpen.value) {
+      scheduleOpenMenuLayout();
+    }
+  };
+
+  window.addEventListener('scroll', scrollHandler, true);
+  window.addEventListener('resize', resizeHandler);
+}
+
+function removeViewportListeners(): void {
+  if (scrollHandler) {
+    window.removeEventListener('scroll', scrollHandler, true);
+    scrollHandler = null;
+  }
+
+  if (resizeHandler) {
+    window.removeEventListener('resize', resizeHandler);
+    resizeHandler = null;
+  }
+}
+
+function addClickOutsideListener(): void {
+  removeClickOutsideListener();
+  clickOutsideHandler = (event: MouseEvent) => {
+    const target = event.target;
+    if (!(target instanceof Node)) {
+      return;
+    }
+
+    const inRoot = Boolean(controlRoot.value && controlRoot.value.contains(target));
+    const inMenu = Boolean(dropdownMenu.value && dropdownMenu.value.contains(target));
+    if (!inRoot && !inMenu) {
+      closeDropdown({ restoreFocus: false });
+    }
+  };
+
+  clickOutsideTimerId = window.setTimeout(() => {
+    clickOutsideTimerId = 0;
+    if (clickOutsideHandler) {
+      document.addEventListener('click', clickOutsideHandler);
+    }
+  }, 0);
+}
+
+function removeClickOutsideListener(): void {
+  if (clickOutsideTimerId) {
+    window.clearTimeout(clickOutsideTimerId);
+    clickOutsideTimerId = 0;
+  }
+
+  if (clickOutsideHandler) {
+    document.removeEventListener('click', clickOutsideHandler);
+    clickOutsideHandler = null;
+  }
+}
+
+const {
+  focusMenuItem,
+  getSafeHighlightIndex,
+  onItemKeydown,
+  onToggleKeydown,
+  scrollHighlightedItemIntoView
+} = useSplitButtonKeyboard({
+  closeDropdown,
+  displayActions,
+  dropdownMenu,
+  highlightedIndex,
+  isDropdownOpen,
+  onActionClick,
+  openDropdown,
+  toggleButton
+});
+
+watch(displayActionKeys, (newKeys, oldKeys) => {
+  pruneResolvedLabels(newKeys);
+
+  if (!isDropdownOpen.value && !isMenuMeasuring.value) {
+    return;
+  }
+
+  if (!newKeys.length) {
+    closeDropdown({ restoreFocus: false });
+    return;
+  }
+
+  const currentKey =
+    Array.isArray(oldKeys) &&
+    highlightedIndex.value >= 0 &&
+    highlightedIndex.value < oldKeys.length
+      ? oldKeys[highlightedIndex.value]
+      : null;
+  const nextIndex = currentKey ? newKeys.indexOf(currentKey) : -1;
+  const safeIndex = nextIndex >= 0 ? nextIndex : 0;
+  const shouldRestoreFocus = isFocusInsideWidget();
+
+  highlightedIndex.value = safeIndex;
+  void nextTick(() => {
+    if (!isDropdownOpen.value) {
+      return;
+    }
+
+    scheduleOpenMenuLayout({
+      focusAfterLayout: shouldRestoreFocus,
+      focusIndex: safeIndex
+    });
+  });
+});
+
+onBeforeUnmount(() => {
+  isComponentUnmounted = true;
+  cancelDeferredWork();
+  removeClickOutsideListener();
+  removeViewportListeners();
+  closeDropdown({ restoreFocus: false });
+});
 </script>

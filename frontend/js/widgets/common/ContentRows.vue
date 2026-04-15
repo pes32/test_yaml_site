@@ -30,43 +30,38 @@
   </template>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import WidgetRenderer from './WidgetRenderer.vue';
 
 defineOptions({
   name: 'ContentRows'
 });
 
-const props = defineProps({
-  rows: {
-    type: Array,
-    required: true
-  },
-  getWidgetAttrs: {
-    type: Function,
-    required: true
-  },
-  getWidgetValue: {
-    type: Function,
-    required: true
-  },
-  textClass: {
-    type: String,
-    default: 'page-section-text'
-  }
+type WidgetRow = string | { widgets?: string[] };
+
+const props = withDefaults(defineProps<{
+  getWidgetAttrs: (widgetName: string) => Record<string, unknown>;
+  getWidgetValue: (widgetName: string) => unknown;
+  rows: WidgetRow[];
+  textClass?: string;
+}>(), {
+  textClass: 'page-section-text'
 });
 
-const emit = defineEmits(['execute', 'input']);
+const emit = defineEmits<{
+  (event: 'execute', payload: unknown): void;
+  (event: 'input', payload: unknown): void;
+}>();
 
-function isWidgetRow(row) {
-  return row && typeof row === 'object' && row.widgets && Array.isArray(row.widgets);
+function isWidgetRow(row: WidgetRow | undefined): row is { widgets: string[] } {
+  return Boolean(row && typeof row === 'object' && row.widgets && Array.isArray(row.widgets));
 }
 
-function nextRowHasWidgets(rowIndex) {
+function nextRowHasWidgets(rowIndex: number): boolean {
   return isWidgetRow(props.rows[rowIndex + 1]);
 }
 
-function getWidgetType(widgetName) {
+function getWidgetType(widgetName: string): string {
   const attrs = props.getWidgetAttrs(widgetName) || {};
   const widgetType = typeof attrs.widget === 'string' ? attrs.widget.trim() : '';
   return widgetType || 'str';

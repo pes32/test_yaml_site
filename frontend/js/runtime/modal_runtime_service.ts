@@ -1,6 +1,6 @@
-import GuiParser from '../gui_parser.js';
+import GuiParser from '../gui_parser.ts';
 import widgetFactory from '../widgets/factory.ts';
-import { ensureAttrsLoaded as ensureAttrsLoadedFlow } from './attrs_loader.js';
+import { ensureAttrsLoaded as ensureAttrsLoadedFlow } from './attrs_loader.ts';
 import { FRONTEND_ERROR_SCOPES } from './error_model.ts';
 import {
   ModalRuntimeStore,
@@ -22,7 +22,7 @@ import {
   type ModalConfigRecord,
   type ModalRuntimeState
 } from './modal_runtime_store.ts';
-import { ensureModalDefinition as ensureModalDefinitionFlow } from './modal_flow.js';
+import { ensureModalDefinition as ensureModalDefinitionFlow } from './modal_flow.ts';
 
 type ModalRuntimeVm = Record<string, unknown> & {
   getWidgetConfig?: (widgetName: string) => { widget?: unknown } | null;
@@ -101,7 +101,7 @@ async function openModal(
   const requestToken = beginModalRequest(state, modalName);
 
   try {
-    const modal = await ensureModalDefinitionFlow(vm, modalName);
+    const modal = await ensureModalDefinitionFlow(vm as Parameters<typeof ensureModalDefinitionFlow>[0], modalName);
     if (!modal) {
       throw new Error(`Не удалось определить конфигурацию модального окна "${modalName}"`);
     }
@@ -112,7 +112,7 @@ async function openModal(
     };
     const requiredWidgetNames = collectModalWidgetNames(pendingState);
     if (requiredWidgetNames.length) {
-      await ensureAttrsLoadedFlow(vm, requiredWidgetNames);
+      await ensureAttrsLoadedFlow(vm as Parameters<typeof ensureAttrsLoadedFlow>[0], requiredWidgetNames);
       if (state.requestToken !== requestToken) {
         return modal;
       }

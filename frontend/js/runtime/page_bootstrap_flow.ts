@@ -1,9 +1,9 @@
-import GuiParser from '../gui_parser.js';
-import frontendApiClient from './api_client.js';
+import GuiParser from '../gui_parser.ts';
+import frontendApiClient from './api_client.ts';
 import PageRuntimeStore from './page_store.ts';
 import PageSessionStore from './page_session_store.ts';
 import type { PageViewHost, ParsedGuiState } from './page_contract.ts';
-import { logDiagnosticsToConsole } from './diagnostics.js';
+import { logDiagnosticsToConsole } from './diagnostics.ts';
 
 function applyPagePayload(vm: PageViewHost, payload: unknown) {
     PageRuntimeStore.bootstrap(vm.configState, (payload || {}) as Record<string, unknown>);

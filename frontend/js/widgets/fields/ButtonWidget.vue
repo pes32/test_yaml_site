@@ -3,150 +3,91 @@
     <button
       class="widget-button inline-flex-center"
       :class="buttonClasses"
-      :style="buttonStyle"
+      :style="standaloneButtonStyle"
       :title="buttonTitle"
       @click="onButtonClick"
     >
-      <img
-        v-if="widgetConfig.icon && !isFontIcon(widgetConfig.icon)"
-        :src="getIconSrc(widgetConfig.icon)"
-        :style="iconStyle"
-        alt=""
-        class="button-icon"
-        @error="onIconError"
-      >
-      <i v-else-if="widgetConfig.icon && isFontIcon(widgetConfig.icon)" :class="widgetConfig.icon"></i>
-      <span v-if="widgetConfig.label" v-text="widgetConfig.label"></span>
+      <action-button-content
+        :icon-name="iconName"
+        :icon-style="iconStyle"
+        :label="buttonLabel"
+      ></action-button-content>
     </button>
 
-    <div v-if="widgetConfig.sup_text" class="widget-info">
-      <span v-text="widgetConfig.sup_text"></span>
+    <div v-if="supportingText" class="widget-info">
+      <span>{{ supportingText }}</span>
     </div>
   </div>
 </template>
 
-<script>
-import { getIconSrc, isFontIcon, onIconError } from '../../gui_parser.js';
-import { executeAction, parseButtonAction } from '../../runtime/action_runtime.js';
+<script setup lang="ts">
+import { computed, inject, onMounted, ref } from 'vue';
+import ActionButtonContent from '../action-button/ActionButtonContent.vue';
+import { parseButtonAction } from '../../runtime/action_runtime.ts';
+import useActionButtonVisual from '../action-button/useActionButtonVisual.ts';
+import useActionExecution from '../action-button/useActionExecution.ts';
+import type { ActionWidgetEmit, ActionWidgetProps } from '../action-button/types.ts';
 
-export default {
-  name: 'ButtonWidget',
-  inject: {
-    getConfirmModal: { from: 'getConfirmModal', default: () => null },
-    openUiModal: { from: 'openUiModal', default: null },
-    closeUiModal: { from: 'closeUiModal', default: null }
-  },
-  props: {
-    widgetConfig: {
-      type: Object,
-      required: true
-    },
-    widgetName: {
-      type: String,
-      required: true
-    }
-  },
-  emits: ['execute'],
-  data() {
-    return {
-      value: ''
-    };
-  },
-  computed: {
-    buttonAction() {
-      return parseButtonAction(this.widgetConfig);
-    },
-    isIconOnly() {
-      return Boolean(this.widgetConfig.icon && !this.widgetConfig.label);
-    },
-    hasBackground() {
-      return Boolean(this.widgetConfig.fon);
-    },
-    buttonClasses() {
-      return {
-        'icon-only': this.isIconOnly,
-        'icon-only--ghost': this.isIconOnly && !this.hasBackground
-      };
-    },
-    buttonTitle() {
-      if (this.isIconOnly && this.widgetConfig.hint) return this.widgetConfig.hint;
-      if (this.widgetConfig.label) return this.widgetConfig.label;
-      return 'Кнопка';
-    },
-    iconStyle() {
-      if (!this.widgetConfig.icon || isFontIcon(this.widgetConfig.icon)) {
-        return {};
-      }
-      const size = Number(this.widgetConfig.size) || 24;
-      return {
-        width: `${size}px`,
-        height: `${size}px`
-      };
-    },
-    buttonStyle() {
-      const width = this.widgetConfig.width || this.widgetConfig.size;
-      if (this.isIconOnly) {
-        const iconRef = 24;
-        const outerRef = 40;
-        const borderTotal = 2;
-        const padRef = (outerRef - borderTotal - iconRef) / 2;
-        const iconSize = Number(this.widgetConfig.size) || iconRef;
-        const widthRaw = this.widgetConfig.width;
-        const hasExplicitWidth = widthRaw != null && widthRaw !== '';
-        let widthValue;
-        let pad;
-        if (hasExplicitWidth) {
-          const nextWidth = Number(widthRaw);
-          widthValue = Number.isFinite(nextWidth) && nextWidth > 0 ? nextWidth : outerRef;
-          pad = Math.max(0, Math.floor((widthValue - borderTotal - iconSize) / 2));
-        } else {
-          pad = Math.max(0, Math.round((padRef * iconSize) / iconRef));
-          widthValue = iconSize + borderTotal + 2 * pad;
-        }
-        return {
-          width: `${widthValue}px`,
-          minWidth: `${widthValue}px`,
-          height: `${widthValue}px`,
-          minHeight: `${widthValue}px`,
-          padding: `${pad}px`
-        };
-      }
-      if (width != null && width !== '') {
-        const widthValue = typeof width === 'number' ? `${width}px` : String(width);
-        return {
-          width: widthValue,
-          justifyContent: 'flex-start',
-          textAlign: 'left'
-        };
-      }
-      return {};
-    }
-  },
-  methods: {
-    isFontIcon,
-    getIconSrc,
-    onIconError,
-    onButtonClick() {
-      if (!this.buttonAction) {
-        return;
-      }
-      void executeAction(this, this.buttonAction, {
-        dialog: this.widgetConfig.dialog || null,
-        outputAttrs: this.widgetConfig.output_attrs,
-        widgetName: this.widgetName
-      });
-    },
-    setValue(value) {
-      this.value = value;
-    },
-    getValue() {
-      return this.value;
-    }
-  },
-  mounted() {
-    if (this.widgetConfig.default !== undefined) {
-      this.value = this.widgetConfig.default;
-    }
+defineOptions({
+  name: 'ButtonWidget'
+});
+
+const props = defineProps<ActionWidgetProps>();
+const emit = defineEmits<ActionWidgetEmit>();
+
+const getConfirmModal = inject<() => unknown | null>('getConfirmModal', () => null);
+const openUiModal = inject<((modalName: string) => Promise<unknown> | unknown) | null>(
+  'openUiModal',
+  null
+);
+const closeUiModal = inject<(() => Promise<unknown> | unknown) | null>(
+  'closeUiModal',
+  null
+);
+
+const value = ref<unknown>('');
+const buttonAction = computed(() => parseButtonAction(props.widgetConfig));
+
+const {
+  buttonClasses,
+  buttonLabel,
+  buttonTitle,
+  iconName,
+  iconStyle,
+  standaloneButtonStyle,
+  supportingText
+} = useActionButtonVisual(props, { fallbackTitle: 'Кнопка' });
+
+const { executeAction } = useActionExecution(props, emit, {
+  closeUiModal,
+  getConfirmModal,
+  openUiModal
+});
+
+function onButtonClick(): void {
+  if (!buttonAction.value) {
+    return;
   }
-};
+  void executeAction(buttonAction.value);
+}
+
+function setValue(nextValue: unknown): void {
+  value.value = nextValue;
+}
+
+function getValue(): unknown {
+  return value.value;
+}
+
+onMounted(() => {
+  if (props.widgetConfig.default !== undefined) {
+    value.value = props.widgetConfig.default;
+  }
+});
+
+defineExpose({
+  getValue,
+  setValue,
+  value
+});
 </script>

@@ -23,13 +23,14 @@
   </details>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 import {
   countDiagnosticsByLevel,
   formatDiagnosticLocation,
-  normalizeDiagnostics
-} from '../../runtime/diagnostics.js';
+  normalizeDiagnostics,
+  type FrontendDiagnosticItem
+} from '../../runtime/diagnostics.ts';
 
 defineOptions({
   name: 'DiagnosticsPanel'
@@ -67,7 +68,7 @@ const summaryText = computed(() => {
   return parts.join(' | ') || 'diagnostics';
 });
 
-function locationText(item) {
+function locationText(item: FrontendDiagnosticItem) {
   return formatDiagnosticLocation(item);
 }
 </script>

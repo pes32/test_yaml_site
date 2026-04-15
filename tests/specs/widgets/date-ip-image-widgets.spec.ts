@@ -18,20 +18,42 @@ test.describe('behavior: date, time, ip and image widgets', () => {
     await expect(dateInput).toHaveValue('01.01.2026');
 
     await widget(page, 'date_widget').getByRole('button', { name: 'Выбрать дату' }).click();
-    await expect(page.locator('.widget-dt-popover--calendar')).toBeVisible();
-    await page.keyboard.press('Escape');
+    const calendar = page.locator('.widget-dt-popover--calendar');
+    await expect(calendar).toBeVisible();
+    await calendar.locator('.widget-dt-day:not(.is-outside)').nth(1).click();
+    await expect(dateInput).toHaveValue('02.01.2026');
+
+    await widget(page, 'date_widget').getByRole('button', { name: 'Выбрать дату' }).click();
+    await expect(calendar).toBeVisible();
+    await page.locator('body').click({ position: { x: 1, y: 1 } });
+    await expect(calendar).toBeHidden();
 
     const timeInput = widgetInput(page, 'time_widget');
-    await fillAndBlur(timeInput, '1234');
-    await expect(timeInput).toHaveValue('12:34');
+    await fillAndBlur(timeInput, '123456');
+    await expect(timeInput).toHaveValue('12:34:56');
 
     await widget(page, 'time_widget').getByRole('button', { name: 'Выбрать время' }).click();
-    await expect(page.locator('.widget-dt-popover--time')).toBeVisible();
+    const timePopover = page.locator('.widget-dt-popover--time');
+    await expect(timePopover).toBeVisible();
+    await timePopover.locator('input').nth(2).fill('7');
+    await timePopover.locator('input').nth(2).blur();
+    await expect(timeInput).toHaveValue('12:34:07');
 
     const datetimeInputs = widget(page, 'demo_datetime').locator('input');
     await expect(datetimeInputs).toHaveCount(2);
     await expect(datetimeInputs.nth(0)).not.toHaveValue('');
     await expect(datetimeInputs.nth(1)).not.toHaveValue('');
+
+    await widget(page, 'demo_datetime').getByRole('button', { name: 'Выбрать дату' }).click();
+    await expect(calendar).toBeVisible();
+    await page.locator('body').click({ position: { x: 1, y: 1 } });
+    await expect(calendar).toBeHidden();
+
+    await widget(page, 'demo_datetime').getByRole('button', { name: 'Выбрать время' }).click();
+    await expect(timePopover).toBeVisible();
+    await timePopover.locator('input').first().fill('9');
+    await timePopover.locator('input').first().blur();
+    await expect(datetimeInputs.nth(1)).toHaveValue(/09:\d{2}/);
   });
 
   test('ip and ip_mask widgets normalize separators, validate ranges and respect readonly', async ({ page }) => {

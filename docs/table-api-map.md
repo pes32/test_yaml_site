@@ -42,7 +42,7 @@
 ## Runtime Modules
 
 - `createTableRuntime.ts` — orchestration entrypoint, который собирает runtime controller.
-- `useTableRuntime.ts` — typed Composition API bridge для `TableWidget.vue`; возвращает setup bindings по table contract.
+- `useTableRuntime.ts` — typed Composition API controller для `TableWidget.vue`; возвращает setup bindings по table contract без generic `Proxy`.
 - `table_cell_runtime.ts` — embedded cell value/editor flow.
 - `table_clipboard_runtime.ts` — browser clipboard integration.
 - `table_context_menu.ts` — context menu behavior.
@@ -57,6 +57,10 @@
 - `table_selection.ts` — selection model and normalization.
 - `table_view_runtime.ts` — visual/runtime view orchestration.
 - `table_widget_helpers.ts` — DOM/geometry helpers used by the table widget.
+
+## Embedded Widget Imports
+
+Table cell editors импортируются из полного TS widget layer: `StringWidget`, `IntWidget`, `FloatWidget`, `DateWidget`, `TimeWidget`, `DateTimeWidget`, `IpWidget`, `IpMaskWidget`, `ListWidget`, `VocWidget`. Возвращать JS helper adapters для этих embedded widgets нельзя; новые table-cell capabilities должны проходить через typed widget exposes и общий lifecycle contract.
 
 ## DOM And Page Integration
 

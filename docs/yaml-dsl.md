@@ -87,8 +87,7 @@ Backend валидирует:
 
 ### Core field widgets
 
-`str`, `text`, `int` и `float` — базовые stateful widgets с единым draft/commit
-контрактом во frontend runtime.
+`str`, `text`, `int`, `float`, `date`, `time`, `datetime`, `ip`, `ip_mask`, `list` и `voc` — stateful widgets с единым draft/commit контрактом во frontend runtime. Их widget-layer реализация переведена на Composition API + TypeScript; YAML-контракт при этом не меняется.
 
 Общее поведение:
 
@@ -101,12 +100,14 @@ Backend валидирует:
 - вне table-cell режима ввод держится как draft и публикуется при blur/commit;
 - в table-cell режиме значение публикуется на input, а commit validation синхронизируется с таблицей.
 
-Особенности:
+Особенности базовых полей:
 
 - `str` — однострочное текстовое поле;
 - `text` — textarea, `rows` задаёт высоту, по умолчанию используется `3`;
 - `int` принимает только целое число в строковом формате, пустое значение валидно;
 - `float` принимает дробное число в строковом формате, запятая при вводе нормализуется в точку, пустое значение валидно.
+
+DOM-heavy поля `date`, `time`, `datetime`, `ip` и `ip_mask` сохраняют тот же lifecycle surface для page/table runtime: `getValue`, `setValue`, `commitDraft`, `commitPendingState`, а date/time widgets дополнительно открываются через picker methods, которые использует table cell runtime.
 
 ### `button` и `split_button`
 
@@ -179,7 +180,7 @@ Runtime behavior:
 - если action один, `split_button` всё равно остаётся `split_button`, а не деградирует в `button`;
 - `dialog` в v1 оборачивает только `url` и `command`;
 - `button` сохраняет существующий button-compatible execution contract;
-- `split_button` использует тот же shared action-runtime, но добавляет dropdown UI.
+- `split_button` использует тот же TypeScript action-runtime, но добавляет dropdown UI.
 
 ### `voc` widget
 

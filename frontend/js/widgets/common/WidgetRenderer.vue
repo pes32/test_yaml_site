@@ -25,19 +25,12 @@ defineOptions({
   name: 'WidgetRenderer'
 });
 
-const props = defineProps({
-  widgetAttrs: {
-    type: Object,
-    required: true
-  },
-  widgetValue: {
-    required: false,
-    default: undefined
-  },
-  widgetName: {
-    type: String,
-    required: true
-  }
+const props = withDefaults(defineProps<{
+  widgetAttrs: Record<string, unknown>;
+  widgetName: string;
+  widgetValue?: unknown;
+}>(), {
+  widgetValue: undefined
 });
 
 const emit = defineEmits<{

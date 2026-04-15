@@ -24,35 +24,48 @@
   </div>
 </template>
 
-<script>
-export default {
-  name: 'ConfirmModal',
-  data() {
-    return {
-      show: false,
-      config: null,
-      _acceptHandler: null
-    };
-  },
-  methods: {
-    open(nextConfig) {
-      this.config = nextConfig || {};
-      this.show = true;
-    },
-    hide() {
-      this.show = false;
-      this._acceptHandler = null;
-    },
-    accept() {
-      if (this._acceptHandler) {
-        this._acceptHandler();
-      }
+<script setup lang="ts">
+import { ref } from 'vue';
 
-      this.hide();
-    },
-    cancel() {
-      this.hide();
-    }
-  }
+type ConfirmModalConfig = {
+  accept?: string;
+  cancel?: string;
+  text?: string;
+  title?: string;
 };
+
+defineOptions({
+  name: 'ConfirmModal'
+});
+
+const show = ref(false);
+const config = ref<ConfirmModalConfig | null>(null);
+const _acceptHandler = ref<(() => void) | null>(null);
+
+function open(nextConfig?: ConfirmModalConfig | null): void {
+  config.value = nextConfig || {};
+  show.value = true;
+}
+
+function hide(): void {
+  show.value = false;
+  _acceptHandler.value = null;
+}
+
+function accept(): void {
+  _acceptHandler.value?.();
+  hide();
+}
+
+function cancel(): void {
+  hide();
+}
+
+defineExpose({
+  _acceptHandler,
+  accept,
+  cancel,
+  hide,
+  open
+});
 </script>

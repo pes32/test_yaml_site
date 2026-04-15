@@ -57,6 +57,15 @@ type UseTableRuntimeOptions = {
 type AnyFn = (...args: unknown[]) => unknown;
 type ComputedLike = { value: unknown };
 
+type TableRuntimeControllerOptions = {
+    boundMethods: Record<string, AnyFn>;
+    computedRefs: Record<string, ComputedLike>;
+    emit: TableWidgetEmit;
+    instance: ReturnType<typeof getCurrentInstance>;
+    props: TableWidgetProps;
+    state: TableRuntimeState;
+};
+
 const TABLE_CONFIG_WATCH_KEYS = [
     'data',
     'label',
@@ -188,6 +197,77 @@ function createInitialTableRuntimeState(
     };
 }
 
+function createTableRuntimeController({
+    boundMethods,
+    computedRefs,
+    emit,
+    instance,
+    props,
+    state
+}: TableRuntimeControllerOptions): TableRuntimeVm & ComponentPublicInstance {
+    const controller = {
+        $emit: emit,
+        $nextTick: nextTick,
+        get $el() {
+            return (instance?.proxy as ComponentPublicInstance | null)?.$el || null;
+        },
+        get $refs() {
+            return (instance?.proxy as ComponentPublicInstance | null)?.$refs || {};
+        },
+        get $root() {
+            return (instance?.proxy as ComponentPublicInstance | null)?.$root || null;
+        },
+        get widgetConfig() {
+            return props.widgetConfig;
+        },
+        get widgetName() {
+            return props.widgetName;
+        }
+    } as Partial<TableRuntimeVm> & Record<string, unknown>;
+
+    (Object.keys(state) as Array<keyof TableRuntimeState>).forEach((key) => {
+        Object.defineProperty(controller, key, {
+            configurable: true,
+            enumerable: true,
+            get: () => state[key],
+            set: (value: unknown) => {
+                (state as Record<string, unknown>)[key as string] = value;
+            }
+        });
+    });
+
+    Object.keys(tableRuntimeMethods).forEach((key) => {
+        Object.defineProperty(controller, key, {
+            configurable: true,
+            enumerable: true,
+            get: () => boundMethods[key]
+        });
+    });
+
+    Object.entries(tableRuntimeComputed).forEach(([key, def]) => {
+        const setter = typeof def === 'object' && typeof (def as { set?: unknown }).set === 'function'
+            ? (def as { set: AnyFn }).set
+            : null;
+
+        Object.defineProperty(controller, key, {
+            configurable: true,
+            enumerable: true,
+            get: () => computedRefs[key]?.value,
+            set: setter
+                ? (value: unknown) => {
+                    if (computedRefs[key]) {
+                        computedRefs[key].value = value;
+                        return;
+                    }
+                    setter.call(controller, value);
+                }
+                : undefined
+        });
+    });
+
+    return controller as TableRuntimeVm & ComponentPublicInstance;
+}
+
 function useTableRuntime(options: UseTableRuntimeOptions): TableWidgetSetupBindings {
     const { cellWidgets, emit, props } = options;
 
@@ -212,50 +292,14 @@ function useTableRuntime(options: UseTableRuntimeOptions): TableWidgetSetupBindi
     const computedRefs = {} as Record<string, ComputedLike>;
     const boundMethods = {} as Record<string, AnyFn>;
 
-    const vmTarget: Record<string, unknown> = {};
-
-    const vm = new Proxy(vmTarget, {
-        get(_target, key) {
-            if (typeof key === 'string') {
-                if (Object.prototype.hasOwnProperty.call(boundMethods, key)) {
-                    return boundMethods[key];
-                }
-                if (Object.prototype.hasOwnProperty.call(computedRefs, key)) {
-                    return computedRefs[key].value;
-                }
-                if (Object.prototype.hasOwnProperty.call(state, key)) {
-                    return Reflect.get(state, key);
-                }
-                if (key === 'widgetConfig') return props.widgetConfig;
-                if (key === 'widgetName') return props.widgetName;
-                if (key === '$emit') return emit;
-                if (key === '$nextTick') return nextTick;
-                if (key === '$refs') return (instance?.proxy as ComponentPublicInstance | null)?.$refs || {};
-                if (key === '$el') return (instance?.proxy as ComponentPublicInstance | null)?.$el || null;
-                if (key === '$root') return (instance?.proxy as ComponentPublicInstance | null)?.$root || null;
-            }
-            return Reflect.get(_target, key);
-        },
-        set(_target, key, value) {
-            if (typeof key === 'string') {
-                const computedDef = (tableRuntimeComputed as Record<string, unknown>)[key];
-                if (
-                    computedDef &&
-                    typeof computedDef === 'object' &&
-                    typeof (computedDef as { set?: unknown }).set === 'function' &&
-                    Object.prototype.hasOwnProperty.call(computedRefs, key)
-                ) {
-                    computedRefs[key].value = value;
-                    return true;
-                }
-                if (Object.prototype.hasOwnProperty.call(state, key)) {
-                    Reflect.set(state, key, value);
-                    return true;
-                }
-            }
-            return Reflect.set(_target, key, value);
-        }
-    }) as unknown as TableRuntimeVm & ComponentPublicInstance;
+    const vm = createTableRuntimeController({
+        boundMethods,
+        computedRefs,
+        emit,
+        instance,
+        props,
+        state
+    });
 
     Object.entries(tableRuntimeMethods).forEach(([name, fn]) => {
         boundMethods[name] = (...args: unknown[]) => (fn as AnyFn).apply(vm, args);

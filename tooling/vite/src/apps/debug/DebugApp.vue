@@ -193,7 +193,7 @@
 </template>
 
 <script lang="ts">
-import debugAppOptions from '../../../../../frontend/js/debug.js';
+import debugAppOptions from '../../../../../frontend/js/debug.ts';
 import DiagnosticsPanel from '../../../../../frontend/js/widgets/common/DiagnosticsPanel.vue';
 import ErrorPanel from '../../../../../frontend/js/widgets/common/ErrorPanel.vue';
 

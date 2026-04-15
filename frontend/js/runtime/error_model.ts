@@ -1,4 +1,4 @@
-import { FrontendApiError } from './api_client.js';
+import { FrontendApiError } from './api_client.ts';
 
 type FrontendErrorKind = typeof FRONTEND_ERROR_KINDS[keyof typeof FRONTEND_ERROR_KINDS];
 type FrontendErrorScope = typeof FRONTEND_ERROR_SCOPES[keyof typeof FRONTEND_ERROR_SCOPES];

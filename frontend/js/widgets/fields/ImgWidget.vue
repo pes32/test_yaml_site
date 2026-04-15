@@ -17,39 +17,57 @@
   </div>
 </template>
 
-<script>
-export default {
-  name: 'ImgWidget',
-  props: {
-    widgetConfig: { type: Object, required: true },
-    widgetName: { type: String, required: true }
-  },
-  data() {
-    return { loadError: false };
-  },
-  computed: {
-    imageSrc() {
-      if (this.loadError || !this.widgetConfig.source) return null;
-      const src = String(this.widgetConfig.source).trim();
-      if (/^https?:\/\//i.test(src)) return src;
-      if (src.startsWith('/')) return src;
-      return '/' + src;
-    },
-    imgStyle() {
-      const width = this.widgetConfig.width;
-      if (width == null || width === '') return {};
-      const widthValue = typeof width === 'number' ? `${width}px` : String(width);
-      return { width: widthValue, maxWidth: '100%', height: 'auto' };
-    }
-  },
-  methods: {
-    onImageError() {
-      this.loadError = true;
-    },
-    setValue() {},
-    getValue() {
-      return null;
-    }
-  }
+<script setup lang="ts">
+import { computed, ref, type CSSProperties } from 'vue';
+
+type ImgWidgetConfig = Record<string, unknown> & {
+  label?: string;
+  source?: unknown;
+  sup_text?: unknown;
+  width?: number | string;
 };
+
+type ImgWidgetProps = {
+  widgetConfig: ImgWidgetConfig;
+  widgetName: string;
+};
+
+defineOptions({
+  name: 'ImgWidget'
+});
+
+const props = defineProps<ImgWidgetProps>();
+const loadError = ref(false);
+
+const imageSrc = computed<string | null>(() => {
+  if (loadError.value || !props.widgetConfig.source) return null;
+  const src = String(props.widgetConfig.source).trim();
+  if (/^https?:\/\//i.test(src)) return src;
+  if (src.startsWith('/')) return src;
+  return `/${src}`;
+});
+
+const imgStyle = computed<CSSProperties>(() => {
+  const width = props.widgetConfig.width;
+  if (width == null || width === '') return {};
+  const widthValue = typeof width === 'number' ? `${width}px` : String(width);
+  return { width: widthValue, maxWidth: '100%', height: 'auto' };
+});
+
+function onImageError(): void {
+  loadError.value = true;
+}
+
+function setValue(): void {
+  /* non-stateful image widget */
+}
+
+function getValue(): null {
+  return null;
+}
+
+defineExpose({
+  getValue,
+  setValue
+});
 </script>

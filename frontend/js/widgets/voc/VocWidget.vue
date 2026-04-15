@@ -205,50 +205,1016 @@
   </md3-field>
 </template>
 
-<script>
+<script setup lang="ts">
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  reactive,
+  ref,
+  toRefs,
+  watch
+} from 'vue';
 import Md3Field from '../common/Md3Field.vue';
 import useWidgetField from '../composables/useWidgetField.ts';
 import {
-  vocModalComputed,
-  vocModalMethods,
-  vocModalWatch
-} from './voc_modal_shared.ts';
+  normalizeVocColumns,
+  normalizeVocRows,
+  parseVocDraft,
+  serializeVocValues,
+  type VocRow
+} from '../../runtime/voc_contract.ts';
 import {
-  beforeUnmountVocWidget,
+  applyModalSelection as resolveAppliedModalSelection,
+  commitMultiselectVocDraft,
+  commitSingleVocDraft,
+  formatVocRowLabel,
+  hasVocValue,
+  modalSortControlClass as resolveModalSortControlClass,
+  moveModalActiveState,
+  normalizeMultiVocValue,
+  normalizeSingleVocValue,
+  replaceVocDraftActiveToken,
+  resolveHighlightedInlineIndex,
+  resolveInlineQuery,
+  resolveInputDisplayValue,
+  resolveModalActiveState,
+  resolveModalOpenState,
+  resolveModalRows,
+  toggleModalRowSelection,
+  toggleModalSortState
+} from './voc_value_core.ts';
+import {
+  closeDropdown as closeDropdownRuntime,
+  focusInput,
+  getInputElement as getInputElementRuntime,
+  isFocusInsideWidget,
+  listItemId as resolveListItemId,
+  openDropdown as openDropdownRuntime,
+  type VocDropdownRuntimeContext,
+  type VocDropdownRuntimeRefs
+} from './voc_dropdown_runtime.ts';
+import {
+  closeModal as closeModalRuntime,
+  focusModalSearchInput,
+  scrollModalActiveRowIntoView,
+  setTableUiLocked as runtimeSetTableUiLocked,
+  type VocModalRuntimeContext,
+  type VocModalRuntimeRefs
+} from './voc_modal_runtime.ts';
+import {
   createVocWidgetState,
-  vocComputed,
-  vocMethods,
-  vocWatch
+  type VocWidgetState
 } from './voc_shared.ts';
 
-export default {
-  name: 'VocWidget',
-  components: { Md3Field },
-  props: {
-    widgetConfig: { type: Object, required: true },
-    widgetName: { type: String, required: true }
+type VocWidgetConfig = Record<string, unknown> & {
+  columns?: unknown;
+  label?: unknown;
+  multiselect?: boolean;
+  placeholder?: string;
+  readonly?: boolean;
+  source?: unknown;
+  sup_text?: unknown;
+  table_cell_mode?: boolean;
+  table_cell_tab_handler?: unknown;
+  table_cell_ui_lock_handler?: unknown;
+  table_cell_validation_handler?: unknown;
+  table_consume_keys?: unknown;
+  value?: unknown;
+};
+
+type VocWidgetProps = {
+  widgetConfig: VocWidgetConfig;
+  widgetName: string;
+};
+
+type VocInputPayload = {
+  config: VocWidgetConfig;
+  name: string;
+  value: unknown;
+};
+
+type VocWidgetEmit = {
+  (event: 'input', payload: VocInputPayload): void;
+};
+
+type VocCommitContext = {
+  kind?: string;
+};
+
+type VocCommitResult =
+  | { status: 'noop' | 'committed' }
+  | { error: unknown; severity: 'recoverable' | 'fatal'; status: 'blocked' };
+
+defineOptions({
+  name: 'VocWidget'
+});
+
+const props = defineProps<VocWidgetProps>();
+const emit = defineEmits<VocWidgetEmit>();
+
+const dropdownRoot = ref<HTMLElement | null>(null);
+const dropdownToggle = ref<HTMLElement | null>(null);
+const dropdownMenu = ref<HTMLElement | null>(null);
+const modalRoot = ref<HTMLElement | null>(null);
+const modalSearchInput = ref<HTMLInputElement | null>(null);
+
+const state = reactive(createVocWidgetState()) as VocWidgetState;
+const field = useWidgetField(props, emit);
+
+const tableCellRootAttrs = field.tableCellRootAttrs;
+const fieldError = field.fieldError;
+const isDraftEditing = field.isDraftEditing;
+const tableCellMode = field.tableCellMode;
+
+const isMultiselect = computed(() => props.widgetConfig.multiselect === true);
+const hasValue = computed(() => hasVocValue(state.value, isMultiselect.value));
+const labelFloats = computed(() => hasValue.value || state.isFocused);
+const showPlaceholder = computed(() =>
+  !hasValue.value && state.isFocused && Boolean(props.widgetConfig.placeholder)
+);
+const columns = computed(() => normalizeVocColumns(props.widgetConfig.columns));
+const rows = computed(() => normalizeVocRows(columns.value, props.widgetConfig.source));
+const inlineQuery = computed(() => resolveInlineQuery(state.inputValue, isMultiselect.value));
+const inlineRows = computed(() => resolveModalRows(rows.value, inlineQuery.value, -1, ''));
+const inputDisplayValue = computed(() =>
+  resolveInputDisplayValue({
+    isMultiselect: isMultiselect.value,
+    isFocused: state.isFocused,
+    isDraftEditing: isDraftEditing.value,
+    inputValue: state.inputValue,
+    value: state.value
+  })
+);
+const listMenuId = computed(() => `voc-menu-${state.listId}`);
+const highlightedId = computed(() =>
+  state.highlightedIndex >= 0 && state.highlightedIndex < inlineRows.value.length
+    ? listItemId(state.highlightedIndex)
+    : null
+);
+const shouldShowInlineDropdown = computed(() =>
+  state.isDropdownOpen && inlineRows.value.length > 0
+);
+const combinedFieldError = computed(() => state.vocError || fieldError.value || '');
+const modalTitle = computed(() => {
+  const label = String(props.widgetConfig.label || '').trim();
+  return label || props.widgetName;
+});
+const modalRows = computed(() =>
+  resolveModalRows(
+    rows.value,
+    state.modalSearch,
+    state.modalSortColumn,
+    state.modalSortDirection
+  )
+);
+const modalSelectedRowIdSet = computed(() => new Set(state.modalSelectedRowIds));
+const modalInlineStyle = computed(() => ({
+  width: 'min(100%, 1100px)',
+  maxWidth: 'min(1100px, 100%)',
+  height: 'min(720px, calc(100vh - 2 * var(--space-md)))',
+  maxHeight: 'min(720px, calc(100vh - 2 * var(--space-md)))'
+}));
+const modalBodyInnerStyle = computed(() => ({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'var(--space-md)',
+  minHeight: '0',
+  padding: '0 20px 20px'
+}));
+const modalSearchInputStyle = computed(() => ({
+  display: 'block',
+  width: '100%',
+  boxSizing: 'border-box'
+}));
+const modalTableWrapStyle = computed(() => ({
+  minHeight: '0',
+  width: '100%'
+}));
+const checkboxCellStyle = computed(() => ({
+  width: '52px',
+  minWidth: '52px'
+}));
+
+function getDropdownRefs(): VocDropdownRuntimeRefs {
+  return {
+    dropdownMenu: dropdownMenu.value,
+    dropdownRoot: dropdownRoot.value,
+    dropdownToggle: dropdownToggle.value,
+    modalRoot: modalRoot.value
+  };
+}
+
+function getModalRefs(): VocModalRuntimeRefs {
+  return {
+    modalRoot: modalRoot.value,
+    modalSearchInput: modalSearchInput.value
+  };
+}
+
+const dropdownRuntimeContext: VocDropdownRuntimeContext = {
+  $nextTick: nextTick,
+  get $refs() {
+    return getDropdownRefs();
   },
-  emits: ['input'],
-  setup(props, { emit }) {
-    return useWidgetField(props, emit);
+  get _clickOutside() {
+    return state._clickOutside;
   },
-  data() {
-    return createVocWidgetState();
+  set _clickOutside(value) {
+    state._clickOutside = value;
   },
-  computed: {
-    ...vocComputed,
-    ...vocModalComputed
+  get _clickOutsideTimerId() {
+    return state._clickOutsideTimerId;
   },
-  methods: {
-    ...vocMethods,
-    ...vocModalMethods
+  set _clickOutsideTimerId(value) {
+    state._clickOutsideTimerId = value;
   },
-  watch: {
-    ...vocWatch,
-    ...vocModalWatch
+  get _scrollUpdate() {
+    return state._scrollUpdate;
   },
-  beforeUnmount() {
-    beforeUnmountVocWidget.call(this);
+  set _scrollUpdate(value) {
+    state._scrollUpdate = value;
+  },
+  get highlightedIndex() {
+    return state.highlightedIndex;
+  },
+  set highlightedIndex(value) {
+    state.highlightedIndex = Number(value) || 0;
+  },
+  get inlineRows() {
+    return inlineRows.value;
+  },
+  get isDropdownOpen() {
+    return state.isDropdownOpen;
+  },
+  set isDropdownOpen(value) {
+    state.isDropdownOpen = Boolean(value);
+  },
+  get listId() {
+    return state.listId;
+  },
+  get menuPosition() {
+    return state.menuPosition;
+  },
+  set menuPosition(value) {
+    state.menuPosition = value;
+  },
+  onOutsideInteractionCommit,
+  resolveHighlightedIndex,
+  get shouldShowInlineDropdown() {
+    return shouldShowInlineDropdown.value;
+  },
+  get widgetConfig() {
+    return props.widgetConfig;
   }
 };
+
+const modalRuntimeContext: VocModalRuntimeContext = {
+  $nextTick: nextTick,
+  get $refs() {
+    return getModalRefs();
+  },
+  getInputElement,
+  get isModalOpen() {
+    return state.isModalOpen;
+  },
+  set isModalOpen(value) {
+    state.isModalOpen = Boolean(value);
+  },
+  get modalActiveRowId() {
+    return state.modalActiveRowId;
+  },
+  get widgetConfig() {
+    return props.widgetConfig;
+  }
+};
+
+const {
+  highlightedIndex,
+  inputValue,
+  isDropdownOpen,
+  isFocused,
+  isModalOpen,
+  menuPosition,
+  modalActiveRowId,
+  modalSearch,
+  modalSelectedRowId,
+  modalSelectedRowIds,
+  modalSortColumn,
+  modalSortDirection,
+  singleDraftDirty,
+  skipNextOutsideCommit,
+  value,
+  vocError
+} = toRefs(state);
+
+function listItemId(index: number): string {
+  return resolveListItemId(dropdownRuntimeContext, Number(index));
+}
+
+function formatRowLabel(row: VocRow | null | undefined): string {
+  return formatVocRowLabel(row || null);
+}
+
+function setSingleValue(value: unknown, options: { forceSyncInput?: boolean } = {}): void {
+  state.value = normalizeSingleVocValue(value);
+  state.singleDraftDirty = false;
+  if (options.forceSyncInput === true || (!state.isFocused && !isDraftEditing.value)) {
+    state.inputValue = String(state.value || '');
+  }
+}
+
+function setMultiValue(value: unknown): void {
+  state.value = normalizeMultiVocValue(value);
+  if (!state.isFocused && !isDraftEditing.value) {
+    state.inputValue = serializeVocValues(state.value);
+  }
+}
+
+function setValue(value: unknown): void {
+  if (isMultiselect.value) {
+    setMultiValue(value);
+    return;
+  }
+
+  const nextValue = Array.isArray(value)
+    ? String(value[0] ?? '')
+    : String(value ?? '');
+  setSingleValue(nextValue, { forceSyncInput: true });
+}
+
+function getValue(): string | string[] {
+  return state.value;
+}
+
+function clearVocError(): void {
+  state.vocError = '';
+  field.handleTableCellCommitValidation('');
+}
+
+function setVocError(message: string): void {
+  const errorMessage = String(message || '').trim();
+  state.vocError = errorMessage;
+  field.handleTableCellCommitValidation(errorMessage);
+}
+
+function syncInputFromCommitted(): void {
+  if (state.isFocused || isDraftEditing.value) {
+    return;
+  }
+  state.inputValue = isMultiselect.value
+    ? serializeVocValues(state.value)
+    : String(state.value || '');
+  if (!isMultiselect.value) {
+    state.singleDraftDirty = false;
+  }
+}
+
+function resolveHighlightedIndex(): number {
+  return resolveHighlightedInlineIndex({
+    isMultiselect: isMultiselect.value,
+    inlineRows: inlineRows.value,
+    value: state.value
+  });
+}
+
+function setHighlightedIndex(index: number, options: { scroll?: boolean } = {}): void {
+  const scroll = options.scroll !== false;
+  const maxIndex = inlineRows.value.length - 1;
+  const nextIndex =
+    maxIndex < 0
+      ? -1
+      : Math.min(Math.max(Number(index) || 0, 0), maxIndex);
+  state.highlightedIndex = nextIndex;
+  if (scroll && nextIndex >= 0) {
+    void nextTick(() => {
+      const items = dropdownMenu.value?.querySelectorAll('[role="option"]');
+      const option = items?.[nextIndex] || null;
+      const element = option?.querySelector('.dropdown-item') || option;
+      element?.scrollIntoView({ block: 'nearest' });
+    });
+  }
+}
+
+function moveHighlightedIndex(delta: number): void {
+  const length = inlineRows.value.length;
+  if (!length) {
+    state.highlightedIndex = -1;
+    return;
+  }
+  const step = Number(delta) || 0;
+  const nextIndex =
+    state.highlightedIndex < 0
+      ? step > 0
+        ? 0
+        : length - 1
+      : (state.highlightedIndex + step + length) % length;
+  setHighlightedIndex(nextIndex);
+}
+
+function getInputElement(): HTMLInputElement | null {
+  return getInputElementRuntime(dropdownRuntimeContext);
+}
+
+function onOutsideInteractionCommit(): void {
+  if (state.isModalOpen) {
+    return;
+  }
+  if (isMultiselect.value && state.skipNextOutsideCommit) {
+    state.skipNextOutsideCommit = false;
+    syncInputFromCommitted();
+    closeDropdown();
+    field.deactivateDraftController();
+    return;
+  }
+  commitDraftMethod({ includeActiveToken: true, fromBlur: true });
+  closeDropdown();
+  field.deactivateDraftController();
+}
+
+function openDropdown(options: { highlightFirst?: boolean } = {}): void {
+  openDropdownRuntime(dropdownRuntimeContext, options);
+}
+
+function closeDropdown(): void {
+  closeDropdownRuntime(dropdownRuntimeContext);
+}
+
+function normalizeMultiselectDraftAndSync(options: {
+  fromBlur?: boolean;
+  includeActiveToken?: boolean;
+} = {}) {
+  const resolution = commitMultiselectVocDraft({
+    rows: rows.value,
+    value: state.value,
+    inputValue: state.inputValue,
+    includeActiveToken: options.includeActiveToken === true,
+    fromBlur: options.fromBlur === true
+  });
+
+  state.value = resolution.nextValue;
+  if (resolution.shouldEmit) {
+    field.emitInput(resolution.nextValue.slice());
+  }
+
+  if (resolution.invalidMessage) {
+    setVocError(resolution.invalidMessage);
+  } else {
+    clearVocError();
+  }
+
+  if (options.fromBlur === true) {
+    state.inputValue = resolution.nextInputValue;
+  }
+
+  return resolution;
+}
+
+function commitDraftMethod(options: {
+  fromBlur?: boolean;
+  includeActiveToken?: boolean;
+} = {}): void {
+  if (isMultiselect.value) {
+    normalizeMultiselectDraftAndSync({
+      includeActiveToken: options.includeActiveToken === true,
+      fromBlur: options.fromBlur === true
+    });
+    return;
+  }
+
+  const resolution = commitSingleVocDraft({
+    rows: rows.value,
+    inputValue: state.inputValue,
+    value: state.value,
+    draftDirty: state.singleDraftDirty
+  });
+
+  state.value = resolution.nextValue;
+  state.inputValue = resolution.nextInputValue;
+  state.singleDraftDirty = false;
+  clearVocError();
+  if (resolution.emit) {
+    field.emitInput(resolution.emittedValue);
+  }
+}
+
+function selectInlineRow(row: VocRow | null | undefined): void {
+  const nextRow = row || null;
+  if (!nextRow) {
+    return;
+  }
+  if (isMultiselect.value) {
+    state.inputValue = replaceVocDraftActiveToken(state.inputValue, nextRow.value);
+    normalizeMultiselectDraftAndSync({
+      includeActiveToken: false,
+      fromBlur: false
+    });
+    closeDropdown();
+    focusInput(dropdownRuntimeContext);
+    return;
+  }
+
+  setSingleValue(nextRow.value, { forceSyncInput: true });
+  clearVocError();
+  field.emitInput(nextRow.value);
+  closeDropdown();
+  field.deactivateDraftController();
+}
+
+function onInputChange(event: Event): void {
+  if (props.widgetConfig.readonly) {
+    return;
+  }
+  field.activateDraftController();
+  state.skipNextOutsideCommit = false;
+  clearVocError();
+
+  const target = event.target instanceof HTMLInputElement ? event.target : null;
+
+  if (isMultiselect.value) {
+    const rawValue = target?.value == null ? '' : String(target.value);
+    state.inputValue = parseVocDraft(rawValue).normalizedText;
+    normalizeMultiselectDraftAndSync({
+      includeActiveToken: false,
+      fromBlur: false
+    });
+    const query = resolveInlineQuery(state.inputValue, true);
+    if (query.trim()) {
+      openDropdown({ highlightFirst: true });
+    } else {
+      closeDropdown();
+    }
+    return;
+  }
+
+  state.inputValue = target?.value == null ? '' : String(target.value);
+  state.singleDraftDirty = true;
+  if (!state.isDropdownOpen) {
+    openDropdown({ highlightFirst: true });
+    return;
+  }
+  setHighlightedIndex(inlineRows.value.length > 0 ? 0 : -1);
+}
+
+function onInputFocus(): void {
+  state.isFocused = true;
+  field.activateDraftController();
+  clearVocError();
+  if (isMultiselect.value) {
+    state.inputValue = state.inputValue !== ''
+      ? state.inputValue
+      : serializeVocValues(state.value);
+    return;
+  }
+  state.inputValue = String(state.value || '');
+}
+
+function onInputBlur(): void {
+  state.isFocused = false;
+  window.setTimeout(() => {
+    if (isFocusInsideWidget(dropdownRuntimeContext)) {
+      return;
+    }
+    onOutsideInteractionCommit();
+  }, 150);
+}
+
+function onWidgetFocusOut(): void {
+  window.setTimeout(() => {
+    if (isFocusInsideWidget(dropdownRuntimeContext)) {
+      return;
+    }
+    onOutsideInteractionCommit();
+  }, 0);
+}
+
+function onInputKeydown(event: KeyboardEvent): void {
+  if (props.widgetConfig.readonly) {
+    return;
+  }
+
+  if (event.key === 'Tab') {
+    const tabHandler = props.widgetConfig.table_cell_tab_handler;
+    if (tableCellMode.value && typeof tabHandler === 'function') {
+      event.preventDefault();
+      closeDropdown();
+      tabHandler(!!event.shiftKey);
+      return;
+    }
+  }
+
+  const shouldOpenModal =
+    event.altKey &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    event.key === 'ArrowDown';
+  if (shouldOpenModal) {
+    event.preventDefault();
+    openModal();
+    return;
+  }
+
+  if (event.key === 'Enter' && !state.isDropdownOpen) {
+    event.preventDefault();
+    openDropdown({ highlightFirst: true });
+    return;
+  }
+
+  if (state.isDropdownOpen) {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      moveHighlightedIndex(1);
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      moveHighlightedIndex(-1);
+      return;
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      const row =
+        state.highlightedIndex >= 0 && state.highlightedIndex < inlineRows.value.length
+          ? inlineRows.value[state.highlightedIndex]
+          : null;
+      if (row) {
+        selectInlineRow(row);
+      }
+      return;
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeDropdown();
+      focusInput(dropdownRuntimeContext);
+    }
+  }
+}
+
+function onMenuKeydown(event: KeyboardEvent): void {
+  if (!shouldShowInlineDropdown.value) {
+    return;
+  }
+
+  if (event.key === 'ArrowDown') {
+    event.preventDefault();
+    moveHighlightedIndex(1);
+    focusInput(dropdownRuntimeContext);
+    return;
+  }
+  if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    moveHighlightedIndex(-1);
+    focusInput(dropdownRuntimeContext);
+    return;
+  }
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    const row =
+      state.highlightedIndex >= 0 && state.highlightedIndex < inlineRows.value.length
+        ? inlineRows.value[state.highlightedIndex]
+        : null;
+    if (row) {
+      selectInlineRow(row);
+    }
+    focusInput(dropdownRuntimeContext);
+    return;
+  }
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeDropdown();
+    focusInput(dropdownRuntimeContext);
+  }
+}
+
+function onArrowClick(): void {
+  if (props.widgetConfig.readonly) {
+    return;
+  }
+  focusInput(dropdownRuntimeContext);
+  openModal();
+}
+
+function setTableUiLocked(locked: boolean): void {
+  runtimeSetTableUiLocked(modalRuntimeContext, Boolean(locked));
+}
+
+function openModal(): void {
+  if (props.widgetConfig.readonly) {
+    return;
+  }
+  state.skipNextOutsideCommit = false;
+  closeDropdown();
+  clearVocError();
+  state.isModalOpen = true;
+  setTableUiLocked(true);
+  state.modalSortColumn = -1;
+  state.modalSortDirection = '';
+
+  const nextState = resolveModalOpenState({
+    isMultiselect: isMultiselect.value,
+    rows: rows.value,
+    value: state.value,
+    inputValue: state.inputValue
+  });
+  state.modalSearch = nextState.modalSearch;
+  state.modalSelectedRowIds = nextState.modalSelectedRowIds;
+  state.modalSelectedRowId = nextState.modalSelectedRowId;
+
+  void nextTick(() => {
+    syncModalActiveRow();
+    focusModalSearchInput(modalRuntimeContext);
+  });
+}
+
+function closeModal(options: { restoreFocus?: boolean } = {}): void {
+  closeModalRuntime(modalRuntimeContext, options);
+}
+
+function closeModalFromCancel(): void {
+  closeModal({ restoreFocus: true });
+}
+
+function applyModalSelection(): void {
+  const selection = resolveAppliedModalSelection({
+    isMultiselect: isMultiselect.value,
+    rows: rows.value,
+    modalSelectedRowIds: state.modalSelectedRowIds,
+    modalSelectedRowId: state.modalSelectedRowId,
+    modalActiveRowId: state.modalActiveRowId
+  });
+
+  if (isMultiselect.value) {
+    setMultiValue(selection.nextValue);
+    state.skipNextOutsideCommit = true;
+    clearVocError();
+    closeModal({ restoreFocus: true });
+    field.emitInput(selection.emittedValue);
+    return;
+  }
+
+  if (selection.shouldEmit) {
+    setSingleValue(selection.nextValue, { forceSyncInput: true });
+    clearVocError();
+    closeModal({ restoreFocus: true });
+    field.emitInput(selection.emittedValue);
+    return;
+  }
+
+  closeModal({ restoreFocus: true });
+}
+
+function modalRowStyle(_row?: VocRow | null): Record<string, string> {
+  return {
+    cursor: 'pointer'
+  };
+}
+
+function modalCellStyle(
+  row: VocRow | null | undefined,
+  baseStyle: Record<string, string> | null = null
+): Record<string, string> {
+  const style = { ...(baseStyle || {}) };
+  const isActive = isModalRowActive(row);
+  const isSelected = isModalRowSelected(row);
+
+  if (!isActive && !isSelected) {
+    return style;
+  }
+
+  style.backgroundColor = isActive
+    ? 'var(--color-dropdown-active)'
+    : 'var(--color-table-hover)';
+
+  if (isActive) {
+    style.boxShadow = 'inset 0 2px 0 0 var(--color-text-main), inset 0 -2px 0 0 var(--color-text-main)';
+  }
+
+  return style;
+}
+
+function modalSortControlClass(columnIndex: number): Record<string, boolean> {
+  return resolveModalSortControlClass(
+    state.modalSortColumn,
+    state.modalSortDirection,
+    Number(columnIndex)
+  );
+}
+
+function toggleModalSort(columnIndex: number): void {
+  const nextState = toggleModalSortState(
+    state.modalSortColumn,
+    state.modalSortDirection,
+    Number(columnIndex)
+  );
+  state.modalSortColumn = nextState.modalSortColumn;
+  state.modalSortDirection = nextState.modalSortDirection;
+  void nextTick(() => syncModalActiveRow());
+}
+
+function isModalRowSelected(row: VocRow | null | undefined): boolean {
+  const nextRow = row || null;
+  if (!nextRow) {
+    return false;
+  }
+  if (isMultiselect.value) {
+    return modalSelectedRowIdSet.value.has(nextRow.id);
+  }
+  return state.modalSelectedRowId === nextRow.id;
+}
+
+function isModalRowActive(row: VocRow | null | undefined): boolean {
+  const nextRow = row || null;
+  return !!(nextRow && state.modalActiveRowId === nextRow.id);
+}
+
+function toggleModalRow(row: VocRow): void {
+  const nextState = toggleModalRowSelection({
+    isMultiselect: isMultiselect.value,
+    modalSelectedRowIds: state.modalSelectedRowIds,
+    modalSelectedRowId: state.modalSelectedRowId,
+    row
+  });
+  state.modalSelectedRowIds = nextState.modalSelectedRowIds;
+  state.modalSelectedRowId = nextState.modalSelectedRowId;
+  state.modalActiveRowId = nextState.modalActiveRowId;
+}
+
+function onModalRowClick(row: VocRow | null | undefined): void {
+  const nextRow = row || null;
+  if (!nextRow) {
+    return;
+  }
+  if (isMultiselect.value) {
+    toggleModalRow(nextRow);
+    return;
+  }
+  state.modalSelectedRowId = nextRow.id;
+  state.modalActiveRowId = nextRow.id;
+}
+
+function onModalRowDoubleClick(row: VocRow | null | undefined): void {
+  onModalRowClick(row || null);
+  if (!isMultiselect.value) {
+    applyModalSelection();
+  }
+}
+
+function onModalSearchInput(event: Event): void {
+  const target = event.target instanceof HTMLInputElement ? event.target : null;
+  state.modalSearch = target?.value == null ? '' : String(target.value);
+}
+
+function syncModalActiveRow(): void {
+  const nextState = resolveModalActiveState({
+    visibleRows: modalRows.value,
+    isMultiselect: isMultiselect.value,
+    modalActiveRowId: state.modalActiveRowId,
+    modalSelectedRowId: state.modalSelectedRowId,
+    modalSelectedRowIds: state.modalSelectedRowIds
+  });
+  state.modalActiveRowId = nextState.modalActiveRowId;
+  state.modalSelectedRowId = nextState.modalSelectedRowId;
+  void nextTick(() => scrollModalActiveRowIntoView(modalRuntimeContext));
+}
+
+function moveModalActiveRow(delta: number): void {
+  const nextState = moveModalActiveState({
+    visibleRows: modalRows.value,
+    isMultiselect: isMultiselect.value,
+    modalActiveRowId: state.modalActiveRowId,
+    modalSelectedRowId: state.modalSelectedRowId,
+    delta: Number(delta) || 0
+  });
+  state.modalActiveRowId = nextState.modalActiveRowId;
+  state.modalSelectedRowId = nextState.modalSelectedRowId;
+  void nextTick(() => scrollModalActiveRowIntoView(modalRuntimeContext));
+}
+
+function onModalKeydown(event: KeyboardEvent): void {
+  if (!state.isModalOpen) {
+    return;
+  }
+
+  const targetTag = String((event.target as HTMLElement | null)?.tagName || '').toUpperCase();
+  if (targetTag === 'BUTTON' && event.key === 'Enter') {
+    return;
+  }
+
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeModalFromCancel();
+    return;
+  }
+  if (event.key === 'ArrowDown') {
+    event.preventDefault();
+    moveModalActiveRow(1);
+    return;
+  }
+  if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    moveModalActiveRow(-1);
+    return;
+  }
+  if (event.key === 'Enter') {
+    const activeRow =
+      modalRows.value.find((row) => row.id === state.modalActiveRowId) || null;
+    if (!activeRow) {
+      return;
+    }
+    event.preventDefault();
+    if (isMultiselect.value) {
+      toggleModalRow(activeRow);
+      return;
+    }
+    state.modalSelectedRowId = activeRow.id;
+    state.modalActiveRowId = activeRow.id;
+    applyModalSelection();
+  }
+}
+
+function commitDraft(options?: { fromBlur?: boolean; includeActiveToken?: boolean }): VocCommitResult {
+  commitDraftMethod(options);
+  return { status: 'committed' };
+}
+
+function commitPendingState(context: VocCommitContext = {}): VocCommitResult {
+  if (!isDraftEditing.value) {
+    return { status: 'noop' };
+  }
+
+  if (isMultiselect.value) {
+    commitDraftMethod({ includeActiveToken: true, fromBlur: true });
+  } else {
+    commitDraftMethod();
+  }
+
+  const message = String(combinedFieldError.value || '').trim();
+  if (message && context.kind) {
+    return {
+      status: 'blocked',
+      severity: 'recoverable',
+      error: new Error(message)
+    };
+  }
+
+  return { status: 'committed' };
+}
+
+watch(
+  () => props.widgetConfig.value,
+  (nextValue) => {
+    if (nextValue === undefined) {
+      return;
+    }
+    field.syncCommittedValue(nextValue, (value) => setValue(value));
+  },
+  { immediate: true }
+);
+
+watch(inlineRows, () => {
+  if (inlineRows.value.length === 0) {
+    state.highlightedIndex = -1;
+    return;
+  }
+  if (state.highlightedIndex >= inlineRows.value.length) {
+    setHighlightedIndex(0, { scroll: false });
+  }
+});
+
+watch(modalRows, () => {
+  if (!state.isModalOpen) {
+    return;
+  }
+  syncModalActiveRow();
+});
+
+onBeforeUnmount(() => {
+  closeDropdown();
+  if (state.isModalOpen) {
+    setTableUiLocked(false);
+  }
+});
+
+defineExpose({
+  clearVocError,
+  closeDropdown,
+  closeModal,
+  combinedFieldError,
+  commitDraft,
+  commitPendingState,
+  fieldError,
+  getInputElement,
+  getValue,
+  isDraftEditing,
+  isModalOpen,
+  moveModalActiveRow,
+  onArrowClick,
+  openDropdown,
+  openModal,
+  setTableUiLocked,
+  setValue,
+  syncModalActiveRow,
+  value,
+  vocError
+});
 </script>

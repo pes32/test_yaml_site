@@ -5,17 +5,16 @@
   </span>
 </template>
 
-<script setup>
-import { getIconSrc, isFontIcon, onIconError } from '../../gui_parser.js';
+<script setup lang="ts">
+import { getIconSrc, isFontIcon, onIconError } from '../../shared/icon_helpers.ts';
 
 defineOptions({
   name: 'ItemIcon'
 });
 
-defineProps({
-  icon: {
-    type: String,
-    default: ''
-  }
+withDefaults(defineProps<{
+  icon?: string;
+}>(), {
+  icon: ''
 });
 </script>

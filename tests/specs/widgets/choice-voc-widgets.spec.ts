@@ -59,6 +59,23 @@ test.describe('behavior: list and voc widgets', () => {
     await expect(voc3).toHaveValue('1, 10');
   });
 
+  test('voc modal supports keyboard search and selection', async ({ page }) => {
+    const voc1 = widgetInput(page, 'voc_1');
+    await voc1.focus();
+    await page.keyboard.press('Alt+ArrowDown');
+
+    const modal = page.locator('.gui-modal');
+    await expect(modal).toBeVisible();
+
+    const search = modal.locator('.voc-modal-search-input');
+    await search.fill('инвентаризация');
+    await expect(modal.getByText('Инвентаризация', { exact: true }).first()).toBeVisible();
+    await search.press('Enter');
+
+    await expect(modal).toHaveCount(0);
+    await expect(voc1).toHaveValue('10');
+  });
+
   test('choice dropdowns close on Escape and keep focus on keyboard selection', async ({ page }) => {
     const listbox = await openChoiceDropdown(page, 'list_1');
     await expect(listbox).toBeVisible();

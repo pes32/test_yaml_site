@@ -20,6 +20,7 @@
 - Активна только одна editing session одновременно.
 - `editingCell === null` означает отсутствие активного cell editor.
 - Любой transition, который меняет selection/sort/grouping/lazy data, обязан либо завершить edit, либо явно перенести его в согласованное состояние.
+- Embedded widget editor обязан публиковать commit через typed widget lifecycle (`commitPendingState`/`commitDraft`) и не должен становиться отдельным source of truth.
 
 ## Selection
 
@@ -31,4 +32,3 @@
 
 - `displayRows` является derived state от raw data + sort/grouping.
 - `tableInlineStyle`, `sortColumnIndex`, `sortDirection`, `groupingActive`, `tableLazyUiActive` считаются derived state и не должны становиться второй истиной.
-

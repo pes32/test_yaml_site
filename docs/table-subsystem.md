@@ -85,7 +85,7 @@ Page runtime отдаёт таблице входные данные и догр
 Если `table_attrs` содержит внешние list/widget refs:
 
 1. `resolveDependencies(...)` извлекает список attr names;
-2. `attrs_loader.js` догружает их из `/api/attrs`;
+2. `attrs_loader.ts` догружает их из `/api/attrs`;
 3. `WidgetRenderer.vue` публикует в subtree только допустимые table runtime services через definition-driven bridge;
 4. таблица получает нормализованный `attrsByName`, error handlers и notifications через injected/runtime boundary;
 5. `TableWidget.vue` не читает global/window state и не обращается к `$root`.
@@ -110,4 +110,4 @@ Embedded cell widgets живут внутри table feature, но их runtime b
 
 Strict typing debt table runtime закрыт на уровне обязательного project gate: `npm --prefix tooling/vite run typecheck` и `npm --prefix tooling/vite run typecheck:table` должны проходить без table diagnostics.
 
-Оставшийся долг не в loose VM-boundary, а в качестве будущей детализации: часть runtime method signatures пока намеренно широкая на внешних event/widget границах и должна сужаться только вместе с покрытием соответствующего поведения smoke/unit tests.
+Оставшийся долг не в generic `Proxy` VM-boundary, а в качестве будущей детализации: часть runtime method signatures пока намеренно широкая на внешних event/widget границах и должна сужаться только вместе с покрытием соответствующего поведения smoke/unit tests.

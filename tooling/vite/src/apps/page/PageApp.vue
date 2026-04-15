@@ -126,7 +126,7 @@
 </template>
 
 <script lang="ts">
-import pageAppOptions from '../../../../../frontend/js/page.js';
+import pageAppOptions from '../../../../../frontend/js/page.ts';
 import ConfirmModal from '../../../../../frontend/js/widgets/common/ConfirmModal.vue';
 import ErrorPanel from '../../../../../frontend/js/widgets/common/ErrorPanel.vue';
 import ItemIcon from '../../../../../frontend/js/widgets/common/ItemIcon.vue';

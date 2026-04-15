@@ -33,33 +33,37 @@ The honest reading of the current status is: DB work has started and has useful 
 What is already done:
 
 - the legacy table runtime has been replaced with explicit TS modules;
-- Vite build remains the primary green frontend gate;
+- `TableWidget.vue` runs through `useTableRuntime.ts`;
+- `typecheck` and `typecheck:table` are green mandatory frontend gates;
+- Vite build remains part of the required frontend gate;
 - stale wrappers, broken scripts, and outdated docs are removed during cleanup passes.
 
 What is still open:
 
-- strict `typecheck` and `typecheck:table` still need a dedicated table runtime typing pass;
-- `TableWidgetVm` is still too wide as a VM boundary;
-- browser/E2E smoke coverage for table interactions does not exist yet.
+- reduce the explicit `useTableRuntime.ts` controller boundary only together with tests for the affected interactions;
+- keep browser/E2E table smoke coverage as a regression gate.
 
 ### Frontend widget refactor
 
-Already migrated to Composition API + TypeScript:
+Status after the full TS pass:
 
-- core fields `str`, `text`, `int`, `float`.
+- migrated: `str`, `text`, `int`, `float`, `button`, `date`, `time`, `datetime`, `ip`, `ip_mask`, `img`, `list`, `voc`, `split_button`;
+- migrated with a controller boundary: `table`;
+- legacy JS removed from `frontend/js`: action runtime, datetime helpers, IP helpers, voc helpers, page/bootstrap glue, API/attrs/modal flows, and diagnostics;
+- shared common components use typed `<script setup lang="ts">`.
 
-Still planned as separate steps:
+Remaining quality steps:
 
-- simple but DOM/action-heavy widgets: `button`, `date`, `time`, `datetime`, `ip`, `ip_mask`;
-- dropdown/lookup widgets: `list`, `voc`, `split_button`;
-- larger subsystems: `img`, `table`.
+- narrow types at DOM/event boundaries;
+- extend Playwright smoke coverage for regressions;
+- keep JS adapter modules out of the widget layer.
 
 ### Ideas Merged From Old Drafts
 
 Old root-level drafts were condensed here to avoid keeping several competing plans in the repository root.
 
 - Table ideas that remain on the roadmap: fill/drag values, paste into selected range, filters/views, and highlighting fresh changes.
-- Test automation should come back as a real browser smoke/E2E runner, not as a placeholder script.
+- Test automation should keep expanding the real browser smoke/E2E runner for new regression cases.
 - DB integration needs a separate bind/save/update flow design.
 
 ## Next
@@ -68,6 +72,6 @@ Old root-level drafts were condensed here to avoid keeping several competing pla
 - Add a careful save/update flow without breaking current contracts.
 - Formalize `select_attrs` or replace it with a clearer mechanism.
 - Continue stabilizing the frontend runtime and the documentation set.
-- Continue the staged Composition API + TypeScript refactor for the remaining widgets.
-- Close the strict typing debt in the table runtime.
+- Keep the full TS widget layer free of legacy JS adapters.
+- Narrow the table controller boundary and external DOM/event signatures without weakening `typecheck`.
 - Add real browser smoke coverage for key flows if the project needs an automated regression gate.

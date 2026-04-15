@@ -92,28 +92,6 @@ npm --prefix tooling/vite ci
 ./stop.sh
 ```
 
-## Полезные команды
-
-Проверка YAML-конфигурации:
-
-```bash
-python3 -m backend.tools.validate_config
-python3 -m backend.tools.validate_config --json
-```
-
-Typecheck frontend:
-
-```bash
-npm --prefix tooling/vite run typecheck
-npm --prefix tooling/vite run typecheck:table
-```
-
-Сборка frontend:
-
-```bash
-npm --prefix tooling/vite run build
-```
-
 ## Production и безопасность
 
 - Production-like стек уже есть, но проект пока честнее воспринимать как demo/runtime prototype, а не как готовую multi-user платформу.

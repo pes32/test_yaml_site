@@ -84,14 +84,14 @@
 
 ## Compat Layer
 
-Текущий cutover использует compat lifecycle adapter поверх legacy widget instances:
+Registry всё ещё содержит compat lifecycle adapter как защитный слой для instance-scoped lifecycle:
 
 - если виджет реализует собственный `commitPendingState(context)`, используется он;
-- иначе compat handle вызывает legacy `commitDraft(...)`;
+- иначе compat handle вызывает `commitDraft(...)` и нормализует результат;
 - локальный draft state по-прежнему живёт внутри виджета;
 - committed state по-прежнему записывается только в `page_session_store`.
 
-Цель compat layer — перевести runtime и render path без переписывания всех widgets под новый интерфейс за один шаг.
+После полного TS-прохода основные stateful widgets реализуют `commitPendingState` напрямую. Compat layer нужен как fallback для controlled rebind/legacy-compatible instances и не должен становиться причиной возвращать Options API или JS-adapter modules.
 
 ## Runtime Bridge
 
@@ -146,3 +146,10 @@ Unknown widget fallback допускается только в render-time unkno
 - legacy draft-controller injections `setActiveDraftWidgetController` / `clearActiveDraftWidgetController`.
 
 Новые runtime-интеграции должны опираться только на `WidgetDefinitionRegistry`, capabilities и lifecycle handle contract.
+
+## Migration Status Matrix
+
+- migrated: `str`, `text`, `int`, `float`, `button`, `date`, `time`, `datetime`, `ip`, `ip_mask`, `img`, `list`, `voc`, `split_button`;
+- migrated with controller boundary: `table`;
+- legacy JS removed from `frontend/js`: action runtime, datetime helpers, IP helpers, voc helpers, page/bootstrap glue, API/attrs/modal flows and diagnostics;
+- shared common components use typed `<script setup lang="ts">`.

@@ -30,30 +30,37 @@
 
 ### Frontend/table quality gate
 
-Что пока не закрыто:
+Что уже закрыто:
 
-- strict `typecheck` и `typecheck:table` всё ещё требуют отдельного typing pass по table runtime;
-- `TableWidgetVm` пока остаётся слишком широким VM-boundary;
-- browser/E2E smoke для table interactions ещё не заведён.
+- table runtime переведён в explicit TS modules;
+- `TableWidget.vue` работает через `useTableRuntime.ts`;
+- strict `typecheck` и `typecheck:table` проходят как обязательный frontend gate.
+
+Что остаётся отдельным долгом:
+
+- сужать explicit controller boundary в `useTableRuntime.ts` только вместе с тестами соответствующих interactions;
+- поддерживать browser/E2E smoke для table interactions как regression gate.
 
 ### Frontend widget refactor
 
-Что уже переведено на Composition API + TypeScript:
+Статус после полного TS-прохода:
 
-- базовые поля `str`, `text`, `int`, `float`.
+- migrated: `str`, `text`, `int`, `float`, `button`, `date`, `time`, `datetime`, `ip`, `ip_mask`, `img`, `list`, `voc`, `split_button`;
+- migrated with controller boundary: `table`;
+- legacy JS removed from `frontend/js`: action runtime, datetime helpers, IP helpers, voc helpers, page/bootstrap glue, API/attrs/modal flows and diagnostics;
+- shared common components use typed `<script setup lang="ts">`.
 
-Что остаётся отдельными этапами:
+Что остаётся отдельными этапами качества:
 
-- простые, но более завязанные на DOM/actions виджеты: `button`, `date`, `time`, `datetime`, `ip`, `ip_mask`;
-- dropdown/lookup виджеты: `list`, `voc`, `split_button`;
-- крупные подсистемы: `img`, `table`.
+- сужать типы на внешних DOM/event границах;
+- расширять Playwright smoke для regressions;
 
 ### Идеи из старых черновиков
 
 Старые root-черновики сжаты сюда, чтобы не держать в корне несколько конкурирующих планов.
 
 - Для таблицы остаются идеи fill/drag values, paste into selected range, фильтры/views и подсветка свежих изменений.
-- Для автотестов целевой следующий шаг — не возвращать placeholder script, а завести реальный browser smoke/E2E runner.
+- Для автотестов целевой следующий шаг — расширять реальный browser smoke/E2E runner под новые regression cases.
 - Для DB-интеграции нужен отдельный дизайн bind/save/update flow.
 
 ## Дальше
@@ -62,6 +69,6 @@
 - Добавить аккуратный save/update flow без поломки текущих контрактов.
 - Формализовать поведение `select_attrs` или заменить его более явным механизмом.
 - Продолжить стабилизацию frontend runtime и документации.
-- Продолжить поэтапный Composition API + TypeScript refactor оставшихся виджетов.
-- Закрыть strict typing debt в table runtime.
+- Поддерживать полный TS widget layer без legacy JS adapters.
+- Сужать table controller boundary и внешние DOM/event signatures без ослабления `typecheck`.
 - Завести реальный browser smoke для ключевых flows, если проекту нужен автоматический regression gate.

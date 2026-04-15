@@ -36,41 +36,6 @@ type WidgetFieldVmBase = Record<string, unknown> & {
     widgetName: string;
 };
 
-type DateTimeWidgetVm = WidgetFieldVmBase & {
-    calendarView: Date;
-    formatTime(timeValue: unknown, options?: Record<string, unknown>): string;
-    getNow(): Date;
-    hasValue: boolean;
-    isFocused: boolean;
-    monthStart(date: Date): Date;
-    normalizeTimeInputValue(rawValue: unknown): { parsedTime: unknown; value: string };
-    pickerHasSeconds: boolean;
-    pickerHour: string;
-    pickerMinute: string;
-    pickerSecond: string;
-    applyTimePickerState(parsedTime: unknown): unknown;
-    value: string;
-};
-
-type IpLikeWidgetVm = WidgetFieldVmBase & {
-    applyNormalizedValue(rawValue: unknown, caretPosition: number | null): void;
-    commitDraft(): void;
-    displayError: string;
-    emitValue(): void;
-    error: string;
-    getValue(): string;
-    handleBackspaceAcrossSeparator(target: unknown): boolean;
-    hasValue: boolean;
-    inputValue: string;
-    isFocused: boolean;
-    labelFloats: boolean;
-    maxLength: number;
-    onBlur(): void;
-    onFocus(): void;
-    setValue(value: unknown): void;
-    showPlaceholder: boolean;
-};
-
 type VocWidgetVm = WidgetFieldVmBase & {
     _clickOutside: unknown;
     _clickOutsideTimerId: number;
@@ -151,8 +116,6 @@ type WidgetWatchEntry<T> =
 type WidgetWatchMap<T> = Record<string, WidgetWatchEntry<T>>;
 
 export type {
-    DateTimeWidgetVm,
-    IpLikeWidgetVm,
     StyleValueMap,
     VocModalVm,
     VocWidgetVm,

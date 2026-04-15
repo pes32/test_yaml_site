@@ -29,6 +29,25 @@ npm install
 npm run install:browsers
 ```
 
+## Frontend Gate Matrix
+
+Для изменений в widget/table runtime минимальный порядок проверки:
+
+```bash
+npm --prefix tooling/vite run typecheck
+npm --prefix tooling/vite run typecheck:table
+npm --prefix tooling/vite run build
+```
+
+Затем запускается targeted Playwright suite:
+
+- `tests/run.sh specs/widgets/buttons-modals.spec.ts` — `button`, `split_button`, action runtime и модалки.
+- `tests/run.sh specs/widgets/date-ip-image-widgets.spec.ts` — `date`, `time`, `datetime`, `ip`, `ip_mask`, `img`.
+- `tests/run.sh specs/widgets/choice-voc-widgets.spec.ts` — `list`, `voc`.
+- `tests/run.sh specs/tables/table-widgets.spec.ts` — `table` и embedded cell widgets.
+
+Финальный regression gate для frontend изменений — полный `tests/run.sh`.
+
 ## SH-Файлы
 
 ### `run.sh`
@@ -342,6 +361,21 @@ UI не открывает. Кликов нет. Ввода нет.
 
 Клавиатурных кнопок нет. ПКМ нет.
 
+#### Тест: `voc modal supports keyboard search and selection`
+
+Действия и проверки:
+
+1. Фокусирует `voc_1`.
+2. Нажимает `Alt+ArrowDown`.
+3. Проверяет, что открылась `.gui-modal`.
+4. Вводит `инвентаризация` в поле поиска.
+5. Проверяет строку `Инвентаризация`.
+6. Нажимает `Enter`.
+7. Проверяет, что модалка закрыта.
+8. Проверяет `voc_1 = 10`.
+
+ЛКМ нет. ПКМ нет.
+
 #### Тест: `choice dropdowns close on Escape and keep focus on keyboard selection`
 
 Действия и проверки:
@@ -482,8 +516,11 @@ UI не открывает. Кликов нет. Ввода нет.
 9. Проверяет текст `Очень длинный текст сообщения`.
 10. ЛКМ по кнопке `Отмена`.
 11. Проверяет, что confirm modal закрыт.
-
-Важно: тест не нажимает accept-кнопки, чтобы не запускать URL/command.
+12. Ставит mock на `/api/execute`.
+13. Снова открывает `func_4`.
+14. ЛКМ по кнопке `Да`.
+15. Проверяет execute payload: `command = test_command`, `page = 2_widget_demo`, `widget = func_4`.
+16. Проверяет, что confirm modal закрыт.
 
 Клавиатуры нет. ПКМ нет.
 

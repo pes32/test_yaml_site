@@ -79,7 +79,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, nextTick, onUpdated, ref } from 'vue';
 import {
   getModalTabs,
@@ -87,10 +87,13 @@ import {
   isModalOpen,
   rememberActiveModalScroll,
   restoreActiveModalScroll,
-  sectionsForTab
+  sectionsForTab,
+  type ModalRuntimeController,
+  type ModalRuntimeState
 } from '../../runtime/modal_runtime_service.ts';
 import { consumeRestoreTargetViewId } from '../../runtime/modal_runtime_store.ts';
 import { injectPageHostRuntimeServices } from '../../runtime/widget_runtime_bridge.ts';
+import type { ParsedGuiSection, ParsedGuiTab } from '../../runtime/page_contract.ts';
 import ItemIcon from './ItemIcon.vue';
 import ModalButtons from './ModalButtons.vue';
 import SectionCard from './SectionCard.vue';
@@ -99,18 +102,21 @@ defineOptions({
   name: 'ModalManager'
 });
 
-const emit = defineEmits(['execute', 'input']);
+const emit = defineEmits<{
+  (event: 'execute', payload: unknown): void;
+  (event: 'input', payload: unknown): void;
+}>();
 
 const hostServices = injectPageHostRuntimeServices();
 
-const modalScrollRoot = ref(null);
+const modalScrollRoot = ref<HTMLElement | null>(null);
 
 const modalRuntimeState = computed(() => {
   if (typeof hostServices?.getModalRuntimeState !== 'function') {
-    return {};
+    return {} as ModalRuntimeState;
   }
 
-  return hostServices.getModalRuntimeState() || {};
+  return (hostServices.getModalRuntimeState() || {}) as ModalRuntimeState;
 });
 
 const modalRuntimeController = computed(() => {
@@ -118,24 +124,29 @@ const modalRuntimeController = computed(() => {
     return null;
   }
 
-  return hostServices.getModalRuntimeController();
+  return hostServices.getModalRuntimeController() as ModalRuntimeController | null;
 });
 
+type ModalConfigView = Record<string, unknown> & {
+  buttons?: string[];
+  icon?: string;
+};
+
 const showModal = computed(() => isModalOpen(modalRuntimeState.value));
-const modalConfig = computed(() => modalRuntimeState.value.modalConfig || null);
+const modalConfig = computed(() => (modalRuntimeState.value.modalConfig || null) as ModalConfigView | null);
 const activeTabIndex = computed(() => Number(modalRuntimeState.value.activeTabIndex) || 0);
 const modalTitle = computed(() => getModalTitle(modalRuntimeState.value));
-const modalTabs = computed(() => getModalTabs(modalRuntimeState.value));
+const modalTabs = computed(() => getModalTabs(modalRuntimeState.value) as ParsedGuiTab[]);
 
-function getModalScrollRoot() {
+function getModalScrollRoot(): HTMLElement | null {
   return modalScrollRoot.value || null;
 }
 
-function rememberCurrentModalScroll() {
+function rememberCurrentModalScroll(): void {
   rememberActiveModalScroll(modalRuntimeState.value, getModalScrollRoot());
 }
 
-function restoreCurrentModalScroll() {
+function restoreCurrentModalScroll(): void {
   const restoreTargetViewId = consumeRestoreTargetViewId(modalRuntimeState.value);
   if (!restoreTargetViewId) {
     return;
@@ -150,7 +161,7 @@ function restoreCurrentModalScroll() {
   });
 }
 
-function runModalBoundaryAction(kind, action) {
+function runModalBoundaryAction<T>(kind: 'modal-close' | 'navigation', action: () => Promise<T> | T) {
   if (typeof hostServices?.runBoundaryAction === 'function') {
     return hostServices.runBoundaryAction(kind, action);
   }
@@ -158,33 +169,35 @@ function runModalBoundaryAction(kind, action) {
   return Promise.resolve(action());
 }
 
-function closeModal() {
-  if (!modalRuntimeController.value || typeof modalRuntimeController.value.closeModal !== 'function') {
+function closeModal(): void {
+  const controller = modalRuntimeController.value;
+  if (!controller || typeof controller.closeModal !== 'function') {
     return;
   }
 
   void runModalBoundaryAction('modal-close', async () => {
     rememberCurrentModalScroll();
-    modalRuntimeController.value.closeModal();
+    controller.closeModal();
     return null;
   });
 }
 
-function setActiveTab(index) {
-  if (!modalRuntimeController.value || typeof modalRuntimeController.value.setActiveTab !== 'function') {
+function setActiveTab(index: number): void {
+  const controller = modalRuntimeController.value;
+  if (!controller || typeof controller.setActiveTab !== 'function') {
     return;
   }
 
   void runModalBoundaryAction('navigation', async () => {
     rememberCurrentModalScroll();
-    modalRuntimeController.value.setActiveTab(index);
+    controller.setActiveTab(index);
     return null;
   }).finally(() => {
     restoreCurrentModalScroll();
   });
 }
 
-function getModalSectionCollapseId(tabIndex, sectionIndex) {
+function getModalSectionCollapseId(tabIndex: number, sectionIndex: number): string {
   if (
     !modalRuntimeController.value ||
     typeof modalRuntimeController.value.getModalSectionCollapseId !== 'function'
@@ -195,14 +208,14 @@ function getModalSectionCollapseId(tabIndex, sectionIndex) {
   return modalRuntimeController.value.getModalSectionCollapseId(tabIndex, sectionIndex);
 }
 
-function isModalSectionCollapsed(tabIndex, sectionIndex) {
+function isModalSectionCollapsed(tabIndex: number, sectionIndex: number): boolean {
   return modalRuntimeController.value &&
     typeof modalRuntimeController.value.isModalSectionCollapsed === 'function'
     ? modalRuntimeController.value.isModalSectionCollapsed(tabIndex, sectionIndex)
     : false;
 }
 
-function toggleModalSectionCollapse(tabIndex, sectionIndex) {
+function toggleModalSectionCollapse(tabIndex: number, sectionIndex: number): void {
   if (
     !modalRuntimeController.value ||
     typeof modalRuntimeController.value.toggleModalSectionCollapse !== 'function'
@@ -213,11 +226,11 @@ function toggleModalSectionCollapse(tabIndex, sectionIndex) {
   modalRuntimeController.value.toggleModalSectionCollapse(tabIndex, sectionIndex);
 }
 
-function getSectionsForTab(tabIndex) {
-  return sectionsForTab(modalRuntimeState.value, tabIndex);
+function getSectionsForTab(tabIndex: number): ParsedGuiSection[] {
+  return sectionsForTab(modalRuntimeState.value, tabIndex) as ParsedGuiSection[];
 }
 
-function getWidgetAttrs(widgetName) {
+function getWidgetAttrs(widgetName: string) {
   if (typeof hostServices?.getWidgetAttrsByName === 'function') {
     return hostServices.getWidgetAttrsByName(widgetName);
   }
@@ -228,17 +241,17 @@ function getWidgetAttrs(widgetName) {
   };
 }
 
-function getWidgetValue(widgetName) {
+function getWidgetValue(widgetName: string) {
   return typeof hostServices?.getWidgetRuntimeValueByName === 'function'
     ? hostServices.getWidgetRuntimeValueByName(widgetName)
     : undefined;
 }
 
-function onWidgetExecute(payload) {
+function onWidgetExecute(payload: unknown): void {
   emit('execute', payload);
 }
 
-function onWidgetInput(payload) {
+function onWidgetInput(payload: unknown): void {
   emit('input', payload);
 }
 

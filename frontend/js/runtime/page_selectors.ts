@@ -1,4 +1,4 @@
-import GuiParser from '../gui_parser.js';
+import GuiParser from '../gui_parser.ts';
 import { resolveAttrConfig } from '../shared/attr_config.ts';
 import type {
     AttrConfigMap,

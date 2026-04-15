@@ -61,6 +61,7 @@ export default defineConfig({
 
           if (
             normalized.includes('/frontend/js/widgets/voc/') ||
+            normalized.includes('/frontend/js/widgets/split-button/') ||
             normalized.endsWith('/frontend/js/widgets/ListWidget.vue') ||
             normalized.endsWith('/frontend/js/widgets/SplitButtonWidget.vue')
           ) {

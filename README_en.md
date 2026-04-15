@@ -35,6 +35,7 @@ Unlike a typical form builder or admin generator, this project is driven by decl
 - Describe UI screens in YAML instead of hand-coding every page.
 - Validate and compile configuration into a backend snapshot.
 - Render a UI runtime with widgets such as `str`, `text`, `int`, `float`, `date`, `time`, `datetime`, `ip`, `ip_mask`, `list`, `voc`, `img`, `button`, `split_button`, and `table`.
+- The frontend source under `frontend/js` is now TypeScript/Vue source: the widget layer, host runtime glue, page/bootstrap/API/attrs/modal/diagnostics flows, and shared Vue components are checked through the root `tsconfig.json`.
 - Use built-in debug tooling and read-only SQL diagnostics.
 - Run the stack locally in a topology close to production: `public nginx -> waitress on 127.0.0.1`.
 
@@ -115,6 +116,15 @@ Frontend build:
 
 ```bash
 npm --prefix tooling/vite run build
+```
+
+Frontend gates for widget/table runtime changes:
+
+```bash
+npm --prefix tooling/vite run typecheck
+npm --prefix tooling/vite run typecheck:table
+npm --prefix tooling/vite run build
+tests/run.sh
 ```
 
 ## Production and safety

@@ -29,7 +29,7 @@
 }
 ```
 
-Transport shape знает только `frontend/js/runtime/api_client.js`. UI-слой работает уже с нормализованными domain-структурами.
+Transport shape знает только `frontend/js/runtime/api_client.ts`. UI-слой работает уже с нормализованными domain-структурами.
 
 ## HTML bootstrap
 
@@ -173,6 +173,7 @@ Frontend normalizes это в `ExecuteResult`.
 
 - `output_attrs` остаётся transport-only полем execute request;
 - `split_button` не вводит отдельный transport format и для command-items использует тот же execute pipeline, что и обычный `button`.
+- frontend action runtime теперь TypeScript-only (`action_runtime.ts` и соседние `action_*.ts` modules), но transport shape `POST /api/execute` не изменился.
 
 ## Debug API
 
@@ -201,7 +202,7 @@ Debug routes используют тот же envelope:
 - запрос выполняется в read-only транзакции;
 - результат ограничивается серверным `max_rows`.
 
-Их raw transport тоже проходит через `frontend/js/runtime/api_client.js`.
+Их raw transport тоже проходит через `frontend/js/runtime/api_client.ts`.
 
 ## Contract Files
 
@@ -210,6 +211,7 @@ Debug routes используют тот же envelope:
 - `backend/contracts.py` — backend-side Pydantic contracts for pages, attrs, modals, diagnostics and API envelope data.
 - `frontend/js/runtime/page_contract.ts` — frontend page/runtime domain boundary.
 - `frontend/js/runtime/widget_contract.ts` — stateful widget value/list normalization helpers.
+- `frontend/js/runtime/action_types.ts` и `frontend/js/runtime/action_runtime.ts` — internal action item/execution contracts для `button` и `split_button`.
 - `frontend/js/widgets/widget_shared_contracts.ts` — widget-facing VM/shared contracts.
 - `frontend/js/widgets/table/table_contract.ts` — internal table runtime/schema/state/service contracts.
 - `frontend/js/runtime/voc_contract.ts` — voc widget source/value contract.
@@ -232,4 +234,4 @@ Debug routes используют тот же envelope:
 - `snapshotVersion`
 - `details`
 
-`api_client.js` знает только envelope и transport status, а page/debug runtime уже работают через этот frontend error shape.
+`api_client.ts` знает только envelope и transport status, а page/debug runtime уже работают через этот frontend error shape.

@@ -31,7 +31,7 @@
         <div ref="collapseInner" class="collapse-inner">
           <div class="card-body page-section-body u-wide">
             <ContentRows
-              :rows="section.rows"
+              :rows="normalizeRows(section.rows)"
               :get-widget-attrs="getWidgetAttrs"
               :get-widget-value="getWidgetValue"
               text-class="page-section-text"
@@ -45,8 +45,9 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import type { ParsedGuiSection } from '../../runtime/page_contract.ts';
 import ContentRows from './ContentRows.vue';
 import ItemIcon from './ItemIcon.vue';
 
@@ -54,59 +55,50 @@ defineOptions({
   name: 'SectionCard'
 });
 
-const props = defineProps({
-  section: {
-    type: Object,
-    required: true
-  },
-  sectionIndex: {
-    type: Number,
-    required: true
-  },
-  collapseId: {
-    type: String,
-    default: ''
-  },
-  isCollapsed: {
-    type: Boolean,
-    default: false
-  },
-  onToggle: {
-    type: Function,
-    default: null
-  },
-  onInput: {
-    type: Function,
-    default: null
-  },
-  getWidgetAttrs: {
-    type: Function,
-    required: true
-  },
-  getWidgetValue: {
-    type: Function,
-    required: true
-  },
-  onExecute: {
-    type: Function,
-    required: true
-  },
-  headerId: {
-    type: String,
-    default: ''
-  }
+type SectionCardConfig = ParsedGuiSection & {
+  collapsible?: boolean;
+  hasFrame?: boolean;
+  icon?: string;
+  name?: string;
+  rows?: unknown[];
+  showHeader?: boolean;
+};
+
+const props = withDefaults(defineProps<{
+  collapseId?: string;
+  getWidgetAttrs: (widgetName: string) => Record<string, unknown>;
+  getWidgetValue: (widgetName: string) => unknown;
+  headerId?: string;
+  isCollapsed?: boolean;
+  onExecute: (payload: unknown) => void;
+  onInput?: ((payload: unknown) => void) | null;
+  onToggle?: (() => void) | null;
+  section: SectionCardConfig;
+  sectionIndex: number;
+}>(), {
+  collapseId: '',
+  headerId: '',
+  isCollapsed: false,
+  onInput: null,
+  onToggle: null
 });
 
 const collapseAnimating = ref(false);
-const collapseStyle = ref(null);
-const collapseEl = ref(null);
-const collapseInner = ref(null);
+const collapseStyle = ref<Record<string, string> | null>(null);
+const collapseEl = ref<HTMLElement | null>(null);
+const collapseInner = ref<HTMLElement | null>(null);
 
 let collapseRafId = 0;
-let removeCollapseTransitionListener = null;
+let removeCollapseTransitionListener: (() => void) | null = null;
 
 const titleTag = 'h5';
 const collapseIconSrc = '/templates/icons/arrow.svg';
+
+function normalizeRows(rows: unknown): Array<string | { widgets?: string[] }> {
+  return (Array.isArray(rows) ? rows : []).filter((row): row is string | { widgets?: string[] } =>
+    typeof row === 'string' || (row !== null && typeof row === 'object')
+  );
+}
 
 const collapseClass = computed(() => {
   if (!props.section.collapsible) {
@@ -177,7 +169,7 @@ function animateCollapse() {
   collapseAnimating.value = true;
   collapseStyle.value = { height: startHeight };
 
-  const onTransitionEnd = (event) => {
+  const onTransitionEnd = (event: TransitionEvent) => {
     if (event.target !== collapseEl.value || event.propertyName !== 'height') {
       return;
     }

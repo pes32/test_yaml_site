@@ -15,489 +15,396 @@
       v-bind="tableCellRootAttrs"
     >
       <div class="widget-dt-inner widget-dt-inner--datetime">
-        <div ref="dateAnchor" class="widget-dt-segment widget-dt-segment--date">
-          <input
-            v-model="dateValue"
-            type="text"
-            class="form-control widget-dt-input widget-dt-input--date"
-            data-table-editor-target="true"
-            :disabled="widgetConfig.readonly"
-            :tabindex="widgetConfig.readonly ? -1 : null"
-            @input="onDateInput"
-            @focus="onSegmentFocus"
-            @blur="onDateBlur"
-            @keydown.enter="onDateEnterCommit"
-          >
-          <span class="widget-dt-icon-wrap">
-            <span
-              class="widget-dt-icon"
-              data-table-action-trigger="date"
-              role="button"
-              tabindex="-1"
-              aria-label="Выбрать дату"
-              @click="openDatePicker"
-              @mousedown.prevent
-            >
-              <img :src="calendarIconSrc" alt="">
-            </span>
-          </span>
-        </div>
-        <div ref="timeAnchor" class="widget-dt-segment widget-dt-segment--time">
-          <input
-            v-model="timeValue"
-            type="text"
-            class="form-control widget-dt-input widget-dt-input--time"
-            data-table-editor-target="true"
-            :disabled="widgetConfig.readonly"
-            :tabindex="widgetConfig.readonly ? -1 : null"
-            @input="onTimeInput"
-            @focus="onSegmentFocus"
-            @blur="onTimeBlur"
-            @keydown.enter="onTimeEnterCommit"
-          >
-          <span class="widget-dt-icon-wrap">
-            <span
-              class="widget-dt-icon"
-              data-table-action-trigger="time"
-              role="button"
-              tabindex="-1"
-              aria-label="Выбрать время"
-              @click="openTimePicker"
-              @mousedown.prevent
-            >
-              <img :src="clockIconSrc" alt="">
-            </span>
-          </span>
-        </div>
+        <date-time-segment
+          ref="dateAnchor"
+          v-model="dateValue"
+          kind="date"
+          segment-class="widget-dt-segment--date"
+          input-class="widget-dt-input--date"
+          :readonly="widgetConfig.readonly"
+          :icon-src="calendarIconSrc"
+          accessible-label="Выбрать дату"
+          @input="onDateInput"
+          @focus="onSegmentFocus"
+          @blur="onDateBlur"
+          @enter="onDateEnterCommit"
+          @open="openDatePicker"
+        ></date-time-segment>
+        <date-time-segment
+          ref="timeAnchor"
+          v-model="timeValue"
+          kind="time"
+          segment-class="widget-dt-segment--time"
+          input-class="widget-dt-input--time"
+          :readonly="widgetConfig.readonly"
+          :icon-src="clockIconSrc"
+          accessible-label="Выбрать время"
+          @input="onTimeInput"
+          @focus="onSegmentFocus"
+          @blur="onTimeBlur"
+          @enter="onTimeEnterCommit"
+          @open="openTimePicker"
+        ></date-time-segment>
       </div>
     </div>
     <Teleport to="body">
-      <div
+      <calendar-popover
         v-if="isDatePopoverOpen"
-        ref="datePopover"
-        class="widget-dt-popover widget-dt-popover--calendar"
-        :style="datePopoverStyle"
-      >
-        <div class="widget-dt-panel-head">
-          <div class="widget-dt-panel-label">Дата</div>
-          <div class="widget-dt-panel-value" v-text="datePreview"></div>
-        </div>
-        <div class="widget-dt-popover-header">
-          <button type="button" class="widget-dt-nav" aria-label="Предыдущий месяц" @click="prevMonth">‹</button>
-          <div class="widget-dt-popover-title" v-text="monthLabel"></div>
-          <button type="button" class="widget-dt-nav" aria-label="Следующий месяц" @click="nextMonth">›</button>
-        </div>
-        <div class="widget-dt-weekdays">
-          <span v-for="day in weekdayLabels" :key="day" v-text="day"></span>
-        </div>
-        <div class="widget-dt-calendar-grid">
-          <button
-            v-for="day in calendarDays"
-            :key="day.key"
-            type="button"
-            class="widget-dt-day"
-            :class="{ 'is-outside': !day.inMonth, 'is-today': day.isToday, 'is-selected': day.isSelected }"
-            @click="selectDate(day.date)"
-          >
-            <span v-text="day.label"></span>
-          </button>
-        </div>
-      </div>
+        ref="datePopoverRef"
+        :popover-style="popover.style.value"
+        :preview="datePart.preview.value"
+        :month-label="datePart.monthLabel.value"
+        :weekday-labels="datePart.weekdayLabels.value"
+        :days="datePart.calendarDays.value"
+        @prev="prevMonth"
+        @next="nextMonth"
+        @select="selectDate"
+        @close="closePopovers"
+      ></calendar-popover>
     </Teleport>
     <Teleport to="body">
-      <div
+      <time-popover
         v-if="isTimePopoverOpen"
-        ref="timePopover"
-        class="widget-dt-popover widget-dt-popover--time"
-        :style="timePopoverStyle"
-      >
-        <div class="widget-dt-panel-head">
-          <div class="widget-dt-panel-label">Время</div>
-        </div>
-        <div class="widget-dt-time-preview" v-text="timePreview"></div>
-        <div class="widget-dt-time-editors">
-          <div class="widget-dt-time-editor">
-            <span class="widget-dt-time-caption">Часы</span>
-            <input
-              type="text"
-              inputmode="numeric"
-              class="widget-dt-time-editor-input"
-              :value="pickerHour"
-              @input="onTimePickerPartInput('pickerHour', 23, $event)"
-              @blur="commitTimePickerPart('pickerHour', 23)"
-              @keydown.enter.prevent="commitTimePickerPart('pickerHour', 23)"
-            >
-          </div>
-          <div class="widget-dt-time-separator">:</div>
-          <div class="widget-dt-time-editor">
-            <span class="widget-dt-time-caption">Минуты</span>
-            <input
-              type="text"
-              inputmode="numeric"
-              class="widget-dt-time-editor-input"
-              :value="pickerMinute"
-              @input="onTimePickerPartInput('pickerMinute', 59, $event)"
-              @blur="commitTimePickerPart('pickerMinute', 59)"
-              @keydown.enter.prevent="commitTimePickerPart('pickerMinute', 59)"
-            >
-          </div>
-          <div class="widget-dt-time-separator">:</div>
-          <div class="widget-dt-time-editor">
-            <span class="widget-dt-time-caption">Секунды</span>
-            <input
-              type="text"
-              inputmode="numeric"
-              class="widget-dt-time-editor-input"
-              :value="pickerSecond"
-              @input="onTimePickerPartInput('pickerSecond', 59, $event)"
-              @blur="commitTimePickerPart('pickerSecond', 59, true)"
-              @keydown.enter.prevent="commitTimePickerPart('pickerSecond', 59, true)"
-            >
-          </div>
-        </div>
-      </div>
+        ref="timePopoverRef"
+        :popover-style="popover.style.value"
+        :preview="timePart.preview.value"
+        :picker-hour="timePart.pickerHour.value"
+        :picker-minute="timePart.pickerMinute.value"
+        :picker-second="timePart.pickerSecond.value"
+        @part-input="onTimePickerPartInput"
+        @part-commit="commitTimePickerPart"
+        @close="closePopovers"
+      ></time-popover>
     </Teleport>
     <template #supporting>
-      <span v-text="widgetConfig.sup_text"></span>
+      <span>{{ widgetConfig.sup_text }}</span>
     </template>
   </md3-field>
 </template>
 
-<script>
+<script setup lang="ts">
+import { nextTick, ref, watch } from 'vue';
 import Md3Field from '../common/Md3Field.vue';
-import useWidgetField from '../composables/useWidgetField.ts';
-import {
-  WEEKDAY_LABELS,
-  addFloatingListener,
-  addOutsideListener,
-  applyTimePickerState,
-  composePickerTimeValue,
-  formatDate,
-  getCalendarDays,
-  getMonthLabel,
-  getNow,
-  hasValue,
-  labelFloats,
-  monthStart,
-  normalizeDateInputValue,
-  normalizeTimeInputValue,
-  normalizeTimePart,
-  parseDate,
-  removeFloatingListener,
-  removeOutsideListener,
-  resolveRefElement,
-  setCalendarViewFromDate,
-  setHiddenPopover,
-  shiftMonth,
-  splitDateTimeValue,
-  syncTimePickerState,
-  updateFloatingPopover
-} from './datetime_shared.ts';
+import CalendarPopover from './CalendarPopover.vue';
+import DateTimeSegment from './DateTimeSegment.vue';
+import TimePopover from './TimePopover.vue';
+import { splitDateTimeValue } from './core.ts';
+import useDatePart from './useDatePart.ts';
+import useDateTimeField, { type DateTimeCommitContext } from './useDateTimeField.ts';
+import useFloatingPopover from './useFloatingPopover.ts';
+import useTimePart, { type TimePartKey } from './useTimePart.ts';
+import type {
+  DateTimeSegmentExpose,
+  DateTimeWidgetEmit,
+  DateTimeWidgetProps,
+  PopoverExpose
+} from './types.ts';
+
+defineOptions({
+  name: 'DateTimeWidget'
+});
 
 const CALENDAR_ICON_SRC = '/templates/icons/calendar.svg';
 const CLOCK_ICON_SRC = '/templates/icons/clock.svg';
 
-export default {
-  name: 'DateTimeWidget',
-  components: { Md3Field },
-  props: {
-    widgetConfig: { type: Object, required: true },
-    widgetName: { type: String, required: true }
-  },
-  emits: ['input'],
-  setup(props, { emit }) {
-    return useWidgetField(props, emit);
-  },
-  data() {
-    return {
-      value: '',
-      isFocused: false,
-      dateValue: '',
-      timeValue: '',
-      isDatePopoverOpen: false,
-      isTimePopoverOpen: false,
-      datePopoverStyle: { visibility: 'hidden' },
-      timePopoverStyle: { visibility: 'hidden' },
-      calendarView: new Date(),
-      pickerHour: '00',
-      pickerMinute: '00',
-      pickerSecond: '00',
-      pickerHasSeconds: false,
-      calendarIconSrc: CALENDAR_ICON_SRC,
-      clockIconSrc: CLOCK_ICON_SRC,
-      _outsideClick: null,
-      _floatingUpdate: null
-    };
-  },
-  computed: {
-    hasValue,
-    labelFloats,
-    calendarDays() {
-      return this.getCalendarDays(this.calendarView, this.dateValue);
-    },
-    monthLabel() {
-      return this.getMonthLabel(this.calendarView);
-    },
-    weekdayLabels() {
-      return WEEKDAY_LABELS;
-    },
-    datePreview() {
-      const date = this.parseDate(this.dateValue) || this.getNow();
-      return this.formatDate(date);
-    },
-    timePreview() {
-      return `${this.pickerHour}:${this.pickerMinute}:${this.pickerSecond}`;
-    }
-  },
-  methods: {
-    addFloatingListener,
-    addOutsideListener,
-    applyTimePickerState,
-    composePickerTimeValue,
-    formatDate,
-    getCalendarDays,
-    getMonthLabel,
-    getNow,
-    monthStart,
-    normalizeDateInputValue,
-    normalizeTimeInputValue,
-    normalizeTimePart,
-    parseDate,
-    removeFloatingListener,
-    removeOutsideListener,
-    resolveRefElement,
-    setCalendarViewFromDate,
-    setHiddenPopover,
-    shiftMonth,
-    splitDateTimeValue,
-    syncTimePickerState,
-    updateFloatingPopover,
-    closePopovers() {
-      this.isDatePopoverOpen = false;
-      this.isTimePopoverOpen = false;
-      this.removeOutsideListener('_outsideClick');
-      this.removeFloatingListener('_floatingUpdate');
-    },
-    bindPopoverTracking() {
-      this.addOutsideListener('_outsideClick', ['pickerHost', 'datePopover', 'timePopover']);
-      this.addFloatingListener('_floatingUpdate', () => this.refreshOpenPopovers());
-    },
-    refreshOpenPopovers() {
-      if (this.isDatePopoverOpen) {
-        this.updateFloatingPopover('dateAnchor', 'datePopover', 'datePopoverStyle', { align: 'start' });
-      }
-      if (this.isTimePopoverOpen) {
-        this.updateFloatingPopover('timeAnchor', 'timePopover', 'timePopoverStyle', { align: 'end' });
-      }
-    },
-    composeValue() {
-      return [this.dateValue, this.timeValue].filter(Boolean).join(' ');
-    },
-    syncValue(shouldEmit = true) {
-      this.value = this.composeValue();
-      if (shouldEmit) {
-        this.emitInput(this.value);
-      }
-    },
-    onSegmentFocus() {
-      this.isFocused = true;
-      this.activateDraftController();
-    },
-    finalizeSegmentBlur(commitHandler) {
-      this.isFocused = false;
-      const shouldScheduleDeactivation = !this.tableCellMode;
+const props = defineProps<DateTimeWidgetProps>();
+const emit = defineEmits<DateTimeWidgetEmit>();
 
-      try {
-        if (typeof commitHandler === 'function') {
-          commitHandler();
-        }
-      } finally {
-        if (shouldScheduleDeactivation) {
-          window.setTimeout(() => {
-            let shouldDeactivate = true;
-            try {
-              const root = this.resolveRefElement('pickerHost');
-              const active = document.activeElement;
-              if (root && active && root.contains(active)) {
-                shouldDeactivate = false;
-              }
-            } finally {
-              if (shouldDeactivate) {
-                this.deactivateDraftController();
-              }
-            }
-          }, 0);
-        }
-      }
-    },
-    onTimePickerPartInput(part, max, event) {
-      const digits = String(event.target.value || '').replace(/\D+/g, '').slice(0, 2);
-      this[part] = digits;
-      if (part === 'pickerSecond' && digits.length) {
-        this.pickerHasSeconds = true;
-      }
-    },
-    commitTimePickerPart(part, max, shouldClose = false) {
-      const normalized = this.normalizeTimePart(this[part], max) || '00';
-      this[part] = normalized;
-      if (part === 'pickerSecond') {
-        this.pickerHasSeconds = true;
-      }
-      this.timeValue = this.composePickerTimeValue();
-      this.syncValue();
-      if (shouldClose) {
-        this.closePopovers();
-      }
-    },
-    onDateInput() {
-      this.syncValue(this.tableCellMode);
-      if (!this.tableCellMode) {
-        this.activateDraftController();
-      }
-    },
-    onTimeInput() {
-      this.syncValue(this.tableCellMode);
-      if (!this.tableCellMode) {
-        this.activateDraftController();
-      }
-    },
-    onDateBlur() {
-      this.finalizeSegmentBlur(() => this.commitDateInput());
-    },
-    onTimeBlur() {
-      this.finalizeSegmentBlur(() => this.commitTimeInput());
-    },
-    onDateEnterCommit(event) {
-      if (this.tableCellMode) {
-        return;
-      }
+const value = ref('');
+const dateValue = ref('');
+const timeValue = ref('');
+const isDatePopoverOpen = ref(false);
+const isTimePopoverOpen = ref(false);
+const pickerHost = ref<HTMLElement | null>(null);
+const dateAnchor = ref<DateTimeSegmentExpose | null>(null);
+const timeAnchor = ref<DateTimeSegmentExpose | null>(null);
+const datePopoverRef = ref<PopoverExpose | null>(null);
+const timePopoverRef = ref<PopoverExpose | null>(null);
+const calendarIconSrc = CALENDAR_ICON_SRC;
+const clockIconSrc = CLOCK_ICON_SRC;
 
-      event.preventDefault();
-      try {
-        this.commitDateInput();
-      } finally {
-        event.target?.blur?.();
-      }
-    },
-    onTimeEnterCommit(event) {
-      if (this.tableCellMode) {
-        return;
-      }
+const field = useDateTimeField(props, emit, value);
+const datePart = useDatePart(dateValue);
+const timePart = useTimePart(timeValue);
+const popover = useFloatingPopover(
+  () => [
+    pickerHost.value,
+    popover.elementFromExpose(datePopoverRef),
+    popover.elementFromExpose(timePopoverRef)
+  ],
+  closePopovers
+);
 
-      event.preventDefault();
-      try {
-        this.commitTimeInput();
-      } finally {
-        event.target?.blur?.();
-      }
-    },
-    commitDateInput() {
-      if (!this.dateValue) {
-        this.handleTableCellCommitValidation('');
-        this.syncValue();
-        return;
-      }
+const {
+  hasValue,
+  isFocused,
+  labelFloats,
+  tableCellCommitError,
+  tableCellMode,
+  tableCellRootAttrs
+} = field;
 
-      const { value, parsedDate } = this.normalizeDateInputValue(this.dateValue);
-      this.dateValue = value;
-      this.setCalendarViewFromDate(parsedDate);
-      this.handleTableCellCommitValidation(parsedDate ? '' : 'Неверный формат даты');
-      this.syncValue();
-    },
-    commitTimeInput() {
-      if (!this.timeValue) {
-        this.handleTableCellCommitValidation('');
-        this.syncValue();
-        return;
-      }
+function closePopovers(): void {
+  isDatePopoverOpen.value = false;
+  isTimePopoverOpen.value = false;
+  popover.unbind();
+}
 
-      const { value, parsedTime } = this.normalizeTimeInputValue(this.timeValue);
-      this.timeValue = value;
-      this.applyTimePickerState(parsedTime);
-      this.handleTableCellCommitValidation(parsedTime ? '' : 'Неверный формат времени');
-      this.syncValue();
-    },
-    commitDraft() {
-      this.commitDateInput();
-      this.commitTimeInput();
-    },
-    openDatePicker() {
-      if (this.widgetConfig.readonly) {
-        return;
-      }
-      const parsedDate = this.parseDate(this.dateValue) || this.getNow();
-      this.calendarView = this.monthStart(parsedDate);
-      this.isDatePopoverOpen = true;
-      this.isTimePopoverOpen = false;
-      this.setHiddenPopover('datePopoverStyle');
-      this.$nextTick(() => {
-        this.refreshOpenPopovers();
-        this.bindPopoverTracking();
-      });
-    },
-    openTimePicker() {
-      if (this.widgetConfig.readonly) {
-        return;
-      }
-      this.syncTimePickerState(this.timeValue);
-      this.isTimePopoverOpen = true;
-      this.isDatePopoverOpen = false;
-      this.setHiddenPopover('timePopoverStyle');
-      this.$nextTick(() => {
-        this.refreshOpenPopovers();
-        this.bindPopoverTracking();
-      });
-    },
-    prevMonth() {
-      this.calendarView = this.shiftMonth(this.calendarView, -1);
-      this.$nextTick(() => this.refreshOpenPopovers());
-    },
-    nextMonth() {
-      this.calendarView = this.shiftMonth(this.calendarView, 1);
-      this.$nextTick(() => this.refreshOpenPopovers());
-    },
-    selectDate(date) {
-      this.dateValue = this.formatDate(date);
-      this.calendarView = this.monthStart(date);
-      this.syncValue();
-      this.closePopovers();
-    },
-    setValue(v) {
-      if (!v) {
-        this.value = '';
-        this.dateValue = '';
-        this.timeValue = '';
-        return;
-      }
+function refreshOpenPopovers(): void {
+  if (isDatePopoverOpen.value) {
+    popover.update(
+      popover.elementFromExpose(dateAnchor),
+      popover.elementFromExpose(datePopoverRef),
+      'start'
+    );
+  }
+  if (isTimePopoverOpen.value) {
+    popover.update(
+      popover.elementFromExpose(timeAnchor),
+      popover.elementFromExpose(timePopoverRef),
+      'end'
+    );
+  }
+}
 
-      const { datePart, timePart } = this.splitDateTimeValue(v);
-      const dateState = this.normalizeDateInputValue(datePart);
-      const timeState = this.normalizeTimeInputValue(timePart);
+function bindPopoverTracking(): void {
+  popover.bind(refreshOpenPopovers);
+}
 
-      this.dateValue = dateState.value;
-      this.timeValue = timeState.value;
-      this.setCalendarViewFromDate(dateState.parsedDate);
-      this.applyTimePickerState(timeState.parsedTime);
-      this.syncValue(false);
-    },
-    getValue() {
-      return this.value;
-    }
-  },
-  watch: {
-    'widgetConfig.value': {
-      immediate: true,
-      handler(value) {
-        if (value === undefined) {
+function composeValue(): string {
+  return [dateValue.value, timeValue.value].filter(Boolean).join(' ');
+}
+
+function syncValue(shouldEmit = true): void {
+  value.value = composeValue();
+  if (shouldEmit) {
+    field.emitInput(value.value);
+  }
+}
+
+function onSegmentFocus(): void {
+  field.onFocus();
+}
+
+function finalizeSegmentBlur(commitHandler: () => void): void {
+  isFocused.value = false;
+  const shouldScheduleDeactivation = !tableCellMode.value;
+
+  try {
+    commitHandler();
+  } finally {
+    if (shouldScheduleDeactivation) {
+      window.setTimeout(() => {
+        const active = document.activeElement;
+        const root = pickerHost.value;
+        if (root && active && root.contains(active)) {
           return;
         }
-        this.syncCommittedValue(value, (nextValue) => this.setValue(nextValue));
-      }
+        field.deactivateDraftController();
+      }, 0);
     }
-  },
-  beforeUnmount() {
-    this.removeOutsideListener('_outsideClick');
-    this.removeFloatingListener('_floatingUpdate');
   }
-};
+}
+
+function onTimePickerPartInput(part: TimePartKey, event: Event): void {
+  const target = event.target;
+  timePart.setPart(part, target instanceof HTMLInputElement ? target.value : '');
+}
+
+function commitTimePickerPart(part: TimePartKey, max: number, shouldClose = false): void {
+  timePart.commitPart(part, max);
+  syncValue();
+  if (shouldClose) {
+    closePopovers();
+  }
+}
+
+function onDateInput(): void {
+  syncValue(tableCellMode.value);
+  if (!tableCellMode.value) {
+    field.activateDraftController();
+  }
+}
+
+function onTimeInput(): void {
+  syncValue(tableCellMode.value);
+  if (!tableCellMode.value) {
+    field.activateDraftController();
+  }
+}
+
+function onDateBlur(): void {
+  finalizeSegmentBlur(() => {
+    commitDateInput();
+  });
+}
+
+function onTimeBlur(): void {
+  finalizeSegmentBlur(() => {
+    commitTimeInput();
+  });
+}
+
+function onDateEnterCommit(event: KeyboardEvent): void {
+  if (tableCellMode.value) {
+    return;
+  }
+
+  event.preventDefault();
+  try {
+    commitDateInput();
+  } finally {
+    const target = event.target;
+    if (target instanceof HTMLElement) {
+      target.blur();
+    }
+  }
+}
+
+function onTimeEnterCommit(event: KeyboardEvent): void {
+  if (tableCellMode.value) {
+    return;
+  }
+
+  event.preventDefault();
+  try {
+    commitTimeInput();
+  } finally {
+    const target = event.target;
+    if (target instanceof HTMLElement) {
+      target.blur();
+    }
+  }
+}
+
+function commitDateInput(context?: DateTimeCommitContext) {
+  if (!dateValue.value) {
+    syncValue(false);
+    return field.commitValue(value.value, '', context);
+  }
+
+  const state = datePart.normalize(dateValue.value);
+  dateValue.value = state.value;
+  syncValue(false);
+  return field.commitValue(
+    value.value,
+    state.parsedDate ? '' : 'Неверный формат даты',
+    context
+  );
+}
+
+function commitTimeInput(context?: DateTimeCommitContext) {
+  if (!timeValue.value) {
+    syncValue(false);
+    return field.commitValue(value.value, '', context);
+  }
+
+  const state = timePart.normalize(timeValue.value);
+  timeValue.value = state.value;
+  syncValue(false);
+  return field.commitValue(
+    value.value,
+    state.parsedTime ? '' : 'Неверный формат времени',
+    context
+  );
+}
+
+function commitDraft(context?: DateTimeCommitContext) {
+  const dateResult = commitDateInput(context);
+  const timeResult = commitTimeInput(context);
+  return timeResult || dateResult;
+}
+
+function commitPendingState(context?: DateTimeCommitContext) {
+  return commitDraft(context);
+}
+
+function openDatePicker(): void {
+  if (props.widgetConfig.readonly) {
+    return;
+  }
+
+  datePart.openFromValue();
+  isDatePopoverOpen.value = true;
+  isTimePopoverOpen.value = false;
+  popover.setHidden();
+  void nextTick(() => {
+    refreshOpenPopovers();
+    bindPopoverTracking();
+  });
+}
+
+function openTimePicker(): void {
+  if (props.widgetConfig.readonly) {
+    return;
+  }
+
+  timePart.syncPickerState(timeValue.value);
+  isTimePopoverOpen.value = true;
+  isDatePopoverOpen.value = false;
+  popover.setHidden();
+  void nextTick(() => {
+    refreshOpenPopovers();
+    bindPopoverTracking();
+  });
+}
+
+function prevMonth(): void {
+  datePart.prevMonth();
+  void nextTick(refreshOpenPopovers);
+}
+
+function nextMonth(): void {
+  datePart.nextMonth();
+  void nextTick(refreshOpenPopovers);
+}
+
+function selectDate(date: Date): void {
+  datePart.selectDate(date);
+  syncValue();
+  closePopovers();
+}
+
+function setValue(nextValue: unknown): void {
+  if (!nextValue) {
+    value.value = '';
+    dateValue.value = '';
+    timeValue.value = '';
+    return;
+  }
+
+  const { datePart: datePartValue, timePart: timePartValue } = splitDateTimeValue(nextValue);
+  const dateState = datePart.normalize(datePartValue);
+  const timeState = timePart.normalize(timePartValue);
+
+  dateValue.value = dateState.value;
+  timeValue.value = timeState.value;
+  syncValue(false);
+}
+
+function getValue(): string {
+  return value.value;
+}
+
+watch(
+  () => props.widgetConfig.value,
+  (nextValue) => {
+    if (nextValue === undefined) {
+      return;
+    }
+    field.syncCommittedValue(nextValue, setValue);
+  },
+  { immediate: true }
+);
+
+defineExpose({
+  commitDraft,
+  commitPendingState,
+  getValue,
+  openDatePicker,
+  openTimePicker,
+  setValue,
+  tableCellCommitError,
+  value
+});
 </script>

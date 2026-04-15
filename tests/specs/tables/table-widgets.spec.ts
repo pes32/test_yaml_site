@@ -109,6 +109,28 @@ test.describe('behavior: complex table widget', () => {
     await editNativeTableCell('big_table', page, 0, 1, 'строка');
     await editNativeTableCell('big_table', page, 0, 3, '42');
 
+    const dateCell = tableCell(page, 'big_table', 0, 9);
+    await expect(dateCell.getByRole('button', { name: 'Выбрать дату' })).toBeVisible();
+    await dateCell.getByRole('button', { name: 'Выбрать дату' }).click();
+    await expect(page.locator('.widget-dt-popover--calendar')).toBeVisible();
+    await page.locator('body').click({ position: { x: 1, y: 1 } });
+    await dateCell.dblclick();
+    const dateEditor = dateCell.getByRole('textbox').first();
+    await dateEditor.fill('32132026');
+    await dateEditor.blur();
+    await expect(dateCell).toHaveAttribute('style', /--widget-table-cell-outline-color/);
+
+    const timeCell = tableCell(page, 'big_table', 0, 10);
+    await expect(timeCell.getByRole('button', { name: 'Выбрать время' })).toBeVisible();
+    await timeCell.getByRole('button', { name: 'Выбрать время' }).click();
+    await expect(page.locator('.widget-dt-popover--time')).toBeVisible();
+    await page.locator('body').click({ position: { x: 1, y: 1 } });
+    await timeCell.dblclick();
+    const timeEditor = timeCell.getByRole('textbox').first();
+    await timeEditor.fill('9999');
+    await timeEditor.blur();
+    await expect(timeCell).toHaveAttribute('style', /--widget-table-cell-outline-color/);
+
     const listCell = tableCell(page, 'big_table', 0, 11);
     await expect(listCell).toBeVisible();
     await expect(listCell.getByRole('button', { name: 'Открыть список' })).toBeVisible();

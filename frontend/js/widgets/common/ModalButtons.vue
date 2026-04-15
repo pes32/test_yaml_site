@@ -19,7 +19,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { injectPageHostRuntimeServices } from '../../runtime/widget_runtime_bridge.ts';
 import WidgetRenderer from './WidgetRenderer.vue';
 
@@ -33,14 +33,14 @@ const CLOSE_BUTTON_CONFIG = Object.freeze({
   command: 'CLOSE_MODAL'
 });
 
-defineProps({
-  buttons: {
-    type: Array,
-    required: true
-  }
-});
+defineProps<{
+  buttons: string[];
+}>();
 
-const emit = defineEmits(['close', 'execute']);
+const emit = defineEmits<{
+  (event: 'close'): void;
+  (event: 'execute', payload: unknown): void;
+}>();
 
 const hostServices = injectPageHostRuntimeServices();
 
@@ -48,7 +48,7 @@ function getCloseButtonConfig() {
   return CLOSE_BUTTON_CONFIG;
 }
 
-function getWidgetAttrs(widgetName) {
+function getWidgetAttrs(widgetName: string) {
   if (typeof hostServices?.getWidgetAttrsByName === 'function') {
     return hostServices.getWidgetAttrsByName(widgetName);
   }
@@ -59,7 +59,7 @@ function getWidgetAttrs(widgetName) {
   };
 }
 
-function getWidgetValue(widgetName) {
+function getWidgetValue(widgetName: string) {
   return typeof hostServices?.getWidgetRuntimeValueByName === 'function'
     ? hostServices.getWidgetRuntimeValueByName(widgetName)
     : undefined;

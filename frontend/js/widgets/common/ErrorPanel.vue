@@ -18,21 +18,21 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
+import type { FrontendRuntimeError } from '../../runtime/error_model.ts';
 
 defineOptions({
   name: 'ErrorPanel'
 });
 
-const props = defineProps({
-  error: {
-    type: Object,
-    default: null
-  }
-});
+const props = defineProps<{
+  error?: FrontendRuntimeError | null;
+}>();
 
-const emit = defineEmits(['dismiss']);
+const emit = defineEmits<{
+  (event: 'dismiss'): void;
+}>();
 
 const detailsText = computed(() => {
   if (!props.error || !props.error.details) {

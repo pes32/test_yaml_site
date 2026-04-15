@@ -14,271 +14,229 @@
       v-bind="tableCellRootAttrs"
     >
       <div class="widget-dt-inner">
-        <div ref="dateAnchor" class="widget-dt-segment widget-dt-segment--single">
-          <input
-            v-model="value"
-            type="text"
-            class="form-control widget-dt-input widget-dt-input--date"
-            data-table-editor-target="true"
-            :disabled="widgetConfig.readonly"
-            :tabindex="widgetConfig.readonly ? -1 : null"
-            @input="onInput"
-            @focus="onFocus"
-            @blur="onBlur"
-            @keydown.enter="onEnterCommit"
-          >
-          <span class="widget-dt-icon-wrap">
-            <span
-              class="widget-dt-icon"
-              data-table-action-trigger="date"
-              role="button"
-              tabindex="-1"
-              aria-label="Выбрать дату"
-              @click="openPicker"
-              @mousedown.prevent
-            >
-              <img :src="calendarIconSrc" alt="">
-            </span>
-          </span>
-        </div>
+        <date-time-segment
+          ref="dateAnchor"
+          v-model="value"
+          kind="date"
+          segment-class="widget-dt-segment--single"
+          input-class="widget-dt-input--date"
+          :readonly="widgetConfig.readonly"
+          :icon-src="calendarIconSrc"
+          accessible-label="Выбрать дату"
+          @input="onInput"
+          @focus="onFocus"
+          @blur="onBlur"
+          @enter="onEnterCommit"
+          @open="openPicker"
+        ></date-time-segment>
       </div>
     </div>
     <Teleport to="body">
-      <div
+      <calendar-popover
         v-if="isCalendarOpen"
-        ref="calendarPopover"
-        class="widget-dt-popover widget-dt-popover--calendar"
-        :style="calendarPopoverStyle"
-      >
-        <div class="widget-dt-panel-head">
-          <div class="widget-dt-panel-label">Дата</div>
-          <div class="widget-dt-panel-value" v-text="calendarPreview"></div>
-        </div>
-        <div class="widget-dt-popover-header">
-          <button type="button" class="widget-dt-nav" aria-label="Предыдущий месяц" @click="prevMonth">‹</button>
-          <div class="widget-dt-popover-title" v-text="monthLabel"></div>
-          <button type="button" class="widget-dt-nav" aria-label="Следующий месяц" @click="nextMonth">›</button>
-        </div>
-        <div class="widget-dt-weekdays">
-          <span v-for="day in weekdayLabels" :key="day" v-text="day"></span>
-        </div>
-        <div class="widget-dt-calendar-grid">
-          <button
-            v-for="day in calendarDays"
-            :key="day.key"
-            type="button"
-            class="widget-dt-day"
-            :class="{ 'is-outside': !day.inMonth, 'is-today': day.isToday, 'is-selected': day.isSelected }"
-            @click="selectDate(day.date)"
-          >
-            <span v-text="day.label"></span>
-          </button>
-        </div>
-      </div>
+        ref="calendarPopoverRef"
+        :popover-style="calendarPopover.style.value"
+        :preview="datePart.preview.value"
+        :month-label="datePart.monthLabel.value"
+        :weekday-labels="datePart.weekdayLabels.value"
+        :days="datePart.calendarDays.value"
+        @prev="prevMonth"
+        @next="nextMonth"
+        @select="selectDate"
+        @close="closePopovers"
+      ></calendar-popover>
     </Teleport>
     <template #supporting>
-      <span v-text="widgetConfig.sup_text"></span>
+      <span>{{ widgetConfig.sup_text }}</span>
     </template>
   </md3-field>
 </template>
 
-<script>
+<script setup lang="ts">
+import { nextTick, ref, watch } from 'vue';
 import Md3Field from '../common/Md3Field.vue';
-import useWidgetField from '../composables/useWidgetField.ts';
-import {
-  WEEKDAY_LABELS,
-  addFloatingListener,
-  addOutsideListener,
-  formatDate,
-  getCalendarDays,
-  getMonthLabel,
-  getNow,
-  hasValue,
-  labelFloats,
-  monthStart,
-  normalizeDateInputValue,
-  parseDate,
-  removeFloatingListener,
-  removeOutsideListener,
-  setCalendarViewFromDate,
-  setHiddenPopover,
-  shiftMonth,
-  updateFloatingPopover
-} from './datetime_shared.ts';
+import CalendarPopover from './CalendarPopover.vue';
+import DateTimeSegment from './DateTimeSegment.vue';
+import useDatePart from './useDatePart.ts';
+import useDateTimeField, { type DateTimeCommitContext } from './useDateTimeField.ts';
+import useFloatingPopover from './useFloatingPopover.ts';
+import type {
+  DateTimeSegmentExpose,
+  DateTimeWidgetEmit,
+  DateTimeWidgetProps,
+  PopoverExpose
+} from './types.ts';
+
+defineOptions({
+  name: 'DateWidget'
+});
 
 const CALENDAR_ICON_SRC = '/templates/icons/calendar.svg';
 
-export default {
-  name: 'DateWidget',
-  components: { Md3Field },
-  props: {
-    widgetConfig: { type: Object, required: true },
-    widgetName: { type: String, required: true }
-  },
-  emits: ['input'],
-  setup(props, { emit }) {
-    return useWidgetField(props, emit);
-  },
-  data() {
-    return {
-      value: '',
-      isFocused: false,
-      isCalendarOpen: false,
-      calendarView: new Date(),
-      calendarPopoverStyle: { visibility: 'hidden' },
-      calendarIconSrc: CALENDAR_ICON_SRC,
-      _outsideClick: null,
-      _floatingUpdate: null
-    };
-  },
-  computed: {
-    hasValue,
-    labelFloats,
-    calendarDays() {
-      return this.getCalendarDays(this.calendarView, this.value);
-    },
-    monthLabel() {
-      return this.getMonthLabel(this.calendarView);
-    },
-    weekdayLabels() {
-      return WEEKDAY_LABELS;
-    },
-    calendarPreview() {
-      const date = this.parseDate(this.value) || this.getNow();
-      return this.formatDate(date);
-    }
-  },
-  methods: {
-    addFloatingListener,
-    addOutsideListener,
-    formatDate,
-    getCalendarDays,
-    getMonthLabel,
-    getNow,
-    monthStart,
-    normalizeDateInputValue,
-    parseDate,
-    removeFloatingListener,
-    removeOutsideListener,
-    setCalendarViewFromDate,
-    setHiddenPopover,
-    shiftMonth,
-    updateFloatingPopover,
-    closePopovers() {
-      this.isCalendarOpen = false;
-      this.removeOutsideListener('_outsideClick');
-      this.removeFloatingListener('_floatingUpdate');
-    },
-    syncCalendarPopoverPosition() {
-      if (!this.isCalendarOpen) {
-        return;
-      }
-      this.updateFloatingPopover('dateAnchor', 'calendarPopover', 'calendarPopoverStyle', { align: 'start' });
-    },
-    onFocus() {
-      this.isFocused = true;
-      this.activateDraftController();
-    },
-    onInput() {
-      if (this.tableCellMode) {
-        this.emitInput(this.value);
-        return;
-      }
+const props = defineProps<DateTimeWidgetProps>();
+const emit = defineEmits<DateTimeWidgetEmit>();
 
-      this.activateDraftController();
-    },
-    onBlur() {
-      this.isFocused = false;
-      try {
-        this.commitDraft();
-      } finally {
-        this.deactivateDraftController();
-      }
-    },
-    onEnterCommit(event) {
-      if (this.tableCellMode) {
-        return;
-      }
+const value = ref('');
+const isCalendarOpen = ref(false);
+const pickerHost = ref<HTMLElement | null>(null);
+const dateAnchor = ref<DateTimeSegmentExpose | null>(null);
+const calendarPopoverRef = ref<PopoverExpose | null>(null);
+const calendarIconSrc = CALENDAR_ICON_SRC;
 
-      event.preventDefault();
-      try {
-        this.commitDraft();
-      } finally {
-        event.target?.blur?.();
-      }
-    },
-    commitInput() {
-      if (!this.value) {
-        this.handleTableCellCommitValidation('');
-        this.emitInput(this.value);
-        return;
-      }
+const field = useDateTimeField(props, emit, value);
+const datePart = useDatePart(value);
+const calendarPopover = useFloatingPopover(
+  () => [pickerHost.value, calendarPopover.elementFromExpose(calendarPopoverRef)],
+  closePopovers
+);
 
-      const { value, parsedDate } = this.normalizeDateInputValue(this.value);
-      this.value = value;
-      this.setCalendarViewFromDate(parsedDate);
-      this.handleTableCellCommitValidation(parsedDate ? '' : 'Неверный формат даты');
-      this.emitInput(this.value);
-    },
-    commitDraft() {
-      this.commitInput();
-    },
-    openPicker() {
-      if (this.widgetConfig.readonly) {
-        return;
-      }
-      const parsedDate = this.parseDate(this.value) || this.getNow();
-      this.calendarView = this.monthStart(parsedDate);
-      this.isCalendarOpen = true;
-      this.setHiddenPopover('calendarPopoverStyle');
-      this.addOutsideListener('_outsideClick', ['pickerHost', 'calendarPopover']);
-      this.$nextTick(() => {
-        this.syncCalendarPopoverPosition();
-        this.addFloatingListener('_floatingUpdate', () => this.syncCalendarPopoverPosition());
-      });
-    },
-    prevMonth() {
-      this.calendarView = this.shiftMonth(this.calendarView, -1);
-      this.$nextTick(() => this.syncCalendarPopoverPosition());
-    },
-    nextMonth() {
-      this.calendarView = this.shiftMonth(this.calendarView, 1);
-      this.$nextTick(() => this.syncCalendarPopoverPosition());
-    },
-    selectDate(date) {
-      this.value = this.formatDate(date);
-      this.calendarView = this.monthStart(date);
-      this.emitInput(this.value);
-      this.closePopovers();
-    },
-    setValue(v) {
-      if (!v) {
-        this.value = '';
-        return;
-      }
+const {
+  hasValue,
+  isFocused,
+  labelFloats,
+  tableCellCommitError,
+  tableCellMode,
+  tableCellRootAttrs
+} = field;
 
-      const { value, parsedDate } = this.normalizeDateInputValue(v);
-      this.value = value;
-      this.setCalendarViewFromDate(parsedDate);
-    },
-    getValue() {
-      return this.value;
-    }
-  },
-  watch: {
-    'widgetConfig.value': {
-      immediate: true,
-      handler(value) {
-        if (value === undefined) {
-          return;
-        }
-        this.syncCommittedValue(value, (nextValue) => this.setValue(nextValue));
-      }
-    }
-  },
-  beforeUnmount() {
-    this.removeOutsideListener('_outsideClick');
-    this.removeFloatingListener('_floatingUpdate');
+function closePopovers(): void {
+  isCalendarOpen.value = false;
+  calendarPopover.unbind();
+}
+
+function syncCalendarPopoverPosition(): void {
+  if (!isCalendarOpen.value) {
+    return;
   }
-};
+  calendarPopover.update(
+    calendarPopover.elementFromExpose(dateAnchor),
+    calendarPopover.elementFromExpose(calendarPopoverRef),
+    'start'
+  );
+}
+
+function onInput(): void {
+  field.onLiveInput(value.value);
+}
+
+function onFocus(): void {
+  field.onFocus();
+}
+
+function onBlur(): void {
+  isFocused.value = false;
+  try {
+    commitDraft();
+  } finally {
+    field.deactivateDraftController();
+  }
+}
+
+function onEnterCommit(event: KeyboardEvent): void {
+  if (tableCellMode.value) {
+    return;
+  }
+
+  event.preventDefault();
+  try {
+    commitDraft();
+  } finally {
+    const target = event.target;
+    if (target instanceof HTMLElement) {
+      target.blur();
+    }
+  }
+}
+
+function commitInput(context?: DateTimeCommitContext) {
+  if (!value.value) {
+    return field.commitValue(value.value, '', context);
+  }
+
+  const state = datePart.normalize(value.value);
+  value.value = state.value;
+  return field.commitValue(
+    value.value,
+    state.parsedDate ? '' : 'Неверный формат даты',
+    context
+  );
+}
+
+function commitDraft(context?: DateTimeCommitContext) {
+  return commitInput(context);
+}
+
+function commitPendingState(context?: DateTimeCommitContext) {
+  return commitDraft(context);
+}
+
+function openPicker(): void {
+  if (props.widgetConfig.readonly) {
+    return;
+  }
+
+  datePart.openFromValue();
+  isCalendarOpen.value = true;
+  calendarPopover.setHidden();
+  void nextTick(() => {
+    syncCalendarPopoverPosition();
+    calendarPopover.bind(syncCalendarPopoverPosition);
+  });
+}
+
+function openDatePicker(): void {
+  openPicker();
+}
+
+function prevMonth(): void {
+  datePart.prevMonth();
+  void nextTick(syncCalendarPopoverPosition);
+}
+
+function nextMonth(): void {
+  datePart.nextMonth();
+  void nextTick(syncCalendarPopoverPosition);
+}
+
+function selectDate(date: Date): void {
+  datePart.selectDate(date);
+  field.emitInput(value.value);
+  closePopovers();
+}
+
+function setValue(nextValue: unknown): void {
+  if (!nextValue) {
+    value.value = '';
+    return;
+  }
+
+  const state = datePart.normalize(nextValue);
+  value.value = state.value;
+}
+
+function getValue(): string {
+  return value.value;
+}
+
+watch(
+  () => props.widgetConfig.value,
+  (nextValue) => {
+    if (nextValue === undefined) {
+      return;
+    }
+    field.syncCommittedValue(nextValue, setValue);
+  },
+  { immediate: true }
+);
+
+defineExpose({
+  commitDraft,
+  commitPendingState,
+  getValue,
+  openDatePicker,
+  openPicker,
+  setValue,
+  tableCellCommitError,
+  value
+});
 </script>

@@ -15,6 +15,7 @@
 - `TableWidgetVm` больше не является loose `Record<string, unknown>` boundary; runtime contract разделён на state/computed/methods/dom/setup bindings.
 - `table_method_helpers.ts` больше не отравляет `this` broad string-index signature, поэтому state fields не типизируются как runtime methods.
 - Pure helpers (`table_selectors.ts`, `table_widget_helpers.ts`, `table_jump.ts`, `table_format.ts`, `table_grouping.ts`) получили явные table-типы.
+- Embedded cell widgets теперь приходят из полного TS widget layer: `date`, `time`, `datetime`, `ip`, `ip_mask`, `list`, `voc`.
 
 ## What Must Not Return
 
@@ -29,6 +30,6 @@
 
 ## Remaining Work
 
-- Завести реальный browser/E2E smoke для table interactions, если проекту нужен автоматический regression gate.
-- После typing pass повторно пройти API map и решить, какие helper modules можно сделать ещё уже или объединить.
+- Расширять реальный browser/E2E smoke для новых table interactions.
+- Повторно проходить API map и решать, какие helper modules можно сделать ещё уже или объединить.
 - Сужать runtime method signatures дальше только вместе с тестами на соответствующие interactions.

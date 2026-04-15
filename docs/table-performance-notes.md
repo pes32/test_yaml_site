@@ -29,5 +29,5 @@
 ## Open Performance Risks
 
 - Пока нет автоматизированного browser benchmark для больших таблиц.
-- Strict table typecheck ещё не закрыт, поэтому часть VM-boundary остаётся шире, чем нужно.
-- Lazy/grouping/sticky paths требуют ручного smoke после крупных изменений, пока не появится E2E runner.
+- Strict table typecheck закрыт, generic `Proxy` boundary в `useTableRuntime.ts` заменён явным controller, но часть внешних DOM/event signatures остаётся широкой и должна сужаться только вместе с regression coverage.
+- Lazy/grouping/sticky paths требуют targeted Playwright smoke после крупных изменений, даже при зелёных type/build gates.
