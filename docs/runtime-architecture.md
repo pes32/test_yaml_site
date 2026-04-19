@@ -154,7 +154,7 @@ Widget layer и непосредственные runtime/helper modules нахо
 - action runtime, datetime helpers, IP helpers, voc helpers и host/runtime glue живут в TypeScript modules;
 - common components вроде `Md3Field.vue`, `ConfirmModal.vue`, `ModalManager.vue`, `SectionCard.vue` и related shared components используют typed `<script setup lang="ts">`.
 
-Stateful widgets должны сохранять exposed lifecycle surface: `getValue`, `setValue`, `commitDraft` и `commitPendingState`. Table-triggered widgets дополнительно сохраняют `openPicker`, `openDatePicker`, `openTimePicker` или `onArrowClick`, если эти методы использует table cell runtime.
+Stateful widgets должны сохранять exposed lifecycle surface: `getValue`, `setValue` и `commitPendingState`. `commitDraft` может оставаться локальной helper-ручкой компонента, но registry-level boundary commit его не вызывает. Table-triggered widgets дополнительно сохраняют `openPicker`, `openDatePicker`, `openTimePicker` или `onArrowClick`, если эти методы использует table cell runtime.
 
 Normalized API response/request contracts живут в `frontend/js/runtime/api_contract.ts`.
 `api_client.ts` остаётся transport/envelope layer, а `page.ts` и `debug.ts` работают с

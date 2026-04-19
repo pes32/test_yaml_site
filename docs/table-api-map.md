@@ -30,8 +30,7 @@
 
 ## Parsing And Pure Logic
 
-- `table_parse_attrs.ts` — canonical parser `table_attrs` и shared attr helpers.
-- `table_schema_parse.ts` — разбор schema/header rows из table attrs.
+- `table_parse_attrs.ts` — canonical parser `table_attrs`, schema/header rows и shared attr helpers.
 - `table_selectors.ts` — typed pure derived cell/table helpers для display actions, cell options, defaults и lazy flag.
 - `table_clipboard.ts` — TSV serialization/deserialization и clipboard data helpers.
 - `table_format.ts` — value formatting.
@@ -71,7 +70,7 @@ Table cell editors импортируются из TS widget layer: `StringWidge
 - `table_page_bridge.ts` — page/runtime bridge helpers.
 - `table_notifications.ts` — user-facing table notifications.
 - `table_debug.ts` — debug-only table helpers.
-- `table_method_helpers.ts` — controller method binding helpers без broad string-index на runtime modules; modules may bind `this` to a narrow runtime surface instead of the aggregate VM.
+- runtime method groups типизируются через `TableRuntimeMethodSubset` в `table_contract.ts`; отдельного helper layer нет.
 
 ## Restricted Surface
 

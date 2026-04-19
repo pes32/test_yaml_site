@@ -14,12 +14,11 @@ import {
     tableCellConsumeKeys as selectTableCellConsumeKeys
 } from './table_selectors.ts';
 import { tableLog } from './table_debug.ts';
-import { defineTableRuntimeModule } from './table_method_helpers.ts';
 import { sanitizeTableCellOptions } from './table_parse_attrs.ts';
 import { replaceRowCellValue } from './table_utils.ts';
-import type { TableCellWidgetConfig } from './table_contract.ts';
+import type { TableCellWidgetConfig, TableRuntimeMethodSubset } from './table_contract.ts';
 
-const CellRuntimeMethods = defineTableRuntimeModule({
+const CellRuntimeMethods = {
     canMutateColumnIndex(colIndex) {
         const column = this.tableColumns[colIndex];
         if (!column) return false;
@@ -263,7 +262,7 @@ const CellRuntimeMethods = defineTableRuntimeModule({
     listColumnIsMultiselect(column) {
         return isListColumnMultiselect(this.getAllAttrsMap(), column);
     }
-});
+} satisfies TableRuntimeMethodSubset;
 
 export { CellRuntimeMethods };
 export default CellRuntimeMethods;

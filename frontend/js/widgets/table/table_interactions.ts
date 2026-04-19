@@ -1,5 +1,4 @@
-import type { TableRuntimeVm, TableRuntimeColumn } from './table_contract.ts';
-import { defineTableRuntimeModule } from './table_method_helpers.ts';
+import type { TableRuntimeVm, TableRuntimeColumn, TableRuntimeMethodSubset } from './table_contract.ts';
 import { TableWidgetHandleKeydown } from './table_keyboard.ts';
 
 type CellEditorActionKind = string;
@@ -14,7 +13,7 @@ function getContainedCell(vm: TableRuntimeVm, target: EventTarget | null | undef
     return cell && vm.$el?.contains(cell) ? cell as HTMLElement : null;
 }
 
-const InteractionRuntimeMethods = defineTableRuntimeModule({
+const InteractionRuntimeMethods = {
     onTableCellClick(this: TableRuntimeVm, event: MouseEvent, row: number, col: number) {
         if (!this.isEditable) return;
         this._shiftAnchorLocked = false;
@@ -284,7 +283,7 @@ const InteractionRuntimeMethods = defineTableRuntimeModule({
         const col = Number.parseInt(td.getAttribute('data-col') || '', 10);
         return Number.isNaN(col) ? 0 : col;
     }
-});
+} satisfies TableRuntimeMethodSubset;
 
 export { InteractionRuntimeMethods };
 export default InteractionRuntimeMethods;

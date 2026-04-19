@@ -1,8 +1,7 @@
 /**
  * Методы выделения ячеек для TableWidget (подмешиваются в methods).
  */
-import type { TableSelectionRuntimeSurface } from './table_contract.ts';
-import { defineTableRuntimeModuleFor } from './table_method_helpers.ts';
+import type { TableRuntimeMethodSubset, TableSelectionRuntimeSurface } from './table_contract.ts';
 import { clamp, getRowCells } from './table_utils.ts';
 
 type SelectionVm = TableSelectionRuntimeSurface;
@@ -15,9 +14,7 @@ function getSelectionFocus(vm: SelectionVm) {
     return vm.selFocus || { r: 0, c: 0 };
 }
 
-const defineSelectionRuntimeModule = defineTableRuntimeModuleFor<TableSelectionRuntimeSurface>();
-
-const SelectionMethods = defineSelectionRuntimeModule({
+const SelectionMethods = {
         normRow(r: number) {
             const max = this.tableData.length - 1;
             if (max < 0) return 0;
@@ -201,7 +198,7 @@ const SelectionMethods = defineSelectionRuntimeModule({
             this.selFocus = { r: nr, c: nc };
             return true;
         }
-    });
+    } satisfies TableRuntimeMethodSubset;
 
 export { SelectionMethods };
 export default SelectionMethods;

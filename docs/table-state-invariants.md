@@ -4,11 +4,14 @@
 
 - `tableData` хранит canonical row data.
 - `tableSchema` хранит canonical schema и header rows.
-- `tableStore.selection` хранит anchor/focus/full-width selection.
-- `tableStore.editing` хранит единственную активную editing session.
+- flat runtime state (`selAnchor`, `selFocus`, `selFullWidthRows`) хранит active selection.
+- flat runtime state (`editingCell`, `cellValidationErrors`) хранит active editing session.
 - `tableStore.grouping` хранит grouping levels и display cache.
-- `tableStore.loading` хранит lazy-loading flags и pending rows.
-- `tableStore.measurement` хранит sticky-header measurement state.
+- `tableStore.loading` хранит lazy-loading flags, pending rows и UI lock.
+- `tableStore.preferences` хранит runtime toggles для sticky header, word wrap и line numbers.
+
+`tableStore.selection`, `tableStore.editing`, `tableStore.contextMenu` и `tableStore.measurement`
+не считаются runtime source of truth, пока call-sites читают parallel flat state. Удалять эти slices можно только отдельным cleanup после проверки public `createStore()` shape.
 
 ## Row Identity
 
@@ -20,7 +23,7 @@
 - Активна только одна editing session одновременно.
 - `editingCell === null` означает отсутствие активного cell editor.
 - Любой transition, который меняет selection/sort/grouping/lazy data, обязан либо завершить edit, либо явно перенести его в согласованное состояние.
-- Embedded widget editor обязан публиковать commit через typed widget lifecycle (`commitPendingState`/`commitDraft`) и не должен становиться отдельным source of truth.
+- Embedded widget editor обязан публиковать boundary commit через typed widget lifecycle `commitPendingState` и не должен становиться отдельным source of truth.
 
 ## Selection
 

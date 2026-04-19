@@ -1,8 +1,8 @@
 import { deserializeTsvToMatrix, serializeSelectionToTsv } from './table_clipboard.ts';
-import { defineTableRuntimeModule } from './table_method_helpers.ts';
 import { getRowCells, normalizeRowToDataRow } from './table_utils.ts';
+import type { TableRuntimeMethodSubset } from './table_contract.ts';
 
-const ClipboardRuntimeMethods = defineTableRuntimeModule({
+const ClipboardRuntimeMethods = {
     listMultiFn() {
         return (col: number) => this.listColumnIsMultiselect(this.tableColumns[col]);
     },
@@ -169,7 +169,7 @@ const ClipboardRuntimeMethods = defineTableRuntimeModule({
             if (hadMenu) this.hideContextMenu();
         }
     }
-});
+} satisfies TableRuntimeMethodSubset;
 
 export { ClipboardRuntimeMethods };
 export default ClipboardRuntimeMethods;

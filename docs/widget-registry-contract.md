@@ -82,16 +82,16 @@
 - `{ status: 'noop' | 'committed' }`
 - `{ status: 'blocked', severity: 'recoverable' | 'fatal', error }`
 
-## Compat Layer
+## Direct Lifecycle
 
-Registry всё ещё содержит compat lifecycle adapter как защитный слой для instance-scoped lifecycle:
+Registry использует только прямой instance-scoped lifecycle:
 
-- если виджет реализует собственный `commitPendingState(context)`, используется он;
-- иначе compat handle вызывает `commitDraft(...)` и нормализует результат;
+- если draft-capable виджет реализует `commitPendingState(context)`, используется он;
+- если у instance нет `commitPendingState`, handle возвращает `noop`;
 - локальный draft state по-прежнему живёт внутри виджета;
 - committed state по-прежнему записывается только в `page_session_store`.
 
-Основные stateful widgets реализуют `commitPendingState` напрямую. Compat layer нужен как fallback для controlled rebind/compatible instances и не должен становиться причиной использовать Options API или JS-adapter modules.
+`commitDraft(...)`, `isDraftEditing` и field-error probing больше не являются registry-level fallback contract. Виджет может держать такие методы локально, но boundary commit идёт только через `commitPendingState`.
 
 ## Runtime Bridge
 

@@ -3,9 +3,9 @@ import {
     cloneTableRowDeep,
     nextLineNumber
 } from './table_utils.ts';
-import { defineTableRuntimeModule } from './table_method_helpers.ts';
+import type { TableRuntimeMethodSubset } from './table_contract.ts';
 
-const RowRuntimeMethods = defineTableRuntimeModule({
+const RowRuntimeMethods = {
     moveTableRowRelative(rowIndex, delta, anchorCol) {
         if (this.groupingActive || this.tableUiLocked) return;
         const length = this.tableData.length;
@@ -221,7 +221,7 @@ const RowRuntimeMethods = defineTableRuntimeModule({
         this.hideContextMenu();
         this.$nextTick(() => this.focusSelectionCell(nextRow, selectedColumn));
     }
-});
+} satisfies TableRuntimeMethodSubset;
 
 export { RowRuntimeMethods };
 export default RowRuntimeMethods;

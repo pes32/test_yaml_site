@@ -18,10 +18,10 @@ Companion docs:
 
 - public entrypoints: `index.ts`, `table_api.ts`;
 - UI root: `TableWidget.vue`;
-- orchestration: `createTableRuntime.ts`, `useTableRuntime.ts`, `table_method_helpers.ts`;
+- orchestration: `createTableRuntime.ts`, `useTableRuntime.ts`;
 - contracts/state: `table_contract.ts`, `table_store.ts`, `table_runtime_state.ts`, `table_runtime_services.ts`, `table_errors.ts`;
 - local state slices: `table_editing_state.ts`, `table_context_menu_state.ts`, `table_lazy_load_state.ts`, `table_measurement_state.ts`;
-- parsing/pure logic: `table_parse_attrs.ts`, `table_schema_parse.ts`, `table_selectors.ts`, `table_clipboard.ts`, `table_format.ts`, `table_sort.ts`, `table_grouping.ts`, `table_utils.ts`;
+- parsing/pure logic: `table_parse_attrs.ts`, `table_selectors.ts`, `table_clipboard.ts`, `table_format.ts`, `table_sort.ts`, `table_grouping.ts`, `table_utils.ts`;
 - runtime behavior: `table_cell_runtime.ts`, `table_clipboard_runtime.ts`, `table_context_menu.ts`, `table_data_runtime.ts`, `table_data_view_runtime.ts`, `table_editing_runtime.ts`, `table_interactions.ts`, `table_jump.ts`, `table_keyboard.ts`, `table_menu_runtime.ts`, `table_row_runtime.ts`, `table_selection.ts`, `table_view_runtime.ts`, `table_widget_helpers.ts`;
 - DOM/page integration: `table_dom.ts`, `table_measurement.ts`, `table_scroll.ts`, `table_sticky_header.ts`, `table_page_bridge.ts`, `table_notifications.ts`, `table_debug.ts`.
 
@@ -38,7 +38,7 @@ Companion docs:
 - порядок импортов не является частью поведения runtime;
 - table modules импортируют друг друга напрямую или получают host services через bridge.
 
-`table_method_helpers.ts` не использует broad string-index для runtime modules. `this` внутри module methods типизируется как явный runtime surface плюс методы текущего модуля, поэтому state fields больше не схлопываются в generic runtime method.
+Runtime method groups типизируются через `TableRuntimeMethodSubset` в `table_contract.ts`; отдельного helper layer для `ThisType` больше нет.
 
 ## External Contract
 

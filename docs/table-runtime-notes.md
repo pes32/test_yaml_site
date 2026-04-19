@@ -6,7 +6,7 @@
 - Runtime orchestration централизован в `createTableRuntime.ts`.
 - Table source находится в TypeScript modules.
 - Public entrypoints: `table_api.ts` и `index.ts`.
-- Parser/schema flow проходит через `table_parse_attrs.ts` и `table_schema_parse.ts`.
+- Parser/schema flow проходит через `table_parse_attrs.ts`.
 - Sticky/measurement/scroll flow живёт в `table_sticky_header.ts`, `table_measurement.ts` и `table_scroll.ts`.
 - Page integration идёт через registry/runtime bridge.
 - `type-holes`, `typecheck`, `typecheck:table`, `build` и `tests/run.sh` входят в обязательный frontend/runtime gate.

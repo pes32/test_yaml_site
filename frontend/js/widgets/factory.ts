@@ -57,14 +57,8 @@ type WidgetLifecycleCommitContext = {
   kind?: string;
 };
 
-type WidgetLifecycleInstance = Record<string, unknown> & {
-  combinedFieldError?: unknown;
-  commitDraft?: (context?: WidgetLifecycleCommitContext) => unknown;
+type WidgetLifecycleInstance = {
   commitPendingState?: (context?: WidgetLifecycleCommitContext) => unknown;
-  error?: unknown;
-  fieldError?: unknown;
-  isDraftEditing?: unknown;
-  vocError?: unknown;
 };
 
 type WidgetLifecycleHandle = {
@@ -280,25 +274,6 @@ function normalizeLifecycleCommitResult(result: unknown): LifecycleCommitResult 
   };
 }
 
-function firstNonEmptyMessage(values: unknown[]): string {
-  for (const value of values) {
-    const message = typeof value === 'string' ? value.trim() : '';
-    if (message) {
-      return message;
-    }
-  }
-
-  return '';
-}
-
-function createRecoverableBlockedResult(error: unknown): LifecycleCommitResult {
-  return {
-    status: 'blocked',
-    severity: 'recoverable',
-    error
-  };
-}
-
 function createFatalBlockedResult(error: unknown): LifecycleCommitResult {
   return {
     status: 'blocked',
@@ -307,20 +282,7 @@ function createFatalBlockedResult(error: unknown): LifecycleCommitResult {
   };
 }
 
-function resolveLifecycleErrorMessage(instance: WidgetLifecycleInstance | null): string {
-  if (!instance) {
-    return '';
-  }
-
-  return firstNonEmptyMessage([
-    instance.fieldError,
-    instance.combinedFieldError,
-    instance.vocError,
-    instance.error
-  ]);
-}
-
-function createLegacyLifecycleHandle(): WidgetLifecycleHandle {
+function createWidgetLifecycleHandle(): WidgetLifecycleHandle {
   let boundInstance: WidgetLifecycleInstance | null = null;
   let disposed = false;
 
@@ -357,25 +319,7 @@ function createLegacyLifecycleHandle(): WidgetLifecycleHandle {
         }
       }
 
-      const hasDraftState = instance.isDraftEditing === true;
-      if (!hasDraftState || typeof instance.commitDraft !== 'function') {
-        return NOOP_COMMIT_RESULT;
-      }
-
-      try {
-        await Promise.resolve(instance.commitDraft(context));
-      } catch (error) {
-        return createFatalBlockedResult(error);
-      }
-
-      const errorMessage = resolveLifecycleErrorMessage(instance);
-      if (errorMessage) {
-        return createRecoverableBlockedResult(new Error(errorMessage));
-      }
-
-      return {
-        status: 'committed'
-      };
+      return NOOP_COMMIT_RESULT;
     },
 
     dispose() {
@@ -471,7 +415,7 @@ class WidgetDefinitionRegistry {
       type,
       capabilities,
       createLifecycleHandle: capabilities.draftCommit
-        ? () => createLegacyLifecycleHandle()
+        ? () => createWidgetLifecycleHandle()
         : () => NOOP_LIFECYCLE_HANDLE,
       prefetch,
       resolveComponent
@@ -570,7 +514,7 @@ export {
   NOOP_LIFECYCLE_HANDLE,
   TABLE_CAPABILITIES,
   WidgetDefinitionRegistry,
-  createLegacyLifecycleHandle,
+  createWidgetLifecycleHandle,
   normalizeLifecycleCommitResult,
   widgetFactory,
   widgetRegistry

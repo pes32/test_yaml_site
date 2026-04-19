@@ -5,19 +5,16 @@ import {
     pruneExpanded,
     TABLE_LAZY_THRESHOLD
 } from './table_grouping.ts';
-import { defineTableRuntimeModuleFor } from './table_method_helpers.ts';
 import { SelectionMethods } from './table_selection.ts';
 import { assignRowLineNumber, clamp, normalizeRowToDataRow } from './table_utils.ts';
 import { compareRowsComposite } from './table_sort.ts';
 import type {
     TableDataRow,
-    TableDataViewRuntimeSurface,
+    TableRuntimeMethodSubset,
     TableRuntimeColumn
 } from './table_contract.ts';
 
-const defineDataViewRuntimeModule = defineTableRuntimeModuleFor<TableDataViewRuntimeSurface>();
-
-const DataViewRuntimeMethods = defineDataViewRuntimeModule({
+const DataViewRuntimeMethods = {
     sortTableDataInPlace() {
         if (!this.sortKeys.length) {
             return;
@@ -426,7 +423,7 @@ const DataViewRuntimeMethods = defineDataViewRuntimeModule({
             this.$nextTick(() => this._scheduleStickyTheadUpdate());
         }
     }
-});
+} satisfies TableRuntimeMethodSubset;
 
 export { DataViewRuntimeMethods };
 export default DataViewRuntimeMethods;

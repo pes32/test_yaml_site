@@ -4,8 +4,7 @@ import {
     defaultCellValueFromColumn as selectDefaultCellValueFromColumn,
     resolveTableLazyEnabled as selectResolveTableLazyEnabled
 } from './table_selectors.ts';
-import type { TableDataRow } from './table_contract.ts';
-import { defineTableRuntimeModule } from './table_method_helpers.ts';
+import type { TableDataRow, TableRuntimeMethodSubset } from './table_contract.ts';
 import { TABLE_LAZY_THRESHOLD } from './table_grouping.ts';
 import {
     cloneTableData,
@@ -19,7 +18,7 @@ import {
     validateExternalTableRows
 } from './table_utils.ts';
 
-const DataRuntimeMethods = defineTableRuntimeModule({
+const DataRuntimeMethods = {
     getAllAttrsMap() {
         if (typeof this.getAllAttrsMapFromRuntime === 'function') {
             const attrs = this.getAllAttrsMapFromRuntime();
@@ -367,7 +366,7 @@ const DataRuntimeMethods = defineTableRuntimeModule({
             this._scheduleStickyTheadUpdate();
         });
     }
-});
+} satisfies TableRuntimeMethodSubset;
 
 export { DataRuntimeMethods };
 export default DataRuntimeMethods;

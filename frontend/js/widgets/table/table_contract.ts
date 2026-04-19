@@ -657,6 +657,13 @@ type TableWidgetVm = TableRuntimeState &
 
 type TableRuntimeVm = TableRuntimeDomSurface & TableWidgetVm;
 
+type TableRuntimeMethodSubset = {
+    [K in keyof TableRuntimeMethods]?: (
+        this: TableRuntimeVm,
+        ...args: Parameters<TableRuntimeMethods[K]>
+    ) => ReturnType<TableRuntimeMethods[K]>;
+};
+
 type TableRuntimeSurface<K extends keyof TableRuntimeVm> = Pick<TableRuntimeVm, K>;
 
 type TableRuntimeModuleSurface = TableRuntimeVm;
@@ -750,6 +757,7 @@ export type {
     TableContextMenuRuntimeSurface,
     TableDataViewRuntimeSurface,
     TableRuntimeDomSurface,
+    TableRuntimeMethodSubset,
     TableRuntimeMethods,
     TableRuntimePropsSurface,
     TableRuntimeSurface,

@@ -1,14 +1,13 @@
-import type { TableDisplayRow, TableHeaderCell, TableRuntimeColumn } from './table_contract.ts';
+import type { TableDisplayRow, TableHeaderCell, TableRuntimeColumn, TableRuntimeMethodSubset } from './table_contract.ts';
 
 import { formatCellValue as formatTableCellValue } from './table_format.ts';
-import { defineTableRuntimeModule } from './table_method_helpers.ts';
-import { parseTableAttrs } from './table_schema_parse.ts';
+import { parseTableAttrs } from './table_parse_attrs.ts';
 import { scheduleUpdate } from './table_scroll.ts';
 import { bindStickyThead, unbindStickyThead, updateStickyThead } from './table_sticky_header.ts';
 import { WidgetMeasure, WidgetUiCoords } from './table_widget_helpers.ts';
 import { safeCellValue } from './table_utils.ts';
 
-const ViewRuntimeMethods = defineTableRuntimeModule({
+const ViewRuntimeMethods = {
     leafColStyle(column: TableRuntimeColumn | null | undefined) {
         if (!column || !column.width) return {};
         return {
@@ -192,7 +191,7 @@ const ViewRuntimeMethods = defineTableRuntimeModule({
     parseTableAttrs(tableAttrs: unknown) {
         parseTableAttrs(this, tableAttrs);
     }
-});
+} satisfies TableRuntimeMethodSubset;
 
 export { ViewRuntimeMethods };
 export default ViewRuntimeMethods;

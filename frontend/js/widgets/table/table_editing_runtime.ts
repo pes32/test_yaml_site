@@ -1,10 +1,9 @@
 import { getRowCells } from './table_utils.ts';
 import { tableDebugState, tableLog } from './table_debug.ts';
-import { defineTableRuntimeModuleFor } from './table_method_helpers.ts';
 import type {
     TableCellWidgetInstance,
-    TableEditingRuntimeSurface,
-    TableRuntimeColumn
+    TableRuntimeColumn,
+    TableRuntimeMethodSubset
 } from './table_contract.ts';
 
 function readEventValue(event: Event | { target?: { value?: unknown } } | unknown): unknown {
@@ -25,9 +24,7 @@ function isTableCellWidgetInstance(value: unknown): value is TableCellWidgetInst
     return !!value && typeof value === 'object' && '$' in value;
 }
 
-const defineEditingRuntimeModule = defineTableRuntimeModuleFor<TableEditingRuntimeSurface>();
-
-const EditingRuntimeMethods = defineEditingRuntimeModule({
+const EditingRuntimeMethods = {
     onCellInput(rowIndex: number, cellIndex: number, event: Event | { target?: { value?: unknown } } | unknown) {
         if (!this.canMutateColumnIndex(cellIndex)) return;
         const newValue = readEventValue(event);
@@ -359,7 +356,7 @@ const EditingRuntimeMethods = defineEditingRuntimeModule({
             );
         });
     }
-});
+} satisfies TableRuntimeMethodSubset;
 
 export { EditingRuntimeMethods };
 export default EditingRuntimeMethods;

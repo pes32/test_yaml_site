@@ -1,11 +1,8 @@
 import { canAddGroupingLevel } from './table_grouping.ts';
-import { defineTableRuntimeModuleFor } from './table_method_helpers.ts';
 import { WidgetUiCoords } from './table_widget_helpers.ts';
-import type { TableContextMenuRuntimeSurface } from './table_contract.ts';
+import type { TableRuntimeMethodSubset } from './table_contract.ts';
 
-const defineMenuRuntimeModule = defineTableRuntimeModuleFor<TableContextMenuRuntimeSurface>();
-
-const MenuRuntimeMethods = defineMenuRuntimeModule({
+const MenuRuntimeMethods = {
     computeBodyModeForMenu() {
         if (this.selectionIsFullRowBlock()) return 'row';
         const { r0, r1, c0, c1 } = this.getSelRect();
@@ -434,7 +431,7 @@ const MenuRuntimeMethods = defineMenuRuntimeModule({
         this.onInput();
         this.$nextTick(() => this._scheduleStickyTheadUpdate());
     }
-});
+} satisfies TableRuntimeMethodSubset;
 
 export { MenuRuntimeMethods };
 export default MenuRuntimeMethods;
