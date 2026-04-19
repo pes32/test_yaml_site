@@ -10,11 +10,11 @@ Companion docs:
 - [table-api-map.md](table-api-map.md)
 - [table-testing-matrix.md](table-testing-matrix.md)
 - [table-performance-notes.md](table-performance-notes.md)
-- [table-migration-notes.md](table-migration-notes.md)
+- [table-runtime-notes.md](table-runtime-notes.md)
 
-## Current Module Layout
+## Module Layout
 
-Слой таблицы сейчас разделён на такие зоны:
+Слой таблицы разделён на такие зоны:
 
 - public entrypoints: `index.ts`, `table_api.ts`;
 - UI root: `TableWidget.vue`;
@@ -30,14 +30,15 @@ Companion docs:
 Актуальный contract:
 
 - `table_contract.ts` разделяет `TableRuntimeState`, `TableRuntimeComputed`, `TableRuntimeMethods`, `TableRuntimeDomSurface`, `TableRuntimeVm` и `TableWidgetSetupBindings`;
+- runtime modules can depend on narrower internal surfaces such as `TableSelectionRuntimeSurface`, `TableEditingRuntimeSurface`, `TableDataViewRuntimeSurface`, `TableContextMenuRuntimeSurface`, `TableLazyRuntimeSurface` and `TableStickyRuntimeSurface`;
 - runtime state содержит обязательные поля loading/grouping/sorting/display/menu/sticky/word-wrap path, а не loose `Record<string, unknown>`;
 - каждый helper экспортирует явный module interface;
 - `createTableRuntime.ts` собирает computed/watch/method groups в одном месте;
 - `TableWidget.vue` работает через `useTableRuntime()` и controller, а не через разрозненные method-mixins;
-- порядок импортов больше не является частью поведения runtime;
+- порядок импортов не является частью поведения runtime;
 - table modules импортируют друг друга напрямую или получают host services через bridge.
 
-`table_method_helpers.ts` не использует broad string-index для runtime modules. `this` внутри module methods типизируется как полный `TableRuntimeVm` плюс методы текущего модуля, поэтому state fields больше не схлопываются в generic runtime method.
+`table_method_helpers.ts` не использует broad string-index для runtime modules. `this` внутри module methods типизируется как явный runtime surface плюс методы текущего модуля, поэтому state fields больше не схлопываются в generic runtime method.
 
 ## External Contract
 
@@ -68,11 +69,13 @@ Table store хранит только table-specific runtime state:
 - measurement/sticky state;
 - runtime preferences.
 
+Runtime preferences включают UI-состояния, которые могут стартовать из YAML, но дальше управляются пользователем в текущей сессии таблицы: sticky header, word wrap и line numbering. `line_numbers` в YAML остаётся default-состоянием, а включение/отключение из context menu не меняет persisted table values.
+
 Page runtime отдаёт таблице входные данные и догружает зависимости, которые таблица объявляет через `resolveDependencies(...)`. Внутренние table details остаются внутри feature.
 
 ## Pure/UI Boundary
 
-Главное правило после рефакторинга:
+Главное правило:
 
 - `TableWidget.vue` отвечает за template, refs, props/emits и подключение runtime controller;
 - `table_selectors.ts` и pure helpers отвечают за typed derived data;
@@ -106,8 +109,8 @@ Embedded cell widgets живут внутри table feature, но их runtime b
 - committed page state не хранится внутри таблицы;
 - table cell editors не получают прямой доступ к page host.
 
-## Current Typing Status
+## Typing Status
 
-Strict typing debt table runtime закрыт на уровне обязательного project gate: `npm --prefix tooling/vite run typecheck` и `npm --prefix tooling/vite run typecheck:table` должны проходить без table diagnostics.
+Strict typing table gate: `npm --prefix tooling/vite run type-holes`, `npm --prefix tooling/vite run typecheck`, `npm --prefix tooling/vite run typecheck:table` и `npm --prefix tooling/vite run build` должны проходить без table diagnostics.
 
-Оставшийся долг не в generic `Proxy` VM-boundary, а в качестве будущей детализации: часть runtime method signatures пока намеренно широкая на внешних event/widget границах и должна сужаться только вместе с покрытием соответствующего поведения smoke/unit tests.
+Оставшийся долг находится во внешних event/widget границах. App-level Vue migration, `TableWidget.vue` migration, runtime type-hole cleanup и удаление `widget_shared_contracts.ts` уже не являются актуальным table migration scope.

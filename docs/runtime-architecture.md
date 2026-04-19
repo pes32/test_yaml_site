@@ -2,16 +2,20 @@
 
 ## Overview
 
-Frontend runtime теперь разделён на несколько явных границ:
+Frontend runtime разделён на несколько явных границ:
 
 1. backend собирает versioned snapshot из YAML;
 2. transport layer отдаёт только нормализованный envelope;
 3. page runtime раскладывает payload по stores и orchestration services;
 4. widget tree рендерится через `WidgetDefinitionRegistry` и не знает про raw backend shape.
 
-`frontend/js/page.ts` после рефакторинга остаётся thin host/facade для `PageApp.vue`: он поднимает stores, lifecycle hooks и делегирует runtime flows, но не содержит widget-specific branching и не раздаёт детям прямой доступ к page-owned state.
+`frontend/js/page.ts` работает как thin host/facade для `PageApp.vue`: он поднимает stores, lifecycle hooks и делегирует runtime flows, но не содержит widget-specific branching и не раздаёт детям прямой доступ к page-owned state.
 
-Frontend source под `frontend/js` теперь TypeScript/Vue source: widget layer, action/table/datetime/voc helpers, host/runtime glue (`page.ts`, API/attrs/modal bootstrap flows, diagnostics) и common Vue components проходят root `tsconfig.json`. Оставшийся strict-долг — не JS adapters, а постепенное сужение внешних DOM/event и compatibility-controller границ.
+Frontend source под `frontend/js` — TypeScript/Vue source: widget layer, action/table/datetime/voc helpers, host/runtime glue (`page.ts`, API/attrs/modal bootstrap flows, diagnostics) и common Vue components проходят root `tsconfig.json`. Оставшийся strict-долг — постепенное сужение внешних DOM/event и compatibility-controller границ.
+
+Type-hole policy автоматизирован отдельным gate: `npm --prefix tooling/vite run type-holes`.
+Новые `: any`, `as unknown as`, `ThisType<any>`, TS suppressions и Vue compat markers
+запрещены без документированной allowlist-записи.
 
 Для table feature companion docs вынесены отдельно:
 
@@ -69,7 +73,7 @@ Frontend source под `frontend/js` теперь TypeScript/Vue source: widget 
 - `error`
 - `requestToken`
 
-Кэш modal definitions и список уже загруженных modal ids по-прежнему живут в `page_session_store.ts`.
+Кэш modal definitions и список loaded modal ids живут в `page_session_store.ts`.
 
 ### Notifications
 
@@ -83,7 +87,7 @@ Frontend source под `frontend/js` теперь TypeScript/Vue source: widget 
 
 ## Widget Registry Contract
 
-Базовый frontend render/runtime contract теперь идёт через `frontend/js/widgets/factory.ts`, который стал `WidgetDefinitionRegistry`.
+Базовый frontend render/runtime contract идёт через `frontend/js/widgets/factory.ts`, который является `WidgetDefinitionRegistry`.
 
 Каждое определение виджета фиксирует:
 
@@ -120,7 +124,7 @@ Frontend source под `frontend/js` теперь TypeScript/Vue source: widget 
 
 ## Widget Lifecycle
 
-Lifecycle handle теперь строгий и instance-scoped:
+Lifecycle handle строгий и instance-scoped:
 
 - `bind(instance)`
 - `unbind()`
@@ -139,24 +143,28 @@ Lifecycle handle теперь строгий и instance-scoped:
 - `{ status: 'noop' | 'committed' }`
 - `{ status: 'blocked', severity: 'recoverable' | 'fatal', error }`
 
-Unknown widget fallback теперь разрешён только как render-time unknown path: компонент рендерится через `StringWidget`, но definition остаётся с пустыми capabilities, no-op lifecycle и единообразным warning один раз на тип/сессию.
+Unknown widget fallback разрешён только как render-time unknown path: компонент рендерится через `StringWidget`, но definition остаётся с пустыми capabilities, no-op lifecycle и единообразным warning один раз на тип/сессию.
 
-## Widget TypeScript Migration Boundary
+## Widget TypeScript Boundary
 
-Полный TS-проход по widget layer закрывает `.vue` widgets и их непосредственные runtime/helper modules:
+Widget layer и непосредственные runtime/helper modules находятся в TypeScript/Vue boundary:
 
-- migrated widgets: `str`, `text`, `int`, `float`, `button`, `date`, `time`, `datetime`, `ip`, `ip_mask`, `img`, `list`, `voc`, `split_button`;
-- `table` остаётся typed Composition API controller feature через `useTableRuntime.ts`;
-- legacy JS adapters удалены из action runtime, datetime helpers, IP helpers, voc helpers и host/runtime glue;
+- TS/Composition API widgets: `str`, `text`, `int`, `float`, `button`, `date`, `time`, `datetime`, `ip`, `ip_mask`, `img`, `list`, `voc`, `split_button`;
+- `table` работает как typed Composition API controller feature через `useTableRuntime.ts`;
+- action runtime, datetime helpers, IP helpers, voc helpers и host/runtime glue живут в TypeScript modules;
 - common components вроде `Md3Field.vue`, `ConfirmModal.vue`, `ModalManager.vue`, `SectionCard.vue` и related shared components используют typed `<script setup lang="ts">`.
 
 Stateful widgets должны сохранять exposed lifecycle surface: `getValue`, `setValue`, `commitDraft` и `commitPendingState`. Table-triggered widgets дополнительно сохраняют `openPicker`, `openDatePicker`, `openTimePicker` или `onArrowClick`, если эти методы использует table cell runtime.
 
+Normalized API response/request contracts живут в `frontend/js/runtime/api_contract.ts`.
+`api_client.ts` остаётся transport/envelope layer, а `page.ts` и `debug.ts` работают с
+domain response structures.
+
 ## Runtime Bridge
 
-Host services больше не инжектятся напрямую из `page.ts` в произвольный subtree.
+Host services публикуются через definition-driven bridge, а не через произвольный доступ к page-owned state.
 
-Новая схема такая:
+Схема:
 
 1. `page.ts` публикует один internal host-services object;
 2. `WidgetRenderer.vue` строит runtime bridge из текущего `WidgetDefinition`;
@@ -177,14 +185,14 @@ Host services больше не инжектятся напрямую из `page
 - `getModalRuntimeState`
 - `getModalRuntimeController`
 
-Для draft runtime финальным API стали:
+Для draft runtime используются:
 
 - `setActiveWidgetLifecycle`
 - `clearActiveWidgetLifecycle`
 
 ## Boundary Commit Order
 
-Любой boundary action теперь идёт через `draftRuntime.runBoundaryAction(kind, action)`.
+Любой boundary action идёт через `draftRuntime.runBoundaryAction(kind, action)`.
 
 Порядок фиксирован:
 
@@ -218,7 +226,7 @@ Modal open path использует `requestToken`.
 
 ## Page Flow
 
-Нормальный startup теперь выглядит так:
+Нормальный startup выглядит так:
 
 1. `page.ts` читает embed bootstrap или вызывает `page_bootstrap_flow.loadPageConfig`;
 2. `page_store.ts` принимает snapshot-derived state;
@@ -230,9 +238,9 @@ Modal open path использует `requestToken`.
 
 ## Table Runtime
 
-Table feature больше не использует engine namespace и side-effect registration.
+Table feature использует explicit modules без engine namespace и side-effect registration.
 
-Новая схема такая:
+Схема:
 
 1. `table_contract.ts` фиксирует внутренние types/state boundaries;
 2. `table_store.ts` владеет table-specific runtime state;

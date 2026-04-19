@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from .contracts import ApiError, Diagnostic
+from .contracts import ApiError, Diagnostic, PageDataResponse, PagesDataResponse
+from .gui_dsl import META_KEYS
 
 
 def _coerce_diagnostic(item: Diagnostic | dict[str, Any]) -> dict[str, Any]:
@@ -53,3 +54,44 @@ def error_payload(
         "error": ApiError(code=code, message=message).model_dump(),
         "diagnostics": [_coerce_diagnostic(item) for item in diagnostics or []],
     }
+
+
+def public_page_config(page_config: dict[str, Any]) -> dict[str, Any]:
+    """Public page config shared by page routes and page API."""
+
+    gui = page_config.get("gui") or {}
+    root_keys = page_config.get("guiMenuKeys")
+    if not isinstance(root_keys, list):
+        root_keys = [key for key in gui.keys() if key not in META_KEYS]
+
+    return {
+        "name": page_config.get("name"),
+        "url": page_config.get("url"),
+        "title": page_config.get("title"),
+        "gui": gui,
+        "guiMenuKeys": root_keys,
+        "modalGuiIds": page_config.get("modalGuiIds") or [],
+    }
+
+
+def page_data_payload(page_config: dict[str, Any]) -> dict[str, Any]:
+    """`data` payload for page API and HTML bootstrap."""
+
+    return PageDataResponse(
+        page=public_page_config(page_config),
+        attrs=page_config.get("attrs") or {},
+    ).model_dump(by_alias=True)
+
+
+def pages_data_payload(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """`data` payload for GET /api/pages."""
+
+    pages = [
+        {
+            "name": name,
+            "title": cfg.get("title", name),
+            "url": cfg.get("url", f"/page/{name}"),
+        }
+        for name, cfg in (snapshot.get("pages") or {}).items()
+    ]
+    return PagesDataResponse(pages=pages).model_dump(by_alias=True)

@@ -1,4 +1,4 @@
-import type { TableHeaderCell, TableRuntimeVm } from './table_contract.ts';
+import type { TableHeaderCell, TableStickyRuntimeSurface } from './table_contract.ts';
 import {
     buildHeaderCellWidthsFromLeafWidths,
     readRenderedLeafWidths,
@@ -6,7 +6,7 @@ import {
 } from './table_measurement.ts';
 import { findVerticalScrollRoot, scheduleUpdate } from './table_scroll.ts';
 
-type StickyRuntimeVm = TableRuntimeVm & {
+type StickyRuntimeVm = TableStickyRuntimeSurface & {
     _stickyCloneClickHandler?: ((event: MouseEvent) => void) | null;
     _stickyCloneContextMenuHandler?: ((event: MouseEvent) => void) | null;
     _stickyCloneKeydownHandler?: ((event: KeyboardEvent) => void) | null;

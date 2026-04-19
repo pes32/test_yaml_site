@@ -29,14 +29,21 @@ function createInitialSortingState(): TableStore['sorting'] {
     };
 }
 
-function createInitialPreferencesState(stickyHeaderEnabled = false): TableStore['preferences'] {
+function createInitialPreferencesState(
+    stickyHeaderEnabled = false,
+    lineNumbersEnabled = false
+): TableStore['preferences'] {
     return {
+        lineNumbersRuntimeEnabled: !!lineNumbersEnabled,
         stickyHeaderRuntimeEnabled: !!stickyHeaderEnabled,
         wordWrapRuntimeEnabled: false
     };
 }
 
-function createTableRuntimeState(stickyHeaderEnabled = false): TableStore {
+function createTableRuntimeState(
+    stickyHeaderEnabled = false,
+    lineNumbersEnabled = false
+): TableStore {
     return {
         sorting: createInitialSortingState(),
         grouping: {
@@ -51,7 +58,7 @@ function createTableRuntimeState(stickyHeaderEnabled = false): TableStore {
             ...createInitialLazyLoadState(),
             tableUiLocked: false
         },
-        preferences: createInitialPreferencesState(stickyHeaderEnabled)
+        preferences: createInitialPreferencesState(stickyHeaderEnabled, lineNumbersEnabled)
     };
 }
 

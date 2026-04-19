@@ -1,35 +1,23 @@
-type UnknownRecord = Record<string, unknown>;
-
-type FrontendApiErrorOptions = {
-    code?: unknown;
-    diagnostics?: unknown;
-    payload?: unknown;
-    snapshotVersion?: unknown;
-    status?: unknown;
-};
-
-type ApiEnvelope = UnknownRecord & {
-    data?: unknown;
-    diagnostics?: unknown;
-    error?: unknown;
-    message?: unknown;
-    ok?: boolean;
-    snapshot_version?: unknown;
-};
-
-type PageSummary = {
-    name: string;
-    title: string;
-    url: string;
-};
-
-type ExecuteRequestPayload = {
-    command: string;
-    output_attrs?: string[];
-    page?: string;
-    params?: UnknownRecord;
-    widget?: string;
-};
+import type {
+    ApiDiagnostic,
+    ApiEnvelope,
+    AttrsResponse,
+    DebugApiRoute,
+    DebugLogsResponse,
+    DebugPagesResponse,
+    DebugSnapshotResponse,
+    DebugSqlResponse,
+    DebugSqlRow,
+    DebugStructureResponse,
+    ExecuteRequestPayload,
+    ExecuteResponse,
+    FrontendApiErrorOptions,
+    ModalResponse,
+    PageResponse,
+    PageSummary,
+    UnknownRecord
+} from './api_contract.ts';
+import { asRecord } from '../shared/object_record.ts';
 
 class FrontendApiError extends Error {
     code: string;
@@ -49,24 +37,18 @@ class FrontendApiError extends Error {
     }
 }
 
-function asObject<T extends UnknownRecord = UnknownRecord>(value: unknown): T {
-    return value && typeof value === 'object' && !Array.isArray(value)
-        ? (value as T)
-        : ({} as T);
-}
-
 function asString(value: unknown): string {
     return typeof value === 'string' ? value : '';
 }
 
 function readErrorRecord(payload: unknown): UnknownRecord {
-    return asObject(asObject(payload).error);
+    return asRecord(asRecord(payload).error);
 }
 
 function normalizeEnvelopeErrorMessage(payload: unknown, fallbackMessage: string): string {
-    const envelope = asObject(payload);
+    const envelope = asRecord(payload);
     const error = envelope.error;
-    const errorMessage = asObject(error).message;
+    const errorMessage = asRecord(error).message;
 
     if (typeof errorMessage === 'string' && errorMessage.trim()) {
         return errorMessage.trim();
@@ -99,7 +81,7 @@ async function parseResponseBody(response: Response): Promise<unknown | null> {
 async function requestEnvelope(url: string, options: RequestInit = {}): Promise<ApiEnvelope | null> {
     const response = await fetch(url, options);
     const payload = await parseResponseBody(response);
-    const envelope = asObject<ApiEnvelope>(payload);
+    const envelope = asRecord<ApiEnvelope>(payload);
     const errorRecord = readErrorRecord(payload);
     const fallbackMessage = `HTTP ${response.status}`;
 
@@ -149,32 +131,34 @@ function uniqueNames(items: unknown): string[] {
 }
 
 function readEnvelopeData(payload: unknown): UnknownRecord {
-    return asObject(asObject<ApiEnvelope>(payload).data);
+    return asRecord(asRecord<ApiEnvelope>(payload).data);
 }
 
-function readEnvelopeDiagnostics(payload: unknown): unknown[] {
-    const diagnostics = asObject<ApiEnvelope>(payload).diagnostics;
-    return Array.isArray(diagnostics) ? diagnostics : [];
+function readEnvelopeDiagnostics(payload: unknown): ApiDiagnostic[] {
+    const diagnostics = asRecord<ApiEnvelope>(payload).diagnostics;
+    return Array.isArray(diagnostics)
+        ? diagnostics.filter((item): item is ApiDiagnostic => !!item && typeof item === 'object' && !Array.isArray(item))
+        : [];
 }
 
 function readEnvelopeSnapshotVersion(payload: unknown): string {
-    return asString(asObject<ApiEnvelope>(payload).snapshot_version);
+    return asString(asRecord<ApiEnvelope>(payload).snapshot_version);
 }
 
-function normalizePageResponse(payload: unknown) {
+function normalizePageResponse(payload: unknown): PageResponse {
     const data = readEnvelopeData(payload);
-    const page = asObject(data.page);
+    const page = asRecord(data.page);
     return {
         page: Object.keys(page).length ? page : null,
-        attrs: asObject(data.attrs),
+        attrs: asRecord(data.attrs),
         diagnostics: readEnvelopeDiagnostics(payload),
         snapshotVersion: readEnvelopeSnapshotVersion(payload)
     };
 }
 
-function normalizeAttrsResponse(payload: unknown) {
+function normalizeAttrsResponse(payload: unknown): AttrsResponse {
     const data = readEnvelopeData(payload);
-    const attrs = asObject(data.attrs);
+    const attrs = asRecord(data.attrs);
     return {
         page: asString(data.page),
         attrs,
@@ -185,11 +169,11 @@ function normalizeAttrsResponse(payload: unknown) {
     };
 }
 
-function normalizeModalResponse(payload: unknown) {
+function normalizeModalResponse(payload: unknown): ModalResponse {
     const data = readEnvelopeData(payload);
-    const attrs = asObject(data.attrs);
-    const dependencies = asObject(data.dependencies);
-    const modal = asObject(data.modal);
+    const attrs = asRecord(data.attrs);
+    const dependencies = asRecord(data.dependencies);
+    const modal = asRecord(data.modal);
     return {
         page: asString(data.page),
         modal: Object.keys(modal).length ? modal : null,
@@ -202,11 +186,11 @@ function normalizeModalResponse(payload: unknown) {
     };
 }
 
-function normalizeExecuteResponse(payload: unknown) {
+function normalizeExecuteResponse(payload: unknown): ExecuteResponse {
     const data = readEnvelopeData(payload);
     return {
         command: asString(data.command),
-        params: asObject(data.params),
+        params: asRecord(data.params),
         page: asString(data.page) || null,
         widget: asString(data.widget) || null,
         message: asString(data.message) || 'Команда выполнена',
@@ -216,69 +200,82 @@ function normalizeExecuteResponse(payload: unknown) {
     };
 }
 
-function normalizePagesResponse(payload: unknown) {
+function normalizePageSummary(item: unknown): PageSummary {
+    const page = asRecord(item);
+    return {
+        name: asString(page.name),
+        title: asString(page.title),
+        url: asString(page.url)
+    };
+}
+
+function normalizePagesResponse(payload: unknown): { pages: PageSummary[]; diagnostics: ApiDiagnostic[]; snapshotVersion: string } {
     const data = readEnvelopeData(payload);
     return {
         pages: Array.isArray(data.pages)
-            ? data.pages.map((item): PageSummary => {
-                const page = asObject(item);
-                return {
-                    name: asString(page.name),
-                    title: asString(page.title),
-                    url: asString(page.url)
-                };
-            })
+            ? data.pages.map(normalizePageSummary)
             : [],
         diagnostics: readEnvelopeDiagnostics(payload),
         snapshotVersion: readEnvelopeSnapshotVersion(payload)
     };
 }
 
-function normalizeDebugStructureResponse(payload: unknown) {
-    const data = readEnvelopeData(payload);
+function normalizeDebugRoute(item: unknown): DebugApiRoute {
+    const route = asRecord(item);
     return {
-        routes: Array.isArray(data.routes) ? data.routes : [],
-        snapshot: asObject(data.snapshot)
+        endpoint: asString(route.endpoint),
+        methods: Array.isArray(route.methods)
+            ? route.methods.map((method) => asString(method)).filter(Boolean)
+            : [],
+        rule: asString(route.rule)
     };
 }
 
-function normalizeDebugLogsResponse(payload: unknown) {
+function normalizeDebugStructureResponse(payload: unknown): DebugStructureResponse {
     const data = readEnvelopeData(payload);
     return {
-        lines: Array.isArray(data.lines) ? data.lines : [],
+        routes: Array.isArray(data.routes) ? data.routes.map(normalizeDebugRoute) : [],
+        snapshot: asRecord(data.snapshot)
+    };
+}
+
+function normalizeDebugLogsResponse(payload: unknown): DebugLogsResponse {
+    const data = readEnvelopeData(payload);
+    return {
+        lines: Array.isArray(data.lines) ? data.lines.map((line) => String(line)) : [],
         total: Number(data.total) || 0
     };
 }
 
-function normalizeDebugPagesResponse(payload: unknown) {
+function normalizeDebugPagesResponse(payload: unknown): DebugPagesResponse {
     const data = readEnvelopeData(payload);
     return {
-        pages: Array.isArray(data.pages) ? data.pages : [],
-        snapshot: asObject(data.snapshot),
-        diagnostics: Array.isArray(data.diagnostics) ? data.diagnostics : [],
+        pages: Array.isArray(data.pages) ? data.pages.map(normalizePageSummary) : [],
+        snapshot: asRecord(data.snapshot),
+        diagnostics: Array.isArray(data.diagnostics) ? readEnvelopeDiagnostics({ diagnostics: data.diagnostics }) : [],
         lastError: typeof data.last_error === 'string' ? data.last_error : null
     };
 }
 
-function normalizeDebugSnapshotResponse(payload: unknown) {
+function normalizeDebugSnapshotResponse(payload: unknown): DebugSnapshotResponse {
     const data = readEnvelopeData(payload);
     return {
-        meta: asObject(data.meta),
+        meta: asRecord(data.meta),
         pageCount: Number(data.page_count) || 0,
-        pagesByUrl: asObject(data.pages_by_url),
-        diagnostics: Array.isArray(data.diagnostics) ? data.diagnostics : [],
+        pagesByUrl: asRecord(data.pages_by_url),
+        diagnostics: Array.isArray(data.diagnostics) ? readEnvelopeDiagnostics({ diagnostics: data.diagnostics }) : [],
         lastError: typeof data.last_error === 'string' ? data.last_error : null
     };
 }
 
-function normalizeDebugSqlResponse(payload: unknown) {
+function normalizeDebugSqlResponse(payload: unknown): DebugSqlResponse {
     const data = readEnvelopeData(payload);
     return {
         query: asString(data.query),
         columns: Array.isArray(data.columns)
             ? data.columns.map((item) => asString(item)).filter(Boolean)
             : [],
-        rows: Array.isArray(data.rows) ? data.rows.map((item) => asObject(item)) : [],
+        rows: Array.isArray(data.rows) ? data.rows.map((item) => asRecord(item)) : [],
         rowCount: Number(data.row_count) || 0,
         truncated: Boolean(data.truncated),
         maxRows: Number(data.max_rows) || 0,
@@ -369,8 +366,19 @@ const frontendApiClient = createFrontendApiClient();
 
 export type {
     ApiEnvelope,
+    AttrsResponse,
+    DebugApiRoute,
+    DebugLogsResponse,
+    DebugPagesResponse,
+    DebugSnapshotResponse,
+    DebugSqlResponse,
+    DebugSqlRow,
+    DebugStructureResponse,
     ExecuteRequestPayload,
+    ExecuteResponse,
     FrontendApiErrorOptions,
+    ModalResponse,
+    PageResponse,
     PageSummary
 };
 
@@ -387,6 +395,7 @@ export {
     normalizeEnvelopeErrorMessage,
     normalizeExecuteResponse,
     normalizeModalResponse,
+    normalizePageSummary,
     normalizePagesResponse,
     normalizePageResponse,
     requestEnvelope

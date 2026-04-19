@@ -3,7 +3,8 @@ import type {
     TableCellOptions,
     TableColumnAttrConfig,
     TableRuntimeColumn,
-    TableWidgetConfig
+    TableWidgetConfig,
+    WidgetAttrsMap
 } from './table_contract.ts';
 
 type ClassMap = Record<string, boolean>;
@@ -146,7 +147,7 @@ function padDatePart(value: number | string): string {
 }
 
 function getColumnAttrConfig(
-    attrsByName: Record<string, unknown> | null | undefined,
+    attrsByName: WidgetAttrsMap | null | undefined,
     column: TableRuntimeColumn | null | undefined
 ): TableColumnAttrConfig {
     const attrs = isObjectRecord(attrsByName) ? attrsByName : {};
@@ -154,18 +155,18 @@ function getColumnAttrConfig(
 
     for (const rawKey of keys) {
         const key = typeof rawKey === 'string' ? rawKey.trim() : '';
-        if (key && isObjectRecord(attrs[key])) {
-            return attrs[key] as TableColumnAttrConfig;
+        if (key && attrs[key]) {
+            return attrs[key];
         }
     }
 
     return isObjectRecord(column?.widgetConfig)
-        ? (column.widgetConfig as TableColumnAttrConfig)
+        ? column.widgetConfig
         : {};
 }
 
 function isListColumnMultiselect(
-    attrsByName: Record<string, unknown> | null | undefined,
+    attrsByName: WidgetAttrsMap | null | undefined,
     column: TableRuntimeColumn | null | undefined
 ): boolean {
     if (!column || !isChoiceColumnType(column.type)) {
@@ -177,7 +178,7 @@ function isListColumnMultiselect(
 }
 
 function getColumnTableCellOptions(
-    attrsByName: Record<string, unknown> | null | undefined,
+    attrsByName: WidgetAttrsMap | null | undefined,
     column: TableRuntimeColumn | null | undefined,
     sanitizeTableCellOptions?: SanitizeTableCellOptions
 ): TableCellOptions {

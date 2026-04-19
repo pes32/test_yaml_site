@@ -1,5 +1,8 @@
 import type {
     TableDisplayRow,
+    TableRuntimeComputedDefinitions,
+    TableRuntimeMethods,
+    TableRuntimeWatchHandlers,
     TableRuntimeVm
 } from './table_contract.ts';
 
@@ -17,7 +20,7 @@ import { SelectionMethods } from './table_selection.ts';
 import { ViewRuntimeMethods } from './table_view_runtime.ts';
 import { WidgetMeasure } from './table_widget_helpers.ts';
 
-const tableRuntimeComputed = {
+const tableRuntimeComputed: TableRuntimeComputedDefinitions = {
     sortKeys: {
         get(this: TableRuntimeVm) {
             return this.tableStore.sorting.sortKeys;
@@ -111,6 +114,14 @@ const tableRuntimeComputed = {
             this.tableStore.preferences.wordWrapRuntimeEnabled = !!value;
         }
     },
+    lineNumbersRuntimeEnabled: {
+        get(this: TableRuntimeVm) {
+            return !!this.tableStore.preferences.lineNumbersRuntimeEnabled;
+        },
+        set(this: TableRuntimeVm, value: unknown) {
+            this.tableStore.preferences.lineNumbersRuntimeEnabled = !!value;
+        }
+    },
     isEditable(this: TableRuntimeVm) {
         return !(this.widgetConfig && this.widgetConfig.readonly === true);
     },
@@ -173,6 +184,7 @@ const tableRuntimeComputed = {
             isFullyLoaded: !!this.isFullyLoaded,
             groupingLevelsLen,
             groupingCanAddLevel: canAddGroupingLevel(this.tableColumns.length, groupingLevelsLen),
+            lineNumbersEnabled: !!this.lineNumbersRuntimeEnabled,
             stickyHeaderEnabled: !!this.stickyHeaderEnabled,
             wordWrapEnabled: !!this.wordWrapEnabled,
             headerColumn:
@@ -210,7 +222,7 @@ const tableRuntimeComputed = {
     }
 };
 
-const tableRuntimeWatch = {
+const tableRuntimeWatch: TableRuntimeWatchHandlers = {
     widgetName(this: TableRuntimeVm) {
         this.initializeTable?.();
     },
@@ -231,7 +243,7 @@ const tableRuntimeWatch = {
     }
 };
 
-const tableRuntimeMethods = {
+const tableRuntimeMethods: TableRuntimeMethods = {
     ...SelectionMethods,
     ...ViewRuntimeMethods,
     ...DataRuntimeMethods,

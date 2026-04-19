@@ -14,7 +14,6 @@
     "frontend/js/widgets/ListWidget.vue",
     "frontend/js/widgets/voc/**/*.ts",
     "frontend/js/widgets/voc/**/*.vue",
-    "frontend/js/widgets/widget_shared_contracts.ts",
     "frontend/js/runtime/voc_contract.ts",
     "frontend/js/runtime/widget_contract.ts"
   ]

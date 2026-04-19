@@ -9,11 +9,15 @@ from typing import Any, Callable, Dict, List
 from flask import jsonify, make_response, request
 from pydantic import ValidationError
 
-from .api_response import error_payload, success_payload
-from .contracts import ExecuteRequest, ExecuteResponse
+from .api_response import error_payload, page_data_payload, pages_data_payload, success_payload
+from .contracts import (
+    AttrsDataResponse,
+    ExecuteRequest,
+    ExecuteResponse,
+    ModalDataResponse,
+)
 
 logger = logging.getLogger(__name__)
-META_KEYS = frozenset({"url", "title", "description"})
 CommandHandler = Callable[[Dict[str, Any]], Any]
 COMMAND_HANDLERS: Dict[str, CommandHandler] = {}
 
@@ -39,27 +43,6 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
     def _page_diagnostics(page_config: Dict[str, Any]) -> List[Dict[str, Any]]:
         return list(page_config.get("diagnostics") or [])
 
-    def _public_page_config(page_config: Dict[str, Any]) -> Dict[str, Any]:
-        gui = page_config.get("gui") or {}
-        root_keys = page_config.get("guiMenuKeys")
-        if not isinstance(root_keys, list):
-            root_keys = [key for key in gui.keys() if key not in META_KEYS]
-
-        return {
-            "name": page_config.get("name"),
-            "url": page_config.get("url"),
-            "title": page_config.get("title"),
-            "gui": gui,
-            "guiMenuKeys": root_keys,
-            "modalGuiIds": page_config.get("modalGuiIds") or [],
-        }
-
-    def _page_payload(page_config: Dict[str, Any]) -> Dict[str, Any]:
-        return {
-            "page": _public_page_config(page_config),
-            "attrs": page_config.get("attrs") or {},
-        }
-
     @app.route("/api/config")
     def api_get_config():
         snapshot = _snapshot()
@@ -68,17 +51,9 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
     @app.route("/api/pages")
     def api_get_pages():
         snapshot = _snapshot()
-        pages_list = [
-            {
-                "name": name,
-                "title": cfg.get("title", name),
-                "url": cfg.get("url", f"/page/{name}"),
-            }
-            for name, cfg in snapshot.get("pages", {}).items()
-        ]
         return _json_response(
             success_payload(
-                data={"pages": pages_list},
+                data=pages_data_payload(snapshot),
                 snapshot=snapshot,
             )
         )
@@ -99,7 +74,7 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
 
         return _json_response(
             success_payload(
-                data=_page_payload(page_config),
+                data=page_data_payload(page_config),
                 snapshot=snapshot,
                 diagnostics=_page_diagnostics(page_config),
             )
@@ -149,12 +124,12 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
             resolved_names = list(attrs.keys())
             missing_names = []
 
-        data = {
-            "page": page_name,
-            "attrs": attrs,
-            "resolved_names": resolved_names,
-            "missing_names": missing_names,
-        }
+        data = AttrsDataResponse(
+            page=page_name,
+            attrs=attrs,
+            resolved_names=resolved_names,
+            missing_names=missing_names,
+        ).model_dump(by_alias=True)
         return _json_response(
             success_payload(
                 data=data,
@@ -206,16 +181,16 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
         widget_names = list(modal.get("widgetNames") or [])
         attrs = {name: page_attrs[name] for name in widget_names if name in page_attrs}
         missing_names = [name for name in widget_names if name not in page_attrs]
-        data = {
-            "page": page_name,
-            "modal": modal,
-            "attrs": attrs,
-            "resolved_names": list(attrs.keys()),
-            "missing_names": missing_names,
-            "dependencies": {
+        data = ModalDataResponse(
+            page=page_name,
+            modal=modal,
+            attrs=attrs,
+            resolved_names=list(attrs.keys()),
+            missing_names=missing_names,
+            dependencies={
                 "widget_names": widget_names,
             },
-        }
+        ).model_dump(by_alias=True)
         return _json_response(
             success_payload(
                 data=data,

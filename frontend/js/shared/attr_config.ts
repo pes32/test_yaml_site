@@ -1,16 +1,83 @@
-type AttrConfigRecord = Record<string, unknown> & {
+import { asRecord, isRecord } from './object_record.ts';
+import type { UnknownRecord } from './object_record.ts';
+
+type KnownWidgetType =
+    | 'button'
+    | 'date'
+    | 'datetime'
+    | 'float'
+    | 'img'
+    | 'int'
+    | 'ip'
+    | 'ip_mask'
+    | 'list'
+    | 'split_button'
+    | 'str'
+    | 'table'
+    | 'text'
+    | 'time'
+    | 'voc';
+
+type WidgetType = KnownWidgetType | (string & {});
+
+type CommonWidgetAttrs = {
+    default?: unknown;
     label?: unknown;
-    source?: unknown;
-    widget?: unknown;
+    name?: unknown;
+    readonly?: boolean;
+    rows?: number | string;
+    sup_text?: unknown;
+    value?: unknown;
+    widget: WidgetType;
+    width?: number | string;
 };
 
-type AttrConfigMap = Record<string, AttrConfigRecord>;
+type ValidationWidgetAttrs = {
+    err_text?: unknown;
+    placeholder?: unknown;
+    regex?: unknown;
+};
 
-function asObject<T extends Record<string, unknown>>(value: unknown): T | null {
-    return value && typeof value === 'object' && !Array.isArray(value)
-        ? (value as T)
-        : null;
-}
+type ChoiceWidgetAttrs = {
+    columns?: unknown[];
+    editable?: boolean;
+    multiselect?: boolean;
+    source?: unknown;
+};
+
+type ActionWidgetAttrs = {
+    command?: unknown;
+    dialog?: unknown;
+    fon?: unknown;
+    hint?: unknown;
+    icon?: unknown;
+    output_attrs?: unknown;
+    size?: number | string;
+    url?: unknown;
+};
+
+type MediaWidgetAttrs = {
+    source?: unknown;
+};
+
+type LegacyYamlAttrCompat = {
+    data?: unknown;
+};
+
+type DynamicYamlAttrExtensions = {
+    [key: `data_${string}`]: unknown;
+    [key: `x_${string}`]: unknown;
+};
+
+type AttrConfigRecord = CommonWidgetAttrs &
+    ValidationWidgetAttrs &
+    ChoiceWidgetAttrs &
+    ActionWidgetAttrs &
+    MediaWidgetAttrs &
+    LegacyYamlAttrCompat &
+    DynamicYamlAttrExtensions;
+
+type AttrConfigMap = Record<string, AttrConfigRecord>;
 
 const FALLBACK_ATTR_CONFIG_CACHE = new Map<string, AttrConfigRecord>();
 
@@ -38,12 +105,11 @@ function fallbackAttrConfig(attrName: string): AttrConfigRecord {
 
 function normalizeAttrConfig(attrName: unknown, attrConfig: unknown): AttrConfigRecord {
     const key = typeof attrName === 'string' ? attrName.trim() : '';
-    const config = asObject<AttrConfigRecord>(attrConfig);
-
-    if (!config) {
+    if (!isRecord(attrConfig)) {
         return fallbackAttrConfig(key);
     }
 
+    const config = attrConfig as Partial<AttrConfigRecord> & UnknownRecord;
     const widget = typeof config.widget === 'string'
         ? config.widget.trim()
         : '';
@@ -55,7 +121,7 @@ function normalizeAttrConfig(attrName: unknown, attrConfig: unknown): AttrConfig
 }
 
 function normalizeAttrsMap(attrsByName: unknown): AttrConfigMap {
-    const attrs = asObject<Record<string, unknown>>(attrsByName) || {};
+    const attrs = asRecord(attrsByName);
     const normalized: AttrConfigMap = {};
 
     Object.entries(attrs).forEach(([attrName, attrConfig]) => {
@@ -66,7 +132,7 @@ function normalizeAttrsMap(attrsByName: unknown): AttrConfigMap {
 }
 
 function resolveAttrConfig(attrsByName: unknown, attrName: unknown): AttrConfigRecord {
-    const attrs = asObject<Record<string, unknown>>(attrsByName) || {};
+    const attrs = asRecord(attrsByName);
     const key = typeof attrName === 'string' ? attrName.trim() : '';
 
     if (!key) {
@@ -87,6 +153,15 @@ export {
 };
 
 export type {
+    ActionWidgetAttrs,
     AttrConfigMap,
-    AttrConfigRecord
+    AttrConfigRecord,
+    ChoiceWidgetAttrs,
+    CommonWidgetAttrs,
+    DynamicYamlAttrExtensions,
+    KnownWidgetType,
+    LegacyYamlAttrCompat,
+    MediaWidgetAttrs,
+    ValidationWidgetAttrs,
+    WidgetType
 };

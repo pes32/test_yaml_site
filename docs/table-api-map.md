@@ -18,7 +18,7 @@
 
 ## Contract And State Layer
 
-- `table_contract.ts` — внутренние типы table runtime: `TableRuntimeState`, `TableRuntimeComputed`, `TableRuntimeMethods`, `TableRuntimeDomSurface`, `TableRuntimeVm`, `TableWidgetSetupBindings`, schema/rows/selection/context-menu/cell-widget contracts.
+- `table_contract.ts` — внутренние типы table runtime: `TableRuntimeState`, `TableRuntimeComputed`, `TableRuntimeMethods`, `TableRuntimeDomSurface`, narrow runtime surfaces, `TableRuntimeVm`, `TableWidgetSetupBindings`, schema/rows/selection/context-menu/cell-widget contracts.
 - `table_errors.ts` — recoverable table errors.
 - `table_store.ts` — создание table-specific runtime store.
 - `table_runtime_state.ts` — начальные slices runtime state.
@@ -60,7 +60,7 @@
 
 ## Embedded Widget Imports
 
-Table cell editors импортируются из полного TS widget layer: `StringWidget`, `IntWidget`, `FloatWidget`, `DateWidget`, `TimeWidget`, `DateTimeWidget`, `IpWidget`, `IpMaskWidget`, `ListWidget`, `VocWidget`. Возвращать JS helper adapters для этих embedded widgets нельзя; новые table-cell capabilities должны проходить через typed widget exposes и общий lifecycle contract.
+Table cell editors импортируются из TS widget layer: `StringWidget`, `IntWidget`, `FloatWidget`, `DateWidget`, `TimeWidget`, `DateTimeWidget`, `IpWidget`, `IpMaskWidget`, `ListWidget`, `VocWidget`. JS helper adapters для embedded widgets не входят в table boundary; новые table-cell capabilities проходят через typed widget exposes и общий lifecycle contract.
 
 ## DOM And Page Integration
 
@@ -71,8 +71,8 @@ Table cell editors импортируются из полного TS widget laye
 - `table_page_bridge.ts` — page/runtime bridge helpers.
 - `table_notifications.ts` — user-facing table notifications.
 - `table_debug.ts` — debug-only table helpers.
-- `table_method_helpers.ts` — controller method binding helpers без broad string-index на runtime modules.
+- `table_method_helpers.ts` — controller method binding helpers без broad string-index на runtime modules; modules may bind `this` to a narrow runtime surface instead of the aggregate VM.
 
-## Removed Legacy Surface
+## Restricted Surface
 
-В актуальном frontend graph больше нет table `.js` modules и нет временных wrappers around schema/header/selection identity. Удалённые имена не являются контрактом и не должны возвращаться без новой причины.
+В table frontend graph не входят `.js` modules, временные wrappers around schema/header/selection identity и side-effect registration names. Эти имена не являются контрактом.

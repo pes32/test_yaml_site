@@ -38,6 +38,17 @@ const emit = defineEmits<{
   execute: [payload: unknown];
 }>();
 
+type WidgetInstanceDebugEntry = {
+  instance: unknown;
+  type: string;
+  widgetName: string;
+};
+
+type WidgetInstanceDebugRegistry = {
+  register(entry: WidgetInstanceDebugEntry): void;
+  unregister(entry: WidgetInstanceDebugEntry): void;
+};
+
 const hostServices = injectPageHostRuntimeServices();
 const widgetInstance = ref<unknown | null>(null);
 
@@ -125,6 +136,41 @@ function syncLifecycleBinding(): void {
   handle.bind(widgetInstance.value);
 }
 
+function getWidgetInstanceDebugRegistry(): WidgetInstanceDebugRegistry | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const debugWindow = window as Window & {
+    __YAMLS_WIDGET_INSTANCE_DEBUG__?: WidgetInstanceDebugRegistry;
+  };
+  return debugWindow.__YAMLS_WIDGET_INSTANCE_DEBUG__ || null;
+}
+
+function registerWidgetDebugInstance(instance: unknown | null = widgetInstance.value): void {
+  if (!instance) {
+    return;
+  }
+
+  getWidgetInstanceDebugRegistry()?.register({
+    instance,
+    type: resolvedWidgetType.value,
+    widgetName: props.widgetName
+  });
+}
+
+function unregisterWidgetDebugInstance(instance: unknown | null = widgetInstance.value): void {
+  if (!instance) {
+    return;
+  }
+
+  getWidgetInstanceDebugRegistry()?.unregister({
+    instance,
+    type: resolvedWidgetType.value,
+    widgetName: props.widgetName
+  });
+}
+
 watch(
   widgetDefinition,
   (definition, previousDefinition) => {
@@ -142,11 +188,18 @@ watch(
   { immediate: true }
 );
 
-watch(widgetInstance, () => {
+watch(widgetInstance, (instance, previousInstance) => {
   syncLifecycleBinding();
+  unregisterWidgetDebugInstance(previousInstance);
+  registerWidgetDebugInstance(instance);
+});
+
+watch(resolvedWidgetType, () => {
+  registerWidgetDebugInstance();
 });
 
 onBeforeUnmount(() => {
+  unregisterWidgetDebugInstance();
   disposeLifecycleHandle(lifecycleHandle.value);
 });
 </script>

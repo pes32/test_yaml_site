@@ -138,6 +138,142 @@ class ApiError(BaseModel):
     message: str
 
 
+class PagePublicConfigResponse(BaseModel):
+    """Public page config inside page/bootstrap responses."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    name: Optional[str] = None
+    url: Optional[str] = None
+    title: Optional[str] = None
+    gui: JsonDict = Field(default_factory=dict)
+    gui_root_keys: List[str] = Field(default_factory=list, alias="guiMenuKeys")
+    modal_gui_ids: List[str] = Field(default_factory=list, alias="modalGuiIds")
+
+
+class PageDataResponse(BaseModel):
+    """`data` contract for GET /api/page/<name> and HTML bootstrap."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    page: PagePublicConfigResponse
+    attrs: JsonDict = Field(default_factory=dict)
+
+
+class AttrsDataResponse(BaseModel):
+    """`data` contract for GET /api/attrs."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    page: str
+    attrs: JsonDict = Field(default_factory=dict)
+    resolved_names: List[str] = Field(default_factory=list, alias="resolved_names")
+    missing_names: List[str] = Field(default_factory=list, alias="missing_names")
+
+
+class ModalDataResponse(AttrsDataResponse):
+    """`data` contract for GET /api/modal-gui."""
+
+    modal: Optional[JsonDict] = None
+    dependencies: JsonDict = Field(default_factory=dict)
+
+
+class PageSummaryResponse(BaseModel):
+    """Short page summary used by /api/pages."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    title: str
+    url: str
+
+
+class PagesDataResponse(BaseModel):
+    """`data` contract for GET /api/pages."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    pages: List[PageSummaryResponse] = Field(default_factory=list)
+
+
+class DebugRouteResponse(BaseModel):
+    """One route row for debug structure."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    endpoint: str
+    methods: List[str] = Field(default_factory=list)
+    rule: str
+
+
+class DebugStructureDataResponse(BaseModel):
+    """`data` contract for GET /api/debug/structure."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    routes: List[DebugRouteResponse] = Field(default_factory=list)
+    snapshot: JsonDict = Field(default_factory=dict)
+
+
+class DebugLogsDataResponse(BaseModel):
+    """`data` contract for GET /api/debug/logs."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    lines: List[str] = Field(default_factory=list)
+    total: int = 0
+
+
+class DebugPageSummaryResponse(BaseModel):
+    """One page row for GET /api/debug/pages."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    name: str
+    title: str
+    url: str
+    modal_ids: List[str] = Field(default_factory=list, alias="modal_ids")
+    source_files: List[JsonDict] = Field(default_factory=list, alias="source_files")
+    diagnostics: List[JsonDict] = Field(default_factory=list)
+
+
+class DebugPagesDataResponse(BaseModel):
+    """`data` contract for GET /api/debug/pages."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    pages: List[DebugPageSummaryResponse] = Field(default_factory=list)
+    snapshot: JsonDict = Field(default_factory=dict)
+    diagnostics: List[JsonDict] = Field(default_factory=list)
+    last_error: Optional[str] = Field(default=None, alias="last_error")
+
+
+class DebugSnapshotDataResponse(BaseModel):
+    """`data` contract for GET /api/debug/snapshot."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    meta: JsonDict = Field(default_factory=dict)
+    page_count: int = Field(default=0, alias="page_count")
+    pages_by_url: Dict[str, str] = Field(default_factory=dict, alias="pages_by_url")
+    diagnostics: List[JsonDict] = Field(default_factory=list)
+    last_error: Optional[str] = Field(default=None, alias="last_error")
+
+
+class DebugSqlDataResponse(BaseModel):
+    """`data` contract for POST /api/debug/sql."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    query: str
+    columns: List[str] = Field(default_factory=list)
+    rows: List[JsonDict] = Field(default_factory=list)
+    row_count: int = Field(default=0, alias="row_count")
+    truncated: bool = False
+    max_rows: int = Field(default=0, alias="max_rows")
+    duration_ms: int = Field(default=0, alias="duration_ms")
+
+
 class ExecuteRequest(BaseModel):
     """Контракт тела POST /api/execute."""
 

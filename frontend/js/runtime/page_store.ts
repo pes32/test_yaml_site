@@ -1,6 +1,12 @@
 'use strict';
 
 import { normalizeAttrsMap } from '../shared/attr_config.ts';
+import { asRecord, isRecord } from '../shared/object_record.ts';
+import type {
+    AttrsResponse,
+    ModalResponse,
+    PageResponse
+} from './api_contract.ts';
 import type {
     AttrConfigMap,
     AttrsPayload,
@@ -12,36 +18,19 @@ import type {
     UnknownRecord
 } from './page_contract.ts';
 
-type NormalizedPageState = {
+type NormalizedPageState = Omit<PageResponse, 'attrs' | 'page'> & {
     attrs: AttrConfigMap;
-    diagnostics: UnknownRecord[];
     page: PageConfigRecord | null;
-    snapshotVersion: string;
 };
 
-type NormalizedAttrsState = {
+type NormalizedAttrsState = Omit<AttrsResponse, 'attrs'> & {
     attrs: AttrConfigMap;
-    diagnostics: UnknownRecord[];
-    missingNames: string[];
-    resolvedNames: string[];
-    snapshotVersion: string;
 };
 
-type NormalizedModalState = {
+type NormalizedModalState = Omit<ModalResponse, 'attrs' | 'modal'> & {
     attrs: AttrConfigMap;
-    dependencies: UnknownRecord;
-    diagnostics: UnknownRecord[];
-    missingNames: string[];
     modal: ParsedGuiModal | null;
-    resolvedNames: string[];
-    snapshotVersion: string;
 };
-
-function asObject<T extends UnknownRecord>(value: unknown): T | null {
-    return value && typeof value === 'object' && !Array.isArray(value)
-        ? (value as T)
-        : null;
-}
 
 function uniqueNames(items: unknown): string[] {
     const seen = new Set<string>();
@@ -61,7 +50,7 @@ function uniqueNames(items: unknown): string[] {
 
 function normalizeDiagnostics(value: unknown): UnknownRecord[] {
     return Array.isArray(value)
-        ? value.filter((item): item is UnknownRecord => !!asObject(item))
+        ? value.filter(isRecord)
         : [];
 }
 
@@ -76,8 +65,8 @@ function createEmptyStore(): PageConfigState {
 }
 
 function normalizePageState(payload: PagePayload): NormalizedPageState {
-    const page = asObject<PageConfigRecord>(payload.page);
-    const attrs = normalizeAttrsMap(payload.attrs) as AttrConfigMap;
+    const page = asRecord<PageConfigRecord>(payload.page);
+    const attrs = normalizeAttrsMap(payload.attrs);
 
     return {
         page: page && Object.keys(page).length ? page : null,
@@ -88,11 +77,12 @@ function normalizePageState(payload: PagePayload): NormalizedPageState {
 }
 
 function normalizeAttrsState(payload: AttrsPayload): NormalizedAttrsState {
-    const attrs = normalizeAttrsMap(payload.attrs) as AttrConfigMap;
+    const attrs = normalizeAttrsMap(payload.attrs);
     const resolvedNames = uniqueNames(payload.resolvedNames || Object.keys(attrs));
 
     return {
         attrs,
+        page: String(payload.page || ''),
         resolvedNames,
         missingNames: uniqueNames(payload.missingNames || []),
         diagnostics: normalizeDiagnostics(payload.diagnostics),
@@ -101,16 +91,17 @@ function normalizeAttrsState(payload: AttrsPayload): NormalizedAttrsState {
 }
 
 function normalizeModalState(payload: ModalPayload): NormalizedModalState {
-    const modal = asObject<ParsedGuiModal>(payload.modal);
-    const attrs = normalizeAttrsMap(payload.attrs) as AttrConfigMap;
+    const modal = asRecord<ParsedGuiModal>(payload.modal);
+    const attrs = normalizeAttrsMap(payload.attrs);
 
     return {
         modal: modal && Object.keys(modal).length ? modal : null,
         attrs,
+        page: String(payload.page || ''),
         diagnostics: normalizeDiagnostics(payload.diagnostics),
         resolvedNames: uniqueNames(payload.resolvedNames || Object.keys(attrs)),
         missingNames: uniqueNames(payload.missingNames || []),
-        dependencies: asObject(payload.dependencies) || {},
+        dependencies: asRecord(payload.dependencies),
         snapshotVersion: String(payload.snapshotVersion || '')
     };
 }
@@ -158,6 +149,7 @@ function mergeModalPayload(
 
     mergeAttrs(store, {
         attrs: normalized.attrs,
+        page: normalized.page,
         resolvedNames: normalized.resolvedNames,
         missingNames: normalized.missingNames,
         diagnostics: normalized.diagnostics,

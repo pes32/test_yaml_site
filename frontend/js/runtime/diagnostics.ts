@@ -1,3 +1,5 @@
+import { asRecord } from '../shared/object_record.ts';
+
 type DiagnosticLevel = 'info' | 'warning' | 'error' | string;
 
 type FrontendDiagnosticItem = {
@@ -14,12 +16,6 @@ type DiagnosticCounts = {
     info: number;
     warning: number;
 };
-
-function asRecord(value: unknown): Record<string, unknown> {
-    return value && typeof value === 'object' && !Array.isArray(value)
-        ? (value as Record<string, unknown>)
-        : {};
-}
 
 function normalizeDiagnostics(items: unknown): FrontendDiagnosticItem[] {
     return (Array.isArray(items) ? items : []).map((item) => {

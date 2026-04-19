@@ -1,12 +1,12 @@
 'use strict';
 
 import { resolveAttrConfig } from '../shared/attr_config.ts';
+import { asRecord, isPlainRecord, isRecord } from '../shared/object_record.ts';
 import type {
     AttrConfigMap,
     PageConfigState,
     PageSessionState,
-    ParsedGuiState,
-    UnknownRecord
+    ParsedGuiState
 } from './page_contract.ts';
 import {
     isStatefulWidgetConfig,
@@ -36,23 +36,6 @@ function toStringList(items: unknown): string[] {
     return uniqueNames(items);
 }
 
-function asObject<T extends UnknownRecord>(value: unknown): T | null {
-    return value && typeof value === 'object' && !Array.isArray(value)
-        ? (value as T)
-        : null;
-}
-
-function asPlainObject<T extends UnknownRecord>(value: unknown): T | null {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
-        return null;
-    }
-
-    const prototype = Object.getPrototypeOf(value);
-    return prototype === Object.prototype || prototype === null
-        ? (value as T)
-        : null;
-}
-
 function plainValueEquals(left: unknown, right: unknown, depth = 0): boolean {
     if (Object.is(left, right)) {
         return true;
@@ -77,23 +60,21 @@ function plainValueEquals(left: unknown, right: unknown, depth = 0): boolean {
         return true;
     }
 
-    const leftObject = asPlainObject<Record<string, unknown>>(left);
-    const rightObject = asPlainObject<Record<string, unknown>>(right);
-    if (!leftObject || !rightObject) {
+    if (!isPlainRecord(left) || !isPlainRecord(right)) {
         return false;
     }
 
-    const leftKeys = Object.keys(leftObject);
-    const rightKeys = Object.keys(rightObject);
+    const leftKeys = Object.keys(left);
+    const rightKeys = Object.keys(right);
     if (leftKeys.length !== rightKeys.length) {
         return false;
     }
 
     for (const key of leftKeys) {
-        if (!Object.prototype.hasOwnProperty.call(rightObject, key)) {
+        if (!Object.prototype.hasOwnProperty.call(right, key)) {
             return false;
         }
-        if (!plainValueEquals(leftObject[key], rightObject[key], depth + 1)) {
+        if (!plainValueEquals(left[key], right[key], depth + 1)) {
             return false;
         }
     }
@@ -114,7 +95,7 @@ function bootstrap(
     store: PageSessionState,
     configState: PageConfigState | null | undefined
 ): PageSessionState {
-    const attrsByName = asObject<AttrConfigMap>(configState?.attrsByName) || {};
+    const attrsByName = asRecord<AttrConfigMap>(configState?.attrsByName);
     store.loadedAttrNames = uniqueNames(Object.keys(attrsByName));
     store.loadedModalIds = [];
     store.parsedGui = null;
@@ -138,7 +119,7 @@ function markModalLoaded(store: PageSessionState, modalId: unknown): string[] {
 }
 
 function setParsedGui(store: PageSessionState, parsedGui: unknown): ParsedGuiState | null {
-    store.parsedGui = parsedGui && typeof parsedGui === 'object'
+    store.parsedGui = isRecord(parsedGui)
         ? (parsedGui as ParsedGuiState)
         : null;
     return store.parsedGui;
@@ -148,8 +129,8 @@ function initializeWidgetValues(
     store: PageSessionState,
     attrsByName: unknown
 ): Record<string, unknown> {
-    const attrs = asObject<AttrConfigMap>(attrsByName) || {};
-    const nextValues = { ...(asObject<Record<string, unknown>>(store.widgetValues) || {}) };
+    const attrs = asRecord<AttrConfigMap>(attrsByName);
+    const nextValues = { ...asRecord(store.widgetValues) };
     let changed = false;
     const now = new Date();
 
@@ -199,8 +180,8 @@ function setWidgetValue(
         return store.widgetValues;
     }
 
-    const currentValues = asObject<Record<string, unknown>>(store.widgetValues) || {};
-    const attrs = asObject<AttrConfigMap>(attrsByName) || {};
+    const currentValues = asRecord(store.widgetValues);
+    const attrs = asRecord<AttrConfigMap>(attrsByName);
     const config = resolveAttrConfig(attrs, key);
     const normalizedValue = isStatefulWidgetConfig(config)
         ? normalizeStatefulWidgetValue(config, value)

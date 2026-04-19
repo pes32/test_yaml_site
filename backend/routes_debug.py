@@ -10,7 +10,14 @@ from flask import jsonify, make_response, render_template, request
 from pydantic import ValidationError
 
 from .api_response import error_payload, success_payload
-from .contracts import DebugSqlRequest
+from .contracts import (
+    DebugLogsDataResponse,
+    DebugPagesDataResponse,
+    DebugSnapshotDataResponse,
+    DebugSqlDataResponse,
+    DebugSqlRequest,
+    DebugStructureDataResponse,
+)
 from .database import DebugSqlError, get_db_manager
 
 logger = logging.getLogger(__name__)
@@ -51,12 +58,13 @@ def register_debug_routes(app, config_service, log_file_path: str):
                     "endpoint": rule.endpoint,
                 })
         routes.sort(key=lambda r: r["rule"])
+        data = DebugStructureDataResponse(
+            routes=routes,
+            snapshot=config_service.get_meta(),
+        ).model_dump(by_alias=True)
         return _json_response(
             success_payload(
-                data={
-                    "routes": routes,
-                    "snapshot": config_service.get_meta(),
-                },
+                data=data,
                 snapshot=snapshot,
                 diagnostics=snapshot.get("diagnostics") or [],
             )
@@ -71,12 +79,10 @@ def register_debug_routes(app, config_service, log_file_path: str):
             with open(path, "r", encoding="utf-8", errors="replace") as handle:
                 lines = handle.readlines()
             last_1000 = lines[-1000:] if len(lines) > 1000 else lines
+            data = DebugLogsDataResponse(lines=last_1000, total=len(lines)).model_dump(by_alias=True)
             return _json_response(
                 success_payload(
-                    data={
-                        "lines": last_1000,
-                        "total": len(lines),
-                    },
+                    data=data,
                     snapshot=snapshot,
                     diagnostics=snapshot.get("diagnostics") or [],
                 )
@@ -116,14 +122,15 @@ def register_debug_routes(app, config_service, log_file_path: str):
                 "diagnostics": cfg.get("diagnostics") or [],
             })
         pages.sort(key=lambda p: p["name"])
+        data = DebugPagesDataResponse(
+            pages=pages,
+            snapshot=snapshot.get("meta") or {},
+            diagnostics=snapshot.get("diagnostics") or [],
+            last_error=config_service.get_last_error(),
+        ).model_dump(by_alias=True)
         return _json_response(
             success_payload(
-                data={
-                    "pages": pages,
-                    "snapshot": snapshot.get("meta") or {},
-                    "diagnostics": snapshot.get("diagnostics") or [],
-                    "last_error": config_service.get_last_error(),
-                },
+                data=data,
                 snapshot=snapshot,
                 diagnostics=snapshot.get("diagnostics") or [],
             )
@@ -133,15 +140,16 @@ def register_debug_routes(app, config_service, log_file_path: str):
     def api_debug_snapshot():
         """Краткая диагностика текущего snapshot."""
         snapshot = _snapshot()
+        data = DebugSnapshotDataResponse(
+            meta=snapshot.get("meta") or {},
+            page_count=len(snapshot.get("pages") or {}),
+            pages_by_url=snapshot.get("pages_by_url") or {},
+            diagnostics=snapshot.get("diagnostics") or [],
+            last_error=config_service.get_last_error(),
+        ).model_dump(by_alias=True)
         return _json_response(
             success_payload(
-                data={
-                    "meta": snapshot.get("meta") or {},
-                    "page_count": len(snapshot.get("pages") or {}),
-                    "pages_by_url": snapshot.get("pages_by_url") or {},
-                    "diagnostics": snapshot.get("diagnostics") or [],
-                    "last_error": config_service.get_last_error(),
-                },
+                data=data,
                 snapshot=snapshot,
                 diagnostics=snapshot.get("diagnostics") or [],
             )
@@ -179,9 +187,10 @@ def register_debug_routes(app, config_service, log_file_path: str):
                 exc.status_code,
             )
 
+        data = DebugSqlDataResponse(**result).model_dump(by_alias=True)
         return _json_response(
             success_payload(
-                data=result,
+                data=data,
                 snapshot=snapshot,
                 diagnostics=snapshot.get("diagnostics") or [],
             )

@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "type-holes": "node scripts/check-type-holes.mjs",
+    "preflight": "npm run type-holes && npm run typecheck:table && npm run typecheck && npm run build",
     "typecheck": "vue-tsc --noEmit -p ../../tsconfig.json",
     "typecheck:table": "vue-tsc --noEmit -p ../../tsconfig.table.json"
   },

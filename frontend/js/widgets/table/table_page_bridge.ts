@@ -1,10 +1,11 @@
 import type { TableRuntimeServices } from './table_contract.ts';
+import type { WidgetAttrsMap } from './table_contract.ts';
 import { createTableRuntimeServices } from './table_runtime_services.ts';
 import { normalizeTableRuntimeError } from './table_errors.ts';
 import { notifyTableRuntimeError } from './table_notifications.ts';
 
 type CreateTablePageBridgeOptions = {
-    getAllAttrsMap?: (() => Record<string, unknown>) | null;
+    getAllAttrsMap?: (() => WidgetAttrsMap) | null;
     handleRecoverableAppError?: ((error: unknown, context?: Record<string, unknown>) => void) | null;
     showAppNotification?: ((message: string, type?: string) => void) | null;
 };

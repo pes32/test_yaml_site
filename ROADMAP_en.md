@@ -4,12 +4,12 @@
 
 ## Current state
 
-- The YAML DSL and snapshot assembly already support working interface pages.
-- The baseline set of widgets, modals, menus, action runtime, and the table/voc/datetime subsystems already form a clickable mockup.
+- The YAML DSL and snapshot assembly support working interface pages.
+- The baseline set of widgets, modals, menus, action runtime, and the table/voc/datetime subsystems form a clickable mockup.
 - A production-like `waitress + nginx` startup flow exists.
-- Debug tooling and a read-only PostgreSQL SQL helper are already available.
+- Debug tooling includes a read-only PostgreSQL SQL helper.
 
-## Partially done
+## Roadmap Areas
 
 ### DB integration
 
@@ -17,7 +17,7 @@ What exists today:
 
 - `backend/database.py` and debug SQL tooling;
 - a PostgreSQL landing page and related materials;
-- signs of the planned flow in the DSL, including `select_attrs`.
+- a reserved DSL contour for planned flows such as `select_attrs`.
 
 What is still missing:
 
@@ -26,17 +26,15 @@ What is still missing:
 - a completed validation/error model for DB-backed actions;
 - a production-ready story for multi-user data entry.
 
-The honest reading of the current status is: DB work has started and has useful pieces already, but it is still roadmap work rather than a finished feature.
+DB work is a design area: the repository contains useful supporting pieces, but YAML forms do not have a completed data-entry/save pipeline.
 
 ### Frontend/table quality gate
 
-What is already done:
+Current state:
 
-- the legacy table runtime has been replaced with explicit TS modules;
+- the table runtime uses explicit TS modules;
 - `TableWidget.vue` runs through `useTableRuntime.ts`;
-- `typecheck` and `typecheck:table` are green mandatory frontend gates;
-- Vite build remains part of the required frontend gate;
-- stale wrappers, broken scripts, and outdated docs are removed during cleanup passes.
+- `type-holes`, `typecheck`, `typecheck:table`, Vite build and `tests/run.sh` are mandatory frontend gates.
 
 What is still open:
 
@@ -45,11 +43,11 @@ What is still open:
 
 ### Frontend widget refactor
 
-Status after the full TS pass:
+Current frontend status:
 
-- migrated: `str`, `text`, `int`, `float`, `button`, `date`, `time`, `datetime`, `ip`, `ip_mask`, `img`, `list`, `voc`, `split_button`;
-- migrated with a controller boundary: `table`;
-- legacy JS removed from `frontend/js`: action runtime, datetime helpers, IP helpers, voc helpers, page/bootstrap glue, API/attrs/modal flows, and diagnostics;
+- TS/Composition API widgets: `str`, `text`, `int`, `float`, `button`, `date`, `time`, `datetime`, `ip`, `ip_mask`, `img`, `list`, `voc`, `split_button`;
+- `table` is a typed controller feature through `useTableRuntime.ts`;
+- `frontend/js` contains TypeScript/Vue source for the widget layer, action runtime, datetime/IP/voc helpers, page/bootstrap glue, API/attrs/modal flows, and diagnostics;
 - shared common components use typed `<script setup lang="ts">`.
 
 Remaining quality steps:
@@ -58,9 +56,7 @@ Remaining quality steps:
 - extend Playwright smoke coverage for regressions;
 - keep JS adapter modules out of the widget layer.
 
-### Ideas Merged From Old Drafts
-
-Old root-level drafts were condensed here to avoid keeping several competing plans in the repository root.
+### Future Ideas
 
 - Table ideas that remain on the roadmap: fill/drag values, paste into selected range, filters/views, and highlighting fresh changes.
 - Test automation should keep expanding the real browser smoke/E2E runner for new regression cases.
@@ -72,6 +68,6 @@ Old root-level drafts were condensed here to avoid keeping several competing pla
 - Add a careful save/update flow without breaking current contracts.
 - Formalize `select_attrs` or replace it with a clearer mechanism.
 - Continue stabilizing the frontend runtime and the documentation set.
-- Keep the full TS widget layer free of legacy JS adapters.
+- Keep the TS/Vue frontend source free of JS adapters in widget/runtime layers.
 - Narrow the table controller boundary and external DOM/event signatures without weakening `typecheck`.
 - Add real browser smoke coverage for key flows if the project needs an automated regression gate.

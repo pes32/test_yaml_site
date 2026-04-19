@@ -82,11 +82,12 @@ async function loadTableListSources(vm: AttrsLoaderHost, attrNames: unknown): Pr
         const cfg = typeof vm.getWidgetConfig === 'function'
             ? vm.getWidgetConfig(name)
             : vm.allAttrs[name];
-        if (!cfg || cfg.widget !== 'table' || !cfg.table_attrs) {
+        const tableAttrs = cfg && 'table_attrs' in cfg ? cfg.table_attrs : null;
+        if (!cfg || cfg.widget !== 'table' || !tableAttrs) {
             return;
         }
 
-        const deps = resolveTableDependencies(cfg);
+        const deps = resolveTableDependencies({ table_attrs: tableAttrs });
         deps.forEach((token) => {
             if (vm.loadedAttrNames.includes(token)) {
                 return;

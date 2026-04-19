@@ -25,9 +25,9 @@ Debug-запуск:
 - `settings/production.env`
 - `settings/debug.env`
 
-Старые корневые env-пути поддерживаются как fallback, но новые настройки лучше хранить в `settings/`.
+Корневые env-пути поддерживаются как fallback, но основные настройки лучше хранить в `settings/`.
 
-Для debug режима итоговый `YAMLS_NGINX_BIND_HOST` сейчас остаётся `0.0.0.0`. Это сделано осознанно для текущего окружения, хотя для более закрытого локального запуска безопаснее был бы `127.0.0.1`.
+Для debug режима итоговый `YAMLS_NGINX_BIND_HOST` остаётся `0.0.0.0`. Такой режим удобен для текущего окружения, хотя для более закрытого локального запуска безопаснее `127.0.0.1`.
 
 ## Nginx, TLS And Logs
 
@@ -48,7 +48,7 @@ Debug-запуск:
 - `templates/mems` — авторские demo assets.
 - `sudoku` — demo/author feature.
 
-`deploy_yamls.sh` не входит в tracked product workflow и выглядит как локальный deploy helper с реальными host/user данными. Его не нужно удалять автоматически без отдельного решения владельца проекта.
+`deploy_yamls.sh` не входит в tracked product workflow и выглядит как локальный deploy helper с реальными host/user данными. Решение по этому файлу принимает владелец проекта.
 
 ## Production Safety
 

@@ -45,6 +45,7 @@ type BuildMenuItemsOptions = {
     isEditable: boolean;
     isEditingCell: boolean;
     isFullyLoaded?: boolean;
+    lineNumbersEnabled?: boolean;
     numCols: number;
     snapshot: ContextMenuSnapshotLike | null;
     stickyHeaderEnabled?: boolean;
@@ -121,6 +122,7 @@ function buildMenuItems(options: BuildMenuItemsOptions): TableContextMenuItem[] 
     const groupingActive = Boolean(options.groupingActive);
     const tableUiLocked = Boolean(options.tableUiLocked);
     const groupingLevelsLen = options.groupingLevelsLen ?? 0;
+    const lineNumbersEnabled = Boolean(options.lineNumbersEnabled);
     const stickyHeaderEnabled = Boolean(options.stickyHeaderEnabled);
     const wordWrapEnabled = Boolean(options.wordWrapEnabled);
     const headerColumn = options.headerColumn || null;
@@ -134,9 +136,11 @@ function buildMenuItems(options: BuildMenuItemsOptions): TableContextMenuItem[] 
 
     if (target?.kind === 'header' && nCols > 0) {
         const col = snapshot.headerCol ?? null;
+        const isGlobalHeader = col == null || col < 0;
         const items: TableContextMenuItem[] = [];
         const hasSortBlock = Boolean(options.headerSortEnabled && col != null && col >= 0);
-        const canToggleSticky = col != null && col >= 0;
+        const canResetAnySort = isGlobalHeader && Array.isArray(snapshot.sortKeys) && snapshot.sortKeys.length > 0;
+        const canToggleSticky = nCols > 0;
         let placedSepBeforeGroupingBlock = false;
         const separatorBeforeGroupingBlock = () => {
             if (placedSepBeforeGroupingBlock) {
@@ -179,6 +183,16 @@ function buildMenuItems(options: BuildMenuItemsOptions): TableContextMenuItem[] 
                     separatorBefore: false
                 }
             );
+        } else if (canResetAnySort) {
+            items.push({
+                id: 'sort_reset',
+                icon: null,
+                label: 'Сбросить сортировку',
+                kbd: '',
+                visible: true,
+                disabled: false,
+                separatorBefore: false
+            });
         }
 
         if (canToggleSticky) {
@@ -200,6 +214,15 @@ function buildMenuItems(options: BuildMenuItemsOptions): TableContextMenuItem[] 
                 disabled: tableUiLocked,
                 separatorBefore: false
             });
+            items.push({
+                id: 'toggle_line_numbers',
+                icon: null,
+                label: lineNumbersEnabled ? 'Отключить нумерацию строк' : 'Включить нумерацию строк',
+                kbd: '',
+                visible: true,
+                disabled: tableUiLocked,
+                separatorBefore: false
+            });
         }
 
         if (isLineNumberHeader) {
@@ -214,7 +237,7 @@ function buildMenuItems(options: BuildMenuItemsOptions): TableContextMenuItem[] 
             });
         }
 
-        if (col != null && col >= 0 && canAddLevel && !isLineNumberHeader) {
+        if (!isGlobalHeader && col != null && col >= 0 && canAddLevel && !isLineNumberHeader) {
             const isDuplicateLevel = Array.isArray(snapshot.groupingLevelsSnapshot) &&
                 snapshot.groupingLevelsSnapshot.includes(col);
             items.push({
@@ -228,7 +251,7 @@ function buildMenuItems(options: BuildMenuItemsOptions): TableContextMenuItem[] 
             });
         }
 
-        if (groupingActive) {
+        if (!isGlobalHeader && groupingActive) {
             items.push({
                 id: 'group_clear',
                 icon: null,

@@ -1,11 +1,11 @@
 /**
  * Методы выделения ячеек для TableWidget (подмешиваются в methods).
  */
-import type { TableRuntimeVm } from './table_contract.ts';
-import { defineTableRuntimeModule } from './table_method_helpers.ts';
+import type { TableSelectionRuntimeSurface } from './table_contract.ts';
+import { defineTableRuntimeModuleFor } from './table_method_helpers.ts';
 import { clamp, getRowCells } from './table_utils.ts';
 
-type SelectionVm = TableRuntimeVm;
+type SelectionVm = TableSelectionRuntimeSurface;
 
 function getSelectionAnchor(vm: SelectionVm) {
     return vm.selAnchor || { r: 0, c: 0 };
@@ -15,7 +15,9 @@ function getSelectionFocus(vm: SelectionVm) {
     return vm.selFocus || { r: 0, c: 0 };
 }
 
-const SelectionMethods = defineTableRuntimeModule({
+const defineSelectionRuntimeModule = defineTableRuntimeModuleFor<TableSelectionRuntimeSurface>();
+
+const SelectionMethods = defineSelectionRuntimeModule({
         normRow(r: number) {
             const max = this.tableData.length - 1;
             if (max < 0) return 0;
@@ -186,11 +188,16 @@ const SelectionMethods = defineTableRuntimeModule({
             return getSelectionFocus(this).r === row && getSelectionFocus(this).c === col ? 0 : -1;
         },
         extendSelectionWithArrow(dr: number, dc: number) {
-            this.selFullWidthRows = null;
             const focus = getSelectionFocus(this);
             const nr = this.normRow(focus.r + dr);
             const nc = this.normCol(focus.c + dc);
             if (nr === focus.r && nc === focus.c) return false;
+            if (this.selFullWidthRows && dr !== 0 && dc === 0) {
+                this.selFocus = { r: nr, c: focus.c };
+                this.setSelFullWidthRowSpan(getSelectionAnchor(this).r, nr);
+                return true;
+            }
+            this.selFullWidthRows = null;
             this.selFocus = { r: nr, c: nc };
             return true;
         }

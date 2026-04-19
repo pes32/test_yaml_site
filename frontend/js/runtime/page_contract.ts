@@ -1,16 +1,9 @@
-type UnknownRecord = Record<string, unknown>;
+import type { AttrConfigMap, AttrConfigRecord } from '../shared/attr_config.ts';
+import type { UnknownRecord } from '../shared/object_record.ts';
 
 type FrontendDiagnostic = UnknownRecord;
 
-type PageAttrConfig = UnknownRecord & {
-    default?: unknown;
-    label?: unknown;
-    name?: unknown;
-    source?: unknown;
-    widget?: unknown;
-};
-
-type AttrConfigMap = Record<string, PageAttrConfig>;
+type PageAttrConfig = AttrConfigRecord;
 
 type PageConfigRecord = UnknownRecord & {
     gui?: unknown;
@@ -70,6 +63,7 @@ type AttrsPayload = {
     attrs?: unknown;
     diagnostics?: unknown;
     missingNames?: unknown;
+    page?: unknown;
     resolvedNames?: unknown;
     snapshotVersion?: unknown;
 };
@@ -88,7 +82,7 @@ type PageRuntimeServices = {
     getWidgetRuntimeValueByName(widgetName: string): unknown;
     handleRecoverableAppError(error: unknown, options?: UnknownRecord): unknown;
     reportAppError(error: unknown, options?: UnknownRecord): unknown;
-    runBoundaryAction<T>(kind: string, action: () => Promise<T> | T): Promise<T>;
+    runBoundaryAction<T>(kind: string, action: () => Promise<T> | T): Promise<PageBoundaryActionResult<T>>;
     showAppNotification(message: string, type?: string): unknown;
 };
 
@@ -105,6 +99,16 @@ type PageRuntimeEventPayloads = {
         sectionId: string;
     };
 };
+
+type PageBoundaryActionResult<T> =
+    | {
+        status: 'executed';
+        value: T;
+    }
+    | {
+        status: string;
+        value?: T;
+    };
 
 type PageScrollRoot = {
     scrollTop: number;
@@ -129,7 +133,7 @@ type PageViewHost = {
     normalizeActiveState(): void;
     onHashChange(event?: Event): unknown;
     pageConfig: PageConfigRecord | null;
-    runBoundaryAction<T>(kind: string, action: () => Promise<T> | T): Promise<T>;
+    runBoundaryAction<T>(kind: string, action: () => Promise<T> | T): Promise<PageBoundaryActionResult<T>>;
     sessionState: PageSessionState;
     uiState: UnknownRecord & {
         hashListenerBound?: boolean;
@@ -144,6 +148,7 @@ export type {
     FrontendDiagnostic,
     ModalPayload,
     PageAttrConfig,
+    PageBoundaryActionResult,
     PageConfigRecord,
     PageConfigState,
     PagePayload,

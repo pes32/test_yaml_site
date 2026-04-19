@@ -8,7 +8,7 @@
 - остальные `*.yaml` / `*.yml` — attrs-фрагменты
 - `modal_<id>.yaml` — отдельные modal documents
 
-Frontend больше не читает raw YAML напрямую. Все документы сначала проходят backend normalization.
+Frontend получает нормализованный snapshot/API payload; raw YAML читает backend.
 
 ## Корневые GUI-элементы
 
@@ -87,7 +87,7 @@ Backend валидирует:
 
 ### Core field widgets
 
-`str`, `text`, `int`, `float`, `date`, `time`, `datetime`, `ip`, `ip_mask`, `list` и `voc` — stateful widgets с единым draft/commit контрактом во frontend runtime. Их widget-layer реализация переведена на Composition API + TypeScript; YAML-контракт при этом не меняется.
+`str`, `text`, `int`, `float`, `date`, `time`, `datetime`, `ip`, `ip_mask`, `list` и `voc` — stateful widgets с единым draft/commit контрактом во frontend runtime. Их widget-layer реализация использует Composition API + TypeScript; YAML-контракт при этом не меняется.
 
 Общее поведение:
 
@@ -234,7 +234,7 @@ operation_code:
 - встроенной модалке;
 - или файлу `modal_<name>.yaml`.
 
-Когда пользователь открывает такую модалку, frontend получает уже нормализованный `/api/modal-gui` response, а не сырой YAML-документ.
+Когда пользователь открывает такую модалку, frontend получает нормализованный `/api/modal-gui` response, а не сырой YAML-документ.
 
 ## Validation
 

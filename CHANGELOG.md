@@ -3,6 +3,9 @@
 [English version](CHANGELOG_en.md)
 
 ## v.0.25 л.
+
+Дата: `04.2026`
+
 - Переезд ключевых frontend-частей на Vue SFC и TypeScript-модули.
 - Очень много рефакторинга
 

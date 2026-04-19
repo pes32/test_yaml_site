@@ -1,26 +1,36 @@
-import type { ComponentPublicInstance } from 'vue';
-import type { AttrConfigRecord } from '../../shared/attr_config.ts';
+import type {
+    Component,
+    ComponentPublicInstance,
+    ComputedRef,
+    Ref,
+    ToRefs
+} from 'vue';
+import type {
+    AttrConfigMap,
+    AttrConfigRecord,
+    CommonWidgetAttrs,
+    LegacyYamlAttrCompat
+} from '../../shared/attr_config.ts';
+import type { UnknownRecord } from '../../shared/object_record.ts';
 
-type UnknownRecord = Record<string, unknown>;
+type WidgetAttrsMap = AttrConfigMap;
+type TableAttrsMap = WidgetAttrsMap;
 
-type TableWidgetConfig = UnknownRecord & {
+type TableWidgetAttrs = {
     data?: unknown;
-    label?: string;
     lazy_chunk_size?: number | string;
     lazy_fail_full_load?: boolean;
     line_numbers?: boolean;
-    readonly?: boolean;
     row?: number | string;
     sort?: boolean;
     source?: unknown;
     sticky_header?: boolean;
-    sup_text?: string;
     table_attrs?: unknown;
     table_lazy?: boolean;
-    value?: unknown;
-    width?: number | string;
     zebra?: boolean;
 };
+
+type TableWidgetConfig = CommonWidgetAttrs & TableWidgetAttrs & LegacyYamlAttrCompat;
 
 type TableRowIdentity = string;
 
@@ -52,7 +62,7 @@ type TableHeaderCell = {
     width?: string | null;
 };
 
-type TableRuntimeColumn = UnknownRecord & {
+type TableRuntimeColumn = {
     attr?: string | null;
     embeddedWidget?: boolean;
     format?: string | null;
@@ -70,7 +80,7 @@ type TableRuntimeColumn = UnknownRecord & {
     width?: string | null;
 };
 
-type TableColumnAttrConfig = AttrConfigRecord & {
+type TableColumnAttrConfig = Partial<AttrConfigRecord> & {
     columns?: unknown[];
     editable?: boolean;
     multiselect?: boolean;
@@ -78,7 +88,7 @@ type TableColumnAttrConfig = AttrConfigRecord & {
     readonly?: boolean;
 };
 
-type TableCellOptions = UnknownRecord & {
+type TableCellOptions = {
     columns?: unknown[];
     default?: unknown;
     editable?: boolean;
@@ -114,6 +124,20 @@ type TableCellWidgetInstance = ComponentPublicInstance & {
     toggleDropdown?: () => void;
     [key: string]: unknown;
 };
+
+type TableCellWidgetRegistryKey =
+    | 'dateCellWidget'
+    | 'datetimeCellWidget'
+    | 'floatCellWidget'
+    | 'intCellWidget'
+    | 'ipCellWidget'
+    | 'ipMaskCellWidget'
+    | 'listCellWidget'
+    | 'stringCellWidget'
+    | 'timeCellWidget'
+    | 'vocCellWidget';
+
+type TableCellWidgetRegistry = Record<TableCellWidgetRegistryKey, Component>;
 
 type TableCellDisplayActionKind = 'date' | 'list' | 'time' | string;
 
@@ -203,6 +227,7 @@ type TableContextMenuSnapshot = {
     bodyMode: 'cell' | 'cells' | 'row' | null;
     groupingLevelsSnapshot: number[];
     headerCol: number | null;
+    lineNumbersEnabled: boolean;
     pasteAnchor: TableCellAddress;
     rect: TableSelectionRect;
     sessionId: number;
@@ -259,6 +284,7 @@ type TableFeatureFlags = {
     headerSortEnabled: boolean;
     isEditable: boolean;
     lazyUiActive: boolean;
+    lineNumbersRuntimeEnabled: boolean;
     stickyHeaderEnabled: boolean;
     wordWrapEnabled: boolean;
 };
@@ -288,7 +314,7 @@ type TableRuntimeError = {
 };
 
 type TableRuntimeServices = {
-    getAllAttrsMap(): Record<string, unknown>;
+    getAllAttrsMap(): WidgetAttrsMap;
     getListOptions(sourceName: string): unknown[];
     handleRecoverableError(error: TableRuntimeError): void;
     notify(message: string, type?: string): void;
@@ -307,6 +333,7 @@ type TableStore = {
     };
     measurement: TableMeasurementState;
     preferences: {
+        lineNumbersRuntimeEnabled: boolean;
         stickyHeaderRuntimeEnabled: boolean;
         wordWrapRuntimeEnabled: boolean;
     };
@@ -357,31 +384,31 @@ type TableRuntimeState = {
     contextMenuPosition: { x: number; y: number };
     contextMenuSessionId: number;
     contextMenuTarget: TableContextMenuTarget | null;
-    dateCellWidget: unknown;
-    datetimeCellWidget: unknown;
+    dateCellWidget: Component;
+    datetimeCellWidget: Component;
     editingCell: TableCellAddress | null;
-    floatCellWidget: unknown;
-    getAllAttrsMapFromRuntime: (() => Record<string, unknown>) | null;
+    floatCellWidget: Component;
+    getAllAttrsMapFromRuntime: (() => WidgetAttrsMap) | null;
     handleRecoverableAppErrorFromRuntime: ((error: unknown, context?: UnknownRecord) => void) | null;
     headerRows: TableHeaderCell[][];
-    intCellWidget: unknown;
-    ipCellWidget: unknown;
-    ipMaskCellWidget: unknown;
-    listCellWidget: unknown;
+    intCellWidget: Component;
+    ipCellWidget: Component;
+    ipMaskCellWidget: Component;
+    listCellWidget: Component;
     selectedRowIndex: number;
     selAnchor: TableCellAddress;
     selFocus: TableCellAddress;
     selFullWidthRows: { r0: number; r1: number } | null;
     showAppNotificationFromRuntime: ((message: string, type?: string) => void) | null;
-    stringCellWidget: unknown;
+    stringCellWidget: Component;
     tableColumns: TableRuntimeColumn[];
     tableData: TableDataRow[];
     tablePageBridge: TableRuntimeServices;
     tableSchema: TableSchema | null;
     tableStore: TableStore;
-    timeCellWidget: unknown;
+    timeCellWidget: Component;
     value: unknown[];
-    vocCellWidget: unknown;
+    vocCellWidget: Component;
 };
 
 type TableRuntimePropsSurface = {
@@ -404,6 +431,7 @@ type TableRuntimeComputed = {
     isLoadingChunk: boolean;
     lazyEnabled: boolean;
     lazySessionId: number;
+    lineNumbersRuntimeEnabled: boolean;
     sortColumnIndex: number | null;
     sortDirection: TableSortDirection;
     sortKeys: TableSortState[];
@@ -416,6 +444,10 @@ type TableRuntimeComputed = {
     tableZebra: boolean;
     wordWrapEnabled: boolean;
     wordWrapRuntimeEnabled: boolean;
+};
+
+type TableRuntimeComputedRefs = {
+    readonly [K in keyof TableRuntimeComputed]: ComputedRef<TableRuntimeComputed[K]>;
 };
 
 type TableMutationOptions = {
@@ -475,7 +507,7 @@ type TableRuntimeMethods = {
     cellTdClass(row: number, col: number): Record<string, boolean>;
     cellUsesEmbeddedWidget(column: TableRuntimeColumn | null | undefined): boolean;
     cellUsesNativeInput(column: TableRuntimeColumn | null | undefined): boolean;
-    cellWidgetComponent(column: TableRuntimeColumn | null | undefined): unknown;
+    cellWidgetComponent(column: TableRuntimeColumn | null | undefined): Component | null;
     cellWidgetConfig(rowIndex: number, cellIndex: number, column: TableRuntimeColumn): TableCellWidgetConfig;
     cellWidgetName(rowIndex: number, cellIndex: number): string;
     cellWidgetRefName(rowIndex: number, cellIndex: number): string;
@@ -487,7 +519,7 @@ type TableRuntimeMethods = {
     clearSelectionFromSnapshot(snapshot: TableContextMenuSnapshot): void;
     clampMenuPosition(event: MouseEvent): { x: number; y: number };
     cloneRect(rect: TableSelectionRect): TableSelectionRect;
-    columnWidgetComponentByType(type: unknown): unknown;
+    columnWidgetComponentByType(type: unknown): Component | null;
     computeAutoWidth(label: unknown): string;
     computeBodyModeForMenu(): TableContextMenuSnapshot['bodyMode'];
     computePasteAnchorRect(rect: TableSelectionRect): TableCellAddress;
@@ -512,7 +544,7 @@ type TableRuntimeMethods = {
     focusSelectionCell(row: number, col: number): void;
     focusSelectionCellWithRetry(row: number, col: number): void;
     formatCellValue(value: unknown, column: TableRuntimeColumn | null | undefined): string;
-    getAllAttrsMap(): Record<string, unknown>;
+    getAllAttrsMap(): WidgetAttrsMap;
     getCellEditorActionElement(row: number, col: number, kind?: string): HTMLElement | null;
     getCellEditorElement(row: number, col: number): HTMLInputElement | HTMLSelectElement | HTMLElement | null;
     getCellWidgetInstance(row: number, col: number): TableCellWidgetInstance | null;
@@ -524,10 +556,9 @@ type TableRuntimeMethods = {
     getTableEl(): HTMLTableElement | null;
     getValue(): unknown[][];
     groupExpanded(pathKey: string): boolean;
-    groupRowStyle(displayRow: TableDisplayRow | null | undefined): Record<string, string>;
-    handleRecoverableAppErrorFromRuntime(error: unknown, context?: UnknownRecord): void;
+    groupRowStyle(displayRow: TableDisplayRow | null | undefined): Record<string, string | number>;
     headerSortAffordancePx(): number;
-    headerThStyle(cell: TableHeaderCell | null | undefined): Record<string, string>;
+    headerThStyle(cell: TableHeaderCell | null | undefined): Partial<Record<string, string>>;
     hideContextMenu(): void;
     iconSrc(name: unknown): string;
     initializeTable(): void;
@@ -541,7 +572,7 @@ type TableRuntimeMethods = {
     isMultiCellSelection(): boolean;
     isPasteAnchorInTable(snapshot: TableContextMenuSnapshot): boolean;
     isPrintableCellKey(event: KeyboardEvent): boolean;
-    leafColStyle(column: TableRuntimeColumn | null | undefined): Record<string, string>;
+    leafColStyle(column: TableRuntimeColumn | null | undefined): Partial<Record<string, string>>;
     lineNumberColumnIndex(): number;
     listColumnIsMultiselect(column: TableRuntimeColumn | null | undefined): boolean;
     listMultiFn(): (col: number) => boolean;
@@ -569,6 +600,8 @@ type TableRuntimeMethods = {
     onInput(): void;
     onIpInput(rowIndex: number, cellIndex: number, event: Event | { target?: { value?: unknown } } | unknown): void;
     onNativeCellBlur(row: number, col: number): void;
+    onColumnNumberHeaderContextMenu(event: MouseEvent, colIndex: number): void;
+    onGroupHeaderContextMenu(event: MouseEvent): void;
     onTableCellClick(event: MouseEvent, row: number, col: number): void;
     onTableCellDblClick(row: number, col: number): void;
     onTableCellMouseDown(event: MouseEvent, row: number, col: number): void;
@@ -598,7 +631,6 @@ type TableRuntimeMethods = {
     setSelFullWidthRowSpan(r0: number, r1: number): void;
     setSelectionSingle(r: number, c: number): void;
     setValue(value: unknown): void;
-    showAppNotificationFromRuntime(message: string, type?: string): void;
     showSortInHeaderCell(rIdx: number, cell: TableHeaderCell | null | undefined): boolean;
     showTableError(message: string, options?: TableShowErrorOptions): void;
     sortAriaLabel(colIdx: number | null): string;
@@ -610,20 +642,70 @@ type TableRuntimeMethods = {
     thAriaSort(rIdx: number, cIdx: number, cell: TableHeaderCell | null | undefined): 'ascending' | 'descending' | undefined;
     tbodyRowCount(): number;
     toggleGroupExpand(pathKey: string): void;
+    toggleLineNumbersFromSnapshot(snapshot?: TableContextMenuSnapshot): void;
     toggleStickyHeaderFromSnapshot(snapshot?: TableContextMenuSnapshot): void;
     toggleWordWrapFromSnapshot(snapshot?: TableContextMenuSnapshot): void;
     writeClipboardText(text: string): Promise<void>;
 };
 
+type TableWidgetEmit = (event: 'input', payload: unknown) => void;
+
 type TableWidgetVm = TableRuntimeState &
     TableRuntimePropsSurface &
     TableRuntimeComputed &
-    TableRuntimeDomSurface &
     TableRuntimeMethods;
 
-type TableRuntimeVm = ComponentPublicInstance & TableWidgetVm;
+type TableRuntimeVm = TableRuntimeDomSurface & TableWidgetVm;
 
-type TableWidgetSetupBindings = TableWidgetVm;
+type TableRuntimeSurface<K extends keyof TableRuntimeVm> = Pick<TableRuntimeVm, K>;
+
+type TableRuntimeModuleSurface = TableRuntimeVm;
+type TableDomRuntimeSurface = TableRuntimeModuleSurface;
+type TableSelectionRuntimeSurface = TableRuntimeModuleSurface;
+type TableEditingRuntimeSurface = TableRuntimeModuleSurface;
+type TableDataViewRuntimeSurface = TableRuntimeModuleSurface;
+type TableContextMenuRuntimeSurface = TableRuntimeModuleSurface;
+type TableLazyRuntimeSurface = TableRuntimeModuleSurface;
+type TableStickyRuntimeSurface = TableRuntimeModuleSurface;
+
+type TableWidgetSetupBindings = ToRefs<TableRuntimeState> &
+    {
+        readonly widgetConfig: Ref<TableWidgetConfig>;
+        readonly widgetName: Ref<string>;
+    } &
+    TableRuntimeComputedRefs &
+    TableRuntimeMethods;
+
+type TableWidgetPublicSurface = {
+    readonly contextMenuOpen: boolean;
+    readonly stickyHeaderEnabled: boolean;
+    readonly tableData: TableDataRow[];
+    getTableEl(): HTMLTableElement | null;
+    getValue(): unknown[][];
+    initializeTable(): void;
+    onTableEditableKeydown(event: KeyboardEvent): void;
+    setValue(value: unknown): void;
+};
+
+type TableRuntimeComputedGetter<T> = (this: TableRuntimeVm) => T;
+
+type TableRuntimeComputedDefinition<T> =
+    | TableRuntimeComputedGetter<T>
+    | {
+          get: TableRuntimeComputedGetter<T>;
+          set?: (this: TableRuntimeVm, value: T) => void;
+      };
+
+type TableRuntimeComputedDefinitions = {
+    [K in keyof TableRuntimeComputed]: TableRuntimeComputedDefinition<TableRuntimeComputed[K]>;
+};
+
+type TableRuntimeWatchHandlers = {
+    stickyHeaderEnabled(this: TableRuntimeVm, value: TableRuntimeComputed['stickyHeaderEnabled']): void;
+    tableLazyUiActive(this: TableRuntimeVm, value: TableRuntimeComputed['tableLazyUiActive']): void;
+    widgetConfig(this: TableRuntimeVm): void;
+    widgetName(this: TableRuntimeVm): void;
+};
 
 export type {
     TableCellDisplayAction,
@@ -631,6 +713,8 @@ export type {
     TableCellAddress,
     TableClipboardPayload,
     TableCellOptions,
+    TableCellWidgetRegistry,
+    TableCellWidgetRegistryKey,
     TableCellWidgetConfig,
     TableCellWidgetInstance,
     TableCellWidgetPayload,
@@ -643,7 +727,9 @@ export type {
     TableDataRow,
     TableDerivedState,
     TableDisplayRow,
+    TableDomRuntimeSurface,
     TableEditingSession,
+    TableEditingRuntimeSurface,
     TableFeatureFlags,
     TableGroupDisplayRow,
     TableGroupingState,
@@ -658,20 +744,35 @@ export type {
     TableRuntimeError,
     TableRuntimeErrorSeverity,
     TableRuntimeComputed,
+    TableRuntimeComputedDefinition,
+    TableRuntimeComputedDefinitions,
+    TableRuntimeComputedRefs,
+    TableContextMenuRuntimeSurface,
+    TableDataViewRuntimeSurface,
     TableRuntimeDomSurface,
     TableRuntimeMethods,
     TableRuntimePropsSurface,
+    TableRuntimeSurface,
     TableRuntimeState,
     TableRuntimeVm,
     TableRuntimeServices,
+    TableRuntimeWatchHandlers,
     TableSchema,
     TableSelectionRect,
+    TableSelectionRuntimeSurface,
     TableSelectionState,
+    TableLazyRuntimeSurface,
+    TableStickyRuntimeSurface,
     TableSortDirection,
     TableSortState,
     TableStore,
+    TableAttrsMap,
+    TableWidgetAttrs,
     TableWidgetConfig,
+    TableWidgetEmit,
+    TableWidgetPublicSurface,
     TableWidgetSetupBindings,
     TableWidgetVm,
-    UnknownRecord
+    UnknownRecord,
+    WidgetAttrsMap
 };

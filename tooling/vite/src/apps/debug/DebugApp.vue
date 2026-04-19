@@ -192,17 +192,44 @@
   </div>
 </template>
 
-<script lang="ts">
-import debugAppOptions from '../../../../../frontend/js/debug.ts';
+<script setup lang="ts">
 import DiagnosticsPanel from '../../../../../frontend/js/widgets/common/DiagnosticsPanel.vue';
 import ErrorPanel from '../../../../../frontend/js/widgets/common/ErrorPanel.vue';
+import { useDebugApp } from '../../../../../frontend/js/debug.ts';
 
-export default {
-  name: 'DebugApp',
-  components: {
-    DiagnosticsPanel,
-    ErrorPanel
-  },
-  ...debugAppOptions
-};
+defineOptions({
+  name: 'DebugApp'
+});
+
+const {
+  activeTab,
+  apiError,
+  apiLoading,
+  apiText,
+  canRunSql,
+  diagnostics,
+  dismissScopeError,
+  formatSqlCell,
+  logError,
+  logLines,
+  logText,
+  loadLogs,
+  logsLoading,
+  onSqlKeydown,
+  pages,
+  pagesError,
+  pagesLoading,
+  publicSurface,
+  runSql,
+  sqlColumns,
+  sqlError,
+  sqlLoading,
+  sqlQuery,
+  sqlResult,
+  sqlRows,
+  sqlSummary,
+  visibleErrors
+} = useDebugApp();
+
+defineExpose(publicSurface);
 </script>

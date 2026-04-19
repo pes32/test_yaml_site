@@ -12,8 +12,112 @@ async function editNativeTableCell(name: string, page: Page, row: number, col: n
   await expect(input).toHaveValue(value);
 }
 
+async function addRowBelowFromCell(name: string, page: Page, row: number, col: number) {
+  await tableCell(page, name, row, col).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Добавить строку ниже' }).click();
+  await expect(page.locator('.context-menu')).toHaveCount(0);
+}
+
+type TableWidgetRuntimeInspection = {
+  registeredType: string;
+  contextMenuOpenValue: boolean;
+  exposed: {
+    contextMenuOpenBoolean: boolean;
+    getValue: boolean;
+    initializeTable: boolean;
+    onTableEditableKeydown: boolean;
+    setValue: boolean;
+    stickyHeaderEnabledBoolean: boolean;
+    tableDataArray: boolean;
+  };
+  refs: {
+    contextMenuEl: boolean;
+    lazySentinelRow: boolean;
+    tableRootFromRuntime: boolean;
+    tableRootFromRuntimeMatchesElement: boolean;
+    tableThead: boolean;
+  };
+};
+
+async function installWidgetInstanceDebugRegistry(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    type WidgetDebugEntry = {
+      instance: unknown;
+      type: string;
+      widgetName: string;
+    };
+    type WidgetDebugRegistry = {
+      entries: Record<string, { instance: unknown; type: string }>;
+      register(entry: WidgetDebugEntry): void;
+      unregister(entry: WidgetDebugEntry): void;
+    };
+    type WidgetDebugWindow = Window & {
+      __YAMLS_WIDGET_INSTANCE_DEBUG__?: WidgetDebugRegistry;
+    };
+
+    const debugWindow = window as WidgetDebugWindow;
+    debugWindow.__YAMLS_WIDGET_INSTANCE_DEBUG__ = {
+      entries: {},
+      register(entry) {
+        this.entries[entry.widgetName] = {
+          instance: entry.instance,
+          type: entry.type
+        };
+      },
+      unregister(entry) {
+        if (this.entries[entry.widgetName]?.instance === entry.instance) {
+          delete this.entries[entry.widgetName];
+        }
+      }
+    };
+  });
+}
+
+async function inspectTableWidgetRuntime(page: Page, name: string): Promise<TableWidgetRuntimeInspection> {
+  return await table(page, name).evaluate((element, widgetName): TableWidgetRuntimeInspection => {
+    type WidgetDebugRegistry = {
+      entries: Record<string, { instance: unknown; type: string }>;
+    };
+    type WidgetDebugWindow = Window & {
+      __YAMLS_WIDGET_INSTANCE_DEBUG__?: WidgetDebugRegistry;
+    };
+
+    function isRecord(value: unknown): value is Record<string, unknown> {
+      return !!value && typeof value === 'object';
+    }
+
+    const registry = (window as WidgetDebugWindow).__YAMLS_WIDGET_INSTANCE_DEBUG__;
+    const entry = registry?.entries[widgetName];
+    const publicInstance = isRecord(entry?.instance) ? entry.instance : {};
+    const getTableEl = publicInstance.getTableEl;
+    const tableRoot = typeof getTableEl === 'function' ? getTableEl() : null;
+
+    return {
+      registeredType: entry?.type || '',
+      contextMenuOpenValue: publicInstance.contextMenuOpen === true,
+      exposed: {
+        contextMenuOpenBoolean: typeof publicInstance.contextMenuOpen === 'boolean',
+        getValue: typeof publicInstance.getValue === 'function',
+        initializeTable: typeof publicInstance.initializeTable === 'function',
+        onTableEditableKeydown: typeof publicInstance.onTableEditableKeydown === 'function',
+        setValue: typeof publicInstance.setValue === 'function',
+        stickyHeaderEnabledBoolean: typeof publicInstance.stickyHeaderEnabled === 'boolean',
+        tableDataArray: Array.isArray(publicInstance.tableData)
+      },
+      refs: {
+        contextMenuEl: document.querySelector('.context-menu') instanceof HTMLElement,
+        lazySentinelRow: element.querySelector('.widget-table__lazy-sentinel') instanceof HTMLTableRowElement,
+        tableRootFromRuntime: tableRoot instanceof HTMLTableElement,
+        tableRootFromRuntimeMatchesElement: tableRoot === element,
+        tableThead: element.querySelector('thead') instanceof HTMLTableSectionElement
+      }
+    };
+  }, name);
+}
+
 test.describe('behavior: demo table widgets', () => {
   test.beforeEach(async ({ page }) => {
+    await installWidgetInstanceDebugRegistry(page);
     await openDemoTab(page, 'Таблицы', 'Демо-таблицы');
   });
 
@@ -68,6 +172,43 @@ test.describe('behavior: demo table widgets', () => {
     await expect(lazyTable.locator('tbody tr').nth(99)).toContainText('REC-0100');
     await expect(lazyTable.locator('tbody tr')).toHaveCount(101);
     await expect(lazyTable.locator('.widget-table__lazy-sentinel')).toHaveCount(1);
+  });
+
+  test('table public surface stays limited while runtime refs work', async ({ page }) => {
+    const lazyTable = table(page, 'demo_table_7');
+    await expect(lazyTable.locator('.widget-table__lazy-sentinel')).toHaveCount(1);
+
+    const mountedRuntime = await inspectTableWidgetRuntime(page, 'demo_table_7');
+    expect(mountedRuntime).toMatchObject({
+      registeredType: 'table',
+      contextMenuOpenValue: false,
+      exposed: {
+        contextMenuOpenBoolean: true,
+        getValue: true,
+        initializeTable: true,
+        onTableEditableKeydown: true,
+        setValue: true,
+        stickyHeaderEnabledBoolean: true,
+        tableDataArray: true
+      },
+      refs: {
+        contextMenuEl: false,
+        lazySentinelRow: true,
+        tableRootFromRuntime: true,
+        tableRootFromRuntimeMatchesElement: true,
+        tableThead: true
+      }
+    });
+
+    await tableCell(page, 'demo_table_2', 0, 0).click({ button: 'right' });
+    await expect(page.locator('.context-menu')).toBeVisible();
+
+    const menuRuntime = await inspectTableWidgetRuntime(page, 'demo_table_2');
+    expect(menuRuntime.contextMenuOpenValue).toBe(true);
+    expect(menuRuntime.refs.contextMenuEl).toBe(true);
+
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.context-menu')).toHaveCount(0);
   });
 });
 
@@ -134,5 +275,91 @@ test.describe('behavior: complex table widget', () => {
     const listCell = tableCell(page, 'big_table', 0, 11);
     await expect(listCell).toBeVisible();
     await expect(listCell.getByRole('button', { name: 'Открыть список' })).toBeVisible();
+  });
+
+  test('full-row keyboard selection keeps focus and Ctrl+Minus deletes the selected row block', async ({ page }) => {
+    const complexTable = table(page, 'big_table');
+    await addRowBelowFromCell('big_table', page, 0, 1);
+    await addRowBelowFromCell('big_table', page, 0, 1);
+    await expect(complexTable.locator('tbody tr')).toHaveCount(3);
+
+    const origin = tableCell(page, 'big_table', 0, 1);
+    await origin.click();
+    await expect(origin).toBeFocused();
+
+    await page.keyboard.press('Shift+Space');
+    await expect(origin).toBeFocused();
+
+    await page.keyboard.press('Shift+ArrowDown');
+    await expect(tableCell(page, 'big_table', 1, 1)).toBeFocused();
+
+    await page.keyboard.down('Control');
+    await page.keyboard.press('-');
+    await page.keyboard.up('Control');
+
+    await expect(complexTable.locator('tbody tr')).toHaveCount(1);
+  });
+
+  test('copies one cell value into every cell of a selected range', async ({ page }) => {
+    await page.evaluate(() => {
+      const clipboardStore = { text: '' };
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {
+          readText: async () => clipboardStore.text,
+          writeText: async (text: string) => {
+            clipboardStore.text = String(text);
+          }
+        }
+      });
+    });
+    await addRowBelowFromCell('big_table', page, 0, 1);
+    await editNativeTableCell('big_table', page, 0, 1, 'seed');
+
+    const source = tableCell(page, 'big_table', 0, 1);
+    await source.click();
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+C' : 'Control+C');
+
+    await source.click();
+    await tableCell(page, 'big_table', 1, 2).click({ modifiers: ['Shift'] });
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+V' : 'Control+V');
+
+    await expect(tableCell(page, 'big_table', 0, 1)).toContainText('seed');
+    await expect(tableCell(page, 'big_table', 0, 2)).toContainText('seed');
+    await expect(tableCell(page, 'big_table', 1, 1)).toContainText('seed');
+    await expect(tableCell(page, 'big_table', 1, 2)).toContainText('seed');
+  });
+
+  test('column number headers open the column context menu and line numbering toggles from any header', async ({ page }) => {
+    const complexTable = table(page, 'big_table');
+    const firstColumnNumber = complexTable.locator('thead tr').last().locator('th').nth(1);
+    await firstColumnNumber.click({ button: 'right' });
+    await expect(page.getByRole('menuitem', { name: 'Отключить нумерацию строк' })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'Открепить заголовки' })).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    await complexTable.getByRole('columnheader', { name: /Строка 1/ }).first().click({ button: 'right' });
+    await page.getByRole('menuitem', { name: 'Отключить нумерацию строк' }).click();
+    await expect(complexTable.locator('thead').getByText('№', { exact: true })).toHaveCount(0);
+
+    await complexTable.getByRole('columnheader', { name: /Строка 1/ }).first().click({ button: 'right' });
+    await page.getByRole('menuitem', { name: 'Включить нумерацию строк' }).click();
+    await expect(complexTable.locator('thead').getByText('№', { exact: true })).toBeVisible();
+  });
+
+  test('group rows use the shared column context menu instead of the browser menu', async ({ page }) => {
+    const complexTable = table(page, 'big_table');
+    await complexTable.getByRole('button', { name: /Строка 1/ }).click();
+    await complexTable.getByRole('columnheader', { name: /Строка 1/ }).first().click({ button: 'right' });
+    await page.getByRole('menuitem', { name: 'Группировка' }).click();
+
+    const groupRow = complexTable.locator('.widget-table__group-row').first();
+    await expect(groupRow).toBeVisible();
+    await groupRow.click({ button: 'right' });
+
+    await expect(page.getByRole('menuitem', { name: 'Открепить заголовки' })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'Отключить нумерацию строк' })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'Перенос по словам' })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'Сбросить сортировку' })).toBeVisible();
   });
 });

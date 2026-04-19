@@ -1,6 +1,6 @@
-import type { TableRuntimeVm } from './table_contract.ts';
+import type { TableStickyRuntimeSurface } from './table_contract.ts';
 
-type StickyMeasurementVm = TableRuntimeVm;
+type StickyMeasurementVm = TableStickyRuntimeSurface;
 
 function readStickyTopPx(root: Element | null | undefined, table: Element | null | undefined): number {
     const tryReadPx = (node: Element | null | undefined) => {

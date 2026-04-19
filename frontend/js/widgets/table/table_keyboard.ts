@@ -203,24 +203,18 @@ import { buildJumpOpts, jumpTarget } from './table_jump.ts';
             vm.exitCellEdit();
             vm.$nextTick?.(() => vm.focusSelectionCell(row, col));
         } else {
-            const last = n - 1;
-            vm.selFullWidthRows = { r0: row, r1: row };
-            vm.selAnchor = { r: row, c: col };
-            if (last === 0) {
-                vm.selFocus = { r: row, c: 0 };
-            } else if (col === 0) {
-                vm.selFocus = { r: row, c: last };
-            } else if (col === last) {
-                vm.selFocus = { r: row, c: 0 };
-            } else {
-                vm.selFocus =
-                    col * 2 <= last
-                        ? { r: row, c: last }
-                        : { r: row, c: 0 };
-            }
+            const rect = vm.getSelRect();
+            const useExistingRowRange =
+                vm.getSelectionCellCount() > 1 &&
+                row >= rect.r0 &&
+                row <= rect.r1;
+            const r0 = useExistingRowRange ? rect.r0 : row;
+            const r1 = useExistingRowRange ? rect.r1 : row;
+            vm.selFullWidthRows = { r0, r1 };
+            vm.selAnchor = { r: r0, c: col };
+            vm.selFocus = { r: row, c: col };
             vm.exitCellEdit();
-            const focus = getFocusCell(vm);
-            vm.focusSelectionCell(focus.r, focus.c);
+            vm.focusSelectionCell(row, col);
         }
         return true;
     }

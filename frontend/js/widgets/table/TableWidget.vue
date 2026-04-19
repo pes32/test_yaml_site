@@ -67,7 +67,11 @@
               </th>
             </tr>
             <tr v-if="hasColumnNumbers">
-              <th v-for="(column, index) in tableColumns" :key="'num-' + index">
+              <th
+                v-for="(column, index) in tableColumns"
+                :key="'num-' + index"
+                @contextmenu="onColumnNumberHeaderContextMenu($event, index)"
+              >
                 <span v-text="column.number != null ? column.number : ''"></span>
               </th>
             </tr>
@@ -180,6 +184,7 @@
                   :style="groupRowStyle(drow)"
                   tabindex="-1"
                   @click.stop.prevent="toggleGroupExpand(drow.pathKey)"
+                  @contextmenu="onGroupHeaderContextMenu($event)"
                 >
                   <span class="widget-table__group-toggle" aria-hidden="true" v-text="groupExpanded(drow.pathKey) ? '−' : '+'"></span>
                   <span class="widget-table__group-label" v-text="drow.label"></span>
@@ -318,8 +323,8 @@
   </div>
 </template>
 
-<script lang="ts">
-import { defineComponent, markRaw } from 'vue';
+<script setup lang="ts">
+import { markRaw } from 'vue';
 
 import DateTimeWidget from '../datetime/DateTimeWidget.vue';
 import DateWidget from '../datetime/DateWidget.vue';
@@ -331,38 +336,133 @@ import IpWidget from '../fields/IpWidget.vue';
 import StringWidget from '../fields/StringWidget.vue';
 import ListWidget from '../ListWidget.vue';
 import VocWidget from '../voc/VocWidget.vue';
+import type {
+  TableCellWidgetRegistry,
+  TableRuntimePropsSurface,
+  TableWidgetEmit,
+  TableWidgetPublicSurface
+} from './table_contract.ts';
 import { useTableRuntime } from './useTableRuntime.ts';
 
-export default defineComponent({
-  name: 'TableWidget',
-  props: {
-    widgetConfig: {
-      type: Object,
-      required: true
-    },
-    widgetName: {
-      type: String,
-      required: true
-    }
-  },
-  emits: ['input'],
-  setup(props, { emit }) {
-    return useTableRuntime({
-      props,
-      emit,
-      cellWidgets: {
-        stringCellWidget: markRaw(StringWidget),
-        intCellWidget: markRaw(IntWidget),
-        floatCellWidget: markRaw(FloatWidget),
-        dateCellWidget: markRaw(DateWidget),
-        timeCellWidget: markRaw(TimeWidget),
-        datetimeCellWidget: markRaw(DateTimeWidget),
-        ipCellWidget: markRaw(IpWidget),
-        ipMaskCellWidget: markRaw(IpMaskWidget),
-        listCellWidget: markRaw(ListWidget),
-        vocCellWidget: markRaw(VocWidget)
-      }
-    });
-  }
+defineOptions({
+  name: 'TableWidget'
 });
+
+const props = defineProps<TableRuntimePropsSurface>();
+const emit = defineEmits<TableWidgetEmit>();
+
+const tableCellWidgets = {
+  stringCellWidget: markRaw(StringWidget),
+  intCellWidget: markRaw(IntWidget),
+  floatCellWidget: markRaw(FloatWidget),
+  dateCellWidget: markRaw(DateWidget),
+  timeCellWidget: markRaw(TimeWidget),
+  datetimeCellWidget: markRaw(DateTimeWidget),
+  ipCellWidget: markRaw(IpWidget),
+  ipMaskCellWidget: markRaw(IpMaskWidget),
+  listCellWidget: markRaw(ListWidget),
+  vocCellWidget: markRaw(VocWidget)
+} satisfies TableCellWidgetRegistry;
+
+const tableRuntime = useTableRuntime({
+  props,
+  emit,
+  cellWidgets: tableCellWidgets
+});
+
+const {
+  cellAllowsEditing,
+  cellDisplayActionClass,
+  cellDisplayActions,
+  cellDisplayActionsClass,
+  cellDisplayClass,
+  cellDisplayTextClass,
+  cellDisplayTextStyle,
+  cellSelectionOutlineStyle,
+  cellTabindex,
+  cellTdClass,
+  cellUsesEmbeddedWidget,
+  cellUsesNativeInput,
+  cellWidgetComponent,
+  cellWidgetConfig,
+  cellWidgetName,
+  cellWidgetRefName,
+  clearCellOverflowHint,
+  contextMenuItems,
+  contextMenuOpen,
+  contextMenuPosition,
+  dataRowByDisplayIndex,
+  displayRows,
+  formatCellValue,
+  groupExpanded,
+  groupRowStyle,
+  groupingActive,
+  hasColumnNumbers,
+  hasExplicitTableWidth,
+  headerRows,
+  headerSortEnabled,
+  headerThStyle,
+  hideContextMenu,
+  iconSrc,
+  isCellEditing,
+  isEditable,
+  isLoadingChunk,
+  leafColStyle,
+  onBodyContextMenu,
+  onCellDisplayAction,
+  onCellInput,
+  onCellInputViewMouseDown,
+  onCellWidgetPayload,
+  onColumnNumberHeaderContextMenu,
+  onContextMenuItemActivate,
+  onCtxIconError,
+  onGroupHeaderContextMenu,
+  onHeaderSortClick,
+  onIpInput,
+  onNativeCellBlur,
+  onTableCellClick,
+  onTableCellDblClick,
+  onTableCellMouseDown,
+  onTableContainerFocusIn,
+  onTableContainerFocusOut,
+  onTableEditableKeydown,
+  onTableHeaderContextMenu,
+  onTbodyMouseDownCapture,
+  onTextCellBlur,
+  safeCell,
+  showSortInHeaderCell,
+  sortAriaLabel,
+  sortControlClass,
+  stickyHeaderEnabled,
+  syncCellOverflowHint,
+  tableColumns,
+  tableData,
+  tableInlineStyle,
+  tableLazyUiActive,
+  tableUiLocked,
+  tableZebra,
+  thAriaSort,
+  toggleGroupExpand,
+  widgetConfig,
+  wordWrapEnabled
+} = tableRuntime;
+
+const tableWidgetPublicSurface = {
+  get contextMenuOpen() {
+    return tableRuntime.contextMenuOpen.value;
+  },
+  get stickyHeaderEnabled() {
+    return tableRuntime.stickyHeaderEnabled.value;
+  },
+  get tableData() {
+    return tableRuntime.tableData.value;
+  },
+  getTableEl: tableRuntime.getTableEl,
+  getValue: tableRuntime.getValue,
+  initializeTable: tableRuntime.initializeTable,
+  onTableEditableKeydown: tableRuntime.onTableEditableKeydown,
+  setValue: tableRuntime.setValue
+} satisfies TableWidgetPublicSurface;
+
+defineExpose(tableWidgetPublicSurface);
 </script>

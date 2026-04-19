@@ -29,7 +29,7 @@
 }
 ```
 
-Transport shape знает только `frontend/js/runtime/api_client.ts`. UI-слой работает уже с нормализованными domain-структурами.
+Transport shape знает только `frontend/js/runtime/api_client.ts`. UI-слой работает с нормализованными domain-структурами.
 
 ## HTML bootstrap
 
@@ -173,7 +173,7 @@ Frontend normalizes это в `ExecuteResult`.
 
 - `output_attrs` остаётся transport-only полем execute request;
 - `split_button` не вводит отдельный transport format и для command-items использует тот же execute pipeline, что и обычный `button`.
-- frontend action runtime теперь TypeScript-only (`action_runtime.ts` и соседние `action_*.ts` modules), но transport shape `POST /api/execute` не изменился.
+- frontend action runtime расположен в TypeScript modules (`action_runtime.ts` и соседние `action_*.ts` files), transport shape `POST /api/execute` общий для `button` и `split_button`.
 
 ## Debug API
 
@@ -203,16 +203,19 @@ Debug routes используют тот же envelope:
 - результат ограничивается серверным `max_rows`.
 
 Их raw transport тоже проходит через `frontend/js/runtime/api_client.ts`.
+Нормализованные frontend response shapes экспортируются из
+`frontend/js/runtime/api_contract.ts`, поэтому `page.ts` и `debug.ts` не держат
+локальные ad hoc transport-типы рядом с runtime-кодом.
 
 ## Contract Files
 
 Актуальные contract files находятся рядом с владельцами runtime:
 
-- `backend/contracts.py` — backend-side Pydantic contracts for pages, attrs, modals, diagnostics and API envelope data.
+- `backend/contracts.py` — backend-side Pydantic contracts for pages, attrs, modals, debug payloads, diagnostics and API envelope data.
+- `frontend/js/runtime/api_contract.ts` — normalized frontend response/request contracts для page/debug/API transport.
 - `frontend/js/runtime/page_contract.ts` — frontend page/runtime domain boundary.
 - `frontend/js/runtime/widget_contract.ts` — stateful widget value/list normalization helpers.
 - `frontend/js/runtime/action_types.ts` и `frontend/js/runtime/action_runtime.ts` — internal action item/execution contracts для `button` и `split_button`.
-- `frontend/js/widgets/widget_shared_contracts.ts` — widget-facing VM/shared contracts.
 - `frontend/js/widgets/table/table_contract.ts` — internal table runtime/schema/state/service contracts.
 - `frontend/js/runtime/voc_contract.ts` — voc widget source/value contract.
 
@@ -220,7 +223,7 @@ Debug routes используют тот же envelope:
 
 ## Frontend error normalization
 
-После transport normalization ошибка не должна ходить по UI как raw `fetch`/HTTP object.
+В UI ошибка не ходит как raw `fetch`/HTTP object.
 
 Единый runtime contract живёт в `frontend/js/runtime/error_model.ts` и нормализует ошибки в:
 
@@ -234,4 +237,4 @@ Debug routes используют тот же envelope:
 - `snapshotVersion`
 - `details`
 
-`api_client.ts` знает только envelope и transport status, а page/debug runtime уже работают через этот frontend error shape.
+`api_client.ts` знает только envelope и transport status, а page/debug runtime работают через этот frontend error shape.

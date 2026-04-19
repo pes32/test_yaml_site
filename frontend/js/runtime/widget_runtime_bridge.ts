@@ -4,18 +4,19 @@ import type {
   WidgetLifecycleHandle,
   WidgetRuntimeFeature
 } from '../widgets/factory.ts';
+import type { AttrConfigMap, AttrConfigRecord } from '../shared/attr_config.ts';
 
 type NotificationType = 'success' | 'info' | 'warning' | 'danger' | string;
 
 type PageHostRuntimeServices = {
   clearActiveWidgetLifecycle?: (handle?: WidgetLifecycleHandle | null) => void;
   closeUiModal?: () => Promise<unknown> | unknown;
-  getAllAttrsMap?: () => Record<string, unknown>;
+  getAllAttrsMap?: () => AttrConfigMap;
   getConfirmModal?: () => unknown;
   getCurrentPageNameFromRuntime?: () => string;
   getModalRuntimeController?: () => unknown;
   getModalRuntimeState?: () => unknown;
-  getWidgetAttrsByName?: (widgetName: string) => Record<string, unknown>;
+  getWidgetAttrsByName?: (widgetName: string) => AttrConfigRecord;
   getWidgetRuntimeValueByName?: (widgetName: string) => unknown;
   handleRecoverableAppError?: (error: unknown, options?: Record<string, unknown>) => unknown;
   openUiModal?: (modalName: string) => Promise<unknown> | unknown;

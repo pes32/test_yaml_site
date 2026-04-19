@@ -39,7 +39,7 @@ const ViewRuntimeMethods = defineTableRuntimeModule({
 
     showSortInHeaderCell(rIdx: number, cell: TableHeaderCell | null | undefined) {
         void rIdx;
-        return (
+        return !!(
             this.headerSortEnabled &&
             cell &&
             cell.colspan === 1 &&
@@ -132,10 +132,11 @@ const ViewRuntimeMethods = defineTableRuntimeModule({
 
     findCellOverflowContentEl(cellEl: Element | null | undefined) {
         if (!cellEl || !cellEl.querySelector) return null;
-        return (
+        const contentEl = (
             cellEl.querySelector('.widget-table__cell-value') ||
             cellEl.querySelector('input.cell-input--view')
         );
+        return contentEl instanceof HTMLElement ? contentEl : null;
     },
 
     syncCellOverflowHint(event: Event) {

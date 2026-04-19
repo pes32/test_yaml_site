@@ -19,7 +19,7 @@
 - Lazy-loading merge обязан сохранять row ids и не дублировать rows.
 - Embedded cell editors не должны становиться источником истины для committed page state.
 
-## Current Guardrails
+## Guardrails
 
 - Pure logic вынесена в helper modules и может тестироваться вне Vue.
 - Sticky-header path локализован в `table_sticky_header.ts`, `table_measurement.ts` и `table_scroll.ts`.
@@ -28,6 +28,6 @@
 
 ## Open Performance Risks
 
-- Пока нет автоматизированного browser benchmark для больших таблиц.
-- Strict table typecheck закрыт, generic `Proxy` boundary в `useTableRuntime.ts` заменён явным controller, но часть внешних DOM/event signatures остаётся широкой и должна сужаться только вместе с regression coverage.
+- Автоматизированный browser benchmark для больших таблиц не входит в текущий gate.
+- Strict table typecheck and `type-holes` входят в gate; `useTableRuntime.ts` использует явный controller, а оставшиеся внешние DOM/event signatures должны сужаться только вместе с regression coverage.
 - Lazy/grouping/sticky paths требуют targeted Playwright smoke после крупных изменений, даже при зелёных type/build gates.

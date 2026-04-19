@@ -1,8 +1,11 @@
 import { canAddGroupingLevel } from './table_grouping.ts';
-import { defineTableRuntimeModule } from './table_method_helpers.ts';
+import { defineTableRuntimeModuleFor } from './table_method_helpers.ts';
 import { WidgetUiCoords } from './table_widget_helpers.ts';
+import type { TableContextMenuRuntimeSurface } from './table_contract.ts';
 
-const MenuRuntimeMethods = defineTableRuntimeModule({
+const defineMenuRuntimeModule = defineTableRuntimeModuleFor<TableContextMenuRuntimeSurface>();
+
+const MenuRuntimeMethods = defineMenuRuntimeModule({
     computeBodyModeForMenu() {
         if (this.selectionIsFullRowBlock()) return 'row';
         const { r0, r1, c0, c1 } = this.getSelRect();
@@ -45,6 +48,7 @@ const MenuRuntimeMethods = defineTableRuntimeModule({
             pasteAnchor: { r: pasteAnchor.r, c: pasteAnchor.c },
             sortKeys,
             groupingLevelsSnapshot: (this.groupingState.levels || []).slice(),
+            lineNumbersEnabled: this.lineNumbersRuntimeEnabled,
             stickyHeaderEnabled: this.stickyHeaderEnabled,
             wordWrapEnabled: this.wordWrapEnabled
         };
@@ -66,6 +70,7 @@ const MenuRuntimeMethods = defineTableRuntimeModule({
             pasteAnchor: { r: pasteAnchor.r, c: pasteAnchor.c },
             sortKeys,
             groupingLevelsSnapshot: (this.groupingState.levels || []).slice(),
+            lineNumbersEnabled: this.lineNumbersRuntimeEnabled,
             stickyHeaderEnabled: this.stickyHeaderEnabled,
             wordWrapEnabled: this.wordWrapEnabled
         };
@@ -117,8 +122,9 @@ const MenuRuntimeMethods = defineTableRuntimeModule({
     onTbodyMouseDownCapture(event) {
         if (!this.isEditable) return;
         if (event.button !== 2) return;
-        const td = event.target.closest?.('tbody td');
-        if (!td || !this.$el.contains(td)) return;
+        const target = event.target;
+        const td = target instanceof Element ? target.closest('tbody td') : null;
+        if (!td || !this.$el || !this.$el.contains(td)) return;
         this._tableContextMenuMouseDown = true;
         setTimeout(() => {
             if (this._tableContextMenuMouseDown && !this.contextMenuOpen) {
@@ -186,6 +192,36 @@ const MenuRuntimeMethods = defineTableRuntimeModule({
         this._attachContextMenuGlobalListeners();
     },
 
+    onColumnNumberHeaderContextMenu(event, colIndex) {
+        const normalizedCol = this.normCol(colIndex);
+        this.onTableHeaderContextMenu(
+            event,
+            -1,
+            {
+                colspan: 1,
+                label: '',
+                leafColIndex: null,
+                rowspan: 1,
+                runtimeColIndex: normalizedCol,
+                width: null
+            },
+            normalizedCol
+        );
+    },
+
+    onGroupHeaderContextMenu(event) {
+        if (this.tableColumns.length === 0) return;
+        event.preventDefault();
+        this._openContextMenuPrepare();
+        this.exitCellEdit();
+        this.contextMenuSessionId += 1;
+        this.contextMenuTarget = { kind: 'header', col: -1 };
+        this.contextMenuContext = this.buildContextMenuSnapshot('header', -1, -1, null);
+        this.contextMenuPosition = this.clampMenuPosition(event);
+        this.contextMenuOpen = true;
+        this._attachContextMenuGlobalListeners();
+    },
+
     _openContextMenuPrepare() {
         this._detachContextMenuGlobalListeners();
         this.contextMenuOpen = false;
@@ -217,6 +253,7 @@ const MenuRuntimeMethods = defineTableRuntimeModule({
         const sortIds = new Set(['sort_asc', 'sort_desc', 'sort_reset']);
         const groupIds = new Set(['group_add_level', 'group_clear']);
         const stickyIds = new Set(['toggle_sticky_header']);
+        const lineNumberIds = new Set(['toggle_line_numbers', 'recalculate_line_numbers']);
         const wrapIds = new Set(['toggle_word_wrap']);
         if (
             !this.isEditable &&
@@ -224,6 +261,7 @@ const MenuRuntimeMethods = defineTableRuntimeModule({
             !sortIds.has(id) &&
             !groupIds.has(id) &&
             !stickyIds.has(id) &&
+            !lineNumberIds.has(id) &&
             !wrapIds.has(id)
         ) {
             return;
@@ -282,6 +320,9 @@ const MenuRuntimeMethods = defineTableRuntimeModule({
             case 'toggle_sticky_header':
                 this.toggleStickyHeaderFromSnapshot();
                 break;
+            case 'toggle_line_numbers':
+                this.toggleLineNumbersFromSnapshot(snapshot);
+                break;
             case 'toggle_word_wrap':
                 this.toggleWordWrapFromSnapshot();
                 break;
@@ -321,8 +362,15 @@ const MenuRuntimeMethods = defineTableRuntimeModule({
     applySortResetFromMenu(snapshot) {
         if (this.tableUiLocked) return;
         const col = snapshot.headerCol;
-        if (col == null) return;
         this.hideContextMenu();
+        if (col == null || col < 0) {
+            if (!this.sortKeys.length) return;
+            this.sortKeys = [];
+            this.restoreSortCycleRowOrder();
+            this.refreshGroupingViewFromData();
+            this.onInput();
+            return;
+        }
         const next = this.sortKeys.filter((item) => item.col !== col);
         if (next.length === this.sortKeys.length) return;
         this.sortKeys = next;

@@ -134,6 +134,35 @@ test.describe('behavior: buttons, split buttons and modals', () => {
     });
   });
 
+  test('split button missing command overwrites the active error snackbar', async ({ page }) => {
+    const snackbar = page.locator('.page-snackbar');
+    const toggle = widget(page, 'button_6').getByRole('button', { name: 'Открыть список действий' });
+
+    async function clickMissingCommand(name: string, sampleDuringReplacement = false) {
+      await toggle.click();
+      const responsePromise = page.waitForResponse((response) =>
+        response.url().endsWith('/api/execute') && response.status() === 404
+      );
+      await page.getByRole('menuitem', { name }).click();
+      await responsePromise;
+      if (sampleDuringReplacement) {
+        await page.waitForTimeout(50);
+        expect(await snackbar.count()).toBe(1);
+      } else {
+        await expect(snackbar).toHaveCount(1);
+      }
+      await expect(snackbar.first()).toContainText('не зарегистрирована');
+      const box = await snackbar.first().boundingBox();
+      expect(box?.width || 0).toBeGreaterThan(300);
+      return box?.width || 0;
+    }
+
+    const firstWidth = await clickMissingCommand('Первый пункт');
+    const secondWidth = await clickMissingCommand('Второй пункт', true);
+
+    expect(Math.abs(secondWidth - firstWidth)).toBeLessThan(1);
+  });
+
   test('confirm dialogs can be accepted or cancelled without accidental navigation', async ({ page }) => {
     await widget(page, 'func_3').getByRole('button', { name: 'Диалог (url)' }).click();
     await expect(page.locator('.confirm-modal-content')).toBeVisible();

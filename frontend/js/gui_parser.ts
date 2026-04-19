@@ -3,9 +3,9 @@ import type {
     ParsedGuiModal,
     ParsedGuiSection,
     ParsedGuiState,
-    ParsedGuiTab,
-    UnknownRecord
+    ParsedGuiTab
 } from './runtime/page_contract.ts';
+import { asRecord } from './shared/object_record.ts';
 
 type DynamicKey = {
     name: string;
@@ -36,12 +36,6 @@ type ParsedGuiModalRecord = ParsedGuiModal & {
 const META_KEYS = new Set(['url', 'title']);
 const raw = getComputedStyle(document.documentElement).getPropertyValue('--anim-ms');
 const COLLAPSE_ANIM_MS = raw ? parseInt(String(raw).trim(), 10) : 350;
-
-    function asRecord(value: unknown): UnknownRecord {
-        return value && typeof value === 'object' && !Array.isArray(value)
-            ? (value as UnknownRecord)
-            : {};
-    }
 
     function parseDynamicKey(rawKey: unknown): DynamicKey {
         const key = String(rawKey || '').trim();

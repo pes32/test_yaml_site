@@ -1,13 +1,14 @@
 import { resolveAttrConfig } from '../../shared/attr_config.ts';
 import { resolveTableDependencies } from '../../shared/table_attr_dependencies.ts';
 import { createTableStore } from './table_store.ts';
+import type { TableWidgetConfig, WidgetAttrsMap } from './table_contract.ts';
 
-function resolveDependencies(tableAttrConfig: Record<string, unknown>): string[] {
+function resolveDependencies(tableAttrConfig: Pick<TableWidgetConfig, 'table_attrs'> | null | undefined): string[] {
     return resolveTableDependencies(tableAttrConfig);
 }
 
 function getListOptions(
-    allAttrs: Record<string, unknown>,
+    allAttrs: WidgetAttrsMap,
     sourceName: string
 ): unknown[] {
     if (!sourceName || !allAttrs || typeof allAttrs !== 'object') {

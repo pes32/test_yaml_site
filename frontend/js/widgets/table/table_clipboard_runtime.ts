@@ -84,17 +84,36 @@ const ClipboardRuntimeMethods = defineTableRuntimeModule({
 
     applyPasteMatrix(snapshot, matrix) {
         if (this.groupingActive || this.tableUiLocked) return;
-        const { r: pasteRow, c: pasteCol } = snapshot.pasteAnchor;
+        const selectionRect = snapshot.rect;
+        const selectionRows = selectionRect.r1 - selectionRect.r0 + 1;
+        const selectionCols = selectionRect.c1 - selectionRect.c0 + 1;
+        const shouldTileIntoSelection =
+            selectionRows > 0 &&
+            selectionCols > 0 &&
+            (selectionRows > matrix.length ||
+                selectionCols > Math.max(...matrix.map((row: unknown) => Array.isArray(row) ? row.length : 0)));
+        const pasteMatrix = shouldTileIntoSelection
+            ? Array.from({ length: selectionRows }, (_, rowOffset) => {
+                const sourceRow = matrix[rowOffset % matrix.length] || [];
+                return Array.from({ length: selectionCols }, (_, colOffset) =>
+                    sourceRow[colOffset % Math.max(1, sourceRow.length)]
+                );
+            })
+            : matrix;
+        const pasteAnchor = shouldTileIntoSelection
+            ? { r: selectionRect.r0, c: selectionRect.c0 }
+            : snapshot.pasteAnchor;
+        const { r: pasteRow, c: pasteCol } = pasteAnchor;
         const numCols = this.tableColumns.length;
-        const neededRows = pasteRow + matrix.length;
+        const neededRows = pasteRow + pasteMatrix.length;
         while (this.tableData.length < neededRows) {
             this.tableData.push(this.makeEmptyRow());
         }
         const numRows = this.tableData.length;
-        for (let rowOffset = 0; rowOffset < matrix.length; rowOffset += 1) {
+        for (let rowOffset = 0; rowOffset < pasteMatrix.length; rowOffset += 1) {
             const rowIndex = pasteRow + rowOffset;
             if (rowIndex < 0 || rowIndex >= numRows) continue;
-            const rowData = matrix[rowOffset];
+            const rowData = pasteMatrix[rowOffset];
             if (!Array.isArray(rowData)) continue;
             const previous = this.tableData[rowIndex];
             const row = [...getRowCells(previous)];

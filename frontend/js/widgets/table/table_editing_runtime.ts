@@ -1,7 +1,11 @@
 import { getRowCells } from './table_utils.ts';
 import { tableDebugState, tableLog } from './table_debug.ts';
-import { defineTableRuntimeModule } from './table_method_helpers.ts';
-import type { TableRuntimeColumn } from './table_contract.ts';
+import { defineTableRuntimeModuleFor } from './table_method_helpers.ts';
+import type {
+    TableCellWidgetInstance,
+    TableEditingRuntimeSurface,
+    TableRuntimeColumn
+} from './table_contract.ts';
 
 function readEventValue(event: Event | { target?: { value?: unknown } } | unknown): unknown {
     if (event instanceof Event) {
@@ -17,7 +21,13 @@ function readEventValue(event: Event | { target?: { value?: unknown } } | unknow
     return event;
 }
 
-const EditingRuntimeMethods = defineTableRuntimeModule({
+function isTableCellWidgetInstance(value: unknown): value is TableCellWidgetInstance {
+    return !!value && typeof value === 'object' && '$' in value;
+}
+
+const defineEditingRuntimeModule = defineTableRuntimeModuleFor<TableEditingRuntimeSurface>();
+
+const EditingRuntimeMethods = defineEditingRuntimeModule({
     onCellInput(rowIndex: number, cellIndex: number, event: Event | { target?: { value?: unknown } } | unknown) {
         if (!this.canMutateColumnIndex(cellIndex)) return;
         const newValue = readEventValue(event);
@@ -164,9 +174,10 @@ const EditingRuntimeMethods = defineTableRuntimeModule({
             `tbody td[data-row="${normalizedRow}"][data-col="${normalizedCol}"]`
         );
         if (!td) return null;
-        return td.querySelector(
+        const editor = td.querySelector(
             '[data-table-editor-target="true"]:not([disabled]), input.cell-input:not([disabled]), select:not([disabled])'
         );
+        return editor instanceof HTMLElement ? editor : null;
     },
 
     getCellEditorActionElement(row, col, kind) {
@@ -179,11 +190,13 @@ const EditingRuntimeMethods = defineTableRuntimeModule({
         );
         if (!td) return null;
         if (!kind) {
-            return td.querySelector('[data-table-action-trigger]:not([disabled])');
+            const trigger = td.querySelector('[data-table-action-trigger]:not([disabled])');
+            return trigger instanceof HTMLElement ? trigger : null;
         }
-        return td.querySelector(
+        const trigger = td.querySelector(
             `[data-table-action-trigger="${String(kind)}"]:not([disabled])`
         );
+        return trigger instanceof HTMLElement ? trigger : null;
     },
 
     focusSelectionCell(row, col) {
@@ -265,8 +278,8 @@ const EditingRuntimeMethods = defineTableRuntimeModule({
     getCellWidgetInstance(row, col) {
         const name = this.cellWidgetRefName(row, col);
         const ref = this.$refs ? this.$refs[name] : null;
-        if (Array.isArray(ref)) return ref[0] || null;
-        return ref || null;
+        const candidate = Array.isArray(ref) ? ref[0] : ref;
+        return isTableCellWidgetInstance(candidate) ? candidate : null;
     },
 
     invokeCellWidgetAction(row, col, actionKind) {

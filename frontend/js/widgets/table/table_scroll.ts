@@ -1,8 +1,8 @@
-import type { TableRuntimeVm } from './table_contract.ts';
+import type { TableStickyRuntimeSurface } from './table_contract.ts';
 
 const globalScope = typeof window !== 'undefined' ? window : globalThis;
 
-type ScrollRuntimeVm = TableRuntimeVm & {
+type ScrollRuntimeVm = TableStickyRuntimeSurface & {
     _updateStickyThead?: () => void;
 };
 

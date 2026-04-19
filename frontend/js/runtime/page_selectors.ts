@@ -1,5 +1,6 @@
 import GuiParser from '../gui_parser.ts';
 import { resolveAttrConfig } from '../shared/attr_config.ts';
+import { asRecord, isRecord } from '../shared/object_record.ts';
 import type {
     AttrConfigMap,
     PageAttrConfig,
@@ -9,8 +10,7 @@ import type {
     ParsedGuiModal,
     ParsedGuiState,
     ParsedGuiSection,
-    ParsedGuiTab,
-    UnknownRecord
+    ParsedGuiTab
 } from './page_contract.ts';
 import {
     isStatefulWidgetConfig,
@@ -23,14 +23,11 @@ const EMPTY_PARSED_GUI: ParsedGuiState = Object.freeze({
     rootContentOnly: false
 });
 
-function asObject<T extends UnknownRecord>(value: unknown): T | null {
-    return value && typeof value === 'object' && !Array.isArray(value)
-        ? (value as T)
-        : null;
-}
-
 function getParsedGuiState(sessionState: PageSessionState | null | undefined): ParsedGuiState {
-    return (asObject<ParsedGuiState>(sessionState?.parsedGui) as ParsedGuiState) || EMPTY_PARSED_GUI;
+    const parsedGui = sessionState?.parsedGui;
+    return isRecord(parsedGui)
+        ? (parsedGui as ParsedGuiState)
+        : EMPTY_PARSED_GUI;
 }
 
 function getMenus(sessionState: PageSessionState | null | undefined): ParsedGuiMenu[] {
@@ -40,7 +37,7 @@ function getMenus(sessionState: PageSessionState | null | undefined): ParsedGuiM
 
 function getModalMap(sessionState: PageSessionState | null | undefined): Record<string, ParsedGuiModal> {
     const parsedGui = getParsedGuiState(sessionState);
-    return asObject<Record<string, ParsedGuiModal>>(parsedGui.modals) || {};
+    return asRecord<Record<string, ParsedGuiModal>>(parsedGui.modals);
 }
 
 function getRootContentOnly(sessionState: PageSessionState | null | undefined): boolean {
@@ -108,7 +105,7 @@ function getCurrentPageName(configState: PageConfigState | null | undefined): st
 }
 
 function selectWidgetAttrs(attrsByName: AttrConfigMap | unknown, widgetName: string): PageAttrConfig {
-    return resolveAttrConfig(attrsByName, widgetName) as PageAttrConfig;
+    return resolveAttrConfig(attrsByName, widgetName);
 }
 
 function selectWidgetRuntimeValue(
@@ -121,7 +118,7 @@ function selectWidgetRuntimeValue(
         return undefined;
     }
 
-    const widgetValues = asObject<Record<string, unknown>>(sessionState?.widgetValues) || {};
+    const widgetValues = asRecord(sessionState?.widgetValues);
     if (Object.prototype.hasOwnProperty.call(widgetValues, widgetName)) {
         return widgetValues[widgetName];
     }
@@ -138,7 +135,7 @@ function getWidgetValue(
     attrsByName: AttrConfigMap | unknown,
     widgetName: string
 ): unknown {
-    const widgetValues = asObject<Record<string, unknown>>(sessionState?.widgetValues) || {};
+    const widgetValues = asRecord(sessionState?.widgetValues);
     if (Object.prototype.hasOwnProperty.call(widgetValues, widgetName)) {
         return widgetValues[widgetName];
     }

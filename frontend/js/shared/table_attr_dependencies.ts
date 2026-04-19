@@ -49,7 +49,7 @@ function extractTableAttrDependencies(tableAttrs: unknown): string[] {
     return deps;
 }
 
-function resolveTableDependencies(tableAttrConfig: Record<string, unknown>): string[] {
+function resolveTableDependencies(tableAttrConfig: { table_attrs?: unknown } | null | undefined): string[] {
     const config = tableAttrConfig && typeof tableAttrConfig === 'object'
         ? tableAttrConfig
         : {};

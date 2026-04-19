@@ -99,7 +99,6 @@
     <transition name="page-snackbar">
       <div
         v-if="snackbar"
-        :key="snackbar.id"
         class="page-snackbar"
         :class="`page-snackbar--${snackbar.type}`"
         role="status"
@@ -115,6 +114,7 @@
         </div>
         <div class="page-snackbar__timer">
           <span
+            :key="snackbar.id"
             class="page-snackbar__timer-bar"
             :class="`page-snackbar__timer-bar--${snackbar.type}`"
             :style="{ animationDuration: snackbar.duration + 'ms' }"
@@ -125,23 +125,47 @@
   </div>
 </template>
 
-<script lang="ts">
-import pageAppOptions from '../../../../../frontend/js/page.ts';
+<script setup lang="ts">
 import ConfirmModal from '../../../../../frontend/js/widgets/common/ConfirmModal.vue';
 import ErrorPanel from '../../../../../frontend/js/widgets/common/ErrorPanel.vue';
 import ItemIcon from '../../../../../frontend/js/widgets/common/ItemIcon.vue';
 import ModalManager from '../../../../../frontend/js/widgets/common/ModalManager.vue';
 import SectionCard from '../../../../../frontend/js/widgets/common/SectionCard.vue';
+import { usePageApp } from '../../../../../frontend/js/page.ts';
 
-export default {
-  name: 'PageApp',
-  components: {
-    ConfirmModal,
-    ErrorPanel,
-    ItemIcon,
-    ModalManager,
-    SectionCard
-  },
-  ...pageAppOptions
-};
+defineOptions({
+  name: 'PageApp'
+});
+
+const {
+  activeMenu,
+  activeMenuIndex,
+  activeSections,
+  activeTabIndex,
+  activeTabs,
+  blockingPageError,
+  closeNotification,
+  confirmModal,
+  dismissPageError,
+  executeCommand,
+  getSectionCollapseId,
+  getWidgetAttrs,
+  getWidgetRuntimeValue,
+  isSectionCollapsed,
+  menus,
+  onMenuClick,
+  onTabClick,
+  onTabsFocusOut,
+  onWidgetInput,
+  pageError,
+  pageScrollRoot,
+  pageTabs,
+  publicSurface,
+  rootContentOnly,
+  snackbar,
+  tabsFocused,
+  toggleSectionCollapse
+} = usePageApp();
+
+defineExpose(publicSurface);
 </script>

@@ -2,14 +2,14 @@
 
 ## Purpose
 
-`frontend/js/widgets/factory.ts` теперь является `WidgetDefinitionRegistry`, а не tuple-based registry компонентов.
+`frontend/js/widgets/factory.ts` является `WidgetDefinitionRegistry`.
 
 Его задача:
 
 - дать единый contract для render path;
 - зафиксировать capabilities виджета;
 - формализовать lifecycle draft-commit;
-- убрать ad hoc branching по `widget.type` из runtime call-sites.
+- держать ad hoc branching по `widget.type` вне runtime call-sites.
 
 ## WidgetDefinition
 
@@ -91,11 +91,11 @@ Registry всё ещё содержит compat lifecycle adapter как защи
 - локальный draft state по-прежнему живёт внутри виджета;
 - committed state по-прежнему записывается только в `page_session_store`.
 
-После полного TS-прохода основные stateful widgets реализуют `commitPendingState` напрямую. Compat layer нужен как fallback для controlled rebind/legacy-compatible instances и не должен становиться причиной возвращать Options API или JS-adapter modules.
+Основные stateful widgets реализуют `commitPendingState` напрямую. Compat layer нужен как fallback для controlled rebind/compatible instances и не должен становиться причиной использовать Options API или JS-adapter modules.
 
 ## Runtime Bridge
 
-Host services больше не должны протекать в widget subtree напрямую.
+Host services публикуются в widget subtree только через runtime bridge.
 
 Схема:
 
@@ -137,9 +137,9 @@ Unknown widget fallback допускается только в render-time unkno
 
 Неизвестный тип не должен наследовать draft/runtime policy от `str` “по смыслу”.
 
-## Deprecation Policy
+## Restricted Surface
 
-После cutover запрещены:
+Запрещены:
 
 - tuple registry exports как основной контракт;
 - ad hoc branching по `widget.type` вне registry/contract layer;
@@ -147,9 +147,9 @@ Unknown widget fallback допускается только в render-time unkno
 
 Новые runtime-интеграции должны опираться только на `WidgetDefinitionRegistry`, capabilities и lifecycle handle contract.
 
-## Migration Status Matrix
+## Current Status Matrix
 
-- migrated: `str`, `text`, `int`, `float`, `button`, `date`, `time`, `datetime`, `ip`, `ip_mask`, `img`, `list`, `voc`, `split_button`;
-- migrated with controller boundary: `table`;
-- legacy JS removed from `frontend/js`: action runtime, datetime helpers, IP helpers, voc helpers, page/bootstrap glue, API/attrs/modal flows and diagnostics;
+- TS/Composition API widgets: `str`, `text`, `int`, `float`, `button`, `date`, `time`, `datetime`, `ip`, `ip_mask`, `img`, `list`, `voc`, `split_button`;
+- `table` работает как typed controller feature;
+- `frontend/js` содержит TypeScript/Vue source для action runtime, datetime helpers, IP helpers, voc helpers, page/bootstrap glue, API/attrs/modal flows and diagnostics;
 - shared common components use typed `<script setup lang="ts">`.

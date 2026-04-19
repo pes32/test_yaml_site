@@ -1,25 +1,28 @@
 /**
  * Canonical schema для table_attrs: runtimeColumns / leafColumns / headerRows / dependencies.
  */
-import { normalizeAttrConfig } from '../../shared/attr_config.ts';
 import type {
+    TableCellOptions,
+    TableColumnAttrConfig,
     TableHeaderCell,
     TableLeafMeta,
     TableRuntimeColumn,
     TableRuntimeVm,
     TableSchema,
-    UnknownRecord
+    WidgetAttrsMap
 } from './table_contract.ts';
 import { WidgetMeasure } from './table_widget_helpers.ts';
 
-type AnyRecord = Record<string, unknown>;
 type TableParseVm = TableRuntimeVm;
-type ParsedLeafColumn = TableRuntimeColumn & AnyRecord;
+type ParsedLeafColumn = TableRuntimeColumn & {
+    label: string;
+    type: string;
+};
 type ColonTokenMeta =
     | { kind: 'builtin'; value: string; widgetType: string }
-    | { kind: 'widget_ref'; config: AnyRecord | null; value: string; widgetType: string }
+    | { kind: 'widget_ref'; config: TableColumnAttrConfig | null; value: string; widgetType: string }
     | { kind: 'width'; value: string };
-type HeaderNode = AnyRecord & {
+type HeaderNode = {
     children?: HeaderNode[];
     label: string;
     leafColIndex: number | null;
@@ -54,7 +57,7 @@ type HeaderNode = AnyRecord & {
         voc: ['source', 'columns', 'placeholder', 'multiselect', 'default'],
         ip: ['placeholder', 'regex', 'err_text', 'default'],
         ip_mask: ['placeholder', 'regex', 'err_text', 'default']
-    };
+    } as const satisfies Record<string, ReadonlyArray<keyof TableCellOptions>>;
 
     function computeAutoWidthLabel(vm: TableParseVm, label: unknown): string {
         const tableEl =
@@ -84,18 +87,38 @@ type HeaderNode = AnyRecord & {
         return isBuiltinWidgetType(key) ? key : '';
     }
 
+    function writeTableCellOption(
+        target: TableCellOptions,
+        key: keyof TableCellOptions,
+        value: unknown
+    ): void {
+        if (key === 'columns') {
+            target.columns = Array.isArray(value) ? value.slice() : undefined;
+            return;
+        }
+        if (key === 'editable') {
+            target.editable = typeof value === 'boolean' ? value : undefined;
+            return;
+        }
+        if (key === 'multiselect') {
+            target.multiselect = typeof value === 'boolean' ? value : undefined;
+            return;
+        }
+        target[key] = value;
+    }
+
     function sanitizeTableCellOptions(
         type: unknown,
-        widgetConfig: UnknownRecord | null | undefined
-    ): UnknownRecord {
+        widgetConfig: TableColumnAttrConfig | null | undefined
+    ): TableCellOptions {
         const widgetType = normalizeWidgetType(type);
-        const cfg: AnyRecord =
+        const cfg: TableColumnAttrConfig =
             widgetConfig && typeof widgetConfig === 'object' ? widgetConfig : {};
         const allowed =
             TABLE_CELL_ALLOWED_OPTIONS[
                 widgetType as keyof typeof TABLE_CELL_ALLOWED_OPTIONS
             ] || [];
-        const out: AnyRecord = {};
+        const out: TableCellOptions = {};
         allowed.forEach((key) => {
             if (!Object.prototype.hasOwnProperty.call(cfg, key)) return;
             const value = cfg[key];
@@ -103,12 +126,12 @@ type HeaderNode = AnyRecord & {
                 out.source = value.slice();
                 return;
             }
-            out[key] = value;
+            writeTableCellOption(out, key, value);
         });
         return out;
     }
 
-    function getAllAttrs(vm: TableParseVm): UnknownRecord {
+    function getAllAttrs(vm: TableParseVm): WidgetAttrsMap {
         if (vm && typeof vm.getAllAttrsMap === 'function') {
             const attrs = vm.getAllAttrsMap();
             if (attrs && typeof attrs === 'object') {
@@ -120,17 +143,15 @@ type HeaderNode = AnyRecord & {
 
     function resolveColonToken(
         token: unknown,
-        allAttrs: UnknownRecord,
+        allAttrs: WidgetAttrsMap,
         dependencies: string[]
     ): ColonTokenMeta | null {
         const key = String(token || '').trim();
         if (!key) return null;
         if (/^\d+$/.test(key)) return { kind: 'width', value: `${key}px` };
         const attrCfg =
-            allAttrs &&
-            typeof allAttrs === 'object' &&
             Object.prototype.hasOwnProperty.call(allAttrs, key)
-                ? (normalizeAttrConfig(key, allAttrs[key]) as AnyRecord | null)
+                ? allAttrs[key]
                 : null;
         if (attrCfg) {
             uniqPush(dependencies, key);
@@ -158,7 +179,7 @@ type HeaderNode = AnyRecord & {
         vm: TableParseVm,
         attrName: string,
         remainder: string,
-        allAttrs: UnknownRecord,
+        allAttrs: WidgetAttrsMap,
         dependencies: string[]
     ): ParsedLeafColumn {
         let label = (remainder || attrName || '').trim();
@@ -168,7 +189,7 @@ type HeaderNode = AnyRecord & {
         let source: string | null = null;
         let number: number | null = null;
         let widgetRef: string | null = null;
-        let widgetConfig: AnyRecord | null = null;
+        let widgetConfig: TableColumnAttrConfig | null = null;
         let readonly = false;
 
         const colonTokens = (remainder && remainder.match(/:\S+/g)) || [];
@@ -389,11 +410,10 @@ type HeaderNode = AnyRecord & {
             }
         }
 
-        const isLineNumbersEnabled = !!(
-            vm &&
-            vm.widgetConfig &&
-            vm.widgetConfig.line_numbers === true
-        );
+        const isLineNumbersEnabled =
+            vm && typeof vm.lineNumbersRuntimeEnabled === 'boolean'
+                ? vm.lineNumbersRuntimeEnabled
+                : !!(vm && vm.widgetConfig && vm.widgetConfig.line_numbers === true);
         const runtimeColumns: TableRuntimeColumn[] = [];
         const leafToRuntimeCol: number[] = [];
         const runtimeToLeafMeta: TableLeafMeta[] = [];

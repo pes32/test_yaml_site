@@ -6,8 +6,8 @@
 
 yamls.ru
 
-- This is a clickable mockup of a system built on YAMLs. I chose YAMLs as the way to describe attributes and the interface because they are simple enough for almost anyone to write. My previous team and I arrived at this approach after building countless line-of-business systems. At this point, the system already includes the most common input widgets, which should cover most typical tasks.
-- I recommend clicking through all the widgets by hand. The core fields and table are already quite usable, and the remaining widgets are being moved toward the newer frontend runtime step by step.
+- This is a clickable mockup of a system built on YAMLs. I chose YAMLs as the way to describe attributes and the interface because they are simple enough for almost anyone to write. My previous team and I arrived at this approach after building countless line-of-business systems. The system includes the most common input widgets, which should cover most typical tasks.
+- I recommend clicking through all the widgets by hand. Many of them turned out well, especially the table; text/textarea are less convincing.
 - The current system is intentionally exaggerated and implemented entirely in YAML. That does not mean this is always the right way to do things, but it is at least something worth thinking about.
 - Database support is planned. In fact, the database layer is already partially wired in, but it does not work yet. The main question is how exactly to integrate it. If I follow the current logic, then functions and business logic should probably be described in PostgreSQL, as the simplest available language for this purpose, and invoked from the current YAML attributes. I am not sure that is a good idea, but building a full custom backend of my own also feels pointless and like wasted time.
 - Maybe one day I will add diagrams and some integrations. Or more widgets and other functionality. I do not know yet.
@@ -27,15 +27,15 @@ Unlike a typical form builder or admin generator, this project is driven by decl
 - Public project name: `Yamls - YAML System`.
 - Current release: `v.0.2 л.`.
 - Current scope: clickable mockup without built-in DB integration in the main YAML flow.
-- Already solid: snapshot build pipeline, YAML DSL, core widget runtime, production-like startup with `waitress + nginx`.
-- Still roadmap: DB-backed forms, persistence, full data sources for YAML widgets, completed `select_attrs`.
+- Stable core: snapshot build pipeline, YAML DSL, core widget runtime, production-like startup with `waitress + nginx`.
+- Roadmap scope: DB-backed forms, persistence, full data sources for YAML widgets, full `select_attrs` behavior.
 
 ## Why use it
 
 - Describe UI screens in YAML instead of hand-coding every page.
 - Validate and compile configuration into a backend snapshot.
 - Render a UI runtime with widgets such as `str`, `text`, `int`, `float`, `date`, `time`, `datetime`, `ip`, `ip_mask`, `list`, `voc`, `img`, `button`, `split_button`, and `table`.
-- The frontend source under `frontend/js` is now TypeScript/Vue source: the widget layer, host runtime glue, page/bootstrap/API/attrs/modal/diagnostics flows, and shared Vue components are checked through the root `tsconfig.json`.
+- The frontend source under `frontend/js` is TypeScript/Vue source: the widget layer, host runtime glue, page/bootstrap/API/attrs/modal/diagnostics flows, and shared Vue components are checked through the root `tsconfig.json`.
 - Use built-in debug tooling and read-only SQL diagnostics.
 - Run the stack locally in a topology close to production: `public nginx -> waitress on 127.0.0.1`.
 
@@ -76,7 +76,7 @@ npm --prefix tooling/vite ci
 
 If `pip install -r requirements.txt` fails with errors such as `No matching distribution found for waitress==3.0.0` or `Werkzeug==3.0.6`, the virtualenv was most likely created with an older Python. Use `Python 3.8+` for this repository.
 
-If you need local overrides, create `settings/production.env` and/or `settings/debug.env`. Default values now live in `settings/production.defaults.env` and `settings/debug.defaults.env`. The legacy root-level paths are still accepted as a fallback.
+If you need local overrides, create `settings/production.env` and/or `settings/debug.env`. Default values live in `settings/production.defaults.env` and `settings/debug.defaults.env`. Root-level env paths are accepted as a fallback.
 
 ### Debug mode
 
@@ -108,6 +108,7 @@ python3 -m backend.tools.validate_config --json
 Frontend typecheck:
 
 ```bash
+npm --prefix tooling/vite run type-holes
 npm --prefix tooling/vite run typecheck
 npm --prefix tooling/vite run typecheck:table
 ```
@@ -121,6 +122,7 @@ npm --prefix tooling/vite run build
 Frontend gates for widget/table runtime changes:
 
 ```bash
+npm --prefix tooling/vite run type-holes
 npm --prefix tooling/vite run typecheck
 npm --prefix tooling/vite run typecheck:table
 npm --prefix tooling/vite run build
@@ -129,7 +131,7 @@ tests/run.sh
 
 ## Production and safety
 
-- The stack already supports a production-like topology, but the project is still best presented as a demo/runtime prototype rather than a finished multi-user platform.
+- The stack supports a production-like topology, but the project is still best presented as a demo/runtime prototype rather than a finished multi-user platform.
 - Debug routes are disabled by default in production mode.
 - There is no complete auth/permission model yet.
 - The main YAML flow does not provide DB persistence yet.
