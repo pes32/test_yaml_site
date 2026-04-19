@@ -1,11 +1,7 @@
 """GUI content and modal structure validation helpers."""
-
 from __future__ import annotations
-
 from typing import Any
-
 from yaml.nodes import MappingNode, ScalarNode, SequenceNode
-
 from .config_shared import (
     _compose_yaml_root,
     _invalid_gui_value,
@@ -15,8 +11,6 @@ from .config_shared import (
 )
 from .contracts import Diagnostic
 from .gui_dsl import META_KEYS, ROOT_CONTENT_TYPES, parse_dynamic_key, split_names
-
-
 def _collect_name_refs_from_node(
     node: Any,
     *,
@@ -27,7 +21,6 @@ def _collect_name_refs_from_node(
 ) -> tuple[list[dict[str, Any]], list[Diagnostic]]:
     refs: list[dict[str, Any]] = []
     diagnostics: list[Diagnostic] = []
-
     if isinstance(node, ScalarNode):
         line = _node_line(node)
         for name in split_names(node.value):
@@ -43,7 +36,6 @@ def _collect_name_refs_from_node(
                 }
             )
         return refs, diagnostics
-
     if isinstance(node, SequenceNode):
         for item in node.value:
             nested_refs, nested_diagnostics = _collect_name_refs_from_node(
@@ -56,7 +48,6 @@ def _collect_name_refs_from_node(
             refs.extend(nested_refs)
             diagnostics.extend(nested_diagnostics)
         return refs, diagnostics
-
     diagnostics.append(
         _invalid_gui_value(
             page_name=page_name,
@@ -71,8 +62,6 @@ def _collect_name_refs_from_node(
         )
     )
     return refs, diagnostics
-
-
 def _validate_rows_node(
     node: Any,
     *,
@@ -89,7 +78,6 @@ def _validate_rows_node(
             file_rel=file_rel,
             node_path=node_path,
         )
-
     if not isinstance(node, SequenceNode):
         return [], [
             _invalid_gui_value(
@@ -104,7 +92,6 @@ def _validate_rows_node(
                 ),
             )
         ]
-
     refs: list[dict[str, Any]] = []
     diagnostics: list[Diagnostic] = []
     for item in node.value:
@@ -136,7 +123,6 @@ def _validate_rows_node(
                 )
             )
             continue
-
         key_node, value_node = item.value[0]
         raw_key = str(getattr(key_node, "value", "") or "")
         entry_type, _entry_name = parse_dynamic_key(raw_key)
@@ -155,7 +141,6 @@ def _validate_rows_node(
                 )
             )
             continue
-
         nested_refs, nested_diagnostics = _validate_content_entry(
             entry_type,
             value_node,
@@ -167,10 +152,7 @@ def _validate_rows_node(
         )
         refs.extend(nested_refs)
         diagnostics.extend(nested_diagnostics)
-
     return refs, diagnostics
-
-
 def _validate_content_entry(
     entry_type: str,
     value_node: Any,
@@ -183,7 +165,6 @@ def _validate_content_entry(
 ) -> tuple[list[dict[str, Any]], list[Diagnostic]]:
     refs: list[dict[str, Any]] = []
     diagnostics: list[Diagnostic] = []
-
     if entry_type == "icon":
         if not isinstance(value_node, ScalarNode):
             diagnostics.append(
@@ -200,7 +181,6 @@ def _validate_content_entry(
                 )
             )
         return refs, diagnostics
-
     if entry_type in {"row", "widgets", "button"}:
         return _collect_name_refs_from_node(
             value_node,
@@ -209,7 +189,6 @@ def _validate_content_entry(
             file_rel=file_rel,
             node_path=node_path,
         )
-
     if entry_type == "rows":
         return _validate_rows_node(
             value_node,
@@ -218,7 +197,6 @@ def _validate_content_entry(
             file_rel=file_rel,
             node_path=node_path,
         )
-
     if entry_type == "tab":
         if not isinstance(value_node, SequenceNode):
             diagnostics.append(
@@ -242,7 +220,6 @@ def _validate_content_entry(
             file_rel=file_rel,
             container="content",
         )
-
     if entry_type in {"box", "collapse"}:
         if isinstance(value_node, ScalarNode):
             return refs, diagnostics
@@ -268,7 +245,6 @@ def _validate_content_entry(
             file_rel=file_rel,
             container="section",
         )
-
     diagnostics.append(
         _invalid_gui_value(
             page_name=page_name,
@@ -280,8 +256,6 @@ def _validate_content_entry(
         )
     )
     return refs, diagnostics
-
-
 def _validate_content_list(
     node: Any,
     *,
@@ -304,11 +278,9 @@ def _validate_content_list(
                 ),
             )
         ]
-
     allowed = {"icon", "row", "rows", "widgets"}
     if container == "content":
         allowed |= {"button", "tab", "box", "collapse"}
-
     refs: list[dict[str, Any]] = []
     diagnostics: list[Diagnostic] = []
     for item in node.value:
@@ -329,7 +301,6 @@ def _validate_content_list(
                 )
             )
             continue
-
         key_node, value_node = item.value[0]
         raw_key = str(getattr(key_node, "value", "") or "")
         entry_type, _entry_name = parse_dynamic_key(raw_key)
@@ -348,7 +319,6 @@ def _validate_content_list(
                 )
             )
             continue
-
         nested_refs, nested_diagnostics = _validate_content_entry(
             entry_type,
             value_node,
@@ -360,10 +330,7 @@ def _validate_content_list(
         )
         refs.extend(nested_refs)
         diagnostics.extend(nested_diagnostics)
-
     return refs, diagnostics
-
-
 def _validate_gui_document(
     gui_file: str,
     *,
@@ -374,10 +341,8 @@ def _validate_gui_document(
     diagnostics: list[Diagnostic] = []
     file_rel = _relpath(gui_file)
     root_node = _compose_yaml_root(gui_file)
-
     if not isinstance(root_node, MappingNode):
         return refs, diagnostics
-
     for key_node, value_node in root_node.value:
         raw_key = str(getattr(key_node, "value", "") or "")
         if raw_key == "url" and not isinstance(value_node, ScalarNode):
@@ -412,7 +377,6 @@ def _validate_gui_document(
             continue
         if raw_key in META_KEYS:
             continue
-
         entry_type, _entry_name = parse_dynamic_key(raw_key)
         if entry_type == "menu":
             nested_refs, nested_diagnostics = _validate_content_list(
@@ -456,13 +420,9 @@ def _validate_gui_document(
                     file_rel=file_rel,
                     container="content",
                 )
-
         refs.extend(nested_refs)
         diagnostics.extend(nested_diagnostics)
-
     return refs, diagnostics
-
-
 def _extract_modal_content_node(
     modal_file: str,
     *,
@@ -479,7 +439,6 @@ def _extract_modal_content_node(
         _only_key, only_value = root_node.value[0]
         if isinstance(only_value, SequenceNode):
             return only_value, []
-
     for key_node, value_node in root_node.value:
         key = str(getattr(key_node, "value", "") or "").strip()
         if key not in {"content", "items"}:
@@ -499,10 +458,7 @@ def _extract_modal_content_node(
                 ),
             )
         ]
-
     return None, []
-
-
 def _validate_modal_documents(
     modal_files: list[str],
     *,
@@ -511,7 +467,6 @@ def _validate_modal_documents(
 ) -> tuple[list[dict[str, Any]], list[Diagnostic]]:
     refs: list[dict[str, Any]] = []
     diagnostics: list[Diagnostic] = []
-
     for modal_file in modal_files:
         content_node, modal_diagnostics = _extract_modal_content_node(
             modal_file,
@@ -521,7 +476,6 @@ def _validate_modal_documents(
         diagnostics.extend(modal_diagnostics)
         if content_node is None:
             continue
-
         nested_refs, nested_diagnostics = _validate_content_list(
             content_node,
             page_name=page_name,
@@ -531,5 +485,4 @@ def _validate_modal_documents(
         )
         refs.extend(nested_refs)
         diagnostics.extend(nested_diagnostics)
-
     return refs, diagnostics

@@ -12,6 +12,7 @@ import type {
     WidgetAttrsMap
 } from './table_contract.ts';
 import { WidgetMeasure } from './table_widget_helpers.ts';
+import { BUILTIN_WIDGET_TYPES } from '../../shared/widget_types.ts';
 
 type TableParseVm = TableRuntimeVm;
 type ParsedLeafColumn = TableRuntimeColumn & {
@@ -34,18 +35,6 @@ type HeaderNode = {
     const LINE_NUMBER_ATTR = '__line_numbers__';
     const LINE_NUMBER_LABEL = '№';
     const LINE_NUMBER_WIDTH = '64px';
-    const BUILTIN_WIDGET_TYPES = new Set([
-        'str',
-        'int',
-        'float',
-        'date',
-        'time',
-        'datetime',
-        'list',
-        'voc',
-        'ip',
-        'ip_mask'
-    ]);
     const TABLE_CELL_ALLOWED_OPTIONS = {
         str: ['placeholder', 'regex', 'err_text', 'default'],
         int: ['placeholder', 'regex', 'err_text', 'default'],

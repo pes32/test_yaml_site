@@ -6,10 +6,10 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Dict, List
 
-from flask import jsonify, make_response, request
+from flask import request
 from pydantic import ValidationError
 
-from .api_response import error_payload, page_data_payload, pages_data_payload, success_payload
+from .api_response import page_data_payload, pages_data_payload, snapshot_error, snapshot_success
 from .contracts import (
     AttrsDataResponse,
     ExecuteRequest,
@@ -25,18 +25,6 @@ COMMAND_HANDLERS: Dict[str, CommandHandler] = {}
 def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG001
     """Регистрирует /api/* маршруты."""
 
-    def _no_cache(resp):
-        try:
-            resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-            resp.headers["Pragma"] = "no-cache"
-            resp.headers["Expires"] = "0"
-        except Exception:
-            pass
-        return resp
-
-    def _json_response(payload: Dict[str, Any], status: int = 200):
-        return _no_cache(make_response(jsonify(payload), status))
-
     def _snapshot():
         return config_service.get_snapshot()
 
@@ -46,64 +34,32 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
     @app.route("/api/config")
     def api_get_config():
         snapshot = _snapshot()
-        return _json_response(success_payload(data=snapshot, snapshot=snapshot))
+        return snapshot_success(snapshot, snapshot)
 
     @app.route("/api/pages")
     def api_get_pages():
         snapshot = _snapshot()
-        return _json_response(
-            success_payload(
-                data=pages_data_payload(snapshot),
-                snapshot=snapshot,
-            )
-        )
+        return snapshot_success(snapshot, pages_data_payload(snapshot), diagnostics=[])
 
     @app.route("/api/page/<path:page_name>")
     def api_get_page(page_name):
         snapshot = _snapshot()
         page_config = snapshot.get("pages", {}).get(page_name)
         if not page_config:
-            return _json_response(
-                error_payload(
-                    code="page_not_found",
-                    message="Страница не найдена",
-                    snapshot=snapshot,
-                ),
-                404,
-            )
+            return snapshot_error(snapshot, code="page_not_found", message="Страница не найдена", status=404)
 
-        return _json_response(
-            success_payload(
-                data=page_data_payload(page_config),
-                snapshot=snapshot,
-                diagnostics=_page_diagnostics(page_config),
-            )
-        )
+        return snapshot_success(snapshot, page_data_payload(page_config), diagnostics=_page_diagnostics(page_config))
 
     @app.route("/api/attrs")
     def api_get_attrs():
         snapshot = _snapshot()
         page_name = (request.args.get("page") or "").strip()
         if not page_name:
-            return _json_response(
-                error_payload(
-                    code="page_required",
-                    message="Не указан параметр page",
-                    snapshot=snapshot,
-                ),
-                400,
-            )
+            return snapshot_error(snapshot, code="page_required", message="Не указан параметр page")
 
         page_config = snapshot.get("pages", {}).get(page_name)
         if not page_config:
-            return _json_response(
-                error_payload(
-                    code="page_not_found",
-                    message="Страница не найдена",
-                    snapshot=snapshot,
-                ),
-                404,
-            )
+            return snapshot_error(snapshot, code="page_not_found", message="Страница не найдена", status=404)
 
         page_attrs = page_config.get("attrs") or {}
         names_param = request.args.get("names")
@@ -130,13 +86,7 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
             resolved_names=resolved_names,
             missing_names=missing_names,
         ).model_dump(by_alias=True)
-        return _json_response(
-            success_payload(
-                data=data,
-                snapshot=snapshot,
-                diagnostics=_page_diagnostics(page_config),
-            )
-        )
+        return snapshot_success(snapshot, data, diagnostics=_page_diagnostics(page_config))
 
     @app.route("/api/modal-gui")
     def api_modal_gui():
@@ -145,36 +95,20 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
         page_name = (request.args.get("page") or "").strip()
         modal_id = (request.args.get("id") or "").strip()
         if not page_name or not modal_id:
-            return _json_response(
-                error_payload(
-                    code="modal_query_required",
-                    message="Укажите query-параметры page и id",
-                    snapshot=snapshot,
-                ),
-                400,
-            )
+            return snapshot_error(snapshot, code="modal_query_required", message="Укажите query-параметры page и id")
 
         page_config = snapshot.get("pages", {}).get(page_name)
         if not page_config:
-            return _json_response(
-                error_payload(
-                    code="page_not_found",
-                    message="Страница не найдена",
-                    snapshot=snapshot,
-                ),
-                404,
-            )
+            return snapshot_error(snapshot, code="page_not_found", message="Страница не найдена", status=404)
 
         modal = (page_config.get("modals") or {}).get(modal_id)
         if not modal:
-            return _json_response(
-                error_payload(
-                    code="modal_not_found",
-                    message=f"Модалка '{modal_id}' не найдена",
-                    snapshot=snapshot,
-                    diagnostics=_page_diagnostics(page_config),
-                ),
-                404,
+            return snapshot_error(
+                snapshot,
+                code="modal_not_found",
+                message=f"Модалка '{modal_id}' не найдена",
+                diagnostics=_page_diagnostics(page_config),
+                status=404,
             )
 
         page_attrs = page_config.get("attrs") or {}
@@ -191,13 +125,7 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
                 "widget_names": widget_names,
             },
         ).model_dump(by_alias=True)
-        return _json_response(
-            success_payload(
-                data=data,
-                snapshot=snapshot,
-                diagnostics=_page_diagnostics(page_config),
-            )
-        )
+        return snapshot_success(snapshot, data, diagnostics=_page_diagnostics(page_config))
 
     @app.route("/api/reload", methods=["POST"])
     def api_reload_config():
@@ -218,29 +146,17 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
                 "meta": snapshot.get("meta") or {},
             }
             if result["last_error"] is None:
-                payload = success_payload(
-                    data=data,
-                    snapshot=snapshot,
-                    diagnostics=snapshot.get("diagnostics") or [],
-                )
+                return snapshot_success(snapshot, data)
             else:
-                payload = error_payload(
+                return snapshot_error(
+                    snapshot,
                     code="reload_failed",
                     message=result["last_error"],
-                    snapshot=snapshot,
                     diagnostics=snapshot.get("diagnostics") or [],
                 )
-            return _json_response(payload)
         except Exception as exc:  # pragma: no cover
             logger.exception("Ошибка при принудительном обновлении конфигурации")
-            return _json_response(
-                error_payload(
-                    code="reload_failed_unexpected",
-                    message=str(exc),
-                    snapshot=_snapshot(),
-                ),
-                500,
-            )
+            return snapshot_error(_snapshot(), code="reload_failed_unexpected", message=str(exc), status=500)
 
     @app.route("/api/execute", methods=["POST"])
     def api_execute():
@@ -249,37 +165,26 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
         try:
             payload = ExecuteRequest.model_validate(data)
         except ValidationError:
-            return _json_response(
-                error_payload(
-                    code="invalid_execute_request",
-                    message="Некорректное тело запроса execute",
-                    snapshot=snapshot,
-                ),
-                400,
-            )
+            return snapshot_error(snapshot, code="invalid_execute_request", message="Некорректное тело запроса execute")
 
         handler = COMMAND_HANDLERS.get(payload.command)
         if handler is None:
-            return _json_response(
-                error_payload(
-                    code="command_not_found",
-                    message=f"Команда '{payload.command}' не зарегистрирована на бэкенде",
-                    snapshot=snapshot,
-                ),
-                404,
+            return snapshot_error(
+                snapshot,
+                code="command_not_found",
+                message=f"Команда '{payload.command}' не зарегистрирована на бэкенде",
+                status=404,
             )
 
         try:
             result = handler(payload.model_dump(by_alias=True)) or {}
         except Exception as exc:  # pragma: no cover
             logger.exception("Ошибка выполнения backend-команды '%s'", payload.command)
-            return _json_response(
-                error_payload(
-                    code="command_failed",
-                    message=str(exc) or f"Ошибка выполнения команды '{payload.command}'",
-                    snapshot=snapshot,
-                ),
-                500,
+            return snapshot_error(
+                snapshot,
+                code="command_failed",
+                message=str(exc) or f"Ошибка выполнения команды '{payload.command}'",
+                status=500,
             )
 
         response_data = ExecuteResponse(
@@ -290,9 +195,4 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
             message=result.get("message") or f"Команда '{payload.command}' выполнена",
             data=result.get("data"),
         )
-        return _json_response(
-            success_payload(
-                data=response_data.model_dump(),
-                snapshot=snapshot,
-            )
-        )
+        return snapshot_success(snapshot, response_data.model_dump(), diagnostics=[])

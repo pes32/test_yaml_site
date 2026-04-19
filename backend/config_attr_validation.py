@@ -1,11 +1,7 @@
 """Attr validation and attr-reference extraction."""
-
 from __future__ import annotations
-
 from typing import Any
-
 from yaml.nodes import MappingNode, ScalarNode, SequenceNode
-
 from .config_attr_schema import ATTR_WIDGET_SCHEMA
 from .config_attr_types import (
     _is_scalar_attr_value,
@@ -22,8 +18,6 @@ from .config_shared import (
     _node_line,
     _relpath,
 )
-
-
 def _validate_voc_columns_config(
     attr_name: str,
     columns_value: Any,
@@ -34,10 +28,8 @@ def _validate_voc_columns_config(
     line: int | None,
 ) -> list:
     diagnostics: list = []
-
     if not isinstance(columns_value, list):
         return diagnostics
-
     if not columns_value:
         diagnostics.append(
             _attr_option_diagnostic(
@@ -52,7 +44,6 @@ def _validate_voc_columns_config(
             )
         )
         return diagnostics
-
     for index, item in enumerate(columns_value):
         label = str(item or "").strip() if isinstance(item, str) else ""
         if label:
@@ -72,10 +63,7 @@ def _validate_voc_columns_config(
                 node_path=f"{attr_name}.columns[{index}]",
             )
         )
-
     return diagnostics
-
-
 def _validate_voc_source_config(
     attr_name: str,
     columns_value: Any,
@@ -89,10 +77,8 @@ def _validate_voc_source_config(
     diagnostics: list = []
     if not isinstance(columns_value, list) or not columns_value:
         return diagnostics
-
     column_count = len(columns_value)
     source_path = f"{attr_name}.source"
-
     def add_row_width_error(*, line: int | None, row_index: int, actual_count: int) -> None:
         diagnostics.append(
             _attr_option_diagnostic(
@@ -109,7 +95,6 @@ def _validate_voc_source_config(
                 node_path=source_path,
             )
         )
-
     if isinstance(source_value, str):
         if not isinstance(source_node, ScalarNode):
             return diagnostics
@@ -130,7 +115,6 @@ def _validate_voc_source_config(
                 )
             )
             return diagnostics
-
         skipped_empty_rows = 0
         for line_index, raw_line in enumerate(str(source_value or "").splitlines()):
             line_text = str(raw_line or "").strip()
@@ -161,7 +145,6 @@ def _validate_voc_source_config(
                 )
             )
         return diagnostics
-
     if isinstance(source_value, list):
         item_nodes = source_node.value if isinstance(source_node, SequenceNode) else []
         for row_index, item in enumerate(source_value):
@@ -174,18 +157,13 @@ def _validate_voc_source_config(
                 row_index=row_index,
                 actual_count=actual_count,
             )
-
     return diagnostics
-
-
 def _voc_source_is_unsupported_scalar(source_value: Any, source_node: Any) -> bool:
     if not isinstance(source_value, str):
         return False
     if not isinstance(source_node, ScalarNode):
         return False
     return getattr(source_node, "style", None) not in TABLE_ATTR_BLOCK_SCALAR_STYLES
-
-
 def _build_duplicate_scalar_list_source_warning(
     attr_name: str,
     source_value: Any,
@@ -197,25 +175,20 @@ def _build_duplicate_scalar_list_source_warning(
 ):
     if not isinstance(source_value, list):
         return None
-
     scalar_values = [str(item) for item in source_value if _is_scalar_attr_value(item)]
     if len(scalar_values) < 2:
         return None
-
     seen: set[str] = set()
     duplicates: list[str] = []
     for item in scalar_values:
         if item in seen and item not in duplicates:
             duplicates.append(item)
         seen.add(item)
-
     if not duplicates:
         return None
-
     duplicate_preview = ", ".join(duplicates[:3])
     if len(duplicates) > 3:
         duplicate_preview += ", …"
-
     return _attr_option_diagnostic(
         "warning",
         "ambiguous_list_source_option",
@@ -229,8 +202,6 @@ def _build_duplicate_scalar_list_source_warning(
         line=line,
         node_path=f"{attr_name}.source",
     )
-
-
 def _validate_attr_config(
     attr_name: str,
     attr_config: Any,
@@ -242,7 +213,6 @@ def _validate_attr_config(
 ) -> tuple[dict[str, Any], list]:
     diagnostics: list = []
     normalized_config = dict(attr_config) if isinstance(attr_config, dict) else {}
-
     if not isinstance(attr_config, dict) or not isinstance(attr_node, MappingNode):
         diagnostics.append(
             _attr_option_diagnostic(
@@ -257,7 +227,6 @@ def _validate_attr_config(
             )
         )
         return normalized_config, diagnostics
-
     node_items = _mapping_node_items(attr_node)
     widget_value = attr_config.get("widget")
     widget_type = str(widget_value or "").strip()
@@ -278,9 +247,7 @@ def _validate_attr_config(
             )
         )
         return normalized_config, diagnostics
-
     allowed = ATTR_WIDGET_SCHEMA[widget_type]["allowed"]
-
     for option_name, option_value in attr_config.items():
         key_node, value_node = node_items.get(option_name, (None, None))
         line = _node_line(key_node) or _node_line(value_node) or _node_line(attr_node)
@@ -301,7 +268,6 @@ def _validate_attr_config(
                 )
             )
             continue
-
         validation_error = _validate_attr_option_value(widget_type, option_name, option_value)
         if validation_error:
             diagnostics.append(
@@ -319,7 +285,6 @@ def _validate_attr_config(
                     node_path=f"{attr_name}.{option_name}",
                 )
             )
-
     if widget_type == "list" and "source" in normalized_config:
         source_node = node_items.get("source", (None, None))[1]
         duplicate_warning = _build_duplicate_scalar_list_source_warning(
@@ -332,7 +297,6 @@ def _validate_attr_config(
         )
         if duplicate_warning:
             diagnostics.append(duplicate_warning)
-
     if widget_type == "voc":
         columns_node = node_items.get("columns", (None, None))[1]
         source_node = node_items.get("source", (None, None))[1]
@@ -377,18 +341,13 @@ def _validate_attr_config(
                 source_node,
             ):
                 normalized_config["source"] = []
-
     return normalized_config, diagnostics
-
-
 def _collect_attr_definitions(attr_files: list[str], page_name: str) -> list[dict[str, Any]]:
     definitions: list[dict[str, Any]] = []
-
     for filepath in attr_files:
         root_node = _compose_yaml_root(filepath)
         if not isinstance(root_node, MappingNode):
             continue
-
         file_rel = _relpath(filepath)
         for key_node, _value_node in root_node.value:
             attr_name = str(getattr(key_node, "value", "") or "").strip()
@@ -402,10 +361,7 @@ def _collect_attr_definitions(attr_files: list[str], page_name: str) -> list[dic
                     "line": _node_line(key_node),
                 }
             )
-
     return definitions
-
-
 def _table_attr_ref_line(node: ScalarNode, line_index: int) -> int | None:
     start_line = _node_line(node)
     if start_line is None:
@@ -413,8 +369,6 @@ def _table_attr_ref_line(node: ScalarNode, line_index: int) -> int | None:
     if getattr(node, "style", None) in TABLE_ATTR_BLOCK_SCALAR_STYLES:
         return start_line + 1 + line_index
     return start_line + line_index
-
-
 def _extract_table_attr_custom_refs(
     table_attrs_node: Any,
     *,
@@ -428,13 +382,11 @@ def _extract_table_attr_custom_refs(
         return []
     if _node_line(table_attrs_node) is None:
         return []
-
     refs: list[dict[str, Any]] = []
     for line_index, raw_line in enumerate(str(table_attrs_node.value or "").split("\n")):
         line = raw_line.strip()
         if not line or line.startswith("/"):
             continue
-
         ref_line = _table_attr_ref_line(table_attrs_node, line_index)
         for token_match in TABLE_ATTR_TOKEN_RE.finditer(raw_line):
             token = token_match.group(0)[1:]
@@ -451,10 +403,7 @@ def _extract_table_attr_custom_refs(
                     "line": ref_line,
                 }
             )
-
     return refs
-
-
 def _collect_attr_refs(
     attr_files: list[str],
     *,
@@ -462,22 +411,18 @@ def _collect_attr_refs(
     page_url: str,
 ) -> list[dict[str, Any]]:
     refs_by_attr_name: dict[str, list[dict[str, Any]]] = {}
-
     for filepath in attr_files:
         root_node = _compose_yaml_root(filepath)
         if not isinstance(root_node, MappingNode):
             continue
-
         file_rel = _relpath(filepath)
         for key_node, value_node in root_node.value:
             attr_name = str(getattr(key_node, "value", "") or "").strip()
             if not attr_name:
                 continue
-
             refs_by_attr_name[attr_name] = []
             if not isinstance(value_node, MappingNode):
                 continue
-
             widget_node = None
             table_attrs_node = None
             for child_key_node, child_value_node in value_node.value:
@@ -486,19 +431,16 @@ def _collect_attr_refs(
                     widget_node = child_value_node
                 elif child_key == "table_attrs":
                     table_attrs_node = child_value_node
-
             if not isinstance(widget_node, ScalarNode):
                 continue
             if str(getattr(widget_node, "value", "") or "").strip() != "table":
                 continue
-
             refs_by_attr_name[attr_name] = _extract_table_attr_custom_refs(
                 table_attrs_node,
                 page_name=page_name,
                 page_url=page_url,
                 file_rel=file_rel,
             )
-
     refs: list[dict[str, Any]] = []
     for attr_refs in refs_by_attr_name.values():
         refs.extend(attr_refs)

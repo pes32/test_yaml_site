@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from flask import jsonify, make_response
+
 from .contracts import ApiError, Diagnostic, PageDataResponse, PagesDataResponse
 from .gui_dsl import META_KEYS
 
@@ -56,6 +58,56 @@ def error_payload(
     }
 
 
+def no_cache(resp):
+    try:
+        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        resp.headers["Pragma"] = "no-cache"
+        resp.headers["Expires"] = "0"
+    except Exception:
+        pass
+    return resp
+
+
+def json_response(payload: dict[str, Any], status: int = 200):
+    return no_cache(make_response(jsonify(payload), status))
+
+
+def snapshot_success(
+    snapshot: dict[str, Any],
+    data: Any,
+    *,
+    diagnostics: list[Diagnostic | dict[str, Any]] | None = None,
+    status: int = 200,
+):
+    return json_response(
+        success_payload(
+            data=data,
+            snapshot=snapshot,
+            diagnostics=diagnostics if diagnostics is not None else snapshot.get("diagnostics") or [],
+        ),
+        status,
+    )
+
+
+def snapshot_error(
+    snapshot: dict[str, Any],
+    *,
+    code: str,
+    message: str,
+    diagnostics: list[Diagnostic | dict[str, Any]] | None = None,
+    status: int = 400,
+):
+    return json_response(
+        error_payload(
+            code=code,
+            message=message,
+            snapshot=snapshot,
+            diagnostics=diagnostics,
+        ),
+        status,
+    )
+
+
 def public_page_config(page_config: dict[str, Any]) -> dict[str, Any]:
     """Public page config shared by page routes and page API."""
 
@@ -69,6 +121,11 @@ def public_page_config(page_config: dict[str, Any]) -> dict[str, Any]:
         "url": page_config.get("url"),
         "title": page_config.get("title"),
         "gui": gui,
+        "parsedGui": page_config.get("parsedGui") or {
+            "menus": [],
+            "modals": {},
+            "rootContentOnly": False,
+        },
         "guiMenuKeys": root_keys,
         "modalGuiIds": page_config.get("modalGuiIds") or [],
     }

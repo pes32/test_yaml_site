@@ -1,4 +1,3 @@
-import GuiParser from '../gui_parser.ts';
 import widgetFactory from '../widgets/factory.ts';
 import { ensureAttrsLoaded as ensureAttrsLoadedFlow } from './attrs_loader.ts';
 import { FRONTEND_ERROR_SCOPES } from './error_model.ts';
@@ -51,25 +50,78 @@ function getModalConfig(state: ModalRuntimeState | null | undefined): ModalConfi
 
 function sectionsForTab(state: ModalRuntimeState | null | undefined, tabIndex: number): unknown[] {
   const modalConfig = asModalConfig(state);
-  if (!GuiParser || !modalConfig) {
+  if (!modalConfig) {
     return [];
   }
 
-  return GuiParser.getActiveSections(modalConfig, tabIndex, getModalTabs(state));
+  const tabs = getModalTabs(state);
+  if (tabs.length) {
+    const safeIndex = Math.max(0, Math.min(Number(tabIndex) || 0, tabs.length - 1));
+    const activeTab = tabs[safeIndex] as Record<string, unknown> | undefined;
+    return Array.isArray(activeTab?.content) ? activeTab.content : [];
+  }
+
+  return Array.isArray(modalConfig.content) ? modalConfig.content : [];
 }
 
 function collectModalWidgetNames(state: ModalRuntimeState | null | undefined): string[] {
   const modalConfig = asModalConfig(state);
-  if (!GuiParser || !modalConfig) {
+  if (!modalConfig) {
     return [];
   }
 
-  return (Array.isArray(GuiParser.collectWidgetNamesFromModal(modalConfig))
-    ? GuiParser.collectWidgetNamesFromModal(modalConfig)
-    : []
-  )
-    .map((name) => (typeof name === 'string' ? name.trim() : ''))
-    .filter(Boolean);
+  const names = new Set<string>();
+  const collectRows = (rows: unknown) => {
+    if (!Array.isArray(rows)) {
+      return;
+    }
+
+    rows.forEach((row) => {
+      if (!row || typeof row === 'string' || typeof row !== 'object') {
+        return;
+      }
+
+      const widgets = (row as Record<string, unknown>).widgets;
+      if (!Array.isArray(widgets)) {
+        return;
+      }
+
+      widgets.forEach((widgetName) => {
+        const token = String(widgetName || '').trim();
+        if (token) {
+          names.add(token);
+        }
+      });
+    });
+  };
+
+  const collectSections = (sections: unknown) => {
+    if (!Array.isArray(sections)) {
+      return;
+    }
+
+    sections.forEach((section) => {
+      if (!section || typeof section !== 'object') {
+        return;
+      }
+      collectRows((section as Record<string, unknown>).rows);
+    });
+  };
+
+  collectSections(modalConfig.content);
+  (Array.isArray(modalConfig.tabs) ? modalConfig.tabs : []).forEach((tab) => {
+    if (tab && typeof tab === 'object') {
+      collectSections((tab as Record<string, unknown>).content);
+    }
+  });
+  (Array.isArray(modalConfig.buttons) ? modalConfig.buttons : []).forEach((buttonName) => {
+    const token = String(buttonName || '').trim();
+    if (token && token !== 'CLOSE') {
+      names.add(token);
+    }
+  });
+
+  return Array.from(names);
 }
 
 async function prefetchModalWidgetTypes(

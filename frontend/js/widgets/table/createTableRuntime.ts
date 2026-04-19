@@ -1,20 +1,18 @@
 import type {
     TableDisplayRow,
     TableRuntimeComputedDefinitions,
-    TableRuntimeMethods,
+    TableRuntimeMethodSubset,
     TableRuntimeWatchHandlers,
     TableRuntimeVm
 } from './table_contract.ts';
 
-import { buildMenuItems, isApplePlatform } from './table_context_menu.ts';
 import { canAddGroupingLevel } from './table_grouping.ts';
 import { ClipboardRuntimeMethods } from './table_clipboard_runtime.ts';
 import { CellRuntimeMethods } from './table_cell_runtime.ts';
 import { DataRuntimeMethods } from './table_data_runtime.ts';
-import { DataViewRuntimeMethods } from './table_data_view_runtime.ts';
 import { EditingRuntimeMethods } from './table_editing_runtime.ts';
 import { InteractionRuntimeMethods } from './table_interactions.ts';
-import { MenuRuntimeMethods } from './table_menu_runtime.ts';
+import { buildMenuItems, isApplePlatform, MenuRuntimeMethods } from './table_menu_runtime.ts';
 import { RowRuntimeMethods } from './table_row_runtime.ts';
 import { SelectionMethods } from './table_selection.ts';
 import { ViewRuntimeMethods } from './table_view_runtime.ts';
@@ -243,18 +241,17 @@ const tableRuntimeWatch: TableRuntimeWatchHandlers = {
     }
 };
 
-const tableRuntimeMethods: TableRuntimeMethods = {
+const tableRuntimeMethods = {
     ...SelectionMethods,
     ...ViewRuntimeMethods,
     ...DataRuntimeMethods,
-    ...DataViewRuntimeMethods,
     ...CellRuntimeMethods,
     ...RowRuntimeMethods,
     ...EditingRuntimeMethods,
     ...InteractionRuntimeMethods,
     ...MenuRuntimeMethods,
     ...ClipboardRuntimeMethods
-};
+} satisfies TableRuntimeMethodSubset;
 
 function mountTableRuntime(vm: TableRuntimeVm) {
     vm.initializeTable?.();

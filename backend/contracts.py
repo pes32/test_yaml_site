@@ -109,6 +109,7 @@ class PageSnapshot(BaseModel):
     url: str
     title: str
     gui: JsonDict
+    parsed_gui: JsonDict = Field(default_factory=dict, alias="parsedGui")
     attrs: JsonDict = Field(default_factory=dict)
     modals: Dict[str, NormalizedModal] = Field(default_factory=dict)
     gui_root_keys: List[str] = Field(default_factory=list, alias="guiMenuKeys")
@@ -147,6 +148,7 @@ class PagePublicConfigResponse(BaseModel):
     url: Optional[str] = None
     title: Optional[str] = None
     gui: JsonDict = Field(default_factory=dict)
+    parsed_gui: JsonDict = Field(default_factory=dict, alias="parsedGui")
     gui_root_keys: List[str] = Field(default_factory=list, alias="guiMenuKeys")
     modal_gui_ids: List[str] = Field(default_factory=list, alias="modalGuiIds")
 

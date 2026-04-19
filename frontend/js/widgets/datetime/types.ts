@@ -31,6 +31,8 @@ type DateTimePopoverStyle = CSSProperties & {
 
 type SegmentKind = 'date' | 'time';
 
+type DateTimeMode = 'date' | 'time' | 'datetime';
+
 type DateTimeSegmentExpose = {
   getRoot: () => HTMLElement | null;
 };
@@ -41,6 +43,7 @@ type PopoverExpose = {
 
 export type {
   CalendarDay,
+  DateTimeMode,
   DateTimePopoverStyle,
   DateTimeSegmentExpose,
   DateTimeWidgetConfig,

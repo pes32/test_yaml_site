@@ -2,6 +2,7 @@
 
 import { normalizeAttrsMap } from '../shared/attr_config.ts';
 import { asRecord, isRecord } from '../shared/object_record.ts';
+import { uniqueNames } from '../shared/string_list.ts';
 import type {
     AttrsResponse,
     ModalResponse,
@@ -31,22 +32,6 @@ type NormalizedModalState = Omit<ModalResponse, 'attrs' | 'modal'> & {
     attrs: AttrConfigMap;
     modal: ParsedGuiModal | null;
 };
-
-function uniqueNames(items: unknown): string[] {
-    const seen = new Set<string>();
-    const result: string[] = [];
-
-    (Array.isArray(items) ? items : []).forEach((item) => {
-        const value = String(item || '').trim();
-        if (!value || seen.has(value)) {
-            return;
-        }
-        seen.add(value);
-        result.push(value);
-    });
-
-    return result;
-}
 
 function normalizeDiagnostics(value: unknown): UnknownRecord[] {
     return Array.isArray(value)

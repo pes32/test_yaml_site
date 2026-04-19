@@ -129,7 +129,7 @@ Unknown widget fallback допускается только в render-time unkno
 
 Правила:
 
-- неизвестный тип рендерится через `StringWidget`;
+- неизвестный тип рендерится через `SimpleInputWidget`;
 - unknown definition имеет пустые capabilities;
 - lifecycle для unknown type всегда no-op;
 - runtimeFeatures для unknown type всегда пустые;

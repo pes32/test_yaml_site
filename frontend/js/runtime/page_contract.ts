@@ -8,6 +8,7 @@ type PageAttrConfig = AttrConfigRecord;
 type PageConfigRecord = UnknownRecord & {
     gui?: unknown;
     name?: unknown;
+    parsedGui?: unknown;
 };
 
 type ParsedGuiSection = UnknownRecord & {

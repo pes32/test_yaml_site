@@ -287,6 +287,7 @@ export type {
   SimpleFieldCommitContext,
   SimpleFieldCommitResult,
   SimpleFieldEmit,
+  SimpleFieldKind,
   SimpleFieldWidgetConfig,
   SimpleFieldWidgetProps
 };

@@ -2,7 +2,7 @@
  * Клавиатура редактируемой таблицы: цепочка обработчиков + диспетчер.
  */
 import type { TableRuntimeVm } from './table_contract.ts';
-import { rowMoveDuplicateOpsAllowed } from './table_context_menu.ts';
+import { rowMoveDuplicateOpsAllowed } from './table_menu_runtime.ts';
 import { tableLog } from './table_debug.ts';
 import { getCellFromEvent } from './table_dom.ts';
 import { buildJumpOpts, jumpTarget } from './table_jump.ts';

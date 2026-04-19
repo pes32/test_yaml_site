@@ -44,14 +44,12 @@
 - `useTableRuntime.ts` — typed Composition API controller для `TableWidget.vue`; возвращает setup bindings по table contract без generic `Proxy`.
 - `table_cell_runtime.ts` — embedded cell value/editor flow.
 - `table_clipboard_runtime.ts` — browser clipboard integration.
-- `table_context_menu.ts` — context menu behavior.
-- `table_data_runtime.ts` — table data mutation/load helpers.
-- `table_data_view_runtime.ts` — display model and lazy/grouping data view.
+- `table_data_runtime.ts` — table data mutation/load helpers, display model, sort, lazy/grouping data view.
 - `table_editing_runtime.ts` — edit start/commit/cancel flow.
 - `table_interactions.ts` — pointer/selection interaction helpers.
 - `table_jump.ts` — row/cell jump helpers.
 - `table_keyboard.ts` — keyboard navigation.
-- `table_menu_runtime.ts` — menu action wiring.
+- `table_menu_runtime.ts` — context menu snapshot, item building, menu action wiring.
 - `table_row_runtime.ts` — row identity and row-level runtime helpers.
 - `table_selection.ts` — selection model and normalization.
 - `table_view_runtime.ts` — visual/runtime view orchestration.
@@ -59,7 +57,7 @@
 
 ## Embedded Widget Imports
 
-Table cell editors импортируются из TS widget layer: `StringWidget`, `IntWidget`, `FloatWidget`, `DateWidget`, `TimeWidget`, `DateTimeWidget`, `IpWidget`, `IpMaskWidget`, `ListWidget`, `VocWidget`. JS helper adapters для embedded widgets не входят в table boundary; новые table-cell capabilities проходят через typed widget exposes и общий lifecycle contract.
+Table cell editors резолвятся через общий `WidgetDefinitionRegistry` с embedded allowlist (`str`, `int`, `float`, `date`, `time`, `datetime`, `ip`, `ip_mask`, `list`, `voc`). `TableWidget.vue` не импортирует standalone widget components напрямую; новые table-cell capabilities проходят через typed widget exposes и общий lifecycle contract.
 
 ## DOM And Page Integration
 

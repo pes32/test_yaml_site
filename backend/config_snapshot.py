@@ -40,7 +40,7 @@ from .contracts import (
     SourceFileMeta,
     utc_now_iso,
 )
-from .gui_dsl import gui_root_keys
+from .gui_dsl import gui_root_keys, normalize_page_gui
 
 
 def _merge_attrs_files(
@@ -115,14 +115,16 @@ def load_page_config(
             )
         merged_modals[modal_id] = modal
 
+    page_gui_root_keys = gui_root_keys(gui)
     page_snapshot = PageSnapshot(
         name=page_name,
         url=page_url,
         title=str(gui.get("title", page_name)),
         gui=gui,
+        parsedGui=normalize_page_gui(gui, page_gui_root_keys),
         attrs=attrs,
         modals=merged_modals,
-        guiMenuKeys=gui_root_keys(gui),
+        guiMenuKeys=page_gui_root_keys,
         modalGuiIds=sorted(merged_modals.keys()),
         sourceFiles=[_source_file_meta(gui_file, "gui"), *attr_sources, *modal_sources],
         diagnostics=diagnostics,

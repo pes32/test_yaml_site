@@ -223,6 +223,17 @@ def normalize_tab(name: str, items: Any) -> dict[str, Any]:
     }
 
 
+def normalize_menu(menu_name: str, items: Any) -> dict[str, Any]:
+    """Собирает runtime-представление меню."""
+    normalized = normalize_content_items(items)
+    return {
+        "name": menu_name or "",
+        "icon": normalized["icon"],
+        "tabs": normalized["tabs"],
+        "content": normalized["content"],
+    }
+
+
 def normalize_modal_runtime(
     modal_id: str,
     modal_name: str,
@@ -312,6 +323,50 @@ def gui_root_keys(gui: dict[str, Any]) -> list[str]:
     return [key for key in gui.keys() if key not in META_KEYS]
 
 
+def normalize_page_gui(
+    gui: dict[str, Any],
+    root_keys: list[str] | None = None,
+) -> dict[str, Any]:
+    """Нормализует page gui в frontend runtime-contract ParsedGuiState."""
+    menus: list[dict[str, Any]] = []
+    modals: dict[str, dict[str, Any]] = {}
+    root_items: list[dict[str, Any]] = []
+
+    keys_to_process = root_keys if isinstance(root_keys, list) else gui_root_keys(gui)
+    for key in keys_to_process:
+        if key not in gui:
+            continue
+
+        value = gui[key]
+        entry_type, entry_name = parse_dynamic_key(key)
+
+        if entry_type == "menu":
+            menus.append(normalize_menu(entry_name, value))
+            continue
+
+        if entry_type in ROOT_CONTENT_TYPES:
+            root_items.append({key: value})
+            continue
+
+        modals[entry_type] = normalize_modal_runtime(
+            entry_type,
+            entry_name or entry_type,
+            value,
+            icon=None,
+        )
+
+    root_content_only = False
+    if not menus and root_items:
+        menus.append(normalize_menu("", root_items))
+        root_content_only = True
+
+    return {
+        "menus": menus,
+        "modals": modals,
+        "rootContentOnly": root_content_only,
+    }
+
+
 def extract_embedded_modals(gui: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """Извлекает встроенные модалки из gui.yaml."""
     modals: dict[str, dict[str, Any]] = {}
@@ -329,4 +384,3 @@ def extract_embedded_modals(gui: dict[str, Any]) -> dict[str, dict[str, Any]]:
         modals[entry_type] = runtime
 
     return modals
-

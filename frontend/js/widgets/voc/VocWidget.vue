@@ -204,7 +204,6 @@
     </template>
   </md3-field>
 </template>
-
 <script setup lang="ts">
 import {
   computed,
@@ -266,7 +265,6 @@ import {
   createVocWidgetState,
   type VocWidgetState
 } from './voc_shared.ts';
-
 type VocWidgetConfig = Record<string, unknown> & {
   columns?: unknown;
   label?: unknown;
@@ -282,51 +280,40 @@ type VocWidgetConfig = Record<string, unknown> & {
   table_consume_keys?: unknown;
   value?: unknown;
 };
-
 type VocWidgetProps = {
   widgetConfig: VocWidgetConfig;
   widgetName: string;
 };
-
 type VocInputPayload = {
   config: VocWidgetConfig;
   name: string;
   value: unknown;
 };
-
 type VocWidgetEmit = {
   (event: 'input', payload: VocInputPayload): void;
 };
-
 type VocCommitContext = {
   kind?: string;
 };
-
 type VocCommitResult =
   | { status: 'noop' | 'committed' }
   | { error: unknown; severity: 'recoverable' | 'fatal'; status: 'blocked' };
-
 defineOptions({
   name: 'VocWidget'
 });
-
 const props = defineProps<VocWidgetProps>();
 const emit = defineEmits<VocWidgetEmit>();
-
 const dropdownRoot = ref<HTMLElement | null>(null);
 const dropdownToggle = ref<HTMLElement | null>(null);
 const dropdownMenu = ref<HTMLElement | null>(null);
 const modalRoot = ref<HTMLElement | null>(null);
 const modalSearchInput = ref<HTMLInputElement | null>(null);
-
 const state = reactive(createVocWidgetState()) as VocWidgetState;
 const field = useWidgetField(props, emit);
-
 const tableCellRootAttrs = field.tableCellRootAttrs;
 const fieldError = field.fieldError;
 const isDraftEditing = field.isDraftEditing;
 const tableCellMode = field.tableCellMode;
-
 const isMultiselect = computed(() => props.widgetConfig.multiselect === true);
 const hasValue = computed(() => hasVocValue(state.value, isMultiselect.value));
 const labelFloats = computed(() => hasValue.value || state.isFocused);
@@ -395,7 +382,6 @@ const checkboxCellStyle = computed(() => ({
   width: '52px',
   minWidth: '52px'
 }));
-
 function getDropdownRefs(): VocDropdownRuntimeRefs {
   return {
     dropdownMenu: dropdownMenu.value,
@@ -404,14 +390,12 @@ function getDropdownRefs(): VocDropdownRuntimeRefs {
     modalRoot: modalRoot.value
   };
 }
-
 function getModalRefs(): VocModalRuntimeRefs {
   return {
     modalRoot: modalRoot.value,
     modalSearchInput: modalSearchInput.value
   };
 }
-
 const dropdownRuntimeContext: VocDropdownRuntimeContext = {
   $nextTick: nextTick,
   get $refs() {
@@ -468,7 +452,6 @@ const dropdownRuntimeContext: VocDropdownRuntimeContext = {
     return props.widgetConfig;
   }
 };
-
 const modalRuntimeContext: VocModalRuntimeContext = {
   $nextTick: nextTick,
   get $refs() {
@@ -488,7 +471,6 @@ const modalRuntimeContext: VocModalRuntimeContext = {
     return props.widgetConfig;
   }
 };
-
 const {
   highlightedIndex,
   inputValue,
@@ -507,15 +489,12 @@ const {
   value,
   vocError
 } = toRefs(state);
-
 function listItemId(index: number): string {
   return resolveListItemId(dropdownRuntimeContext, Number(index));
 }
-
 function formatRowLabel(row: VocRow | null | undefined): string {
   return formatVocRowLabel(row || null);
 }
-
 function setSingleValue(value: unknown, options: { forceSyncInput?: boolean } = {}): void {
   state.value = normalizeSingleVocValue(value);
   state.singleDraftDirty = false;
@@ -523,41 +502,34 @@ function setSingleValue(value: unknown, options: { forceSyncInput?: boolean } = 
     state.inputValue = String(state.value || '');
   }
 }
-
 function setMultiValue(value: unknown): void {
   state.value = normalizeMultiVocValue(value);
   if (!state.isFocused && !isDraftEditing.value) {
     state.inputValue = serializeVocValues(state.value);
   }
 }
-
 function setValue(value: unknown): void {
   if (isMultiselect.value) {
     setMultiValue(value);
     return;
   }
-
   const nextValue = Array.isArray(value)
     ? String(value[0] ?? '')
     : String(value ?? '');
   setSingleValue(nextValue, { forceSyncInput: true });
 }
-
 function getValue(): string | string[] {
   return state.value;
 }
-
 function clearVocError(): void {
   state.vocError = '';
   field.handleTableCellCommitValidation('');
 }
-
 function setVocError(message: string): void {
   const errorMessage = String(message || '').trim();
   state.vocError = errorMessage;
   field.handleTableCellCommitValidation(errorMessage);
 }
-
 function syncInputFromCommitted(): void {
   if (state.isFocused || isDraftEditing.value) {
     return;
@@ -569,7 +541,6 @@ function syncInputFromCommitted(): void {
     state.singleDraftDirty = false;
   }
 }
-
 function resolveHighlightedIndex(): number {
   return resolveHighlightedInlineIndex({
     isMultiselect: isMultiselect.value,
@@ -577,7 +548,6 @@ function resolveHighlightedIndex(): number {
     value: state.value
   });
 }
-
 function setHighlightedIndex(index: number, options: { scroll?: boolean } = {}): void {
   const scroll = options.scroll !== false;
   const maxIndex = inlineRows.value.length - 1;
@@ -595,7 +565,6 @@ function setHighlightedIndex(index: number, options: { scroll?: boolean } = {}):
     });
   }
 }
-
 function moveHighlightedIndex(delta: number): void {
   const length = inlineRows.value.length;
   if (!length) {
@@ -611,11 +580,9 @@ function moveHighlightedIndex(delta: number): void {
       : (state.highlightedIndex + step + length) % length;
   setHighlightedIndex(nextIndex);
 }
-
 function getInputElement(): HTMLInputElement | null {
   return getInputElementRuntime(dropdownRuntimeContext);
 }
-
 function onOutsideInteractionCommit(): void {
   if (state.isModalOpen) {
     return;
@@ -631,15 +598,12 @@ function onOutsideInteractionCommit(): void {
   closeDropdown();
   field.deactivateDraftController();
 }
-
 function openDropdown(options: { highlightFirst?: boolean } = {}): void {
   openDropdownRuntime(dropdownRuntimeContext, options);
 }
-
 function closeDropdown(): void {
   closeDropdownRuntime(dropdownRuntimeContext);
 }
-
 function normalizeMultiselectDraftAndSync(options: {
   fromBlur?: boolean;
   includeActiveToken?: boolean;
@@ -651,25 +615,20 @@ function normalizeMultiselectDraftAndSync(options: {
     includeActiveToken: options.includeActiveToken === true,
     fromBlur: options.fromBlur === true
   });
-
   state.value = resolution.nextValue;
   if (resolution.shouldEmit) {
     field.emitInput(resolution.nextValue.slice());
   }
-
   if (resolution.invalidMessage) {
     setVocError(resolution.invalidMessage);
   } else {
     clearVocError();
   }
-
   if (options.fromBlur === true) {
     state.inputValue = resolution.nextInputValue;
   }
-
   return resolution;
 }
-
 function commitDraftMethod(options: {
   fromBlur?: boolean;
   includeActiveToken?: boolean;
@@ -681,14 +640,12 @@ function commitDraftMethod(options: {
     });
     return;
   }
-
   const resolution = commitSingleVocDraft({
     rows: rows.value,
     inputValue: state.inputValue,
     value: state.value,
     draftDirty: state.singleDraftDirty
   });
-
   state.value = resolution.nextValue;
   state.inputValue = resolution.nextInputValue;
   state.singleDraftDirty = false;
@@ -697,7 +654,6 @@ function commitDraftMethod(options: {
     field.emitInput(resolution.emittedValue);
   }
 }
-
 function selectInlineRow(row: VocRow | null | undefined): void {
   const nextRow = row || null;
   if (!nextRow) {
@@ -713,14 +669,12 @@ function selectInlineRow(row: VocRow | null | undefined): void {
     focusInput(dropdownRuntimeContext);
     return;
   }
-
   setSingleValue(nextRow.value, { forceSyncInput: true });
   clearVocError();
   field.emitInput(nextRow.value);
   closeDropdown();
   field.deactivateDraftController();
 }
-
 function onInputChange(event: Event): void {
   if (props.widgetConfig.readonly) {
     return;
@@ -728,9 +682,7 @@ function onInputChange(event: Event): void {
   field.activateDraftController();
   state.skipNextOutsideCommit = false;
   clearVocError();
-
   const target = event.target instanceof HTMLInputElement ? event.target : null;
-
   if (isMultiselect.value) {
     const rawValue = target?.value == null ? '' : String(target.value);
     state.inputValue = parseVocDraft(rawValue).normalizedText;
@@ -746,7 +698,6 @@ function onInputChange(event: Event): void {
     }
     return;
   }
-
   state.inputValue = target?.value == null ? '' : String(target.value);
   state.singleDraftDirty = true;
   if (!state.isDropdownOpen) {
@@ -755,7 +706,6 @@ function onInputChange(event: Event): void {
   }
   setHighlightedIndex(inlineRows.value.length > 0 ? 0 : -1);
 }
-
 function onInputFocus(): void {
   state.isFocused = true;
   field.activateDraftController();
@@ -768,7 +718,6 @@ function onInputFocus(): void {
   }
   state.inputValue = String(state.value || '');
 }
-
 function onInputBlur(): void {
   state.isFocused = false;
   window.setTimeout(() => {
@@ -778,7 +727,6 @@ function onInputBlur(): void {
     onOutsideInteractionCommit();
   }, 150);
 }
-
 function onWidgetFocusOut(): void {
   window.setTimeout(() => {
     if (isFocusInsideWidget(dropdownRuntimeContext)) {
@@ -787,12 +735,10 @@ function onWidgetFocusOut(): void {
     onOutsideInteractionCommit();
   }, 0);
 }
-
 function onInputKeydown(event: KeyboardEvent): void {
   if (props.widgetConfig.readonly) {
     return;
   }
-
   if (event.key === 'Tab') {
     const tabHandler = props.widgetConfig.table_cell_tab_handler;
     if (tableCellMode.value && typeof tabHandler === 'function') {
@@ -802,7 +748,6 @@ function onInputKeydown(event: KeyboardEvent): void {
       return;
     }
   }
-
   const shouldOpenModal =
     event.altKey &&
     !event.ctrlKey &&
@@ -813,13 +758,11 @@ function onInputKeydown(event: KeyboardEvent): void {
     openModal();
     return;
   }
-
   if (event.key === 'Enter' && !state.isDropdownOpen) {
     event.preventDefault();
     openDropdown({ highlightFirst: true });
     return;
   }
-
   if (state.isDropdownOpen) {
     if (event.key === 'ArrowDown') {
       event.preventDefault();
@@ -849,12 +792,10 @@ function onInputKeydown(event: KeyboardEvent): void {
     }
   }
 }
-
 function onMenuKeydown(event: KeyboardEvent): void {
   if (!shouldShowInlineDropdown.value) {
     return;
   }
-
   if (event.key === 'ArrowDown') {
     event.preventDefault();
     moveHighlightedIndex(1);
@@ -885,7 +826,6 @@ function onMenuKeydown(event: KeyboardEvent): void {
     focusInput(dropdownRuntimeContext);
   }
 }
-
 function onArrowClick(): void {
   if (props.widgetConfig.readonly) {
     return;
@@ -893,11 +833,9 @@ function onArrowClick(): void {
   focusInput(dropdownRuntimeContext);
   openModal();
 }
-
 function setTableUiLocked(locked: boolean): void {
   runtimeSetTableUiLocked(modalRuntimeContext, Boolean(locked));
 }
-
 function openModal(): void {
   if (props.widgetConfig.readonly) {
     return;
@@ -909,7 +847,6 @@ function openModal(): void {
   setTableUiLocked(true);
   state.modalSortColumn = -1;
   state.modalSortDirection = '';
-
   const nextState = resolveModalOpenState({
     isMultiselect: isMultiselect.value,
     rows: rows.value,
@@ -919,21 +856,17 @@ function openModal(): void {
   state.modalSearch = nextState.modalSearch;
   state.modalSelectedRowIds = nextState.modalSelectedRowIds;
   state.modalSelectedRowId = nextState.modalSelectedRowId;
-
   void nextTick(() => {
     syncModalActiveRow();
     focusModalSearchInput(modalRuntimeContext);
   });
 }
-
 function closeModal(options: { restoreFocus?: boolean } = {}): void {
   closeModalRuntime(modalRuntimeContext, options);
 }
-
 function closeModalFromCancel(): void {
   closeModal({ restoreFocus: true });
 }
-
 function applyModalSelection(): void {
   const selection = resolveAppliedModalSelection({
     isMultiselect: isMultiselect.value,
@@ -942,7 +875,6 @@ function applyModalSelection(): void {
     modalSelectedRowId: state.modalSelectedRowId,
     modalActiveRowId: state.modalActiveRowId
   });
-
   if (isMultiselect.value) {
     setMultiValue(selection.nextValue);
     state.skipNextOutsideCommit = true;
@@ -951,7 +883,6 @@ function applyModalSelection(): void {
     field.emitInput(selection.emittedValue);
     return;
   }
-
   if (selection.shouldEmit) {
     setSingleValue(selection.nextValue, { forceSyncInput: true });
     clearVocError();
@@ -959,16 +890,13 @@ function applyModalSelection(): void {
     field.emitInput(selection.emittedValue);
     return;
   }
-
   closeModal({ restoreFocus: true });
 }
-
 function modalRowStyle(_row?: VocRow | null): Record<string, string> {
   return {
     cursor: 'pointer'
   };
 }
-
 function modalCellStyle(
   row: VocRow | null | undefined,
   baseStyle: Record<string, string> | null = null
@@ -976,22 +904,17 @@ function modalCellStyle(
   const style = { ...(baseStyle || {}) };
   const isActive = isModalRowActive(row);
   const isSelected = isModalRowSelected(row);
-
   if (!isActive && !isSelected) {
     return style;
   }
-
   style.backgroundColor = isActive
     ? 'var(--color-dropdown-active)'
     : 'var(--color-table-hover)';
-
   if (isActive) {
     style.boxShadow = 'inset 0 2px 0 0 var(--color-text-main), inset 0 -2px 0 0 var(--color-text-main)';
   }
-
   return style;
 }
-
 function modalSortControlClass(columnIndex: number): Record<string, boolean> {
   return resolveModalSortControlClass(
     state.modalSortColumn,
@@ -999,7 +922,6 @@ function modalSortControlClass(columnIndex: number): Record<string, boolean> {
     Number(columnIndex)
   );
 }
-
 function toggleModalSort(columnIndex: number): void {
   const nextState = toggleModalSortState(
     state.modalSortColumn,
@@ -1010,7 +932,6 @@ function toggleModalSort(columnIndex: number): void {
   state.modalSortDirection = nextState.modalSortDirection;
   void nextTick(() => syncModalActiveRow());
 }
-
 function isModalRowSelected(row: VocRow | null | undefined): boolean {
   const nextRow = row || null;
   if (!nextRow) {
@@ -1021,12 +942,10 @@ function isModalRowSelected(row: VocRow | null | undefined): boolean {
   }
   return state.modalSelectedRowId === nextRow.id;
 }
-
 function isModalRowActive(row: VocRow | null | undefined): boolean {
   const nextRow = row || null;
   return !!(nextRow && state.modalActiveRowId === nextRow.id);
 }
-
 function toggleModalRow(row: VocRow): void {
   const nextState = toggleModalRowSelection({
     isMultiselect: isMultiselect.value,
@@ -1038,7 +957,6 @@ function toggleModalRow(row: VocRow): void {
   state.modalSelectedRowId = nextState.modalSelectedRowId;
   state.modalActiveRowId = nextState.modalActiveRowId;
 }
-
 function onModalRowClick(row: VocRow | null | undefined): void {
   const nextRow = row || null;
   if (!nextRow) {
@@ -1051,19 +969,16 @@ function onModalRowClick(row: VocRow | null | undefined): void {
   state.modalSelectedRowId = nextRow.id;
   state.modalActiveRowId = nextRow.id;
 }
-
 function onModalRowDoubleClick(row: VocRow | null | undefined): void {
   onModalRowClick(row || null);
   if (!isMultiselect.value) {
     applyModalSelection();
   }
 }
-
 function onModalSearchInput(event: Event): void {
   const target = event.target instanceof HTMLInputElement ? event.target : null;
   state.modalSearch = target?.value == null ? '' : String(target.value);
 }
-
 function syncModalActiveRow(): void {
   const nextState = resolveModalActiveState({
     visibleRows: modalRows.value,
@@ -1076,7 +991,6 @@ function syncModalActiveRow(): void {
   state.modalSelectedRowId = nextState.modalSelectedRowId;
   void nextTick(() => scrollModalActiveRowIntoView(modalRuntimeContext));
 }
-
 function moveModalActiveRow(delta: number): void {
   const nextState = moveModalActiveState({
     visibleRows: modalRows.value,
@@ -1089,17 +1003,14 @@ function moveModalActiveRow(delta: number): void {
   state.modalSelectedRowId = nextState.modalSelectedRowId;
   void nextTick(() => scrollModalActiveRowIntoView(modalRuntimeContext));
 }
-
 function onModalKeydown(event: KeyboardEvent): void {
   if (!state.isModalOpen) {
     return;
   }
-
   const targetTag = String((event.target as HTMLElement | null)?.tagName || '').toUpperCase();
   if (targetTag === 'BUTTON' && event.key === 'Enter') {
     return;
   }
-
   if (event.key === 'Escape') {
     event.preventDefault();
     closeModalFromCancel();
@@ -1131,23 +1042,19 @@ function onModalKeydown(event: KeyboardEvent): void {
     applyModalSelection();
   }
 }
-
 function commitDraft(options?: { fromBlur?: boolean; includeActiveToken?: boolean }): VocCommitResult {
   commitDraftMethod(options);
   return { status: 'committed' };
 }
-
 function commitPendingState(context: VocCommitContext = {}): VocCommitResult {
   if (!isDraftEditing.value) {
     return { status: 'noop' };
   }
-
   if (isMultiselect.value) {
     commitDraftMethod({ includeActiveToken: true, fromBlur: true });
   } else {
     commitDraftMethod();
   }
-
   const message = String(combinedFieldError.value || '').trim();
   if (message && context.kind) {
     return {
@@ -1156,10 +1063,8 @@ function commitPendingState(context: VocCommitContext = {}): VocCommitResult {
       error: new Error(message)
     };
   }
-
   return { status: 'committed' };
 }
-
 watch(
   () => props.widgetConfig.value,
   (nextValue) => {
@@ -1170,7 +1075,6 @@ watch(
   },
   { immediate: true }
 );
-
 watch(inlineRows, () => {
   if (inlineRows.value.length === 0) {
     state.highlightedIndex = -1;
@@ -1180,21 +1084,18 @@ watch(inlineRows, () => {
     setHighlightedIndex(0, { scroll: false });
   }
 });
-
 watch(modalRows, () => {
   if (!state.isModalOpen) {
     return;
   }
   syncModalActiveRow();
 });
-
 onBeforeUnmount(() => {
   closeDropdown();
   if (state.isModalOpen) {
     setTableUiLocked(false);
   }
 });
-
 defineExpose({
   clearVocError,
   closeDropdown,

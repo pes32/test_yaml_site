@@ -324,20 +324,7 @@
 </template>
 
 <script setup lang="ts">
-import { markRaw } from 'vue';
-
-import DateTimeWidget from '../datetime/DateTimeWidget.vue';
-import DateWidget from '../datetime/DateWidget.vue';
-import TimeWidget from '../datetime/TimeWidget.vue';
-import FloatWidget from '../fields/FloatWidget.vue';
-import IntWidget from '../fields/IntWidget.vue';
-import IpMaskWidget from '../fields/IpMaskWidget.vue';
-import IpWidget from '../fields/IpWidget.vue';
-import StringWidget from '../fields/StringWidget.vue';
-import ListWidget from '../ListWidget.vue';
-import VocWidget from '../voc/VocWidget.vue';
 import type {
-  TableCellWidgetRegistry,
   TableRuntimePropsSurface,
   TableWidgetEmit,
   TableWidgetPublicSurface
@@ -351,23 +338,9 @@ defineOptions({
 const props = defineProps<TableRuntimePropsSurface>();
 const emit = defineEmits<TableWidgetEmit>();
 
-const tableCellWidgets = {
-  stringCellWidget: markRaw(StringWidget),
-  intCellWidget: markRaw(IntWidget),
-  floatCellWidget: markRaw(FloatWidget),
-  dateCellWidget: markRaw(DateWidget),
-  timeCellWidget: markRaw(TimeWidget),
-  datetimeCellWidget: markRaw(DateTimeWidget),
-  ipCellWidget: markRaw(IpWidget),
-  ipMaskCellWidget: markRaw(IpMaskWidget),
-  listCellWidget: markRaw(ListWidget),
-  vocCellWidget: markRaw(VocWidget)
-} satisfies TableCellWidgetRegistry;
-
 const tableRuntime = useTableRuntime({
   props,
-  emit,
-  cellWidgets: tableCellWidgets
+  emit
 });
 
 const {

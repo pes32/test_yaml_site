@@ -1,4 +1,3 @@
-import GuiParser from '../gui_parser.ts';
 import { resolveAttrConfig } from '../shared/attr_config.ts';
 import { asRecord, isRecord } from '../shared/object_record.ts';
 import type {
@@ -64,22 +63,56 @@ function getActiveSections(
     activeTabIndex: number,
     activeTabs: ParsedGuiTab[]
 ): ParsedGuiSection[] {
-    const sections = GuiParser
-        ? GuiParser.getActiveSections(activeMenu, activeTabIndex, activeTabs)
-        : [];
+    const tabArray = Array.isArray(activeTabs) ? activeTabs : [];
+    if (tabArray.length) {
+        const safeIndex = Math.max(0, Math.min(Number(activeTabIndex) || 0, tabArray.length - 1));
+        const activeTab = tabArray[safeIndex];
+        const sections = activeTab && Array.isArray(activeTab.content) ? activeTab.content : [];
+        return Array.isArray(sections) ? sections : [];
+    }
+
+    const sections = activeMenu && Array.isArray(activeMenu.content) ? activeMenu.content : [];
     return Array.isArray(sections) ? sections : [];
+}
+
+function collectWidgetNamesFromSections(sections: ParsedGuiSection[]): string[] {
+    const names = new Set<string>();
+
+    sections.forEach((section) => {
+        const rows = Array.isArray(section.rows) ? section.rows : [];
+        rows.forEach((row) => {
+            if (!row || typeof row === 'string') {
+                return;
+            }
+
+            const widgets = asRecord(row).widgets;
+            if (!Array.isArray(widgets)) {
+                return;
+            }
+
+            widgets.forEach((widgetName) => {
+                const token = String(widgetName || '').trim();
+                if (token) {
+                    names.add(token);
+                }
+            });
+        });
+    });
+
+    return Array.from(names);
 }
 
 function collectActiveWidgetNames(
     activeMenu: ParsedGuiMenu | null | undefined,
     activeTabIndex: number
 ): string[] {
-    if (!GuiParser || !activeMenu) {
+    if (!activeMenu) {
         return [];
     }
 
-    const names = GuiParser.collectWidgetNamesFromMenu(activeMenu, activeTabIndex);
-    return Array.isArray(names) ? names.map((name) => String(name || '').trim()).filter(Boolean) : [];
+    return collectWidgetNamesFromSections(
+        getActiveSections(activeMenu, activeTabIndex, getActiveTabs(activeMenu))
+    );
 }
 
 function getCurrentPageName(configState: PageConfigState | null | undefined): string {

@@ -4,22 +4,23 @@
     :has-value="hasValue"
     :label-floats="labelFloats"
     :is-focused="isFocused"
-    :wrap-extra="{ 'widget-dt': true, 'widget-dt--datetime': true, error: !!tableCellCommitError }"
-    :wrap-data="{ 'data-type': 'datetime' }"
+    :wrap-extra="wrapExtra"
+    :wrap-data="{ 'data-type': mode }"
     :has-supporting="!!widgetConfig.sup_text"
-    container-modifier="datetime"
+    :container-modifier="isDateTimeMode ? 'datetime' : undefined"
   >
     <div
       ref="pickerHost"
-      class="widget-dt-host widget-dt-host--datetime"
+      :class="hostClass"
       v-bind="tableCellRootAttrs"
     >
-      <div class="widget-dt-inner widget-dt-inner--datetime">
+      <div :class="innerClass">
         <date-time-segment
+          v-if="hasDateSegment"
           ref="dateAnchor"
           v-model="dateValue"
           kind="date"
-          segment-class="widget-dt-segment--date"
+          :segment-class="dateSegmentClass"
           input-class="widget-dt-input--date"
           :readonly="widgetConfig.readonly"
           :icon-src="calendarIconSrc"
@@ -31,10 +32,11 @@
           @open="openDatePicker"
         ></date-time-segment>
         <date-time-segment
+          v-if="hasTimeSegment"
           ref="timeAnchor"
           v-model="timeValue"
           kind="time"
-          segment-class="widget-dt-segment--time"
+          :segment-class="timeSegmentClass"
           input-class="widget-dt-input--time"
           :readonly="widgetConfig.readonly"
           :icon-src="clockIconSrc"
@@ -83,7 +85,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import Md3Field from '../common/Md3Field.vue';
 import CalendarPopover from './CalendarPopover.vue';
 import DateTimeSegment from './DateTimeSegment.vue';
@@ -94,6 +96,7 @@ import useDateTimeField, { type DateTimeCommitContext } from './useDateTimeField
 import useFloatingPopover from './useFloatingPopover.ts';
 import useTimePart, { type TimePartKey } from './useTimePart.ts';
 import type {
+  DateTimeMode,
   DateTimeSegmentExpose,
   DateTimeWidgetEmit,
   DateTimeWidgetProps,
@@ -101,7 +104,7 @@ import type {
 } from './types.ts';
 
 defineOptions({
-  name: 'DateTimeWidget'
+  name: 'DateTimeInputWidget'
 });
 
 const CALENDAR_ICON_SRC = '/templates/icons/calendar.svg';
@@ -123,6 +126,28 @@ const timePopoverRef = ref<PopoverExpose | null>(null);
 const calendarIconSrc = CALENDAR_ICON_SRC;
 const clockIconSrc = CLOCK_ICON_SRC;
 
+const mode = computed<DateTimeMode>(() => {
+  const widgetType = String(props.widgetConfig.widget || '').trim();
+  return widgetType === 'time' || widgetType === 'datetime' ? widgetType : 'date';
+});
+const isDateTimeMode = computed(() => mode.value === 'datetime');
+const hasDateSegment = computed(() => mode.value !== 'time');
+const hasTimeSegment = computed(() => mode.value !== 'date');
+const hostClass = computed(() => ({
+  'widget-dt-host': true,
+  'widget-dt-host--datetime': isDateTimeMode.value
+}));
+const innerClass = computed(() => ({
+  'widget-dt-inner': true,
+  'widget-dt-inner--datetime': isDateTimeMode.value
+}));
+const dateSegmentClass = computed(() =>
+  isDateTimeMode.value ? 'widget-dt-segment--date' : 'widget-dt-segment--single'
+);
+const timeSegmentClass = computed(() =>
+  isDateTimeMode.value ? 'widget-dt-segment--time' : 'widget-dt-segment--single'
+);
+
 const field = useDateTimeField(props, emit, value);
 const datePart = useDatePart(dateValue);
 const timePart = useTimePart(timeValue);
@@ -143,6 +168,12 @@ const {
   tableCellMode,
   tableCellRootAttrs
 } = field;
+
+const wrapExtra = computed(() => ({
+  'widget-dt': true,
+  'widget-dt--datetime': isDateTimeMode.value,
+  error: !!tableCellCommitError.value
+}));
 
 function closePopovers(): void {
   isDatePopoverOpen.value = false;
@@ -167,11 +198,13 @@ function refreshOpenPopovers(): void {
   }
 }
 
-function bindPopoverTracking(): void {
-  popover.bind(refreshOpenPopovers);
-}
-
 function composeValue(): string {
+  if (mode.value === 'date') {
+    return dateValue.value;
+  }
+  if (mode.value === 'time') {
+    return timeValue.value;
+  }
   return [dateValue.value, timeValue.value].filter(Boolean).join(' ');
 }
 
@@ -188,35 +221,74 @@ function onSegmentFocus(): void {
 
 function finalizeSegmentBlur(commitHandler: () => void): void {
   isFocused.value = false;
-  const shouldScheduleDeactivation = !tableCellMode.value;
+  const shouldScheduleDeactivation = isDateTimeMode.value && !tableCellMode.value;
 
   try {
     commitHandler();
   } finally {
-    if (shouldScheduleDeactivation) {
-      window.setTimeout(() => {
-        const active = document.activeElement;
-        const root = pickerHost.value;
-        if (root && active && root.contains(active)) {
-          return;
-        }
-        field.deactivateDraftController();
-      }, 0);
+    if (!shouldScheduleDeactivation) {
+      field.deactivateDraftController();
+      return;
     }
+
+    window.setTimeout(() => {
+      const active = document.activeElement;
+      const root = pickerHost.value;
+      if (root && active && root.contains(active)) {
+        return;
+      }
+      field.deactivateDraftController();
+    }, 0);
   }
 }
 
-function onTimePickerPartInput(part: TimePartKey, event: Event): void {
-  const target = event.target;
-  timePart.setPart(part, target instanceof HTMLInputElement ? target.value : '');
+function commitDateInput(context?: DateTimeCommitContext) {
+  if (!dateValue.value) {
+    syncValue(false);
+    return field.commitValue(value.value, '', context);
+  }
+
+  const state = datePart.normalize(dateValue.value);
+  dateValue.value = state.value;
+  syncValue(false);
+  return field.commitValue(
+    value.value,
+    state.parsedDate ? '' : 'Неверный формат даты',
+    context
+  );
 }
 
-function commitTimePickerPart(part: TimePartKey, max: number, shouldClose = false): void {
-  timePart.commitPart(part, max);
-  syncValue();
-  if (shouldClose) {
-    closePopovers();
+function commitTimeInput(context?: DateTimeCommitContext) {
+  if (!timeValue.value) {
+    syncValue(false);
+    return field.commitValue(value.value, '', context);
   }
+
+  const state = timePart.normalize(timeValue.value);
+  timeValue.value = state.value;
+  syncValue(false);
+  return field.commitValue(
+    value.value,
+    state.parsedTime ? '' : 'Неверный формат времени',
+    context
+  );
+}
+
+function commitDraft(context?: DateTimeCommitContext) {
+  if (mode.value === 'date') {
+    return commitDateInput(context);
+  }
+  if (mode.value === 'time') {
+    return commitTimeInput(context);
+  }
+
+  const dateResult = commitDateInput(context);
+  const timeResult = commitTimeInput(context);
+  return timeResult || dateResult;
+}
+
+function commitPendingState(context?: DateTimeCommitContext) {
+  return commitDraft(context);
 }
 
 function onDateInput(): void {
@@ -277,50 +349,8 @@ function onTimeEnterCommit(event: KeyboardEvent): void {
   }
 }
 
-function commitDateInput(context?: DateTimeCommitContext) {
-  if (!dateValue.value) {
-    syncValue(false);
-    return field.commitValue(value.value, '', context);
-  }
-
-  const state = datePart.normalize(dateValue.value);
-  dateValue.value = state.value;
-  syncValue(false);
-  return field.commitValue(
-    value.value,
-    state.parsedDate ? '' : 'Неверный формат даты',
-    context
-  );
-}
-
-function commitTimeInput(context?: DateTimeCommitContext) {
-  if (!timeValue.value) {
-    syncValue(false);
-    return field.commitValue(value.value, '', context);
-  }
-
-  const state = timePart.normalize(timeValue.value);
-  timeValue.value = state.value;
-  syncValue(false);
-  return field.commitValue(
-    value.value,
-    state.parsedTime ? '' : 'Неверный формат времени',
-    context
-  );
-}
-
-function commitDraft(context?: DateTimeCommitContext) {
-  const dateResult = commitDateInput(context);
-  const timeResult = commitTimeInput(context);
-  return timeResult || dateResult;
-}
-
-function commitPendingState(context?: DateTimeCommitContext) {
-  return commitDraft(context);
-}
-
 function openDatePicker(): void {
-  if (props.widgetConfig.readonly) {
+  if (props.widgetConfig.readonly || !hasDateSegment.value) {
     return;
   }
 
@@ -330,12 +360,12 @@ function openDatePicker(): void {
   popover.setHidden();
   void nextTick(() => {
     refreshOpenPopovers();
-    bindPopoverTracking();
+    popover.bind(refreshOpenPopovers);
   });
 }
 
 function openTimePicker(): void {
-  if (props.widgetConfig.readonly) {
+  if (props.widgetConfig.readonly || !hasTimeSegment.value) {
     return;
   }
 
@@ -345,8 +375,16 @@ function openTimePicker(): void {
   popover.setHidden();
   void nextTick(() => {
     refreshOpenPopovers();
-    bindPopoverTracking();
+    popover.bind(refreshOpenPopovers);
   });
+}
+
+function openPicker(): void {
+  if (hasDateSegment.value) {
+    openDatePicker();
+    return;
+  }
+  openTimePicker();
 }
 
 function prevMonth(): void {
@@ -365,6 +403,19 @@ function selectDate(date: Date): void {
   closePopovers();
 }
 
+function onTimePickerPartInput(part: TimePartKey, event: Event): void {
+  const target = event.target;
+  timePart.setPart(part, target instanceof HTMLInputElement ? target.value : '');
+}
+
+function commitTimePickerPart(part: TimePartKey, max: number, shouldClose = false): void {
+  timePart.commitPart(part, max);
+  syncValue();
+  if (shouldClose) {
+    closePopovers();
+  }
+}
+
 function setValue(nextValue: unknown): void {
   if (!nextValue) {
     value.value = '';
@@ -373,12 +424,21 @@ function setValue(nextValue: unknown): void {
     return;
   }
 
-  const { datePart: datePartValue, timePart: timePartValue } = splitDateTimeValue(nextValue);
-  const dateState = datePart.normalize(datePartValue);
-  const timeState = timePart.normalize(timePartValue);
-
-  dateValue.value = dateState.value;
-  timeValue.value = timeState.value;
+  if (mode.value === 'date') {
+    const state = datePart.normalize(nextValue);
+    dateValue.value = state.value;
+    timeValue.value = '';
+  } else if (mode.value === 'time') {
+    const state = timePart.normalize(nextValue);
+    dateValue.value = '';
+    timeValue.value = state.value;
+  } else {
+    const { datePart: nextDate, timePart: nextTime } = splitDateTimeValue(nextValue);
+    const dateState = datePart.normalize(nextDate);
+    const timeState = timePart.normalize(nextTime);
+    dateValue.value = dateState.value;
+    timeValue.value = timeState.value;
+  }
   syncValue(false);
 }
 
@@ -402,6 +462,7 @@ defineExpose({
   commitPendingState,
   getValue,
   openDatePicker,
+  openPicker,
   openTimePicker,
   setValue,
   tableCellCommitError,

@@ -31,7 +31,7 @@
         <div ref="collapseInner" class="collapse-inner">
           <div class="card-body page-section-body u-wide">
             <ContentRows
-              :rows="normalizeRows(section.rows)"
+              :rows="sectionRows"
               :get-widget-attrs="getWidgetAttrs"
               :get-widget-value="getWidgetValue"
               text-class="page-section-text"
@@ -93,12 +93,9 @@ let removeCollapseTransitionListener: (() => void) | null = null;
 
 const titleTag = 'h5';
 const collapseIconSrc = '/templates/icons/arrow.svg';
-
-function normalizeRows(rows: unknown): Array<string | { widgets?: string[] }> {
-  return (Array.isArray(rows) ? rows : []).filter((row): row is string | { widgets?: string[] } =>
-    typeof row === 'string' || (row !== null && typeof row === 'object')
-  );
-}
+const sectionRows = computed(() =>
+  (props.section.rows || []) as Array<string | { widgets?: string[] }>
+);
 
 const collapseClass = computed(() => {
   if (!props.section.collapsible) {

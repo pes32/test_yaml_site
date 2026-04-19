@@ -1,15 +1,4 @@
-type StatefulWidgetType =
-  | 'date'
-  | 'datetime'
-  | 'float'
-  | 'int'
-  | 'ip'
-  | 'ip_mask'
-  | 'list'
-  | 'str'
-  | 'text'
-  | 'time'
-  | 'voc';
+import { STATEFUL_WIDGET_TYPES, type StatefulWidgetType } from '../shared/widget_types.ts';
 
 type WidgetConfigLike =
   | string
@@ -41,20 +30,6 @@ type NormalizedListOption = {
   label: string;
   value: string;
 };
-
-const STATEFUL_WIDGET_TYPES = new Set<StatefulWidgetType>([
-  'str',
-  'text',
-  'int',
-  'float',
-  'date',
-  'time',
-  'datetime',
-  'ip',
-  'ip_mask',
-  'list',
-  'voc'
-]);
 
 function asWidgetConfig(configOrType: WidgetConfigLike): WidgetConfigRecord | null {
   if (

@@ -13,7 +13,6 @@ import {
 } from 'vue';
 import { resolveTableDependencies } from '../../shared/table_attr_dependencies.ts';
 import type {
-    TableCellWidgetRegistry,
     TableRuntimeComputed,
     TableRuntimeComputedDefinition,
     TableRuntimeComputedRefs,
@@ -38,7 +37,6 @@ import {
 import { createTableStore } from './table_store.ts';
 
 type UseTableRuntimeOptions = {
-    cellWidgets: TableCellWidgetRegistry;
     emit: TableWidgetEmit;
     props: TableRuntimePropsSurface;
 };
@@ -123,7 +121,6 @@ function tableDependencySignature(
 }
 
 function createInitialTableRuntimeState(
-    cellWidgets: TableCellWidgetRegistry,
     props: TableRuntimePropsSurface,
     tablePageBridge: ReturnType<typeof createTablePageBridge>
 ): TableRuntimeState {
@@ -155,16 +152,6 @@ function createInitialTableRuntimeState(
         _contextMenuClickHandler: null,
         _contextMenuKeydownHandler: null,
         editingCell: null,
-        stringCellWidget: cellWidgets.stringCellWidget,
-        intCellWidget: cellWidgets.intCellWidget,
-        floatCellWidget: cellWidgets.floatCellWidget,
-        dateCellWidget: cellWidgets.dateCellWidget,
-        timeCellWidget: cellWidgets.timeCellWidget,
-        datetimeCellWidget: cellWidgets.datetimeCellWidget,
-        ipCellWidget: cellWidgets.ipCellWidget,
-        ipMaskCellWidget: cellWidgets.ipMaskCellWidget,
-        listCellWidget: cellWidgets.listCellWidget,
-        vocCellWidget: cellWidgets.vocCellWidget,
         _tableFocusWithin: false,
         _sortCycleRowOrder: null,
         cellValidationErrors: {},
@@ -319,35 +306,11 @@ function createRuntimeComputedRef<K extends keyof TableRuntimeComputed>(
 }
 
 function createRuntimeComputedRefs(vm: TableRuntimeVm): TableRuntimeComputedRefs {
-    return {
-        _lazyPendingRows: createRuntimeComputedRef(vm, '_lazyPendingRows'),
-        contextMenuItems: createRuntimeComputedRef(vm, 'contextMenuItems'),
-        displayRows: createRuntimeComputedRef(vm, 'displayRows'),
-        groupingActive: createRuntimeComputedRef(vm, 'groupingActive'),
-        groupingState: createRuntimeComputedRef(vm, 'groupingState'),
-        groupingViewCache: createRuntimeComputedRef(vm, 'groupingViewCache'),
-        hasColumnNumbers: createRuntimeComputedRef(vm, 'hasColumnNumbers'),
-        hasExplicitTableWidth: createRuntimeComputedRef(vm, 'hasExplicitTableWidth'),
-        headerSortEnabled: createRuntimeComputedRef(vm, 'headerSortEnabled'),
-        isEditable: createRuntimeComputedRef(vm, 'isEditable'),
-        isFullyLoaded: createRuntimeComputedRef(vm, 'isFullyLoaded'),
-        isLoadingChunk: createRuntimeComputedRef(vm, 'isLoadingChunk'),
-        lazyEnabled: createRuntimeComputedRef(vm, 'lazyEnabled'),
-        lazySessionId: createRuntimeComputedRef(vm, 'lazySessionId'),
-        lineNumbersRuntimeEnabled: createRuntimeComputedRef(vm, 'lineNumbersRuntimeEnabled'),
-        sortColumnIndex: createRuntimeComputedRef(vm, 'sortColumnIndex'),
-        sortDirection: createRuntimeComputedRef(vm, 'sortDirection'),
-        sortKeys: createRuntimeComputedRef(vm, 'sortKeys'),
-        stickyHeaderEnabled: createRuntimeComputedRef(vm, 'stickyHeaderEnabled'),
-        stickyHeaderRuntimeEnabled: createRuntimeComputedRef(vm, 'stickyHeaderRuntimeEnabled'),
-        tableInlineStyle: createRuntimeComputedRef(vm, 'tableInlineStyle'),
-        tableLazyUiActive: createRuntimeComputedRef(vm, 'tableLazyUiActive'),
-        tableMinRowCount: createRuntimeComputedRef(vm, 'tableMinRowCount'),
-        tableUiLocked: createRuntimeComputedRef(vm, 'tableUiLocked'),
-        tableZebra: createRuntimeComputedRef(vm, 'tableZebra'),
-        wordWrapEnabled: createRuntimeComputedRef(vm, 'wordWrapEnabled'),
-        wordWrapRuntimeEnabled: createRuntimeComputedRef(vm, 'wordWrapRuntimeEnabled')
-    };
+    return objectKeys(tableRuntimeComputed).reduce((refs, key) => {
+        (refs as Record<string, ComputedRef<unknown>>)[key] =
+            createRuntimeComputedRef(vm, key) as ComputedRef<unknown>;
+        return refs;
+    }, {} as Record<string, ComputedRef<unknown>>) as TableRuntimeComputedRefs;
 }
 
 function bindRuntimeMethod<K extends keyof TableRuntimeMethods>(
@@ -409,7 +372,7 @@ function createTableWidgetSetupBindings(
 }
 
 function useTableRuntime(options: UseTableRuntimeOptions): TableWidgetSetupBindings {
-    const { cellWidgets, emit, props } = options;
+    const { emit, props } = options;
 
     const instance = getCurrentInstance();
 
@@ -427,7 +390,7 @@ function useTableRuntime(options: UseTableRuntimeOptions): TableWidgetSetupBindi
         showAppNotification: showAppNotificationFromRuntime
     });
 
-    const state = reactive(createInitialTableRuntimeState(cellWidgets, props, tablePageBridge)) as TableRuntimeState;
+    const state = reactive(createInitialTableRuntimeState(props, tablePageBridge)) as TableRuntimeState;
 
     const computedRefs: Partial<TableRuntimeComputedRefs> = {};
     const boundMethods: Partial<TableRuntimeMethods> = {};

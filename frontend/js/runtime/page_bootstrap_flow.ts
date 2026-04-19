@@ -1,4 +1,3 @@
-import GuiParser from '../gui_parser.ts';
 import { asRecord } from '../shared/object_record.ts';
 import frontendApiClient from './api_client.ts';
 import PageRuntimeStore from './page_store.ts';
@@ -28,12 +27,10 @@ function isParsedGuiState(value: unknown): value is ParsedGuiState {
 }
 
 function parsePageGuiState(rawConfig: unknown): ParsedGuiState {
-    const parsed = GuiParser
-        ? GuiParser.parsePageGui(rawConfig)
-        : EMPTY_PARSED_GUI_STATE;
+    const parsed = asRecord(rawConfig).parsedGui;
 
     if (!isParsedGuiState(parsed)) {
-        throw new Error('GUI parser returned an invalid ParsedGuiState');
+        throw new Error('Page payload does not contain a valid parsedGui state');
     }
 
     return parsed;

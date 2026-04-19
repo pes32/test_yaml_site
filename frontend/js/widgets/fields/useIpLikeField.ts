@@ -223,10 +223,19 @@ function validateIPv4Cidr(value: string): boolean {
   return number >= 0 && number <= 32;
 }
 
+function resolveIpLikeOptions(widgetType: unknown): UseIpLikeFieldOptions {
+  const allowMask = String(widgetType || '').trim() === 'ip_mask';
+  return {
+    allowMask,
+    maskTemplate: allowMask ? IP_CIDR_TEMPLATE : IP_MASK_TEMPLATE,
+    validate: allowMask ? validateIPv4Cidr : validateIPv4
+  };
+}
+
 function useIpLikeField(
   props: Readonly<IpLikeWidgetProps>,
   emit: IpLikeWidgetEmit,
-  options: UseIpLikeFieldOptions
+  options: UseIpLikeFieldOptions = resolveIpLikeOptions(props.widgetConfig.widget)
 ) {
   const field = useWidgetField(props as IpLikeWidgetProps, emit);
   const inputRef: Ref<HTMLInputElement | null> = ref(null);
@@ -416,6 +425,7 @@ export {
   IP_CIDR_TEMPLATE,
   IP_MASK_TEMPLATE,
   normalizeIpLikeValue,
+  resolveIpLikeOptions,
   useIpLikeField,
   validateIPv4,
   validateIPv4Cidr

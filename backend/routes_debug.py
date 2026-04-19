@@ -6,10 +6,10 @@ from __future__ import annotations
 import logging
 import os
 
-from flask import jsonify, make_response, render_template, request
+from flask import render_template, request
 from pydantic import ValidationError
 
-from .api_response import error_payload, success_payload
+from .api_response import snapshot_error, snapshot_success
 from .contracts import (
     DebugLogsDataResponse,
     DebugPagesDataResponse,
@@ -28,18 +28,6 @@ def register_debug_routes(app, config_service, log_file_path: str):
 
     def _snapshot():
         return config_service.get_snapshot()
-
-    def _no_cache(resp):
-        try:
-            resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-            resp.headers["Pragma"] = "no-cache"
-            resp.headers["Expires"] = "0"
-        except Exception:
-            pass
-        return resp
-
-    def _json_response(payload, status: int = 200):
-        return _no_cache(make_response(jsonify(payload), status))
 
     @app.route("/debug")
     def debug_panel():
@@ -62,13 +50,7 @@ def register_debug_routes(app, config_service, log_file_path: str):
             routes=routes,
             snapshot=config_service.get_meta(),
         ).model_dump(by_alias=True)
-        return _json_response(
-            success_payload(
-                data=data,
-                snapshot=snapshot,
-                diagnostics=snapshot.get("diagnostics") or [],
-            )
-        )
+        return snapshot_success(snapshot, data)
 
     @app.route("/api/debug/logs")
     def api_debug_logs():
@@ -80,32 +62,12 @@ def register_debug_routes(app, config_service, log_file_path: str):
                 lines = handle.readlines()
             last_1000 = lines[-1000:] if len(lines) > 1000 else lines
             data = DebugLogsDataResponse(lines=last_1000, total=len(lines)).model_dump(by_alias=True)
-            return _json_response(
-                success_payload(
-                    data=data,
-                    snapshot=snapshot,
-                    diagnostics=snapshot.get("diagnostics") or [],
-                )
-            )
+            return snapshot_success(snapshot, data)
         except FileNotFoundError:
-            return _json_response(
-                error_payload(
-                    code="log_file_not_found",
-                    message="Файл лога не найден",
-                    snapshot=snapshot,
-                ),
-                404,
-            )
+            return snapshot_error(snapshot, code="log_file_not_found", message="Файл лога не найден", status=404)
         except Exception as exc:
             logger.exception("Ошибка чтения файла лога: %s", path)
-            return _json_response(
-                error_payload(
-                    code="log_read_failed",
-                    message=str(exc),
-                    snapshot=snapshot,
-                ),
-                500,
-            )
+            return snapshot_error(snapshot, code="log_read_failed", message=str(exc), status=500)
 
     @app.route("/api/debug/pages")
     def api_debug_pages():
@@ -128,13 +90,7 @@ def register_debug_routes(app, config_service, log_file_path: str):
             diagnostics=snapshot.get("diagnostics") or [],
             last_error=config_service.get_last_error(),
         ).model_dump(by_alias=True)
-        return _json_response(
-            success_payload(
-                data=data,
-                snapshot=snapshot,
-                diagnostics=snapshot.get("diagnostics") or [],
-            )
-        )
+        return snapshot_success(snapshot, data)
 
     @app.route("/api/debug/snapshot")
     def api_debug_snapshot():
@@ -147,13 +103,7 @@ def register_debug_routes(app, config_service, log_file_path: str):
             diagnostics=snapshot.get("diagnostics") or [],
             last_error=config_service.get_last_error(),
         ).model_dump(by_alias=True)
-        return _json_response(
-            success_payload(
-                data=data,
-                snapshot=snapshot,
-                diagnostics=snapshot.get("diagnostics") or [],
-            )
-        )
+        return snapshot_success(snapshot, data)
 
     @app.route("/api/debug/sql", methods=["POST"])
     def api_debug_sql():
@@ -164,34 +114,23 @@ def register_debug_routes(app, config_service, log_file_path: str):
         try:
             payload = DebugSqlRequest.model_validate(data)
         except ValidationError:
-            return _json_response(
-                error_payload(
-                    code="invalid_debug_sql_request",
-                    message="Некорректное тело запроса debug SQL",
-                    snapshot=snapshot,
-                    diagnostics=snapshot.get("diagnostics") or [],
-                ),
-                400,
+            return snapshot_error(
+                snapshot,
+                code="invalid_debug_sql_request",
+                message="Некорректное тело запроса debug SQL",
+                diagnostics=snapshot.get("diagnostics") or [],
             )
 
         try:
             result = get_db_manager().execute_readonly_select(payload.query)
         except DebugSqlError as exc:
-            return _json_response(
-                error_payload(
-                    code=exc.code,
-                    message=str(exc),
-                    snapshot=snapshot,
-                    diagnostics=snapshot.get("diagnostics") or [],
-                ),
-                exc.status_code,
+            return snapshot_error(
+                snapshot,
+                code=exc.code,
+                message=str(exc),
+                diagnostics=snapshot.get("diagnostics") or [],
+                status=exc.status_code,
             )
 
         data = DebugSqlDataResponse(**result).model_dump(by_alias=True)
-        return _json_response(
-            success_payload(
-                data=data,
-                snapshot=snapshot,
-                diagnostics=snapshot.get("diagnostics") or [],
-            )
-        )
+        return snapshot_success(snapshot, data)

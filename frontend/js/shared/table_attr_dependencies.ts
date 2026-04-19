@@ -1,15 +1,4 @@
-const BUILTIN_WIDGET_TYPES = new Set([
-    'str',
-    'int',
-    'float',
-    'date',
-    'time',
-    'datetime',
-    'list',
-    'voc',
-    'ip',
-    'ip_mask'
-]);
+import { BUILTIN_WIDGET_TYPES } from './widget_types.ts';
 
 function uniqPush(list: string[], value: unknown): void {
     const key = String(value || '').trim();

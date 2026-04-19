@@ -1,11 +1,7 @@
 import { defineAsyncComponent, type Component } from 'vue';
-import FloatWidget from './fields/FloatWidget.vue';
 import ImgWidget from './fields/ImgWidget.vue';
-import IntWidget from './fields/IntWidget.vue';
-import IpMaskWidget from './fields/IpMaskWidget.vue';
-import IpWidget from './fields/IpWidget.vue';
-import StringWidget from './fields/StringWidget.vue';
-import TextWidget from './fields/TextWidget.vue';
+import IpLikeWidget from './fields/IpLikeWidget.vue';
+import SimpleFieldWidget from './fields/SimpleFieldWidget.vue';
 import ButtonWidget from './fields/ButtonWidget.vue';
 
 type KnownWidgetType =
@@ -141,32 +137,32 @@ const TABLE_CAPABILITIES: WidgetCapabilities = Object.freeze({
 const DEFAULT_WIDGET_DEFINITIONS: ReadonlyArray<WidgetDefinitionRecord> = Object.freeze([
   {
     type: 'str',
-    component: StringWidget,
+    component: SimpleFieldWidget,
     capabilities: FIELD_WIDGET_CAPABILITIES
   },
   {
     type: 'int',
-    component: IntWidget,
+    component: SimpleFieldWidget,
     capabilities: FIELD_WIDGET_CAPABILITIES
   },
   {
     type: 'float',
-    component: FloatWidget,
+    component: SimpleFieldWidget,
     capabilities: FIELD_WIDGET_CAPABILITIES
   },
   {
     type: 'ip',
-    component: IpWidget,
+    component: IpLikeWidget,
     capabilities: FIELD_WIDGET_CAPABILITIES
   },
   {
     type: 'ip_mask',
-    component: IpMaskWidget,
+    component: IpLikeWidget,
     capabilities: FIELD_WIDGET_CAPABILITIES
   },
   {
     type: 'text',
-    component: TextWidget,
+    component: SimpleFieldWidget,
     capabilities: FIELD_WIDGET_CAPABILITIES
   },
   {
@@ -196,17 +192,17 @@ const DEFAULT_WIDGET_DEFINITIONS: ReadonlyArray<WidgetDefinitionRecord> = Object
   },
   {
     type: 'datetime',
-    loader: () => import('./datetime/DateTimeWidget.vue'),
+    loader: () => import('./datetime/DateTimeInputWidget.vue'),
     capabilities: FIELD_WIDGET_CAPABILITIES
   },
   {
     type: 'date',
-    loader: () => import('./datetime/DateWidget.vue'),
+    loader: () => import('./datetime/DateTimeInputWidget.vue'),
     capabilities: FIELD_WIDGET_CAPABILITIES
   },
   {
     type: 'time',
-    loader: () => import('./datetime/TimeWidget.vue'),
+    loader: () => import('./datetime/DateTimeInputWidget.vue'),
     capabilities: FIELD_WIDGET_CAPABILITIES
   },
   {
@@ -376,7 +372,7 @@ class WidgetDefinitionRegistry {
       }
 
       if (!loader) {
-        return StringWidget;
+        return SimpleFieldWidget;
       }
 
       const cached = this.asyncComponents.get(type);
@@ -429,7 +425,7 @@ class WidgetDefinitionRegistry {
 
     this.warnedUnknownTypes.add(type);
     console.warn(
-      `[widget-registry] Unknown widget type "${type}", falling back to StringWidget render path.`
+      `[widget-registry] Unknown widget type "${type}", falling back to SimpleInputWidget render path.`
     );
   }
 
@@ -445,7 +441,7 @@ class WidgetDefinitionRegistry {
       prefetch: async () => {
         /* no-op */
       },
-      resolveComponent: () => StringWidget
+      resolveComponent: () => SimpleFieldWidget
     };
   }
 

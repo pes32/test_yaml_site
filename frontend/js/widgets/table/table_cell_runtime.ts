@@ -16,7 +16,14 @@ import {
 import { tableLog } from './table_debug.ts';
 import { sanitizeTableCellOptions } from './table_parse_attrs.ts';
 import { replaceRowCellValue } from './table_utils.ts';
+import { widgetFactory } from '../factory.ts';
+import { EMBEDDED_TABLE_WIDGET_TYPES } from '../../shared/widget_types.ts';
 import type { TableCellWidgetConfig, TableRuntimeMethodSubset } from './table_contract.ts';
+
+function resolveEmbeddedWidgetType(type: unknown): string {
+    const key = String(type || '').trim();
+    return EMBEDDED_TABLE_WIDGET_TYPES.has(key) ? key : 'str';
+}
 
 const CellRuntimeMethods = {
     canMutateColumnIndex(colIndex) {
@@ -45,18 +52,7 @@ const CellRuntimeMethods = {
     },
 
     columnWidgetComponentByType(type) {
-        const key = String(type || '').trim();
-        if (key === 'str') return this.stringCellWidget;
-        if (key === 'int') return this.intCellWidget;
-        if (key === 'float') return this.floatCellWidget;
-        if (key === 'date') return this.dateCellWidget;
-        if (key === 'time') return this.timeCellWidget;
-        if (key === 'datetime') return this.datetimeCellWidget;
-        if (key === 'list') return this.listCellWidget;
-        if (key === 'voc') return this.vocCellWidget;
-        if (key === 'ip') return this.ipCellWidget;
-        if (key === 'ip_mask') return this.ipMaskCellWidget;
-        return null;
+        return widgetFactory.getDefinition(resolveEmbeddedWidgetType(type)).resolveComponent();
     },
 
     cellWidgetComponent(column) {

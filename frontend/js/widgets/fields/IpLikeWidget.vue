@@ -33,15 +33,13 @@
 <script setup lang="ts">
 import Md3Field from '../common/Md3Field.vue';
 import {
-  IP_CIDR_TEMPLATE,
   useIpLikeField,
-  validateIPv4Cidr,
   type IpLikeWidgetEmit,
   type IpLikeWidgetProps
 } from './useIpLikeField.ts';
 
 defineOptions({
-  name: 'IpMaskWidget'
+  name: 'IpLikeWidget'
 });
 
 const props = defineProps<IpLikeWidgetProps>();
@@ -66,11 +64,7 @@ const {
   setValue,
   showPlaceholder,
   tableCellRootAttrs
-} = useIpLikeField(props, emit, {
-  allowMask: true,
-  maskTemplate: IP_CIDR_TEMPLATE,
-  validate: validateIPv4Cidr
-});
+} = useIpLikeField(props, emit);
 
 defineExpose({
   commitDraft,
