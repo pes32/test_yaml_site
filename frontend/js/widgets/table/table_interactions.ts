@@ -1,5 +1,6 @@
 import type { TableRuntimeVm, TableRuntimeColumn, TableRuntimeMethodSubset } from './table_contract.ts';
 import { TableWidgetHandleKeydown } from './table_keyboard.ts';
+import { displayCellToCore } from './table_selection_model.ts';
 
 type CellEditorActionKind = string;
 
@@ -147,7 +148,18 @@ const InteractionRuntimeMethods = {
                 this.emptyCellValueForColumn(normalizedCol)
             );
             this.setSelectionSingle(normalizedRow, normalizedCol);
-            this.editingCell = { r: normalizedRow, c: normalizedCol };
+            const coreCell = displayCellToCore(
+                { r: normalizedRow, c: normalizedCol },
+                this.tableColumns,
+                this.tableViewModelSnapshot()
+            );
+            if (coreCell) {
+                this.dispatchTableCoreCommand(
+                    { cell: coreCell, draftValue: character, type: 'ENTER_EDIT_MODE' },
+                    'open editor',
+                    { skipRows: true, skipSort: true, skipGrouping: true, skipSelection: true, skipContextMenu: true }
+                );
+            }
             this._tableProgrammaticFocus = true;
             this.$nextTick?.(() => {
                 this.$nextTick?.(() => {
@@ -237,7 +249,23 @@ const InteractionRuntimeMethods = {
                 this.exitCellEdit();
             }
             this.setSelectionSingle(row, col);
-            this.editingCell = { r: row, c: col };
+            const coreCell = displayCellToCore(
+                { r: row, c: col },
+                this.tableColumns,
+                this.tableViewModelSnapshot()
+            );
+            if (coreCell) {
+                const dataIndex = this.resolveDataRowIndex(row);
+                this.dispatchTableCoreCommand(
+                    {
+                        cell: coreCell,
+                        draftValue: dataIndex >= 0 ? this.tableData[dataIndex]?.cells[col] : undefined,
+                        type: 'ENTER_EDIT_MODE'
+                    },
+                    'open editor',
+                    { skipRows: true, skipSort: true, skipGrouping: true, skipSelection: true, skipContextMenu: true }
+                );
+            }
         }
     },
 

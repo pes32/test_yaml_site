@@ -1,6 +1,13 @@
 import { getRowCells } from './table_utils.ts';
 import { tableDebugState, tableLog } from './table_debug.ts';
+import {
+    commitEditorHandle,
+    createDomTableEditorHandle,
+    isTableEditorHandle
+} from './table_editing_model.ts';
+import { displayCellToCore } from './table_selection_model.ts';
 import type {
+    TableEditorHandle,
     TableCellWidgetInstance,
     TableRuntimeColumn,
     TableRuntimeMethodSubset
@@ -125,10 +132,15 @@ const EditingRuntimeMethods = {
                 active.blur();
             }
             const columnDef = this.tableColumns[col];
+            this.commitCellEditorHandle(row, col);
             this.applyTrimToEditedTextCell(row, col);
             if (columnDef) this.onCellFormat(row, col, columnDef);
         }
-        this.editingCell = null;
+        this.dispatchTableCoreCommand(
+            { type: 'CANCEL_EDIT' },
+            'close editor',
+            { skipRows: true, skipSort: true, skipGrouping: true, skipSelection: true, skipContextMenu: true }
+        );
     },
 
     applyTrimToEditedTextCell(row, col) {
@@ -175,6 +187,30 @@ const EditingRuntimeMethods = {
             '[data-table-editor-target="true"]:not([disabled]), input.cell-input:not([disabled]), select:not([disabled])'
         );
         return editor instanceof HTMLElement ? editor : null;
+    },
+
+    getCellEditorHandle(row, col): TableEditorHandle | null {
+        const widget = this.getCellWidgetInstance(row, col);
+        if (isTableEditorHandle(widget)) return widget;
+        const editor = this.getCellEditorElement(row, col);
+        if (!editor) return null;
+        return createDomTableEditorHandle(editor, {
+            commitValue: (value) => this.patchCellValue(row, col, value)
+        });
+    },
+
+    commitCellEditorHandle(row, col) {
+        const handle = this.getCellEditorHandle(row, col);
+        const coreCell = displayCellToCore(
+            { r: row, c: col },
+            this.tableColumns,
+            this.tableViewModelSnapshot()
+        );
+        if (!handle || !coreCell) return undefined;
+        return commitEditorHandle(handle, {
+            colKey: coreCell.colKey,
+            rowId: coreCell.rowId
+        });
     },
 
     getCellEditorActionElement(row, col, kind) {
@@ -250,7 +286,19 @@ const EditingRuntimeMethods = {
             this.editingCell = null;
             return;
         }
-        this.editingCell = { r: normalizedRow, c: normalizedCol };
+        const coreCell = displayCellToCore(
+            { r: normalizedRow, c: normalizedCol },
+            this.tableColumns,
+            this.tableViewModelSnapshot()
+        );
+        if (!coreCell) return;
+        const dataIndex = this.resolveDataRowIndex(normalizedRow);
+        const draftValue = dataIndex >= 0 ? this.tableData[dataIndex]?.cells[normalizedCol] : undefined;
+        this.dispatchTableCoreCommand(
+            { cell: coreCell, draftValue, type: 'ENTER_EDIT_MODE' },
+            'open editor',
+            { skipRows: true, skipSort: true, skipGrouping: true, skipSelection: true, skipContextMenu: true }
+        );
         this._tableProgrammaticFocus = true;
         this.$nextTick(() => {
             const editor = this.getCellEditorElement(normalizedRow, normalizedCol);

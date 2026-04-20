@@ -76,106 +76,7 @@
               </th>
             </tr>
           </thead>
-          <tbody v-if="!groupingActive" @mousedown.capture="onTbodyMouseDownCapture">
-            <tr v-for="(row, rowIndex) in tableData" :key="row.id || ('r' + rowIndex)">
-              <td
-                v-for="(column, cellIndex) in tableColumns"
-                :key="cellIndex"
-                :data-row="rowIndex"
-                :data-col="cellIndex"
-                :class="cellTdClass(rowIndex, cellIndex)"
-                :tabindex="cellTabindex(rowIndex, cellIndex)"
-                :style="cellSelectionOutlineStyle(rowIndex, cellIndex)"
-                style="cursor: pointer;"
-                @click="onTableCellClick($event, rowIndex, cellIndex)"
-                @dblclick.stop="onTableCellDblClick(rowIndex, cellIndex)"
-                @mouseenter="syncCellOverflowHint($event)"
-                @mouseleave="clearCellOverflowHint($event)"
-                @mousedown="onTableCellMouseDown($event, rowIndex, cellIndex)"
-                @contextmenu="onBodyContextMenu($event, rowIndex, cellIndex)"
-              >
-                <template v-if="cellUsesEmbeddedWidget(column)">
-                  <div
-                    v-if="isEditable && isCellEditing(rowIndex, cellIndex) && cellAllowsEditing(rowIndex, cellIndex)"
-                    class="cell-editor-wrap"
-                  >
-                    <component
-                      :is="cellWidgetComponent(column)"
-                      :ref="cellWidgetRefName(rowIndex, cellIndex)"
-                      :widget-config="cellWidgetConfig(rowIndex, cellIndex, column)"
-                      :widget-name="cellWidgetName(rowIndex, cellIndex)"
-                      @input="onCellWidgetPayload(rowIndex, cellIndex, $event)"
-                    ></component>
-                  </div>
-                  <div v-else class="widget-table__cell-display" :class="cellDisplayClass(column)">
-                    <span
-                      class="widget-table__cell-display-text widget-table__cell-value"
-                      :class="cellDisplayTextClass(column)"
-                      :style="cellDisplayTextStyle(column)"
-                      v-text="formatCellValue(safeCell(row, cellIndex), column)"
-                    ></span>
-                    <span v-if="cellDisplayActions(column).length" class="widget-table__cell-actions" :class="cellDisplayActionsClass(column)">
-                      <template v-for="action in cellDisplayActions(column)" :key="action.kind">
-                        <button
-                          v-if="cellAllowsEditing(rowIndex, cellIndex)"
-                          type="button"
-                          class="widget-table__cell-action"
-                          :class="cellDisplayActionClass(action)"
-                          :aria-label="action.label"
-                          @mousedown.stop.prevent
-                          @click.stop.prevent="onCellDisplayAction(rowIndex, cellIndex, action.kind)"
-                        >
-                          <svg v-if="action.kind === 'list'" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                            <path d="M10 9.00002L6.16667 12.8334L5 11.6667L10 6.66669L15 11.6667L13.8333 12.8334L10 9.00002Z" fill="currentColor"></path>
-                          </svg>
-                          <img v-else :src="iconSrc(action.icon)" alt="" aria-hidden="true">
-                        </button>
-                        <span v-else class="widget-table__cell-action widget-table__cell-action--readonly" :class="cellDisplayActionClass(action)" aria-hidden="true">
-                          <svg v-if="action.kind === 'list'" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M10 9.00002L6.16667 12.8334L5 11.6667L10 6.66669L15 11.6667L13.8333 12.8334L10 9.00002Z" fill="currentColor"></path>
-                          </svg>
-                          <img v-else :src="iconSrc(action.icon)" alt="">
-                        </span>
-                      </template>
-                    </span>
-                  </div>
-                </template>
-                <input
-                  v-else-if="isEditable && cellUsesNativeInput(column) && column.type === 'ip' && (!wordWrapEnabled || isCellEditing(rowIndex, cellIndex))"
-                  type="text"
-                  class="cell-input w-100"
-                  :class="{ 'cell-input--view': !isCellEditing(rowIndex, cellIndex) }"
-                  tabindex="-1"
-                  :value="safeCell(row, cellIndex)"
-                  :readOnly="!isCellEditing(rowIndex, cellIndex)"
-                  @mousedown="onCellInputViewMouseDown($event, rowIndex, cellIndex)"
-                  @input="onIpInput(rowIndex, cellIndex, $event)"
-                  @blur="onNativeCellBlur(rowIndex, cellIndex)"
-                >
-                <input
-                  v-else-if="isEditable && cellUsesNativeInput(column) && (!wordWrapEnabled || isCellEditing(rowIndex, cellIndex))"
-                  type="text"
-                  class="cell-input w-100"
-                  :class="{ 'cell-input--view': !isCellEditing(rowIndex, cellIndex) }"
-                  tabindex="-1"
-                  :value="safeCell(row, cellIndex)"
-                  :readOnly="!isCellEditing(rowIndex, cellIndex)"
-                  @mousedown="onCellInputViewMouseDown($event, rowIndex, cellIndex)"
-                  @input="onCellInput(rowIndex, cellIndex, $event)"
-                  @blur="onTextCellBlur(rowIndex, cellIndex, column)"
-                >
-                <template v-else>
-                  <span class="widget-table__cell-value" v-text="formatCellValue(safeCell(row, cellIndex), column)"></span>
-                </template>
-              </td>
-            </tr>
-            <tr v-if="tableLazyUiActive" ref="lazySentinelRow" class="widget-table__lazy-sentinel" aria-hidden="true">
-              <td :colspan="Math.max(1, tableColumns.length)" class="widget-table__lazy-hint">
-                <span v-if="isLoadingChunk">Загрузка…</span>
-              </td>
-            </tr>
-          </tbody>
-          <tbody v-else @mousedown.capture="onTbodyMouseDownCapture">
+          <tbody @mousedown.capture="onTbodyMouseDownCapture">
             <tr v-for="(drow, rowIndex) in displayRows" :key="drow.pathKey">
               <template v-if="drow.kind === 'group'">
                 <td
@@ -282,6 +183,11 @@
                   </template>
                 </td>
               </template>
+            </tr>
+            <tr v-if="tableLazyUiActive" ref="lazySentinelRow" class="widget-table__lazy-sentinel" aria-hidden="true">
+              <td :colspan="Math.max(1, tableColumns.length)" class="widget-table__lazy-hint">
+                <span v-if="isLoadingChunk">Загрузка…</span>
+              </td>
             </tr>
           </tbody>
         </table>

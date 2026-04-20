@@ -27,9 +27,15 @@ type TableWidgetConfig = CommonWidgetAttrs & LegacyYamlAttrCompat & {
     zebra?: boolean;
 };
 type TableRowIdentity = string;
+type TableRowId = TableRowIdentity;
+type TableColumnKey = string;
 type TableCellAddress = {
     c: number;
     r: number;
+};
+type TableCoreCellAddress = {
+    colKey: TableColumnKey;
+    rowId: TableRowId;
 };
 type TableSelectionRect = {
     c0: number;
@@ -40,6 +46,10 @@ type TableSelectionRect = {
 type TableSortDirection = 'asc' | 'desc';
 type TableSortState = {
     col: number;
+    dir: TableSortDirection;
+};
+type TableCoreSortState = {
+    colKey: TableColumnKey;
     dir: TableSortDirection;
 };
 type TableHeaderCell = {
@@ -66,6 +76,9 @@ type TableRuntimeColumn = {
     widgetConfig?: TableColumnAttrConfig;
     widgetRef?: string | null;
     width?: string | null;
+};
+type TableCoreColumn = TableRuntimeColumn & {
+    columnKey: TableColumnKey;
 };
 type TableColumnAttrConfig = Partial<AttrConfigRecord> & {
     columns?: unknown[];
@@ -162,8 +175,18 @@ type TableSelectionState = {
     focus: TableCellAddress;
     fullWidthRows: { r0: number; r1: number } | null;
 };
+type TableCoreSelectionState = {
+    anchor: TableCoreCellAddress | null;
+    focus: TableCoreCellAddress | null;
+    fullWidthRowIds: TableRowId[] | null;
+};
 type TableEditingSession = {
     activeCell: TableCellAddress | null;
+    validationErrors: Record<string, string>;
+};
+type TableCoreEditingSession = {
+    activeCell: TableCoreCellAddress | null;
+    draftValue: unknown;
     validationErrors: Record<string, string>;
 };
 type TableContextMenuTarget =
@@ -178,15 +201,23 @@ type TableContextMenuTarget =
       };
 type TableContextMenuSnapshot = {
     anchorCol: number;
+    anchorColumnKey?: TableColumnKey | null;
     anchorRow: number;
+    anchorRowId?: TableRowId | null;
     bodyMode: 'cell' | 'cells' | 'row' | null;
     groupingLevelsSnapshot: number[];
+    groupingLevelKeysSnapshot?: TableColumnKey[];
     headerCol: number | null;
+    headerColumnKey?: TableColumnKey | null;
     lineNumbersEnabled: boolean;
     pasteAnchor: TableCellAddress;
+    pasteAnchorColumnKey?: TableColumnKey | null;
+    pasteAnchorRowId?: TableRowId | null;
     rect: TableSelectionRect;
+    selectionSnapshot?: TableCoreSelectionState;
     sessionId: number;
     sortKeys: TableSortState[];
+    sortKeyColumnsSnapshot?: TableCoreSortState[];
     stickyHeaderEnabled: boolean;
     wordWrapEnabled: boolean;
 };
@@ -214,6 +245,67 @@ type TableClipboardPayload = {
     matrix: unknown[][];
     pasteAnchor: TableCellAddress;
     rect: TableSelectionRect;
+};
+type TableCoreContextMenuState = {
+    context: TableContextMenuSnapshot | null;
+    open: boolean;
+    sessionId: number;
+};
+type TableCoreState = {
+    activeCell: TableCoreCellAddress | null;
+    columns: TableCoreColumn[];
+    contextMenu: TableCoreContextMenuState;
+    editing: TableCoreEditingSession | null;
+    grouping: {
+        expanded: Set<string>;
+        levelKeys: TableColumnKey[];
+    };
+    rows: TableDataRow[];
+    selection: TableCoreSelectionState;
+    sortKeys: TableCoreSortState[];
+};
+type TableCommand =
+    | { type: 'SET_ACTIVE_CELL'; cell: TableCoreCellAddress | null }
+    | {
+          type: 'SET_SELECTION_RECT';
+          anchor: TableCoreCellAddress | null;
+          focus: TableCoreCellAddress | null;
+          fullWidthRowIds?: TableRowId[] | null;
+      }
+    | { type: 'ENTER_EDIT_MODE'; cell: TableCoreCellAddress; draftValue: unknown }
+    | { type: 'COMMIT_EDIT'; value: unknown }
+    | { type: 'CANCEL_EDIT' }
+    | {
+          type: 'INSERT_ROWS';
+          afterRowId?: TableRowId | null;
+          beforeRowId?: TableRowId | null;
+          rows: TableDataRow[];
+      }
+    | { type: 'DELETE_ROWS'; rowIds: TableRowId[] }
+    | { type: 'PASTE_TSV'; anchor: TableCoreCellAddress; matrix: unknown[][] }
+    | { type: 'SORT_COLUMNS'; sortKeys: TableCoreSortState[] }
+    | { type: 'CLEAR_SORT'; colKey?: TableColumnKey | null }
+    | { type: 'ADD_GROUP_LEVEL'; colKey: TableColumnKey }
+    | { type: 'REMOVE_GROUP_LEVEL'; colKey: TableColumnKey }
+    | { type: 'REBUILD_GROUPING' }
+    | { type: 'APPEND_LOADED_ROWS'; rows: TableDataRow[] }
+    | { type: 'OPEN_CONTEXT_MENU'; snapshot: TableContextMenuSnapshot }
+    | { type: 'CLOSE_CONTEXT_MENU' };
+type TableViewModel = {
+    displayIndexToRowId: Array<TableRowId | null>;
+    displayRows: TableDisplayRow[];
+    orderedRowIds: TableRowId[];
+    rowIdToDisplayIndex: Map<TableRowId, number>;
+    rowIdToSourceIndex: Map<TableRowId, number>;
+    validPathKeys: Set<string>;
+};
+type TableEditorHandle = {
+    blur?: () => void;
+    commitDraft: () => unknown;
+    commitPendingState: (context: { colKey: TableColumnKey; rowId: TableRowId }) => unknown;
+    focus: () => void;
+    getValue: () => unknown;
+    setValue: (value: unknown) => void;
 };
 type TableLazyLoadState = {
     isFullyLoaded: boolean;
@@ -416,21 +508,31 @@ export type {
     TableCellDisplayAction,
     TableCellDisplayActionKind,
     TableCellAddress,
+    TableColumnKey,
     TableClipboardPayload,
     TableCellOptions,
     TableCellWidgetConfig,
     TableCellWidgetInstance,
     TableCellWidgetPayload,
     TableColumnAttrConfig,
+    TableCommand,
     TableContextMenuItem,
     TableContextMenuSnapshot,
     TableContextMenuState,
     TableContextMenuTarget,
+    TableCoreCellAddress,
+    TableCoreColumn,
+    TableCoreContextMenuState,
+    TableCoreEditingSession,
+    TableCoreSelectionState,
+    TableCoreSortState,
+    TableCoreState,
     TableDataDisplayRow,
     TableDataRow,
     TableDisplayRow,
     TableDomRuntimeSurface,
     TableEditingSession,
+    TableEditorHandle,
     TableGroupDisplayRow,
     TableGroupingState,
     TableGroupingViewCache,
@@ -439,6 +541,7 @@ export type {
     TableLeafMeta,
     TableMeasurementState,
     TableRowIdentity,
+    TableRowId,
     TableRuntimeColumn,
     TableRuntimeError,
     TableRuntimeErrorSeverity,
@@ -462,6 +565,7 @@ export type {
     TableSortDirection,
     TableSortState,
     TableStore,
+    TableViewModel,
     TableWidgetConfig,
     TableWidgetEmit,
     TableWidgetPublicSurface,

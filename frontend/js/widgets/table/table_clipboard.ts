@@ -2,6 +2,28 @@
  * TSV clipboard helpers without Vue/runtime side effects.
  */
 import { getRowCells } from './table_utils.ts';
+import type {
+    TableCellAddress,
+    TableDataRow,
+    TableRuntimeColumn,
+    TableSelectionRect
+} from './table_contract.ts';
+
+type ApplyPasteMatrixOptions = {
+    canMutateColumnIndex?: (colIndex: number) => boolean;
+    createEmptyRow: () => TableDataRow;
+    pasteAnchor: TableCellAddress;
+    rect: TableSelectionRect;
+    resolveSourceRowIndex?: (displayRowIndex: number) => number;
+    tableColumns: TableRuntimeColumn[];
+    tableData: TableDataRow[];
+};
+
+type ApplyPasteMatrixResult = {
+    pasteAnchor: TableCellAddress;
+    rows: TableDataRow[];
+    tiled: boolean;
+};
 
 function normalizeTsvInput(text: string | null | undefined): string {
     if (text == null) return '';
@@ -115,10 +137,97 @@ function serializeSelectionToTsv(
     return lines.join('\n');
 }
 
+function cloneDataRow(row: TableDataRow): TableDataRow {
+    return {
+        id: String(row.id),
+        cells: getRowCells(row).slice()
+    };
+}
+
+function tilePasteMatrix(
+    matrix: unknown[][],
+    selectionRows: number,
+    selectionCols: number
+): unknown[][] {
+    if (!matrix.length || selectionRows <= 0 || selectionCols <= 0) return matrix;
+    return Array.from({ length: selectionRows }, (_, rowOffset) => {
+        const sourceRow = matrix[rowOffset % matrix.length] || [];
+        return Array.from({ length: selectionCols }, (_, colOffset) =>
+            sourceRow[colOffset % Math.max(1, sourceRow.length)]
+        );
+    });
+}
+
+function applyPasteMatrixToTableState(
+    matrix: unknown[][],
+    options: ApplyPasteMatrixOptions
+): ApplyPasteMatrixResult {
+    const tableData = Array.isArray(options.tableData) ? options.tableData : [];
+    const tableColumns = Array.isArray(options.tableColumns) ? options.tableColumns : [];
+    const rows = tableData.map((row) => cloneDataRow(row));
+    const numCols = tableColumns.length;
+    if (!matrix.length || numCols === 0) {
+        return {
+            pasteAnchor: options.pasteAnchor,
+            rows,
+            tiled: false
+        };
+    }
+
+    const selectionRect = options.rect;
+    const selectionRows = selectionRect.r1 - selectionRect.r0 + 1;
+    const selectionCols = selectionRect.c1 - selectionRect.c0 + 1;
+    const matrixWidth = Math.max(...matrix.map((row) => (Array.isArray(row) ? row.length : 0)));
+    const shouldTileIntoSelection =
+        selectionRows > 0 &&
+        selectionCols > 0 &&
+        (selectionRows > matrix.length || selectionCols > matrixWidth);
+    const pasteMatrix = shouldTileIntoSelection
+        ? tilePasteMatrix(matrix, selectionRows, selectionCols)
+        : matrix;
+    const pasteAnchor = shouldTileIntoSelection
+        ? { r: selectionRect.r0, c: selectionRect.c0 }
+        : options.pasteAnchor;
+    const neededRows = pasteAnchor.r + pasteMatrix.length;
+    while (rows.length < neededRows) {
+        rows.push(cloneDataRow(options.createEmptyRow()));
+    }
+
+    for (let rowOffset = 0; rowOffset < pasteMatrix.length; rowOffset += 1) {
+        const rowIndex = pasteAnchor.r + rowOffset;
+        const resolvedRowIndex = options.resolveSourceRowIndex
+            ? options.resolveSourceRowIndex(rowIndex)
+            : rowIndex;
+        const sourceRowIndex = resolvedRowIndex >= 0 ? resolvedRowIndex : rowIndex;
+        if (sourceRowIndex < 0 || sourceRowIndex >= rows.length) continue;
+        const sourceRow = pasteMatrix[rowOffset];
+        if (!Array.isArray(sourceRow)) continue;
+        const nextCells = getRowCells(rows[sourceRowIndex]).slice();
+        for (let colOffset = 0; colOffset < sourceRow.length; colOffset += 1) {
+            const colIndex = pasteAnchor.c + colOffset;
+            if (colIndex < 0 || colIndex >= numCols) continue;
+            if (options.canMutateColumnIndex && !options.canMutateColumnIndex(colIndex)) continue;
+            nextCells[colIndex] = sourceRow[colOffset];
+        }
+        rows[sourceRowIndex] = {
+            id: String(rows[sourceRowIndex].id),
+            cells: nextCells
+        };
+    }
+
+    return {
+        pasteAnchor,
+        rows,
+        tiled: shouldTileIntoSelection
+    };
+}
+
 export {
+    applyPasteMatrixToTableState,
     cellToTsvString,
     deserializeTsvToMatrix,
     normalizeTsvInput,
     sanitizeForTsvCell,
     serializeSelectionToTsv
 };
+export type { ApplyPasteMatrixOptions, ApplyPasteMatrixResult };

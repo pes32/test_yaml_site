@@ -195,11 +195,7 @@ const tableRuntimeComputed: TableRuntimeComputedDefinitions = {
         return (this.groupingState?.levels.length || 0) > 0;
     },
     displayRows(this: TableRuntimeVm) {
-        if (!this.groupingActive) return [];
-        const cache = this.groupingViewCache;
-        return cache && Array.isArray(cache.displayRows)
-            ? (cache.displayRows as TableDisplayRow[])
-            : [];
+        return this.tableViewModelSnapshot().displayRows as TableDisplayRow[];
     },
     tableLazyUiActive(this: TableRuntimeVm) {
         return this.lazyEnabled && !this.isFullyLoaded && !this.groupingActive;

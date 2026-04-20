@@ -2,6 +2,7 @@
  * Методы выделения ячеек для TableWidget (подмешиваются в methods).
  */
 import type { TableRuntimeMethodSubset, TableSelectionRuntimeSurface } from './table_contract.ts';
+import { selectionRectFromDisplay } from './table_selection_model.ts';
 import { clamp, getRowCells } from './table_utils.ts';
 
 type SelectionVm = TableSelectionRuntimeSurface;
@@ -32,29 +33,15 @@ const SelectionMethods = {
             this.selFullWidthRows = { r0: lo, r1: hi };
         },
         getSelRect() {
-            if (this.selFullWidthRows) {
-                const rLo = this.normRow(
-                    Math.min(this.selFullWidthRows.r0, this.selFullWidthRows.r1)
-                );
-                const rHi = this.normRow(
-                    Math.max(this.selFullWidthRows.r0, this.selFullWidthRows.r1)
-                );
-                const n = this.tableColumns.length;
-                if (n === 0) return { r0: rLo, r1: rHi, c0: 0, c1: 0 };
-                return { r0: rLo, r1: rHi, c0: 0, c1: n - 1 };
-            }
-            const anchor = getSelectionAnchor(this);
-            const focus = getSelectionFocus(this);
-            const ar = anchor.r;
-            const ac = anchor.c;
-            const fr = focus.r;
-            const fc = focus.c;
-            return {
-                r0: Math.min(ar, fr),
-                r1: Math.max(ar, fr),
-                c0: Math.min(ac, fc),
-                c1: Math.max(ac, fc)
-            };
+            return selectionRectFromDisplay(
+                {
+                    anchor: getSelectionAnchor(this),
+                    focus: getSelectionFocus(this),
+                    fullWidthRows: this.selFullWidthRows
+                },
+                this.tbodyRowCount ? this.tbodyRowCount() : this.tableData.length,
+                this.tableColumns.length
+            );
         },
         getSelectionCellCount() {
             const { r0, r1, c0, c1 } = this.getSelRect();
@@ -161,7 +148,12 @@ const SelectionMethods = {
         clearSelectedCells() {
             const { r0, r1, c0, c1 } = this.getSelRect();
             for (let r = r0; r <= r1; r++) {
-                const row = this.tableData[r];
+                const dataIndex =
+                    typeof this.resolveDataRowIndex === 'function'
+                        ? this.resolveDataRowIndex(r)
+                        : r;
+                if (dataIndex < 0) continue;
+                const row = this.tableData[dataIndex];
                 const base = [...getRowCells(row)];
                 for (let c = c0; c <= c1; c++) {
                     if (
@@ -173,9 +165,9 @@ const SelectionMethods = {
                     base[c] = this.emptyCellValueForColumn(c);
                 }
                 if (row && typeof row === 'object' && row.id != null && !Array.isArray(row)) {
-                    this.tableData.splice(r, 1, { id: row.id, cells: base });
+                    this.tableData.splice(dataIndex, 1, { id: row.id, cells: base });
                 } else {
-                    this.tableData.splice(r, 1, { id: `row_${r}`, cells: base });
+                    this.tableData.splice(dataIndex, 1, { id: `row_${dataIndex}`, cells: base });
                 }
             }
             this.onInput();

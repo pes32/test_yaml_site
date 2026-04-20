@@ -1,5 +1,9 @@
-import { deserializeTsvToMatrix, serializeSelectionToTsv } from './table_clipboard.ts';
-import { getRowCells, normalizeRowToDataRow } from './table_utils.ts';
+import {
+    applyPasteMatrixToTableState,
+    deserializeTsvToMatrix,
+    serializeSelectionToTsv
+} from './table_clipboard.ts';
+import { getRowCells } from './table_utils.ts';
 import type { TableRuntimeMethodSubset } from './table_contract.ts';
 
 const ClipboardRuntimeMethods = {
@@ -27,7 +31,8 @@ const ClipboardRuntimeMethods = {
         const tsv = serializeSelectionToTsv(
             this.tableData,
             snapshot.rect,
-            this.listMultiFn()
+            this.listMultiFn(),
+            (rowIndex: number) => this.dataRowByDisplayIndex(rowIndex)
         );
         this.writeClipboardText(tsv);
         if (this.contextMenuOpen) this.hideContextMenu();
@@ -38,7 +43,8 @@ const ClipboardRuntimeMethods = {
         const tsv = serializeSelectionToTsv(
             this.tableData,
             snapshot.rect,
-            this.listMultiFn()
+            this.listMultiFn(),
+            (rowIndex: number) => this.dataRowByDisplayIndex(rowIndex)
         );
         this.writeClipboardText(tsv);
         this.clearRectangleValues(snapshot.rect);
@@ -50,7 +56,9 @@ const ClipboardRuntimeMethods = {
         if (this.groupingActive || this.tableUiLocked) return;
         const { r0, r1, c0, c1 } = rect;
         for (let rowIndex = r0; rowIndex <= r1; rowIndex += 1) {
-            const row = this.tableData[rowIndex];
+            const dataIndex = this.resolveDataRowIndex(rowIndex);
+            if (dataIndex < 0) continue;
+            const row = this.tableData[dataIndex];
             if (!row) continue;
             const base = [...getRowCells(row)];
             for (let colIndex = c0; colIndex <= c1; colIndex += 1) {
@@ -58,9 +66,9 @@ const ClipboardRuntimeMethods = {
                 base[colIndex] = this.emptyCellValueForColumn(colIndex);
             }
             if (row && typeof row === 'object' && row.id != null && !Array.isArray(row)) {
-                this.tableData.splice(rowIndex, 1, { id: row.id, cells: base });
+                this.tableData.splice(dataIndex, 1, { id: row.id, cells: base });
             } else {
-                this.tableData.splice(rowIndex, 1, { id: `row_${rowIndex}`, cells: base });
+                this.tableData.splice(dataIndex, 1, { id: `row_${dataIndex}`, cells: base });
             }
         }
     },
@@ -76,7 +84,7 @@ const ClipboardRuntimeMethods = {
         const { r, c } = snapshot.pasteAnchor;
         return (
             r >= 0 &&
-            r < this.tableData.length &&
+            r < this.tbodyRowCount() &&
             c >= 0 &&
             c < this.tableColumns.length
         );
@@ -84,51 +92,18 @@ const ClipboardRuntimeMethods = {
 
     applyPasteMatrix(snapshot, matrix) {
         if (this.groupingActive || this.tableUiLocked) return;
-        const selectionRect = snapshot.rect;
-        const selectionRows = selectionRect.r1 - selectionRect.r0 + 1;
-        const selectionCols = selectionRect.c1 - selectionRect.c0 + 1;
-        const shouldTileIntoSelection =
-            selectionRows > 0 &&
-            selectionCols > 0 &&
-            (selectionRows > matrix.length ||
-                selectionCols > Math.max(...matrix.map((row: unknown) => Array.isArray(row) ? row.length : 0)));
-        const pasteMatrix = shouldTileIntoSelection
-            ? Array.from({ length: selectionRows }, (_, rowOffset) => {
-                const sourceRow = matrix[rowOffset % matrix.length] || [];
-                return Array.from({ length: selectionCols }, (_, colOffset) =>
-                    sourceRow[colOffset % Math.max(1, sourceRow.length)]
-                );
-            })
-            : matrix;
-        const pasteAnchor = shouldTileIntoSelection
-            ? { r: selectionRect.r0, c: selectionRect.c0 }
-            : snapshot.pasteAnchor;
-        const { r: pasteRow, c: pasteCol } = pasteAnchor;
-        const numCols = this.tableColumns.length;
-        const neededRows = pasteRow + pasteMatrix.length;
-        while (this.tableData.length < neededRows) {
-            this.tableData.push(this.makeEmptyRow());
-        }
-        const numRows = this.tableData.length;
-        for (let rowOffset = 0; rowOffset < pasteMatrix.length; rowOffset += 1) {
-            const rowIndex = pasteRow + rowOffset;
-            if (rowIndex < 0 || rowIndex >= numRows) continue;
-            const rowData = pasteMatrix[rowOffset];
-            if (!Array.isArray(rowData)) continue;
-            const previous = this.tableData[rowIndex];
-            const row = [...getRowCells(previous)];
-            for (let colOffset = 0; colOffset < rowData.length; colOffset += 1) {
-                const colIndex = pasteCol + colOffset;
-                if (colIndex < 0 || colIndex >= numCols) continue;
-                if (!this.canMutateColumnIndex(colIndex)) continue;
-                row[colIndex] = rowData[colOffset];
-            }
-            if (previous && typeof previous === 'object' && previous.id != null && !Array.isArray(previous)) {
-                this.tableData.splice(rowIndex, 1, { id: previous.id, cells: row });
-            } else {
-                this.tableData.splice(rowIndex, 1, { id: `row_${rowIndex}`, cells: row });
-            }
-        }
+        const result = applyPasteMatrixToTableState(matrix, {
+            canMutateColumnIndex: (colIndex: number) => this.canMutateColumnIndex(colIndex),
+            createEmptyRow: () => this.makeEmptyRow(),
+            pasteAnchor: snapshot.pasteAnchor,
+            rect: snapshot.rect,
+            resolveSourceRowIndex: (displayRowIndex: number) =>
+                this.resolveDataRowIndex(displayRowIndex),
+            tableColumns: this.tableColumns,
+            tableData: this.tableData
+        });
+        this.tableData.splice(0, this.tableData.length, ...result.rows);
+        this.checkTableInvariants?.('paste');
         this.onInput();
     },
 

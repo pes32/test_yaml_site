@@ -1,4 +1,6 @@
 import { canAddGroupingLevel } from './table_grouping.ts';
+import { buildContextMenuSnapshot, isContextMenuSnapshotCurrent } from './table_context_menu_model.ts';
+import { buildCoreSelectionFromDisplay } from './table_selection_model.ts';
 import { WidgetUiCoords } from './table_widget_helpers.ts';
 import type {
     TableContextMenuSnapshot,
@@ -397,49 +399,60 @@ const MenuRuntimeMethods = {
             ? WidgetUiCoords.cloneRect(rect)
             : { r0: rect.r0, r1: rect.r1, c0: rect.c0, c1: rect.c1 };
     },
+    buildSelectionSnapshotFromDisplay() {
+        return buildCoreSelectionFromDisplay(
+            {
+                anchor: this.selAnchor,
+                focus: this.selFocus,
+                fullWidthRows: this.selFullWidthRows
+            },
+            this.tableColumns,
+            this.tableViewModelSnapshot()
+        );
+    },
     buildContextMenuSnapshot(kind, anchorRow, anchorCol, headerCol) {
         const rect = this.cloneRect(this.getSelRect());
         const pasteAnchor = this.computePasteAnchorRect(this.getSelRect());
         const bodyMode =
             kind === 'header' ? null : this.computeBodyModeForMenu();
-        const sortKeys = Array.isArray(this.sortKeys)
-            ? this.sortKeys.map((item: TableSortState) => ({ col: item.col, dir: item.dir }))
-            : [];
-        return {
-            sessionId: this.contextMenuSessionId,
-            bodyMode,
-            anchorRow,
+        return buildContextMenuSnapshot({
             anchorCol,
+            anchorRow,
+            bodyMode,
+            columns: this.tableColumns,
+            groupingLevels: this.groupingState.levels || [],
             rect,
             headerCol: headerCol != null ? headerCol : null,
-            pasteAnchor: { r: pasteAnchor.r, c: pasteAnchor.c },
-            sortKeys,
-            groupingLevelsSnapshot: (this.groupingState.levels || []).slice(),
             lineNumbersEnabled: this.lineNumbersRuntimeEnabled,
+            pasteAnchor: { r: pasteAnchor.r, c: pasteAnchor.c },
+            selectionSnapshot: this.buildSelectionSnapshotFromDisplay(),
+            sessionId: this.contextMenuSessionId,
+            sortKeys: this.sortKeys || [],
             stickyHeaderEnabled: this.stickyHeaderEnabled,
+            viewModel: this.tableViewModelSnapshot(),
             wordWrapEnabled: this.wordWrapEnabled
-        };
+        });
     },
     buildClipboardActionSnapshot() {
         const rect = this.cloneRect(this.getSelRect());
         const pasteAnchor = this.computePasteAnchorRect(this.getSelRect());
-        const sortKeys = Array.isArray(this.sortKeys)
-            ? this.sortKeys.map((item: TableSortState) => ({ col: item.col, dir: item.dir }))
-            : [];
-        return {
-            sessionId: this.contextMenuSessionId,
-            bodyMode: this.computeBodyModeForMenu(),
-            anchorRow: this.selFocus.r,
+        return buildContextMenuSnapshot({
             anchorCol: this.selFocus.c,
+            anchorRow: this.selFocus.r,
+            bodyMode: this.computeBodyModeForMenu(),
+            columns: this.tableColumns,
+            groupingLevels: this.groupingState.levels || [],
             rect,
             headerCol: null,
-            pasteAnchor: { r: pasteAnchor.r, c: pasteAnchor.c },
-            sortKeys,
-            groupingLevelsSnapshot: (this.groupingState.levels || []).slice(),
             lineNumbersEnabled: this.lineNumbersRuntimeEnabled,
+            pasteAnchor: { r: pasteAnchor.r, c: pasteAnchor.c },
+            selectionSnapshot: this.buildSelectionSnapshotFromDisplay(),
+            sessionId: this.contextMenuSessionId,
+            sortKeys: this.sortKeys || [],
             stickyHeaderEnabled: this.stickyHeaderEnabled,
+            viewModel: this.tableViewModelSnapshot(),
             wordWrapEnabled: this.wordWrapEnabled
-        };
+        });
     },
     clampMenuPosition(event: MouseEvent) {
         if (WidgetUiCoords && WidgetUiCoords.clampMenuPosition) return WidgetUiCoords.clampMenuPosition(event);
@@ -510,16 +523,11 @@ const MenuRuntimeMethods = {
         this.selectedRowIndex = normalizedRow;
         this.exitCellEdit();
         this.contextMenuSessionId += 1;
-        this.contextMenuTarget = { kind: 'body', row: normalizedRow, col: normalizedCol };
-        this.contextMenuContext = this.buildContextMenuSnapshot(
-            'body',
-            normalizedRow,
-            normalizedCol,
-            null
+        this.showContextMenuSnapshot(
+            event,
+            { kind: 'body', row: normalizedRow, col: normalizedCol },
+            this.buildContextMenuSnapshot('body', normalizedRow, normalizedCol, null)
         );
-        this.contextMenuPosition = this.clampMenuPosition(event);
-        this.contextMenuOpen = true;
-        this._attachContextMenuGlobalListeners();
     },
     onTableHeaderContextMenu(event, rowIndex, cell, colIndex) {
         void rowIndex;
@@ -545,11 +553,11 @@ const MenuRuntimeMethods = {
         this._openContextMenuPrepare();
         this.exitCellEdit();
         this.contextMenuSessionId += 1;
-        this.contextMenuTarget = { kind: 'header', col: colIndex };
-        this.contextMenuContext = this.buildContextMenuSnapshot('header', -1, -1, colIndex);
-        this.contextMenuPosition = this.clampMenuPosition(event);
-        this.contextMenuOpen = true;
-        this._attachContextMenuGlobalListeners();
+        this.showContextMenuSnapshot(
+            event,
+            { kind: 'header', col: colIndex },
+            this.buildContextMenuSnapshot('header', -1, -1, colIndex)
+        );
     },
     onColumnNumberHeaderContextMenu(event, colIndex) {
         const normalizedCol = this.normCol(colIndex);
@@ -573,10 +581,20 @@ const MenuRuntimeMethods = {
         this._openContextMenuPrepare();
         this.exitCellEdit();
         this.contextMenuSessionId += 1;
-        this.contextMenuTarget = { kind: 'header', col: -1 };
-        this.contextMenuContext = this.buildContextMenuSnapshot('header', -1, -1, null);
+        this.showContextMenuSnapshot(
+            event,
+            { kind: 'header', col: -1 },
+            this.buildContextMenuSnapshot('header', -1, -1, null)
+        );
+    },
+    showContextMenuSnapshot(event, target, snapshot) {
+        this.contextMenuTarget = target;
         this.contextMenuPosition = this.clampMenuPosition(event);
-        this.contextMenuOpen = true;
+        this.dispatchTableCoreCommand(
+            { snapshot, type: 'OPEN_CONTEXT_MENU' },
+            'open context menu',
+            { skipRows: true, skipSort: true, skipGrouping: true, skipSelection: true, skipEditing: true }
+        );
         this._attachContextMenuGlobalListeners();
     },
     _openContextMenuPrepare() {
@@ -588,9 +606,11 @@ const MenuRuntimeMethods = {
     hideContextMenu() {
         this._tableContextMenuMouseDown = false;
         this._detachContextMenuGlobalListeners();
-        this.contextMenuOpen = false;
-        this.contextMenuContext = null;
-        this.contextMenuTarget = null;
+        this.dispatchTableCoreCommand(
+            { type: 'CLOSE_CONTEXT_MENU' },
+            'close context menu',
+            { skipRows: true, skipSort: true, skipGrouping: true, skipSelection: true, skipEditing: true }
+        );
         this.$nextTick(() => {
             if (this.tableColumns.length > 0 && this.tableData.length > 0) {
                 this.focusSelectionCell(this.selFocus.r, this.selFocus.c);
@@ -622,6 +642,10 @@ const MenuRuntimeMethods = {
         }
         if (this.tableUiLocked) return;
         if (!snapshot) return;
+        if (!isContextMenuSnapshotCurrent(snapshot, this.contextMenuSessionId)) {
+            this.hideContextMenu();
+            return;
+        }
         switch (id) {
             case 'add_row_above':
                 this.addRowAboveFromSnapshot(snapshot);
@@ -704,10 +728,10 @@ const MenuRuntimeMethods = {
         if (col == null || col < 0) return;
         this.hideContextMenu();
         this._sortCycleRowOrder = this.tableData.slice();
-        this.sortKeys = [{ col, dir: direction === 'asc' ? 'asc' : 'desc' }];
-        this.sortTableDataInPlace();
-        this.refreshGroupingViewFromData();
-        this.onInput();
+        this.applySortKeysFromRuntime(
+            [{ col, dir: direction === 'asc' ? 'asc' : 'desc' }],
+            'sort'
+        );
     },
     applySortResetFromMenu(snapshot) {
         if (this.tableUiLocked) return;
@@ -715,22 +739,12 @@ const MenuRuntimeMethods = {
         this.hideContextMenu();
         if (col == null || col < 0) {
             if (!this.sortKeys.length) return;
-            this.sortKeys = [];
-            this.restoreSortCycleRowOrder();
-            this.refreshGroupingViewFromData();
-            this.onInput();
+            this.applySortKeysFromRuntime([], 'sort reset');
             return;
         }
         const next = this.sortKeys.filter((item: TableSortState) => item.col !== col);
         if (next.length === this.sortKeys.length) return;
-        this.sortKeys = next;
-        if (next.length === 0) {
-            this.restoreSortCycleRowOrder();
-        } else {
-            this.sortTableDataInPlace();
-        }
-        this.refreshGroupingViewFromData();
-        this.onInput();
+        this.applySortKeysFromRuntime(next, 'sort reset');
     },
     onGroupAddLevelFromSnapshot(snapshot) {
         const col = snapshot.headerCol;

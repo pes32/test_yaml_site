@@ -76,6 +76,7 @@ load_stack_env_for_base_url() {
 }
 
 run_playwright() {
+  unset NO_COLOR
   case "$COMMAND" in
     test)
       npm run test -- "$@"

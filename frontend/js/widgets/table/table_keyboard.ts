@@ -6,6 +6,7 @@ import { rowMoveDuplicateOpsAllowed } from './table_menu_runtime.ts';
 import { tableLog } from './table_debug.ts';
 import { getCellFromEvent } from './table_dom.ts';
 import { buildJumpOpts, jumpTarget } from './table_jump.ts';
+import { resolveEditingBoundary } from './table_editing_model.ts';
 
     type KeyboardVm = TableRuntimeVm;
     type KeyboardCtx = {
@@ -78,6 +79,13 @@ import { buildJumpOpts, jumpTarget } from './table_jump.ts';
         const focus = getFocusCell(vm);
         const r = ed ? ed.r : focus.r;
         const c = ed ? ed.c : focus.c;
+        const boundary = resolveEditingBoundary({
+            colCount: vm.tableColumns.length,
+            current: { r, c },
+            key: 'Tab',
+            rowCount: tbodyRowCount(vm),
+            shiftKey: !!event.shiftKey
+        });
         if (typeof vm.navigateTableByTabFromCell === 'function') {
             if (!vm.navigateTableByTabFromCell(r, c, !!event.shiftKey)) {
                 return false;
@@ -89,27 +97,9 @@ import { buildJumpOpts, jumpTarget } from './table_jump.ts';
         const lastRow = tbodyRowCount(vm) - 1;
         const lastCol = vm.tableColumns.length - 1;
         if (lastRow < 0 || lastCol < 0) return false;
-        let nr;
-        let nc;
-        if (event.shiftKey) {
-            if (c > 0) {
-                nr = r;
-                nc = c - 1;
-            } else if (r > 0) {
-                nr = r - 1;
-                nc = lastCol;
-            } else {
-                return false;
-            }
-        } else if (c < lastCol) {
-            nr = r;
-            nc = c + 1;
-        } else if (r < lastRow) {
-            nr = r + 1;
-            nc = 0;
-        } else {
-            return false;
-        }
+        if (!boundary.nextCell) return false;
+        const nr = boundary.nextCell.r;
+        const nc = boundary.nextCell.c;
         event.preventDefault();
         vm.exitCellEdit();
         vm.setSelectionSingle(nr, nc);
@@ -376,30 +366,21 @@ import { buildJumpOpts, jumpTarget } from './table_jump.ts';
         const col = ctx.col;
         if (event.key !== 'Enter') return false;
         event.preventDefault();
-        const lastRow = tbodyRowCount(vm) - 1;
-        const lastCol = vm.tableColumns.length - 1;
-        if (vm.isCellEditing(row, col)) {
-            vm.exitCellEdit();
-            if (row < lastRow) {
-                vm.setSelectionSingle(row + 1, col);
-                vm.$nextTick?.(() => vm.focusSelectionCell(row + 1, col));
-            } else if (col === lastCol) {
-                vm.addNewRow();
-            } else {
-                vm.setSelectionSingle(row, col + 1);
-                vm.$nextTick?.(() => vm.focusSelectionCell(row, col + 1));
-            }
+        const boundary = resolveEditingBoundary({
+            addRowOnFinalEnter: true,
+            colCount: vm.tableColumns.length,
+            current: { r: row, c: col },
+            key: 'Enter',
+            rowCount: tbodyRowCount(vm)
+        });
+        if (vm.isCellEditing(row, col)) vm.exitCellEdit();
+        if (boundary.shouldAddRow) {
+            vm.addNewRow();
             return true;
         }
-        if (row < lastRow) {
-            vm.setSelectionSingle(row + 1, col);
-            vm.$nextTick?.(() => vm.focusSelectionCell(row + 1, col));
-        } else if (col === lastCol) {
-            vm.addNewRow();
-        } else {
-            vm.setSelectionSingle(row, col + 1);
-            vm.$nextTick?.(() => vm.focusSelectionCell(row, col + 1));
-        }
+        if (!boundary.nextCell) return true;
+        vm.setSelectionSingle(boundary.nextCell.r, boundary.nextCell.c);
+        vm.$nextTick?.(() => vm.focusSelectionCell(boundary.nextCell!.r, boundary.nextCell!.c));
         return true;
     }
 
