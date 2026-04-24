@@ -96,30 +96,38 @@ function parseRuntimeColIndex(th: Element | null | undefined): number | null {
     return Number.isNaN(raw) || raw < 0 ? null : raw;
 }
 
+function runtimeColIndexFromStickySortTrigger(
+    event: Event,
+    overlay: HTMLTableElement
+): number | null {
+    const target = event.target as HTMLElement | null;
+    const trigger = target?.closest('.widget-table__th-inner');
+    if (!trigger || !overlay.contains(trigger)) return null;
+    return parseRuntimeColIndex(trigger.closest('th'));
+}
+
+function activateStickyHeaderSort(
+    vm: StickyRuntimeVm,
+    overlay: HTMLTableElement,
+    event: MouseEvent | KeyboardEvent
+): void {
+    const runtimeColIndex = runtimeColIndexFromStickySortTrigger(event, overlay);
+    if (runtimeColIndex == null) return;
+    event.preventDefault();
+    event.stopPropagation();
+    vm.onHeaderSortClick(runtimeColIndex, event);
+}
+
 function bindStickyCloneEvents(vm: StickyRuntimeVm, overlay: HTMLTableElement): void {
     if (overlay === vm._stickyCloneTableEl) return;
 
     vm._stickyCloneClickHandler = (event: MouseEvent) => {
-        const target = event.target as HTMLElement | null;
-        const trigger = target?.closest('.widget-table__th-inner');
-        if (!trigger || !overlay.contains(trigger)) return;
-        const runtimeColIndex = parseRuntimeColIndex(trigger.closest('th'));
-        if (runtimeColIndex == null) return;
-        event.preventDefault();
-        event.stopPropagation();
-        vm.onHeaderSortClick(runtimeColIndex, event);
+        activateStickyHeaderSort(vm, overlay, event);
     };
 
     vm._stickyCloneKeydownHandler = (event: KeyboardEvent) => {
         if (event.key !== 'Enter' && event.key !== ' ') return;
-        const target = event.target as HTMLElement | null;
-        const trigger = target?.closest('.widget-table__th-inner');
-        if (!trigger || !overlay.contains(trigger)) return;
-        const runtimeColIndex = parseRuntimeColIndex(trigger.closest('th'));
-        if (runtimeColIndex == null) return;
-        event.preventDefault();
-        event.stopPropagation();
-        vm.onHeaderSortClick(runtimeColIndex, event);
+        activateStickyHeaderSort(vm, overlay, event);
     };
 
     vm._stickyCloneContextMenuHandler = (event: MouseEvent) => {

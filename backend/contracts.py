@@ -16,10 +16,24 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-class Diagnostic(BaseModel):
-    """Структурированная диагностика сборки snapshot и API-контрактов."""
-
+class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+class AliasedStrictModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+
+class IgnoreModel(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+
+class AliasedIgnoreModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+
+class Diagnostic(StrictModel):
+    """Структурированная диагностика сборки snapshot и API-контрактов."""
 
     level: Literal["info", "warning", "error"]
     code: str
@@ -31,10 +45,8 @@ class Diagnostic(BaseModel):
     node_path: Optional[str] = None
 
 
-class SourceFileMeta(BaseModel):
+class SourceFileMeta(StrictModel):
     """Метаданные исходного YAML-файла, входящего в snapshot."""
-
-    model_config = ConfigDict(extra="forbid")
 
     path: str
     kind: Literal["gui", "attrs", "modal"]
@@ -42,10 +54,8 @@ class SourceFileMeta(BaseModel):
     mtime_ns: Optional[int] = None
 
 
-class SnapshotMeta(BaseModel):
+class SnapshotMeta(StrictModel):
     """Метаданные собранного snapshot."""
-
-    model_config = ConfigDict(extra="forbid")
 
     version: str
     created_at: str
@@ -67,10 +77,8 @@ class RawModalDocument(RootModel[Union[List[Any], JsonDict]]):
     """Raw YAML-документ модалки."""
 
 
-class NormalizedModal(BaseModel):
+class NormalizedModal(AliasedStrictModel):
     """Нормализованный runtime-контракт модального окна."""
-
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     id: str
     name: str
@@ -100,10 +108,8 @@ class NormalizedModal(BaseModel):
         return stripped or None
 
 
-class PageSnapshot(BaseModel):
+class PageSnapshot(AliasedStrictModel):
     """Собранный snapshot одной страницы."""
-
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     name: str
     url: str
@@ -118,10 +124,8 @@ class PageSnapshot(BaseModel):
     diagnostics: List[Diagnostic] = Field(default_factory=list)
 
 
-class AppSnapshot(BaseModel):
+class AppSnapshot(StrictModel):
     """Полный snapshot конфигурации приложения."""
-
-    model_config = ConfigDict(extra="forbid")
 
     meta: SnapshotMeta
     pages: Dict[str, PageSnapshot] = Field(default_factory=dict)
@@ -130,19 +134,15 @@ class AppSnapshot(BaseModel):
     diagnostics: List[Diagnostic] = Field(default_factory=list)
 
 
-class ApiError(BaseModel):
+class ApiError(StrictModel):
     """Формальная структура ошибки API."""
-
-    model_config = ConfigDict(extra="forbid")
 
     code: str
     message: str
 
 
-class PagePublicConfigResponse(BaseModel):
+class PagePublicConfigResponse(AliasedStrictModel):
     """Public page config inside page/bootstrap responses."""
-
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     name: Optional[str] = None
     url: Optional[str] = None
@@ -153,19 +153,15 @@ class PagePublicConfigResponse(BaseModel):
     modal_gui_ids: List[str] = Field(default_factory=list, alias="modalGuiIds")
 
 
-class PageDataResponse(BaseModel):
+class PageDataResponse(StrictModel):
     """`data` contract for GET /api/page/<name> and HTML bootstrap."""
-
-    model_config = ConfigDict(extra="forbid")
 
     page: PagePublicConfigResponse
     attrs: JsonDict = Field(default_factory=dict)
 
 
-class AttrsDataResponse(BaseModel):
+class AttrsDataResponse(AliasedStrictModel):
     """`data` contract for GET /api/attrs."""
-
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     page: str
     attrs: JsonDict = Field(default_factory=dict)
@@ -180,56 +176,44 @@ class ModalDataResponse(AttrsDataResponse):
     dependencies: JsonDict = Field(default_factory=dict)
 
 
-class PageSummaryResponse(BaseModel):
+class PageSummaryResponse(StrictModel):
     """Short page summary used by /api/pages."""
-
-    model_config = ConfigDict(extra="forbid")
 
     name: str
     title: str
     url: str
 
 
-class PagesDataResponse(BaseModel):
+class PagesDataResponse(StrictModel):
     """`data` contract for GET /api/pages."""
-
-    model_config = ConfigDict(extra="forbid")
 
     pages: List[PageSummaryResponse] = Field(default_factory=list)
 
 
-class DebugRouteResponse(BaseModel):
+class DebugRouteResponse(StrictModel):
     """One route row for debug structure."""
-
-    model_config = ConfigDict(extra="forbid")
 
     endpoint: str
     methods: List[str] = Field(default_factory=list)
     rule: str
 
 
-class DebugStructureDataResponse(BaseModel):
+class DebugStructureDataResponse(StrictModel):
     """`data` contract for GET /api/debug/structure."""
-
-    model_config = ConfigDict(extra="forbid")
 
     routes: List[DebugRouteResponse] = Field(default_factory=list)
     snapshot: JsonDict = Field(default_factory=dict)
 
 
-class DebugLogsDataResponse(BaseModel):
+class DebugLogsDataResponse(StrictModel):
     """`data` contract for GET /api/debug/logs."""
-
-    model_config = ConfigDict(extra="forbid")
 
     lines: List[str] = Field(default_factory=list)
     total: int = 0
 
 
-class DebugPageSummaryResponse(BaseModel):
+class DebugPageSummaryResponse(AliasedStrictModel):
     """One page row for GET /api/debug/pages."""
-
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     name: str
     title: str
@@ -239,10 +223,8 @@ class DebugPageSummaryResponse(BaseModel):
     diagnostics: List[JsonDict] = Field(default_factory=list)
 
 
-class DebugPagesDataResponse(BaseModel):
+class DebugPagesDataResponse(AliasedStrictModel):
     """`data` contract for GET /api/debug/pages."""
-
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     pages: List[DebugPageSummaryResponse] = Field(default_factory=list)
     snapshot: JsonDict = Field(default_factory=dict)
@@ -250,10 +232,8 @@ class DebugPagesDataResponse(BaseModel):
     last_error: Optional[str] = Field(default=None, alias="last_error")
 
 
-class DebugSnapshotDataResponse(BaseModel):
+class DebugSnapshotDataResponse(AliasedStrictModel):
     """`data` contract for GET /api/debug/snapshot."""
-
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     meta: JsonDict = Field(default_factory=dict)
     page_count: int = Field(default=0, alias="page_count")
@@ -262,10 +242,8 @@ class DebugSnapshotDataResponse(BaseModel):
     last_error: Optional[str] = Field(default=None, alias="last_error")
 
 
-class DebugSqlDataResponse(BaseModel):
+class DebugSqlDataResponse(AliasedStrictModel):
     """`data` contract for POST /api/debug/sql."""
-
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     query: str
     columns: List[str] = Field(default_factory=list)
@@ -276,10 +254,8 @@ class DebugSqlDataResponse(BaseModel):
     duration_ms: int = Field(default=0, alias="duration_ms")
 
 
-class ExecuteRequest(BaseModel):
+class ExecuteRequest(AliasedIgnoreModel):
     """Контракт тела POST /api/execute."""
-
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
     command: str
     params: JsonDict = Field(default_factory=dict)
@@ -296,10 +272,8 @@ class ExecuteRequest(BaseModel):
         return stripped
 
 
-class DebugSqlRequest(BaseModel):
+class DebugSqlRequest(IgnoreModel):
     """Контракт тела POST /api/debug/sql."""
-
-    model_config = ConfigDict(extra="ignore")
 
     query: str
 
@@ -312,10 +286,8 @@ class DebugSqlRequest(BaseModel):
         return stripped
 
 
-class ExecuteResponse(BaseModel):
+class ExecuteResponse(StrictModel):
     """Формальный ответ execute API."""
-
-    model_config = ConfigDict(extra="forbid")
 
     command: str
     params: JsonDict = Field(default_factory=dict)

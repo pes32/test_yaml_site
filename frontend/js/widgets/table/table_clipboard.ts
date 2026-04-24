@@ -25,6 +25,12 @@ type ApplyPasteMatrixResult = {
     tiled: boolean;
 };
 
+type PreparedPasteMatrix = {
+    matrix: unknown[][];
+    pasteAnchor: TableCellAddress;
+    tiled: boolean;
+};
+
 function normalizeTsvInput(text: string | null | undefined): string {
     if (text == null) return '';
     let normalized = String(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -158,6 +164,29 @@ function tilePasteMatrix(
     });
 }
 
+function preparePasteMatrix(
+    matrix: unknown[][],
+    rect: TableSelectionRect,
+    pasteAnchor: TableCellAddress
+): PreparedPasteMatrix {
+    const selectionRows = rect.r1 - rect.r0 + 1;
+    const selectionCols = rect.c1 - rect.c0 + 1;
+    const matrixWidth = Math.max(...matrix.map((row) => (Array.isArray(row) ? row.length : 0)));
+    const shouldTileIntoSelection =
+        selectionRows > 0 &&
+        selectionCols > 0 &&
+        (selectionRows > matrix.length || selectionCols > matrixWidth);
+    return {
+        matrix: shouldTileIntoSelection
+            ? tilePasteMatrix(matrix, selectionRows, selectionCols)
+            : matrix,
+        pasteAnchor: shouldTileIntoSelection
+            ? { r: rect.r0, c: rect.c0 }
+            : pasteAnchor,
+        tiled: shouldTileIntoSelection
+    };
+}
+
 function applyPasteMatrixToTableState(
     matrix: unknown[][],
     options: ApplyPasteMatrixOptions
@@ -174,20 +203,9 @@ function applyPasteMatrixToTableState(
         };
     }
 
-    const selectionRect = options.rect;
-    const selectionRows = selectionRect.r1 - selectionRect.r0 + 1;
-    const selectionCols = selectionRect.c1 - selectionRect.c0 + 1;
-    const matrixWidth = Math.max(...matrix.map((row) => (Array.isArray(row) ? row.length : 0)));
-    const shouldTileIntoSelection =
-        selectionRows > 0 &&
-        selectionCols > 0 &&
-        (selectionRows > matrix.length || selectionCols > matrixWidth);
-    const pasteMatrix = shouldTileIntoSelection
-        ? tilePasteMatrix(matrix, selectionRows, selectionCols)
-        : matrix;
-    const pasteAnchor = shouldTileIntoSelection
-        ? { r: selectionRect.r0, c: selectionRect.c0 }
-        : options.pasteAnchor;
+    const prepared = preparePasteMatrix(matrix, options.rect, options.pasteAnchor);
+    const pasteMatrix = prepared.matrix;
+    const pasteAnchor = prepared.pasteAnchor;
     const neededRows = pasteAnchor.r + pasteMatrix.length;
     while (rows.length < neededRows) {
         rows.push(cloneDataRow(options.createEmptyRow()));
@@ -218,7 +236,7 @@ function applyPasteMatrixToTableState(
     return {
         pasteAnchor,
         rows,
-        tiled: shouldTileIntoSelection
+        tiled: prepared.tiled
     };
 }
 
@@ -227,7 +245,8 @@ export {
     cellToTsvString,
     deserializeTsvToMatrix,
     normalizeTsvInput,
+    preparePasteMatrix,
     sanitizeForTsvCell,
     serializeSelectionToTsv
 };
-export type { ApplyPasteMatrixOptions, ApplyPasteMatrixResult };
+export type { ApplyPasteMatrixOptions, ApplyPasteMatrixResult, PreparedPasteMatrix };

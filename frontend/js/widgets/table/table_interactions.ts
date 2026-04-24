@@ -1,8 +1,17 @@
 import type { TableRuntimeVm, TableRuntimeColumn, TableRuntimeMethodSubset } from './table_contract.ts';
+import { readCellDisplayAddress } from './table_dom.ts';
 import { TableWidgetHandleKeydown } from './table_keyboard.ts';
+import { dispatchRuntimeCellPatches } from './table_runtime_commands.ts';
+import { TABLE_RUNTIME_SYNC } from './table_runtime_state.ts';
 import { displayCellToCore } from './table_selection_model.ts';
 
 type CellEditorActionKind = string;
+type CellIdentityArgs = [
+    rowId: string,
+    colKey: string,
+    fallbackRow: number,
+    fallbackCol: number
+];
 
 function getElement(value: EventTarget | null | undefined): HTMLElement | null {
     return value instanceof HTMLElement ? value : null;
@@ -12,6 +21,42 @@ function getContainedCell(vm: TableRuntimeVm, target: EventTarget | null | undef
     const element = getElement(target);
     const cell = element?.closest('tbody td');
     return cell && vm.$el?.contains(cell) ? cell as HTMLElement : null;
+}
+
+function displayCellByIdentity(
+    vm: TableRuntimeVm,
+    [rowId, colKey, fallbackRow, fallbackCol]: CellIdentityArgs
+) {
+    return vm.displayCellFromIdentity(rowId, colKey, {
+        r: fallbackRow,
+        c: fallbackCol
+    });
+}
+
+function coreCellAtDisplay(vm: TableRuntimeVm, row: number, col: number) {
+    return displayCellToCore(
+        { r: row, c: col },
+        vm.tableColumns,
+        vm.tableViewModelSnapshot()
+    );
+}
+
+function patchDisplayCellForTyping(
+    vm: TableRuntimeVm,
+    row: number,
+    col: number,
+    value: unknown,
+    phase: string
+) {
+    const coreCell = coreCellAtDisplay(vm, row, col);
+    if (!coreCell) return null;
+    dispatchRuntimeCellPatches(
+        vm,
+        [{ cell: coreCell, value }],
+        phase,
+        { skipGroupingViewRefresh: true }
+    );
+    return coreCell;
 }
 
 const InteractionRuntimeMethods = {
@@ -36,15 +81,21 @@ const InteractionRuntimeMethods = {
     },
 
     onTableCellDblClick(this: TableRuntimeVm, row: number, col: number) {
-        if (!this.isEditable) return;
+        const cell = this.selectCellForEdit(row, col);
+        if (!cell) return;
+        this.enterCellEditAt(cell.r, cell.c, { caretEnd: true });
+    },
+
+    selectCellForEdit(this: TableRuntimeVm, row: number, col: number) {
+        if (!this.isEditable) return null;
         const normalizedRow = this.normRow(row);
         const normalizedCol = this.normCol(col);
         this.setSelectionSingle(normalizedRow, normalizedCol);
         if (!this.canMutateColumnIndex(normalizedCol)) {
             this.$nextTick?.(() => this.focusSelectionCell(normalizedRow, normalizedCol));
-            return;
+            return null;
         }
-        this.enterCellEditAt(normalizedRow, normalizedCol, { caretEnd: true });
+        return { c: normalizedCol, r: normalizedRow };
     },
 
     onCellDisplayAction(
@@ -53,16 +104,22 @@ const InteractionRuntimeMethods = {
         col: number,
         actionKind: CellEditorActionKind
     ) {
-        if (!this.isEditable) return;
-        const normalizedRow = this.normRow(row);
-        const normalizedCol = this.normCol(col);
-        this.setSelectionSingle(normalizedRow, normalizedCol);
-        if (!this.canMutateColumnIndex(normalizedCol)) {
-            this.$nextTick?.(() => this.focusSelectionCell(normalizedRow, normalizedCol));
-            return;
-        }
-        this.enterCellEditAt(normalizedRow, normalizedCol, { caretEnd: true });
-        this.activateCellEditorAction(normalizedRow, normalizedCol, actionKind);
+        const cell = this.selectCellForEdit(row, col);
+        if (!cell) return;
+        this.enterCellEditAt(cell.r, cell.c, { caretEnd: true });
+        this.activateCellEditorAction(cell.r, cell.c, actionKind);
+    },
+
+    onCellDisplayActionByIdentity(
+        this: TableRuntimeVm,
+        rowId: string,
+        colKey: string,
+        fallbackRow: number,
+        fallbackCol: number,
+        actionKind: CellEditorActionKind
+    ) {
+        const cell = displayCellByIdentity(this, [rowId, colKey, fallbackRow, fallbackCol]);
+        this.onCellDisplayAction(cell.r, cell.c, actionKind);
     },
 
     navigateTableByTabFromCell(this: TableRuntimeVm, row: number, col: number, shiftKey: boolean) {
@@ -105,9 +162,8 @@ const InteractionRuntimeMethods = {
 
             const activeCell = getContainedCell(this, document.activeElement);
             if (activeCell) {
-                const tableRow = Number.parseInt(activeCell.getAttribute('data-row') || '', 10);
-                const tableCol = Number.parseInt(activeCell.getAttribute('data-col') || '', 10);
-                if (tableRow === row && tableCol === col) {
+                const address = readCellDisplayAddress(activeCell);
+                if (address?.row === row && address.col === col) {
                     return;
                 }
             }
@@ -118,6 +174,11 @@ const InteractionRuntimeMethods = {
         });
     },
 
+    onNativeCellBlurByIdentity(this: TableRuntimeVm, ...cellArgs: CellIdentityArgs) {
+        const cell = displayCellByIdentity(this, cellArgs);
+        this.onNativeCellBlur(cell.r, cell.c);
+    },
+
     onTextCellBlur(
         this: TableRuntimeVm,
         row: number,
@@ -125,6 +186,14 @@ const InteractionRuntimeMethods = {
         _column: TableRuntimeColumn | null | undefined
     ) {
         this.onNativeCellBlur(row, col);
+    },
+
+    onTextCellBlurByIdentity(
+        this: TableRuntimeVm,
+        ...args: [...CellIdentityArgs, _column: TableRuntimeColumn | null | undefined]
+    ) {
+        const cellArgs = args.slice(0, 4) as CellIdentityArgs;
+        this.onNativeCellBlurByIdentity(...cellArgs);
     },
 
     isPrintableCellKey(this: TableRuntimeVm, event: KeyboardEvent) {
@@ -142,24 +211,20 @@ const InteractionRuntimeMethods = {
         const isEmbedded = this.cellUsesEmbeddedWidget(column);
 
         if (isEmbedded) {
-            this.patchCellValue(
+            const coreCell = patchDisplayCellForTyping(
+                this,
                 normalizedRow,
                 normalizedCol,
-                this.emptyCellValueForColumn(normalizedCol)
+                this.emptyCellValueForColumn(normalizedCol),
+                'start typing clear cell'
             );
+            if (!coreCell) return;
             this.setSelectionSingle(normalizedRow, normalizedCol);
-            const coreCell = displayCellToCore(
-                { r: normalizedRow, c: normalizedCol },
-                this.tableColumns,
-                this.tableViewModelSnapshot()
-            );
-            if (coreCell) {
                 this.dispatchTableCoreCommand(
                     { cell: coreCell, draftValue: character, type: 'ENTER_EDIT_MODE' },
                     'open editor',
-                    { skipRows: true, skipSort: true, skipGrouping: true, skipSelection: true, skipContextMenu: true }
+                    TABLE_RUNTIME_SYNC.EDITING_ONLY
                 );
-            }
             this._tableProgrammaticFocus = true;
             this.$nextTick?.(() => {
                 this.$nextTick?.(() => {
@@ -193,7 +258,14 @@ const InteractionRuntimeMethods = {
             return;
         }
 
-        this.patchCellValue(normalizedRow, normalizedCol, character);
+        const coreCell = patchDisplayCellForTyping(
+            this,
+            normalizedRow,
+            normalizedCol,
+            character,
+            'start typing replace cell'
+        );
+        if (!coreCell) return;
         this.enterCellEditAt(normalizedRow, normalizedCol, { caretEnd: true });
     },
 
@@ -203,12 +275,20 @@ const InteractionRuntimeMethods = {
         const normalizedRow = this.normRow(row);
         const normalizedCol = this.normCol(col);
         this._shiftSelectGesture = true;
-        this.selFullWidthRows = null;
+        const anchor = !this._shiftAnchorLocked && this.selFocus
+            ? { r: this.selFocus.r, c: this.selFocus.c }
+            : this.selAnchor;
         if (!this._shiftAnchorLocked && this.selFocus) {
-            this.selAnchor = { r: this.selFocus.r, c: this.selFocus.c };
             this._shiftAnchorLocked = true;
         }
-        this.selFocus = { r: normalizedRow, c: normalizedCol };
+        this.setDisplaySelection(
+            {
+                anchor,
+                focus: { r: normalizedRow, c: normalizedCol },
+                fullWidthRows: null
+            },
+            'shift mouse selection'
+        );
         this.focusSelectionCell(normalizedRow, normalizedCol);
     },
 
@@ -221,9 +301,9 @@ const InteractionRuntimeMethods = {
         this._tableFocusWithin = true;
         if (this._tableProgrammaticFocus) return;
 
-        const row = Number.parseInt(td.getAttribute('data-row') || '', 10);
-        const col = Number.parseInt(td.getAttribute('data-col') || '', 10);
-        if (Number.isNaN(row) || Number.isNaN(col)) return;
+        const address = readCellDisplayAddress(td);
+        if (!address) return;
+        const { row, col } = address;
 
         if (target === td) {
             const keepForMenu = Boolean(
@@ -249,21 +329,16 @@ const InteractionRuntimeMethods = {
                 this.exitCellEdit();
             }
             this.setSelectionSingle(row, col);
-            const coreCell = displayCellToCore(
-                { r: row, c: col },
-                this.tableColumns,
-                this.tableViewModelSnapshot()
-            );
+            const coreCell = coreCellAtDisplay(this, row, col);
             if (coreCell) {
-                const dataIndex = this.resolveDataRowIndex(row);
                 this.dispatchTableCoreCommand(
                     {
                         cell: coreCell,
-                        draftValue: dataIndex >= 0 ? this.tableData[dataIndex]?.cells[col] : undefined,
+                        draftValue: this.safeCell(this.dataRowByIdentity(coreCell.rowId), col),
                         type: 'ENTER_EDIT_MODE'
                     },
                     'open editor',
-                    { skipRows: true, skipSort: true, skipGrouping: true, skipSelection: true, skipContextMenu: true }
+                    TABLE_RUNTIME_SYNC.EDITING_ONLY
                 );
             }
         }
@@ -295,12 +370,20 @@ const InteractionRuntimeMethods = {
         dc: number
     ) {
         if (!target) return;
-        this.selFocus = { r: target.r, c: target.c };
+        const nextSelection = {
+            anchor: this.selAnchor,
+            focus: { r: target.r, c: target.c },
+            fullWidthRows: this.selFullWidthRows
+        };
         if (this.selFullWidthRows && dr !== 0 && dc === 0) {
-            this.setSelFullWidthRowSpan(anchorRow, target.r);
+            nextSelection.fullWidthRows = {
+                r0: Math.min(anchorRow, target.r),
+                r1: Math.max(anchorRow, target.r)
+            };
         } else if (this.selFullWidthRows && dc !== 0) {
-            this.selFullWidthRows = null;
+            nextSelection.fullWidthRows = null;
         }
+        this.setDisplaySelection(nextSelection, 'jump extend selection');
         this.exitCellEdit();
         this.$nextTick?.(() => this.focusSelectionCell(this.selFocus!.r, this.selFocus!.c));
     },
@@ -308,8 +391,7 @@ const InteractionRuntimeMethods = {
     activeCellCol(this: TableRuntimeVm) {
         const td = getContainedCell(this, document.activeElement);
         if (!td) return 0;
-        const col = Number.parseInt(td.getAttribute('data-col') || '', 10);
-        return Number.isNaN(col) ? 0 : col;
+        return readCellDisplayAddress(td)?.col ?? 0;
     }
 } satisfies TableRuntimeMethodSubset;
 

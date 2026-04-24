@@ -30,4 +30,4 @@
 
 - Расширять реальный browser/E2E smoke для новых table interactions.
 - Повторно проходить API map и решать, какие helper modules можно сузить или объединить.
-- Сужать оставшиеся aggregate runtime method signatures дальше только вместе с тестами на соответствующие interactions.
+- Поддерживать новые cross-module calls через явные method contracts и surface-типы, без возврата к aggregate runtime typing.

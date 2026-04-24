@@ -14,15 +14,20 @@ function generateTableRowId(): string {
     return 'tr_' + Date.now() + '_' + ++rowIdSeq;
 }
 
-function getRowCells(row: unknown): unknown[] {
+function isObjectRowWithCells(row: unknown): row is { cells: unknown[]; id?: unknown } {
     if (
         row &&
         typeof row === 'object' &&
         !Array.isArray(row) &&
         Array.isArray((row as { cells?: unknown[] }).cells)
     ) {
-        return (row as { cells: unknown[] }).cells;
+        return true;
     }
+    return false;
+}
+
+function getRowCells(row: unknown): unknown[] {
+    if (isObjectRowWithCells(row)) return row.cells;
     if (Array.isArray(row)) return row;
     return [];
 }
@@ -177,25 +182,26 @@ function stripTableDataForEmit(
     });
 }
 
-function cloneTableData(value: unknown) {
-    if (!Array.isArray(value)) return [];
+function tryStructuredClone<T>(value: T): T | null {
     try {
         if (typeof structuredClone === 'function') {
             return structuredClone(value);
         }
     } catch {
-        /* fallback */
+        /* ignore */
     }
+    return null;
+}
+
+function cloneTableData(value: unknown) {
+    if (!Array.isArray(value)) return [];
+    const structured = tryStructuredClone(value);
+    if (structured) return structured;
     return value.map((row) => {
-        if (
-            row &&
-            typeof row === 'object' &&
-            !Array.isArray(row) &&
-            Array.isArray((row as { cells?: unknown[] }).cells)
-        ) {
+        if (isObjectRowWithCells(row)) {
             return {
-                id: (row as { id?: string }).id || generateTableRowId(),
-                cells: (row as { cells: unknown[] }).cells.slice()
+                id: row.id || generateTableRowId(),
+                cells: row.cells.slice()
             };
         }
         return Array.isArray(row) ? row.slice() : [];
@@ -222,14 +228,7 @@ function cloneCellValueDeep<T>(value: T): T {
         }
         return result as T;
     }
-    try {
-        if (typeof structuredClone === 'function') {
-            return structuredClone(value);
-        }
-    } catch {
-        /* ignore */
-    }
-    return value;
+    return tryStructuredClone(value) ?? value;
 }
 
 function cloneTableRowDeep(

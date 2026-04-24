@@ -75,12 +75,16 @@ function getActiveSections(
     return Array.isArray(sections) ? sections : [];
 }
 
-function collectWidgetNamesFromSections(sections: ParsedGuiSection[]): string[] {
+function collectWidgetNamesFromSections(sections: unknown): string[] {
     const names = new Set<string>();
 
-    sections.forEach((section) => {
-        const rows = Array.isArray(section.rows) ? section.rows : [];
-        rows.forEach((row) => {
+    (Array.isArray(sections) ? sections : []).forEach((section) => {
+        if (!section || typeof section !== 'object') {
+            return;
+        }
+        const sectionRecord = asRecord(section);
+        const rows: unknown[] = Array.isArray(sectionRecord.rows) ? sectionRecord.rows : [];
+        rows.forEach((row: unknown) => {
             if (!row || typeof row === 'string') {
                 return;
             }
@@ -186,6 +190,7 @@ function getWidgetValue(
 export {
     EMPTY_PARSED_GUI,
     collectActiveWidgetNames,
+    collectWidgetNamesFromSections,
     getActiveMenu,
     getActiveSections,
     getActiveTabs,

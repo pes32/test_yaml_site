@@ -1,4 +1,4 @@
-import { BUILTIN_WIDGET_TYPES } from './widget_types.ts';
+import { isBuiltinWidgetType } from './widget_types.ts';
 
 function uniqPush(list: string[], value: unknown): void {
     const key = String(value || '').trim();
@@ -6,10 +6,6 @@ function uniqPush(list: string[], value: unknown): void {
         return;
     }
     list.push(key);
-}
-
-function isBuiltinWidgetType(token: unknown): boolean {
-    return BUILTIN_WIDGET_TYPES.has(String(token || '').trim());
 }
 
 function extractTableAttrDependencies(tableAttrs: unknown): string[] {
@@ -48,6 +44,5 @@ function resolveTableDependencies(tableAttrConfig: { table_attrs?: unknown } | n
 
 export {
     extractTableAttrDependencies,
-    isBuiltinWidgetType,
     resolveTableDependencies
 };

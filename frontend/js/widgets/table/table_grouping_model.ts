@@ -4,7 +4,11 @@ import type {
     TableDisplayRow,
     TableRuntimeColumn
 } from './table_contract.ts';
-import { buildPathKey, normalizePathSegment } from './table_grouping.ts';
+import {
+    buildPathKey,
+    normalizePathSegment,
+    sortGroupKeys as sortedGroupKeys
+} from './table_grouping.ts';
 import { withUniqueColumnKeys } from './table_state_core.ts';
 import { getRowCells } from './table_utils.ts';
 
@@ -23,34 +27,49 @@ function buildRowIdToSourceIndex(rows: readonly TableDataRow[]): Map<string, num
     return map;
 }
 
+function createDisplayProjection(): TableDisplayProjection {
+    return {
+        displayIndexToRowId: [],
+        displayRows: [],
+        rowIdToDisplayIndex: new Map<string, number>(),
+        validPathKeys: new Set<string>()
+    };
+}
+
+function pushDataDisplayRow(
+    projection: TableDisplayProjection,
+    rowId: string,
+    dataIndex: number,
+    depth: number,
+    pathKey: string
+): void {
+    projection.rowIdToDisplayIndex.set(rowId, projection.displayRows.length);
+    projection.displayIndexToRowId.push(rowId);
+    projection.displayRows.push({
+        dataIndex,
+        depth,
+        kind: 'data',
+        pathKey,
+        rowId
+    });
+    projection.validPathKeys.add(pathKey);
+}
+
 function buildFlatDisplayRows(
     orderedRowIds: readonly string[],
     rowIdToSourceIndex: Map<string, number>,
     options: { limit?: number; offset?: number } = {}
 ): TableDisplayProjection {
-    const displayRows: TableDisplayRow[] = [];
-    const displayIndexToRowId: Array<string | null> = [];
-    const rowIdToDisplayIndex = new Map<string, number>();
-    const validPathKeys = new Set<string>();
+    const projection = createDisplayProjection();
     const start = Math.max(0, Math.floor(options.offset || 0));
     const limit = options.limit == null ? orderedRowIds.length : Math.max(0, Math.floor(options.limit));
     const visibleRowIds = orderedRowIds.slice(start, start + limit);
     visibleRowIds.forEach((rowId) => {
         const dataIndex = rowIdToSourceIndex.get(rowId);
         if (dataIndex == null) return;
-        const pathKey = `leaf:${rowId}`;
-        rowIdToDisplayIndex.set(rowId, displayRows.length);
-        displayIndexToRowId.push(rowId);
-        displayRows.push({
-            dataIndex,
-            depth: 0,
-            kind: 'data',
-            pathKey,
-            rowId
-        });
-        validPathKeys.add(pathKey);
+        pushDataDisplayRow(projection, rowId, dataIndex, 0, `leaf:${rowId}`);
     });
-    return { displayIndexToRowId, displayRows, rowIdToDisplayIndex, validPathKeys };
+    return projection;
 }
 
 function groupRowIdsByColumn(
@@ -71,15 +90,6 @@ function groupRowIdsByColumn(
     return groups;
 }
 
-function sortedGroupKeys(groups: Map<string, string[]>): string[] {
-    return [...groups.keys()].sort((left, right) =>
-        String(left).localeCompare(String(right), undefined, {
-            numeric: false,
-            sensitivity: 'base'
-        })
-    );
-}
-
 function buildGroupedDisplayRows(
     rows: readonly TableDataRow[],
     columns: readonly TableRuntimeColumn[],
@@ -88,10 +98,7 @@ function buildGroupedDisplayRows(
     groupingLevelKeys: readonly TableColumnKey[],
     expanded: Set<string>
 ): TableDisplayProjection {
-    const displayRows: TableDisplayRow[] = [];
-    const displayIndexToRowId: Array<string | null> = [];
-    const rowIdToDisplayIndex = new Map<string, number>();
-    const validPathKeys = new Set<string>();
+    const projection = createDisplayProjection();
     const coreColumns = withUniqueColumnKeys(columns);
     const levelColumnIndexes = groupingLevelKeys
         .map((colKey) => coreColumns.findIndex((column) => column.columnKey === colKey))
@@ -104,16 +111,7 @@ function buildGroupedDisplayRows(
             prefixSegments.length > 0
                 ? `${buildPathKey(prefixSegments)}/leaf:${rowId}`
                 : `leaf:${rowId}`;
-        rowIdToDisplayIndex.set(rowId, displayRows.length);
-        displayIndexToRowId.push(rowId);
-        displayRows.push({
-            dataIndex,
-            depth,
-            kind: 'data',
-            pathKey,
-            rowId
-        });
-        validPathKeys.add(pathKey);
+        pushDataDisplayRow(projection, rowId, dataIndex, depth, pathKey);
     };
 
     const walk = (rowIds: readonly string[], level: number, prefixSegments: string[]) => {
@@ -131,9 +129,9 @@ function buildGroupedDisplayRows(
         for (const groupKey of sortedGroupKeys(groups)) {
             const childSegments = prefixSegments.concat([groupKey]);
             const pathKey = buildPathKey(childSegments);
-            validPathKeys.add(pathKey);
-            displayIndexToRowId.push(null);
-            displayRows.push({
+            projection.validPathKeys.add(pathKey);
+            projection.displayIndexToRowId.push(null);
+            projection.displayRows.push({
                 colIndex,
                 columnLabel: columnTitle,
                 depth: level,
@@ -150,7 +148,7 @@ function buildGroupedDisplayRows(
     };
 
     walk(orderedRowIds, 0, []);
-    return { displayIndexToRowId, displayRows, rowIdToDisplayIndex, validPathKeys };
+    return projection;
 }
 
 export {

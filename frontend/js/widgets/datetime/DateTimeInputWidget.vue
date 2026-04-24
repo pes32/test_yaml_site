@@ -85,8 +85,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import Md3Field from '../common/Md3Field.vue';
+import { useWidgetConfigValueSync } from '../composables/useWidgetConfigValueSync.ts';
 import CalendarPopover from './CalendarPopover.vue';
 import DateTimeSegment from './DateTimeSegment.vue';
 import TimePopover from './TimePopover.vue';
@@ -446,16 +447,7 @@ function getValue(): string {
   return value.value;
 }
 
-watch(
-  () => props.widgetConfig.value,
-  (nextValue) => {
-    if (nextValue === undefined) {
-      return;
-    }
-    field.syncCommittedValue(nextValue, setValue);
-  },
-  { immediate: true }
-);
+useWidgetConfigValueSync(props, field.syncCommittedValue, setValue);
 
 defineExpose({
   commitDraft,

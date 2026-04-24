@@ -14,13 +14,15 @@ import {
 } from 'vue';
 import { normalizePageResponse } from './api_client.ts';
 import { ensureAttrsLoaded as ensureAttrsLoadedFlow, fetchActiveViewAttrs as fetchActiveViewAttrsFlow } from './attrs_loader.ts';
-import readPageBootstrap from './bootstrap.ts';
 import {
     FRONTEND_ERROR_SCOPES,
     type FrontendErrorOptions,
     type FrontendRuntimeError
 } from './error_model.ts';
-import { executeCommand as executeCommandFlow } from './execute_flow.ts';
+import {
+    executeCommand as executeCommandFlow,
+    type ExecuteCommandData
+} from './execute_flow.ts';
 import {
     createEmptyModalRuntimeState,
     createModalRuntimeController,
@@ -57,8 +59,7 @@ import type {
     PageViewHost,
     ParsedGuiMenu,
     ParsedGuiSection,
-    ParsedGuiTab,
-    UnknownRecord
+    ParsedGuiTab
 } from './page_contract.ts';
 import {
     getActiveMenu,
@@ -84,16 +85,12 @@ import {
     handleTabClick as handleTabClickFlow,
     isSectionCollapsed as isSectionCollapsedFlow,
     normalizeActiveState as normalizeActiveStateFlow,
-    prefetchActiveViewWidgets as prefetchActiveViewWidgetsFlow,
     prefetchWidgetsByNames as prefetchWidgetsByNamesFlow,
-    refreshActiveViewAfterNavigation as refreshActiveViewAfterNavigationFlow,
     registerHashListener as registerHashListenerFlow,
     rememberActiveViewScroll as rememberActiveViewScrollFlow,
     restoreActiveViewScroll as restoreActiveViewScrollFlow,
-    setActiveViewFromHash as setActiveViewFromHashFlow,
     toggleSectionCollapse as toggleSectionCollapseFlow,
     unregisterHashListener as unregisterHashListenerFlow,
-    updateHash as updateHashFlow
 } from './page_view_runtime.ts';
 import {
     PAGE_HOST_RUNTIME_SERVICES_KEY
@@ -106,13 +103,7 @@ import { usePageErrorRuntime } from './page_error_runtime.ts';
 import { usePageNotifications } from './page_notifications.ts';
 import { usePageUiState, type PageUiState } from './page_ui_state.ts';
 import { asRecord } from '../shared/object_record.ts';
-import type { ExecuteCommandData } from './execute_flow.ts';
 import type { WidgetLifecycleHandle } from '../widgets/factory.ts';
-
-type WidgetInputPayload = {
-    name?: string;
-    value?: unknown;
-};
 
 type PageAppPublicSurface = {
     bootstrapPage(): Promise<void>;
@@ -156,6 +147,11 @@ type PageAppBindings = PageAppPublicSurface & {
     toggleSectionCollapse(sectionIndex: number): void;
 };
 
+type WidgetInputPayload = {
+    name?: string;
+    value?: unknown;
+};
+
 type PageAppRuntimeHost = PageViewHost & {
     clearActiveWidgetLifecycle(handle?: WidgetLifecycleHandle | null): WidgetLifecycleHandle | null;
     closeUiModal(): Promise<BoundaryActionResult<null>>;
@@ -175,11 +171,9 @@ type PageAppRuntimeHost = PageViewHost & {
 };
 
 function normalizeBoundaryActionKind(kind: string): BoundaryActionKind {
-    if (kind === 'modal-close' || kind === 'navigation' || kind === 'execute') {
-        return kind;
-    }
-
-    return 'execute';
+    return kind === 'modal-close' || kind === 'navigation' || kind === 'execute'
+        ? kind
+        : 'execute';
 }
 
 function normalizeExecuteCommandData(value: unknown): ExecuteCommandData | null {
@@ -199,14 +193,34 @@ function normalizeExecuteCommandData(value: unknown): ExecuteCommandData | null 
 
 function normalizeWidgetInputPayload(value: unknown): WidgetInputPayload | null {
     const payload = asRecord(value);
-    if (!payload || typeof payload.name !== 'string' || !payload.name.trim()) {
+    return payload && typeof payload.name === 'string' && payload.name.trim()
+        ? {
+              name: payload.name,
+              value: payload.value
+          }
+        : null;
+}
+
+function readPageBootstrap(scriptId = 'page-data'): unknown | null {
+    if (typeof document === 'undefined') {
         return null;
     }
 
-    return {
-        name: payload.name,
-        value: payload.value
-    };
+    const element = document.getElementById(scriptId);
+    if (!element) {
+        return null;
+    }
+
+    const raw = typeof element.textContent === 'string' ? element.textContent.trim() : '';
+    if (!raw) {
+        return null;
+    }
+
+    try {
+        return JSON.parse(raw);
+    } catch (error) {
+        throw new Error(`Не удалось разобрать bootstrap JSON (${scriptId})`, { cause: error });
+    }
 }
 
 function usePageApp(): PageAppBindings {
@@ -260,18 +274,18 @@ function usePageApp(): PageAppBindings {
     const activeSections = computed(() =>
         getActiveSections(activeMenu.value, activeTabIndex.value, activeTabs.value)
     );
+    let pageHost!: PageAppRuntimeHost;
+
+    const bindPageFlow = <TArgs extends unknown[], TResult>(
+        flow: (host: PageAppRuntimeHost, ...args: TArgs) => TResult
+    ) => (...args: TArgs) => flow(pageHost, ...args);
 
     function waitForViewUpdate(): Promise<void> {
         return nextTick();
     }
 
-    function registerHashListener(): void {
-        registerHashListenerFlow(pageHost);
-    }
-
-    function unregisterHashListener(): void {
-        unregisterHashListenerFlow(pageHost);
-    }
+    const registerHashListener = bindPageFlow(registerHashListenerFlow);
+    const unregisterHashListener = bindPageFlow(unregisterHashListenerFlow);
 
     async function bootstrapPage(): Promise<void> {
         const bootstrapPayload = readPageBootstrap();
@@ -286,57 +300,15 @@ function usePageApp(): PageAppBindings {
         await finishInitialViewActivation();
     }
 
-    function applyPagePayload(payload: unknown): void {
-        applyPagePayloadFlow(pageHost, payload || {});
-    }
-
-    async function loadPageConfig(): Promise<unknown> {
-        return loadPageConfigFlow(pageHost);
-    }
-
-    function parseConfiguration(): void {
-        parseConfigurationFlow(pageHost);
-    }
-
-    async function finishInitialViewActivation(): Promise<void> {
-        await finishInitialViewActivationFlow(pageHost);
-    }
-
-    function normalizeActiveState(): void {
-        normalizeActiveStateFlow(pageHost);
-    }
-
-    function setActiveViewFromHash(): void {
-        setActiveViewFromHashFlow(pageHost);
-    }
-
-    function updateHash(): void {
-        updateHashFlow(pageHost);
-    }
-
-    async function onHashChange(): Promise<void> {
-        await handleHashChangeFlow(pageHost);
-    }
-
-    function onMenuClick(index: number): void {
-        handleMenuClickFlow(pageHost, index);
-    }
-
-    function onTabClick(index: number): void {
-        handleTabClickFlow(pageHost, index);
-    }
-
-    async function refreshActiveViewAfterNavigation(): Promise<void> {
-        await refreshActiveViewAfterNavigationFlow(pageHost);
-    }
-
-    async function prefetchWidgetsByNames(names: string[]): Promise<void> {
-        await prefetchWidgetsByNamesFlow(pageHost, names);
-    }
-
-    async function prefetchActiveViewWidgets(): Promise<void> {
-        await prefetchActiveViewWidgetsFlow(pageHost);
-    }
+    const applyPagePayload = (payload: unknown) => applyPagePayloadFlow(pageHost, payload || {});
+    const loadPageConfig = bindPageFlow(loadPageConfigFlow);
+    const parseConfiguration = bindPageFlow(parseConfigurationFlow);
+    const finishInitialViewActivation = bindPageFlow(finishInitialViewActivationFlow);
+    const normalizeActiveState = bindPageFlow(normalizeActiveStateFlow);
+    const onHashChange = bindPageFlow(handleHashChangeFlow);
+    const onMenuClick = bindPageFlow(handleMenuClickFlow);
+    const onTabClick = bindPageFlow(handleTabClickFlow);
+    const prefetchWidgetsByNames = bindPageFlow(prefetchWidgetsByNamesFlow);
 
     function getCurrentPageName(): string {
         return selectCurrentPageName(configState);
@@ -443,33 +415,18 @@ function usePageApp(): PageAppBindings {
         return selectWidgetValue(sessionState, allAttrs.value, widgetName);
     }
 
-    function getActiveViewId(): string {
-        return getActiveViewIdFlow(pageHost);
-    }
+    const getActiveViewId = bindPageFlow(getActiveViewIdFlow);
 
     function getPageScrollRoot(): PageScrollRoot | null {
         return pageScrollRoot.value;
     }
 
-    function rememberActiveViewScroll(): void {
-        rememberActiveViewScrollFlow(pageHost);
-    }
-
-    function restoreActiveViewScroll(viewId = getActiveViewId()): void {
+    const rememberActiveViewScroll = bindPageFlow(rememberActiveViewScrollFlow);
+    const restoreActiveViewScroll = (viewId = getActiveViewId()) =>
         restoreActiveViewScrollFlow(pageHost, viewId);
-    }
-
-    function getSectionCollapseId(sectionIndex: number): string {
-        return getSectionCollapseIdFlow(pageHost, sectionIndex);
-    }
-
-    function isSectionCollapsed(sectionIndex: number): boolean {
-        return isSectionCollapsedFlow(pageHost, sectionIndex);
-    }
-
-    function toggleSectionCollapse(sectionIndex: number): void {
-        toggleSectionCollapseFlow(pageHost, sectionIndex);
-    }
+    const getSectionCollapseId = bindPageFlow(getSectionCollapseIdFlow);
+    const isSectionCollapsed = bindPageFlow(isSectionCollapsedFlow);
+    const toggleSectionCollapse = bindPageFlow(toggleSectionCollapseFlow);
 
     async function executeCommand(commandData: unknown): Promise<void> {
         const normalizedCommand = normalizeExecuteCommandData(commandData);
@@ -505,82 +462,71 @@ function usePageApp(): PageAppBindings {
         tabsFocused.value = false;
     }
 
-    const pageHost: PageAppRuntimeHost = {
-        $nextTick(callback?: () => void) {
-            return callback ? nextTick(callback) : nextTick();
-        },
-        get activeMenu() {
-            return activeMenu.value;
-        },
-        get activeMenuIndex() {
-            return activeMenuIndex.value;
-        },
-        set activeMenuIndex(value: number) {
+    pageHost = (() => {
+        const host = {
+            $nextTick(callback?: () => void) {
+                return callback ? nextTick(callback) : nextTick();
+            },
+            clearActiveWidgetLifecycle,
+            closeUiModal,
+            configState,
+            fetchActiveViewAttrs,
+            getCurrentPageName,
+            getPageScrollRoot,
+            getWidgetAttrs,
+            getWidgetConfig,
+            getWidgetRuntimeValue,
+            getWidgetValue,
+            handleRecoverableError,
+            modalRuntimeState,
+            normalizeActiveState,
+            onHashChange,
+            openUiModal,
+            prefetchWidgetsByNames,
+            reportDiagnosticError,
+            runBoundaryAction,
+            sessionState,
+            setActiveWidgetLifecycle,
+            showNotification,
+            uiState,
+            waitForViewUpdate
+        } as Record<string, unknown>;
+        const proxy = <TValue>(
+            key: string,
+            getter: () => TValue,
+            setter?: (value: TValue) => void
+        ) => {
+            Object.defineProperty(host, key, {
+                configurable: true,
+                enumerable: true,
+                get: getter,
+                set: setter
+            });
+        };
+
+        proxy('activeMenu', () => activeMenu.value);
+        proxy('activeMenuIndex', () => activeMenuIndex.value, (value) => {
             activeMenuIndex.value = value;
-        },
-        get activeTabIndex() {
-            return activeTabIndex.value;
-        },
-        set activeTabIndex(value: number) {
+        });
+        proxy('activeTabIndex', () => activeTabIndex.value, (value) => {
             activeTabIndex.value = value;
-        },
-        get activeTabs() {
-            return activeTabs.value;
-        },
-        get allAttrs() {
-            return allAttrs.value;
-        },
-        get collapsedSections() {
-            return collapsedSections.value;
-        },
-        set collapsedSections(value: Record<string, boolean>) {
+        });
+        proxy('activeTabs', () => activeTabs.value);
+        proxy('allAttrs', () => allAttrs.value);
+        proxy('collapsedSections', () => collapsedSections.value, (value) => {
             collapsedSections.value = value;
-        },
-        configState,
-        get diagnostics() {
-            return diagnostics.value;
-        },
-        fetchActiveViewAttrs,
-        getCurrentPageName,
-        getPageScrollRoot,
-        getWidgetConfig,
-        get menus() {
-            return menus.value;
-        },
-        get loadedAttrNames() {
-            return loadedAttrNames.value;
-        },
-        normalizeActiveState,
-        onHashChange,
-        get pageConfig() {
-            return pageConfig.value;
-        },
-        runBoundaryAction,
-        sessionState,
-        uiState,
-        get viewScrollTopById() {
-            return viewScrollTopById.value;
-        },
-        set viewScrollTopById(value: Record<string, number>) {
+        });
+        proxy('diagnostics', () => diagnostics.value);
+        proxy('loadedAttrNames', () => loadedAttrNames.value);
+        proxy('menus', () => menus.value);
+        proxy('modalRuntimeController', () => modalRuntimeController);
+        proxy('pageConfig', () => pageConfig.value);
+        proxy('viewScrollTopById', () => viewScrollTopById.value, (value) => {
             viewScrollTopById.value = value;
-        },
-        waitForViewUpdate,
-        clearActiveWidgetLifecycle,
-        closeUiModal,
-        getWidgetAttrs,
-        getWidgetRuntimeValue,
-        getWidgetValue,
-        handleRecoverableError,
-        get modalRuntimeController() {
-            return modalRuntimeController;
-        },
-        modalRuntimeState,
-        openUiModal,
-        prefetchWidgetsByNames,
-        reportDiagnosticError,
-        setActiveWidgetLifecycle,
-        showNotification
-    };
+        });
+
+        return host as PageAppRuntimeHost;
+    })();
 
     modalRuntimeController = createModalRuntimeController(pageHost, modalRuntimeState);
     provide(PAGE_HOST_RUNTIME_SERVICES_KEY, createPageHostRuntimeServices(pageHost, confirmModal));

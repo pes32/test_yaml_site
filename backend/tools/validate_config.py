@@ -7,7 +7,8 @@ import json
 import sys
 from pathlib import Path
 
-from backend.config import ConfigLoadError, ROOT_DIR, build_config_snapshot
+from backend.config_shared import ConfigLoadError, ROOT_DIR
+from backend.config_snapshot import build_config_snapshot
 
 
 def parse_args() -> argparse.Namespace:

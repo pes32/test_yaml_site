@@ -33,9 +33,7 @@
         @click="onToggleClick"
         @keydown="onToggleKeydown"
       >
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path d="M10 9.00002L6.16667 12.8334L5 11.6667L10 6.66669L15 11.6667L13.8333 12.8334L10 9.00002Z" fill="currentColor"></path>
-        </svg>
+        <dropdown-chevron-icon></dropdown-chevron-icon>
       </button>
     </div>
 
@@ -87,16 +85,19 @@
 <script setup lang="ts">
 import {
   computed,
-  inject,
   nextTick,
   onBeforeUnmount,
   ref,
   watch
 } from 'vue';
 import ActionButtonContent from './action-button/ActionButtonContent.vue';
-import useActionButtonVisual from './action-button/useActionButtonVisual.ts';
-import useActionExecution from './action-button/useActionExecution.ts';
+import useActionWidgetBase from './action-button/useActionWidgetBase.ts';
+import DropdownChevronIcon from './common/DropdownChevronIcon.vue';
 import type { ActionItem, ActionWidgetEmit, ActionWidgetProps } from './action-button/types.ts';
+import {
+  createDropdownOutsideClickController,
+  createDropdownViewportController
+} from './dropdown/dropdown_runtime.ts';
 import useSplitButtonActions from './split-button/useSplitButtonActions.ts';
 import useSplitButtonKeyboard from './split-button/useSplitButtonKeyboard.ts';
 import useSplitButtonMenuPosition from './split-button/useSplitButtonMenuPosition.ts';
@@ -107,16 +108,6 @@ defineOptions({
 
 const props = defineProps<ActionWidgetProps>();
 const emit = defineEmits<ActionWidgetEmit>();
-
-const getConfirmModal = inject<() => unknown | null>('getConfirmModal', () => null);
-const openUiModal = inject<((modalName: string) => Promise<unknown> | unknown) | null>(
-  'openUiModal',
-  null
-);
-const closeUiModal = inject<(() => Promise<unknown> | unknown) | null>(
-  'closeUiModal',
-  null
-);
 
 const controlRoot = ref<HTMLElement | null>(null);
 const toggleButton = ref<HTMLButtonElement | null>(null);
@@ -129,10 +120,6 @@ const openCycleId = ref(0);
 const listId = `split-${Math.random().toString(36).slice(2, 9)}`;
 
 let isComponentUnmounted = false;
-let clickOutsideTimerId = 0;
-let clickOutsideHandler: ((event: MouseEvent) => void) | null = null;
-let scrollHandler: EventListener | null = null;
-let resizeHandler: EventListener | null = null;
 
 const {
   displayActionKeys,
@@ -149,11 +136,21 @@ const {
   resetMenuLayout,
   scheduleMenuLayout
 } = useSplitButtonMenuPosition(controlRoot, dropdownMenu);
-
-const { executeAction } = useActionExecution(props, emit, {
-  closeUiModal,
-  getConfirmModal,
-  openUiModal
+const outsideClickController = createDropdownOutsideClickController({
+  getElements: () => [controlRoot.value, dropdownMenu.value],
+  onOutsideClick: () => closeDropdown({ restoreFocus: false })
+});
+const viewportController = createDropdownViewportController({
+  onResize: () => {
+    if (isDropdownOpen.value) {
+      scheduleOpenMenuLayout();
+    }
+  },
+  onScroll: () => {
+    if (isDropdownOpen.value) {
+      scheduleOpenMenuLayout();
+    }
+  }
 });
 
 const menuId = computed(() => `split-button-menu-${listId}`);
@@ -163,10 +160,11 @@ const {
   buttonTitle,
   iconName,
   iconStyle,
+  executeAction,
   splitControlStyle: controlStyle,
   splitPrimaryStyle: primaryStyle,
   supportingText
-} = useActionButtonVisual(props, { fallbackTitle: 'Split button' });
+} = useActionWidgetBase(props, emit, { fallbackTitle: 'Split button' });
 
 const toggleTitle = computed(() =>
   hasActions.value
@@ -234,8 +232,8 @@ function openDropdown(options: { focusIndex?: number } = {}): void {
       onMeasured: () => {
         isMenuMeasuring.value = false;
         isDropdownOpen.value = true;
-        addClickOutsideListener();
-        addViewportListeners();
+        outsideClickController.add();
+        viewportController.add();
       },
       resetScroll: true
     });
@@ -246,8 +244,8 @@ function closeDropdown(options: { restoreFocus?: boolean } = {}): void {
   openCycleId.value += 1;
   const shouldRestoreFocus = options.restoreFocus === true;
   cancelDeferredWork();
-  removeClickOutsideListener();
-  removeViewportListeners();
+  outsideClickController.remove();
+  viewportController.remove();
 
   if (!isDropdownOpen.value) {
     isMenuMeasuring.value = false;
@@ -308,71 +306,6 @@ function scheduleOpenMenuLayout(options: { focusAfterLayout?: boolean; focusInde
   });
 }
 
-function addViewportListeners(): void {
-  removeViewportListeners();
-
-  scrollHandler = () => {
-    if (isDropdownOpen.value) {
-      scheduleOpenMenuLayout();
-    }
-  };
-  resizeHandler = () => {
-    if (isDropdownOpen.value) {
-      scheduleOpenMenuLayout();
-    }
-  };
-
-  window.addEventListener('scroll', scrollHandler, true);
-  window.addEventListener('resize', resizeHandler);
-}
-
-function removeViewportListeners(): void {
-  if (scrollHandler) {
-    window.removeEventListener('scroll', scrollHandler, true);
-    scrollHandler = null;
-  }
-
-  if (resizeHandler) {
-    window.removeEventListener('resize', resizeHandler);
-    resizeHandler = null;
-  }
-}
-
-function addClickOutsideListener(): void {
-  removeClickOutsideListener();
-  clickOutsideHandler = (event: MouseEvent) => {
-    const target = event.target;
-    if (!(target instanceof Node)) {
-      return;
-    }
-
-    const inRoot = Boolean(controlRoot.value && controlRoot.value.contains(target));
-    const inMenu = Boolean(dropdownMenu.value && dropdownMenu.value.contains(target));
-    if (!inRoot && !inMenu) {
-      closeDropdown({ restoreFocus: false });
-    }
-  };
-
-  clickOutsideTimerId = window.setTimeout(() => {
-    clickOutsideTimerId = 0;
-    if (clickOutsideHandler) {
-      document.addEventListener('click', clickOutsideHandler);
-    }
-  }, 0);
-}
-
-function removeClickOutsideListener(): void {
-  if (clickOutsideTimerId) {
-    window.clearTimeout(clickOutsideTimerId);
-    clickOutsideTimerId = 0;
-  }
-
-  if (clickOutsideHandler) {
-    document.removeEventListener('click', clickOutsideHandler);
-    clickOutsideHandler = null;
-  }
-}
-
 const {
   focusMenuItem,
   getSafeHighlightIndex,
@@ -428,8 +361,8 @@ watch(displayActionKeys, (newKeys, oldKeys) => {
 onBeforeUnmount(() => {
   isComponentUnmounted = true;
   cancelDeferredWork();
-  removeClickOutsideListener();
-  removeViewportListeners();
+  outsideClickController.remove();
+  viewportController.remove();
   closeDropdown({ restoreFocus: false });
 });
 </script>

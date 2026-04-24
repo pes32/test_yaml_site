@@ -1,19 +1,11 @@
 /**
  * Cell comparison helpers for table sorting.
  */
-
-function emptyForSort(
-    value: unknown,
-    column: Record<string, unknown> | null | undefined,
-    listColumnIsMultiselect: ((column: Record<string, unknown>) => boolean) | undefined
-): boolean {
-    const listMulti = listColumnIsMultiselect || (() => false);
-    if (column && (column.type === 'list' || column.type === 'voc') && listMulti(column)) {
-        return !Array.isArray(value) || value.length === 0;
-    }
-    if (value == null) return true;
-    return String(value).trim() === '';
-}
+import {
+    isChoiceLikeColumn,
+    isTableCellValueEmpty,
+    tableChoiceSortKey
+} from './table_choice_value.ts';
 
 function parseIpParts(value: unknown): number[] {
     const parts = String(value || '')
@@ -38,28 +30,14 @@ function compareIp(left: unknown, right: unknown): number {
     return 0;
 }
 
-function listSortKey(
-    value: unknown,
-    column: Record<string, unknown> | null | undefined,
-    listColumnIsMultiselect: ((column: Record<string, unknown>) => boolean) | undefined
-): string {
-    const listMulti = listColumnIsMultiselect || (() => false);
-    if (column && (column.type === 'list' || column.type === 'voc') && listMulti(column)) {
-        if (!Array.isArray(value)) return '';
-        return [...value].map((item) => String(item)).sort().join('\u0001');
-    }
-    if (Array.isArray(value)) return value.map((item) => String(item)).join('\u0001');
-    return String(value ?? '');
-}
-
 function compareCells(
     left: unknown,
     right: unknown,
     column: Record<string, unknown> | null | undefined,
     listColumnIsMultiselect: ((column: Record<string, unknown>) => boolean) | undefined
 ): number {
-    const leftEmpty = emptyForSort(left, column, listColumnIsMultiselect);
-    const rightEmpty = emptyForSort(right, column, listColumnIsMultiselect);
+    const leftEmpty = isTableCellValueEmpty(left, column, listColumnIsMultiselect);
+    const rightEmpty = isTableCellValueEmpty(right, column, listColumnIsMultiselect);
     if (leftEmpty && rightEmpty) return 0;
     if (leftEmpty) return 1;
     if (rightEmpty) return -1;
@@ -92,9 +70,9 @@ function compareCells(
         });
     }
 
-    if (type === 'list' || type === 'voc') {
-        const leftKey = listSortKey(left, currentColumn, listColumnIsMultiselect);
-        const rightKey = listSortKey(right, currentColumn, listColumnIsMultiselect);
+    if (isChoiceLikeColumn(currentColumn)) {
+        const leftKey = tableChoiceSortKey(left, currentColumn, listColumnIsMultiselect);
+        const rightKey = tableChoiceSortKey(right, currentColumn, listColumnIsMultiselect);
         return leftKey.localeCompare(rightKey, undefined, {
             numeric: true,
             sensitivity: 'base'
@@ -154,6 +132,5 @@ function compareRowsComposite(
 export {
     compareCells,
     compareRows,
-    compareRowsComposite,
-    emptyForSort
+    compareRowsComposite
 };

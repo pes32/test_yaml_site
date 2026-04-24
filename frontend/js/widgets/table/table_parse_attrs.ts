@@ -12,7 +12,7 @@ import type {
     WidgetAttrsMap
 } from './table_contract.ts';
 import { WidgetMeasure } from './table_widget_helpers.ts';
-import { BUILTIN_WIDGET_TYPES } from '../../shared/widget_types.ts';
+import { isBuiltinWidgetType } from '../../shared/widget_types.ts';
 
 type TableParseVm = TableRuntimeVm;
 type ParsedLeafColumn = TableRuntimeColumn & {
@@ -65,10 +65,6 @@ type HeaderNode = {
         const key = String(value || '').trim();
         if (!key || list.indexOf(key) >= 0) return;
         list.push(key);
-    }
-
-    function isBuiltinWidgetType(token: unknown): boolean {
-        return BUILTIN_WIDGET_TYPES.has(String(token || '').trim());
     }
 
     function normalizeWidgetType(token: unknown): string {
@@ -241,7 +237,7 @@ type HeaderNode = {
             readonly,
             widgetConfig: widgetConfig || {},
             tableCellOptions: sanitizeTableCellOptions(resolvedType, widgetConfig),
-            embeddedWidget: BUILTIN_WIDGET_TYPES.has(resolvedType)
+            embeddedWidget: isBuiltinWidgetType(resolvedType)
         };
     }
 
@@ -516,20 +512,7 @@ type HeaderNode = {
         vm.headerRows = schema.headerRows;
     }
 
-const TableSchema = {
-    LINE_NUMBER_ATTR,
-    LINE_NUMBER_LABEL,
-    BUILTIN_WIDGET_TYPES,
-    TABLE_CELL_ALLOWED_OPTIONS,
-    buildSchema,
-    buildHeaderRows,
-    extractDependencies,
-    isBuiltinWidgetType,
-    sanitizeTableCellOptions
-};
-
 export {
-    BUILTIN_WIDGET_TYPES,
     LINE_NUMBER_ATTR,
     LINE_NUMBER_LABEL,
     TABLE_CELL_ALLOWED_OPTIONS,
@@ -540,5 +523,3 @@ export {
     parseTableAttrs,
     sanitizeTableCellOptions
 };
-
-export default TableSchema;

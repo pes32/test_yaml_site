@@ -69,7 +69,7 @@ def _load_vite_manifest():
 
 
 def _vite_entry_assets(entry_name: str) -> dict:
-    """Возвращает entry asset и все связанные CSS-файлы, включая imported chunks."""
+    """Возвращает entry asset и связанные CSS/JS preload-файлы из imported chunks."""
 
     manifest = _load_vite_manifest()
     entry = manifest.get(entry_name)
@@ -77,10 +77,12 @@ def _vite_entry_assets(entry_name: str) -> dict:
         return {}
 
     css_files: list[str] = []
+    import_files: list[str] = []
     seen_chunks: set[str] = set()
     seen_css: set[str] = set()
+    seen_imports: set[str] = set()
 
-    def _collect_css(chunk_name: str):
+    def _collect_chunk_assets(chunk_name: str, include_js: bool = True):
         if chunk_name in seen_chunks:
             return
         seen_chunks.add(chunk_name)
@@ -88,6 +90,11 @@ def _vite_entry_assets(entry_name: str) -> dict:
         chunk = manifest.get(chunk_name)
         if not isinstance(chunk, dict):
             return
+
+        js_file = chunk.get("file")
+        if include_js and isinstance(js_file, str) and js_file not in seen_imports:
+            seen_imports.add(js_file)
+            import_files.append(js_file)
 
         for css_file in chunk.get("css") or []:
             if not isinstance(css_file, str) or css_file in seen_css:
@@ -97,12 +104,13 @@ def _vite_entry_assets(entry_name: str) -> dict:
 
         for imported_chunk in chunk.get("imports") or []:
             if isinstance(imported_chunk, str):
-                _collect_css(imported_chunk)
+                _collect_chunk_assets(imported_chunk)
 
-    _collect_css(entry_name)
+    _collect_chunk_assets(entry_name, include_js=False)
 
     return {
         "file": entry.get("file"),
+        "imports": import_files,
         "css": css_files,
     }
 

@@ -16,8 +16,7 @@ function createTableStore(options: CreateTableStoreOptions = {}): TableStore {
             state: {
                 levels: [],
                 expanded: new Set()
-            },
-            viewCache: null
+            }
         },
         selection: {
             anchor: { r: 0, c: 0 },
@@ -25,17 +24,17 @@ function createTableStore(options: CreateTableStoreOptions = {}): TableStore {
             fullWidthRows: null
         },
         editing: {
-            activeCell: null,
-            validationErrors: {}
+            activeCell: null
         },
-        contextMenu: {
+        menu: {
             open: false,
             position: { x: 0, y: 0 },
             target: null,
             context: null,
             sessionId: 0
         },
-        measurement: {
+        sticky: {
+            headerRuntimeEnabled: !!options.stickyHeaderEnabled,
             stickyTheadPinned: false,
             stickyPinnedTableWidth: 0,
             stickyPinnedWidthsByRow: null,
@@ -49,9 +48,11 @@ function createTableStore(options: CreateTableStoreOptions = {}): TableStore {
             lazyPendingRows: [],
             tableUiLocked: false
         },
-        preferences: {
+        validation: {
+            cellErrors: {}
+        },
+        view: {
             lineNumbersRuntimeEnabled: !!options.lineNumbersEnabled,
-            stickyHeaderRuntimeEnabled: !!options.stickyHeaderEnabled,
             wordWrapRuntimeEnabled: false
         }
     };

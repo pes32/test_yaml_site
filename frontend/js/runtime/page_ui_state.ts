@@ -9,6 +9,43 @@ type PageUiState = {
     viewScrollTopById: Record<string, number>;
 };
 
+function numericStateRef(
+    state: PageUiState,
+    key: 'activeMenuIndex' | 'activeTabIndex'
+) {
+    return computed({
+        get: () => Number(state[key]) || 0,
+        set: (value: number) => {
+            state[key] = Number(value) || 0;
+        }
+    });
+}
+
+function booleanStateRef(
+    state: PageUiState,
+    key: 'tabsFocused'
+) {
+    return computed({
+        get: () => Boolean(state[key]),
+        set: (value: boolean) => {
+            state[key] = Boolean(value);
+        }
+    });
+}
+
+function recordStateRef<TValue extends Record<string, boolean> | Record<string, number>>(
+    state: PageUiState,
+    key: 'collapsedSections' | 'viewScrollTopById'
+) {
+    return computed({
+        get: () => (state[key] && typeof state[key] === 'object' ? state[key] : {}) as TValue,
+        set: (value: TValue) => {
+            state[key] = (value && typeof value === 'object' ? value : {}) as
+                PageUiState['collapsedSections'] & PageUiState['viewScrollTopById'];
+        }
+    });
+}
+
 function usePageUiState() {
     const uiState: PageUiState = reactive({
         activeMenuIndex: 0,
@@ -19,36 +56,17 @@ function usePageUiState() {
         viewScrollTopById: {}
     });
 
-    const activeMenuIndex = computed({
-        get: () => Number(uiState.activeMenuIndex) || 0,
-        set: (value: number) => {
-            uiState.activeMenuIndex = Number(value) || 0;
-        }
-    });
-    const activeTabIndex = computed({
-        get: () => Number(uiState.activeTabIndex) || 0,
-        set: (value: number) => {
-            uiState.activeTabIndex = Number(value) || 0;
-        }
-    });
-    const collapsedSections = computed({
-        get: () => uiState.collapsedSections,
-        set: (value: Record<string, boolean>) => {
-            uiState.collapsedSections = value && typeof value === 'object' ? value : {};
-        }
-    });
-    const viewScrollTopById = computed({
-        get: () => uiState.viewScrollTopById,
-        set: (value: Record<string, number>) => {
-            uiState.viewScrollTopById = value && typeof value === 'object' ? value : {};
-        }
-    });
-    const tabsFocused = computed({
-        get: () => Boolean(uiState.tabsFocused),
-        set: (value: boolean) => {
-            uiState.tabsFocused = Boolean(value);
-        }
-    });
+    const activeMenuIndex = numericStateRef(uiState, 'activeMenuIndex');
+    const activeTabIndex = numericStateRef(uiState, 'activeTabIndex');
+    const collapsedSections = recordStateRef<Record<string, boolean>>(
+        uiState,
+        'collapsedSections'
+    );
+    const viewScrollTopById = recordStateRef<Record<string, number>>(
+        uiState,
+        'viewScrollTopById'
+    );
+    const tabsFocused = booleanStateRef(uiState, 'tabsFocused');
 
     return {
         activeMenuIndex,

@@ -1,0 +1,11 @@
+{% from "_vite_assets.html" import vite_asset_links %}
+
+{% macro app_head(title, bundle, include_modulepreload=True) -%}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link rel="icon" href="{{ url_for('favicon') }}">
+    {{ vite_asset_links(bundle, include_modulepreload=include_modulepreload) }}
+</head>
+{%- endmacro %}

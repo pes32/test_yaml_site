@@ -14,7 +14,6 @@ import {
 import { resolveTableDependencies } from '../../shared/table_attr_dependencies.ts';
 import type {
     TableRuntimeComputed,
-    TableRuntimeComputedDefinition,
     TableRuntimeComputedRefs,
     TableRuntimeDomSurface,
     TableRuntimeMethods,
@@ -24,16 +23,18 @@ import type {
     WidgetAttrsMap,
     TableWidgetConfig,
     TableWidgetEmit,
-    TableWidgetSetupBindings
+    TableWidgetSetupBindings,
+    TableWidgetSetupMethods
 } from './table_contract.ts';
 import { createTablePageBridge } from './table_page_bridge.ts';
+import { TABLE_WIDGET_SETUP_METHOD_KEYS } from './table_setup_keys.ts';
 import {
     mountTableRuntime,
-    tableRuntimeComputed,
-    tableRuntimeMethods,
-    tableRuntimeWatch,
     unmountTableRuntime
-} from './createTableRuntime.ts';
+} from './table_runtime_lifecycle.ts';
+import { tableRuntimeComputed } from './table_runtime_computed.ts';
+import { tableRuntimeMethods } from './table_runtime_registry.ts';
+import { tableRuntimeWatch } from './table_runtime_watch.ts';
 import { createTableStore } from './table_store.ts';
 
 type UseTableRuntimeOptions = {
@@ -43,14 +44,16 @@ type UseTableRuntimeOptions = {
 
 type RuntimeObjectKey<T extends object> = Extract<keyof T, string>;
 
-type TableRuntimeControllerOptions = {
-    boundMethods: Partial<TableRuntimeMethods>;
+type TableRuntimeVmOptions = {
     computedRefs: Partial<TableRuntimeComputedRefs>;
     emit: TableWidgetEmit;
     instance: ReturnType<typeof getCurrentInstance>;
     props: TableRuntimePropsSurface;
     state: TableRuntimeState;
 };
+
+type RuntimeVmTarget = Partial<TableRuntimeVm> & Record<string, unknown>;
+type RuntimeComputedUnknownSetter = (this: TableRuntimeVm, value: unknown) => void;
 
 const TABLE_CONFIG_WATCH_KEYS = [
     'data',
@@ -70,6 +73,35 @@ const TABLE_CONFIG_WATCH_KEYS = [
     'width',
     'zebra'
 ] as const satisfies ReadonlyArray<keyof TableWidgetConfig>;
+
+const TABLE_RUNTIME_COMPUTED_FALLBACKS = {
+    _lazyPendingRows: () => [],
+    contextMenuItems: () => [],
+    displayRows: () => [],
+    groupingActive: () => false,
+    groupingState: () => ({ levels: [], expanded: new Set<string>() }),
+    hasColumnNumbers: () => false,
+    hasExplicitTableWidth: () => false,
+    headerSortEnabled: () => false,
+    isEditable: () => false,
+    isFullyLoaded: () => false,
+    isLoadingChunk: () => false,
+    lazyEnabled: () => false,
+    lazySessionId: () => 0,
+    lineNumbersRuntimeEnabled: () => false,
+    sortColumnIndex: () => null,
+    sortDirection: () => 'asc',
+    sortKeys: () => [],
+    stickyHeaderEnabled: () => false,
+    stickyHeaderRuntimeEnabled: () => false,
+    tableInlineStyle: () => ({}),
+    tableLazyUiActive: () => false,
+    tableMinRowCount: () => 0,
+    tableUiLocked: () => false,
+    tableZebra: () => false,
+    wordWrapEnabled: () => false,
+    wordWrapRuntimeEnabled: () => false
+} satisfies { [K in keyof TableRuntimeComputed]: () => TableRuntimeComputed[K] };
 
 function objectKeys<T extends object>(object: T): Array<RuntimeObjectKey<T>> {
     return Object.keys(object) as Array<RuntimeObjectKey<T>>;
@@ -182,105 +214,82 @@ function createInitialTableRuntimeState(
     };
 }
 
-function computedSetter<K extends keyof TableRuntimeComputed>(
-    definition: TableRuntimeComputedDefinition<TableRuntimeComputed[K]>
-): ((this: TableRuntimeVm, value: TableRuntimeComputed[K]) => void) | null {
-    if (typeof definition === 'function') {
-        return null;
-    }
-    return definition.set || null;
+function setRuntimeComputedValue(
+    vm: TableRuntimeVm,
+    key: keyof TableRuntimeComputed,
+    value: unknown
+): boolean {
+    const definition = tableRuntimeComputed[key];
+    const setter =
+        typeof definition === 'function'
+            ? null
+            : (definition.set as RuntimeComputedUnknownSetter | undefined);
+    if (!setter) return false;
+    setter.call(vm, value);
+    return true;
 }
 
-function defineRuntimeStateProperty<K extends keyof TableRuntimeState>(
-    controller: Partial<TableRuntimeVm>,
-    state: TableRuntimeState,
-    key: K
+function defineRuntimeProperty<TValue>(
+    target: RuntimeVmTarget,
+    key: string,
+    getter: () => TValue,
+    setter?: (value: TValue) => void
 ): void {
-    Object.defineProperty(controller, key, {
+    Object.defineProperty(target, key, {
         configurable: true,
         enumerable: true,
-        get: () => state[key],
-        set: (value: TableRuntimeState[K]) => {
-            state[key] = value;
-        }
+        get: getter,
+        ...(setter ? { set: setter } : {})
     });
 }
 
-function defineRuntimeMethodProperty<K extends keyof TableRuntimeMethods>(
-    controller: Partial<TableRuntimeVm>,
-    boundMethods: Partial<TableRuntimeMethods>,
+function runtimeComputedFallback<K extends keyof TableRuntimeComputed>(
     key: K
-): void {
-    Object.defineProperty(controller, key, {
-        configurable: true,
-        enumerable: true,
-        get: () => boundMethods[key]
-    });
+): TableRuntimeComputed[K] {
+    const createFallback = TABLE_RUNTIME_COMPUTED_FALLBACKS[key] as () => TableRuntimeComputed[K];
+    return createFallback();
 }
 
-function defineRuntimeComputedProperty<K extends keyof TableRuntimeComputed>(
-    controller: Partial<TableRuntimeVm>,
-    controllerVm: TableRuntimeVm,
-    computedRefs: Partial<TableRuntimeComputedRefs>,
-    key: K
-): void {
-    const setter = computedSetter(tableRuntimeComputed[key]);
+function createTableRuntimeVm(options: TableRuntimeVmOptions): TableRuntimeVm {
+    const target: RuntimeVmTarget = {};
+    const vm = target as TableRuntimeVm;
+    const baseProperties: Array<[string, () => unknown]> = [
+        ['$el', () => options.instance?.proxy?.$el || null],
+        ['$emit', () => options.emit],
+        ['$nextTick', () => nextTick],
+        ['$refs', () => runtimeRefsFromInstance(options.instance)],
+        ['$root', () => options.instance?.proxy?.$root || null],
+        ['widgetConfig', () => options.props.widgetConfig],
+        ['widgetName', () => options.props.widgetName]
+    ];
 
-    Object.defineProperty(controller, key, {
-        configurable: true,
-        enumerable: true,
-        get: () => computedRefs[key]?.value,
-        set: setter
-            ? (value: TableRuntimeComputed[K]) => {
-                setter.call(controllerVm, value);
+    baseProperties.forEach(([key, getter]) => {
+        defineRuntimeProperty(target, key, getter);
+    });
+
+    objectKeys(options.state).forEach((key) => {
+        defineRuntimeProperty(
+            target,
+            key,
+            () => options.state[key],
+            (value) => {
+                (options.state as Record<string, unknown>)[key] = value;
             }
-            : undefined
-    });
-}
-
-function createTableRuntimeController({
-    boundMethods,
-    computedRefs,
-    emit,
-    instance,
-    props,
-    state
-}: TableRuntimeControllerOptions): TableRuntimeVm {
-    const controller: Partial<TableRuntimeVm> = {
-        $emit: emit,
-        $nextTick: nextTick,
-        get $el() {
-            return instance?.proxy?.$el || null;
-        },
-        get $refs() {
-            return runtimeRefsFromInstance(instance);
-        },
-        get $root() {
-            return instance?.proxy?.$root || null;
-        },
-        get widgetConfig() {
-            return props.widgetConfig;
-        },
-        get widgetName() {
-            return props.widgetName;
-        }
-    };
-
-    const controllerVm = controller as TableRuntimeVm;
-
-    objectKeys(state).forEach((key) => {
-        defineRuntimeStateProperty(controller, state, key);
-    });
-
-    objectKeys(tableRuntimeMethods).forEach((key) => {
-        defineRuntimeMethodProperty(controller, boundMethods, key);
+        );
     });
 
     objectKeys(tableRuntimeComputed).forEach((key) => {
-        defineRuntimeComputedProperty(controller, controllerVm, computedRefs, key);
+        defineRuntimeProperty(
+            target,
+            key,
+            () => options.computedRefs[key]?.value ?? runtimeComputedFallback(key),
+            (value) => {
+                setRuntimeComputedValue(vm, key, value);
+            }
+        );
     });
 
-    return controllerVm;
+    return vm;
 }
 
 function createRuntimeComputedRef<K extends keyof TableRuntimeComputed>(
@@ -313,47 +322,12 @@ function createRuntimeComputedRefs(vm: TableRuntimeVm): TableRuntimeComputedRefs
     }, {} as Record<string, ComputedRef<unknown>>) as TableRuntimeComputedRefs;
 }
 
-function bindRuntimeMethod<K extends keyof TableRuntimeMethods>(
-    vm: TableRuntimeVm,
-    method: TableRuntimeMethods[K]
-): TableRuntimeMethods[K] {
-    const runtimeMethod = method as (
-        this: TableRuntimeVm,
-        ...args: Parameters<TableRuntimeMethods[K]>
-    ) => ReturnType<TableRuntimeMethods[K]>;
-    const boundMethod = (...args: Parameters<TableRuntimeMethods[K]>) =>
-        Reflect.apply(runtimeMethod, vm, args);
-
-    return boundMethod as TableRuntimeMethods[K];
-}
-
-function assignRuntimeMethod<K extends keyof TableRuntimeMethods>(
-    methods: Partial<TableRuntimeMethods>,
-    key: K,
-    method: TableRuntimeMethods[K]
-): void {
-    methods[key] = method;
-}
-
-function assertCompleteRuntimeMethods(
-    methods: Partial<TableRuntimeMethods>
-): asserts methods is TableRuntimeMethods {
-    objectKeys(tableRuntimeMethods).forEach((key) => {
-        if (typeof methods[key] !== 'function') {
-            throw new Error(`Table runtime method "${key}" was not initialized.`);
-        }
-    });
-}
-
 function createBoundRuntimeMethods(vm: TableRuntimeVm): TableRuntimeMethods {
-    const methods: Partial<TableRuntimeMethods> = {};
-
-    objectKeys(tableRuntimeMethods).forEach((key) => {
-        assignRuntimeMethod(methods, key, bindRuntimeMethod(vm, tableRuntimeMethods[key]));
-    });
-
-    assertCompleteRuntimeMethods(methods);
-    return methods;
+    return objectKeys(tableRuntimeMethods).reduce((bound, key) => {
+        (bound as Record<string, (...args: unknown[]) => unknown>)[key] = (...args: unknown[]) =>
+            Reflect.apply(tableRuntimeMethods[key], vm, args);
+        return bound;
+    }, {} as Partial<TableRuntimeMethods>) as TableRuntimeMethods;
 }
 
 function createTableWidgetSetupBindings(
@@ -362,12 +336,17 @@ function createTableWidgetSetupBindings(
     computedRefs: TableRuntimeComputedRefs,
     boundMethods: TableRuntimeMethods
 ): TableWidgetSetupBindings {
+    const setupMethods = TABLE_WIDGET_SETUP_METHOD_KEYS.reduce((methods, key) => {
+        (methods as Record<string, unknown>)[key] = boundMethods[key];
+        return methods;
+    }, {} as Partial<TableWidgetSetupMethods>) as TableWidgetSetupMethods;
+
     return {
         ...toRefs(state),
         widgetConfig: toRef(props, 'widgetConfig'),
         widgetName: toRef(props, 'widgetName'),
         ...computedRefs,
-        ...boundMethods
+        ...setupMethods
     };
 }
 
@@ -393,10 +372,7 @@ function useTableRuntime(options: UseTableRuntimeOptions): TableWidgetSetupBindi
     const state = reactive(createInitialTableRuntimeState(props, tablePageBridge)) as TableRuntimeState;
 
     const computedRefs: Partial<TableRuntimeComputedRefs> = {};
-    const boundMethods: Partial<TableRuntimeMethods> = {};
-
-    const vm = createTableRuntimeController({
-        boundMethods,
+    const vm = createTableRuntimeVm({
         computedRefs,
         emit,
         instance,
@@ -405,7 +381,7 @@ function useTableRuntime(options: UseTableRuntimeOptions): TableWidgetSetupBindi
     });
 
     const runtimeMethods = createBoundRuntimeMethods(vm);
-    Object.assign(boundMethods, runtimeMethods);
+    Object.assign(vm, runtimeMethods);
 
     const runtimeComputedRefs = createRuntimeComputedRefs(vm);
     Object.assign(computedRefs, runtimeComputedRefs);

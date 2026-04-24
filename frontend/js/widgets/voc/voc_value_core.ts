@@ -1,9 +1,7 @@
 import {
     filterVocRows,
     findFirstVocRowByValue,
-    formatVocRowLabel,
     parseVocDraft,
-    replaceVocDraftActiveToken,
     resolveSingleVocDraftCommit,
     resolveVocManualTokens,
     restoreVocRowIdsByValues,
@@ -11,6 +9,7 @@ import {
     serializeVocValues
 } from '../../runtime/voc_contract.ts';
 import type { VocRow } from '../../runtime/voc_contract.ts';
+export { formatVocRowLabel, replaceVocDraftActiveToken } from '../../runtime/voc_contract.ts';
 
 type SortDirection = '' | 'asc' | 'desc' | string;
 
@@ -98,31 +97,31 @@ function sortVocRows(rows: unknown, columnIndex: number, direction: SortDirectio
     });
 }
 
-function hasVocValue(value: unknown, isMultiselect: boolean): boolean {
+export function hasVocValue(value: unknown, isMultiselect: boolean): boolean {
     if (isMultiselect) {
         return Array.isArray(value) && value.length > 0;
     }
     return String(value || '').trim() !== '';
 }
 
-function normalizeSingleVocValue(value: unknown): string {
+export function normalizeSingleVocValue(value: unknown): string {
     return value == null ? '' : String(value);
 }
 
-function normalizeMultiVocValue(value: unknown): string[] {
+export function normalizeMultiVocValue(value: unknown): string[] {
     return Array.isArray(value)
         ? value.map((item) => String(item ?? ''))
         : [];
 }
 
-function resolveInlineQuery(inputValue: string, isMultiselect: boolean): string {
+export function resolveInlineQuery(inputValue: string, isMultiselect: boolean): string {
     if (isMultiselect) {
         return parseVocDraft(inputValue).activeToken;
     }
     return inputValue;
 }
 
-function resolveInputDisplayValue({
+export function resolveInputDisplayValue({
     isMultiselect,
     isFocused,
     isDraftEditing,
@@ -143,7 +142,7 @@ function resolveInputDisplayValue({
     return String(value || '');
 }
 
-function resolveHighlightedInlineIndex({ isMultiselect, inlineRows, value }: InlineHighlightOptions): number {
+export function resolveHighlightedInlineIndex({ isMultiselect, inlineRows, value }: InlineHighlightOptions): number {
     if (isMultiselect) {
         return inlineRows.length > 0 ? 0 : -1;
     }
@@ -154,11 +153,11 @@ function resolveHighlightedInlineIndex({ isMultiselect, inlineRows, value }: Inl
         : (inlineRows.length > 0 ? 0 : -1);
 }
 
-function commitSingleVocDraft({ rows, inputValue, value, draftDirty }: SingleDraftOptions) {
+export function commitSingleVocDraft({ rows, inputValue, value, draftDirty }: SingleDraftOptions) {
     return resolveSingleVocDraftCommit(rows, inputValue, value, { draftDirty });
 }
 
-function commitMultiselectVocDraft({
+export function commitMultiselectVocDraft({
     rows,
     value,
     inputValue,
@@ -188,7 +187,7 @@ function commitMultiselectVocDraft({
     };
 }
 
-function resolveModalRows(
+export function resolveModalRows(
     rows: unknown,
     modalSearch: unknown,
     modalSortColumn: number,
@@ -201,7 +200,7 @@ function resolveModalRows(
     );
 }
 
-function toggleModalSortState(
+export function toggleModalSortState(
     modalSortColumn: number,
     modalSortDirection: SortDirection,
     columnIndex: number
@@ -230,7 +229,7 @@ function toggleModalSortState(
     };
 }
 
-function modalSortControlClass(
+export function modalSortControlClass(
     modalSortColumn: number,
     modalSortDirection: SortDirection,
     columnIndex: number
@@ -246,7 +245,7 @@ function modalSortControlClass(
     };
 }
 
-function resolveModalOpenState({ isMultiselect, rows, value, inputValue }: ModalOpenOptions) {
+export function resolveModalOpenState({ isMultiselect, rows, value, inputValue }: ModalOpenOptions) {
     const modalSearch = isMultiselect
         ? parseVocDraft(inputValue).activeToken
         : String(inputValue || '').trim();
@@ -267,7 +266,7 @@ function resolveModalOpenState({ isMultiselect, rows, value, inputValue }: Modal
     };
 }
 
-function resolveModalActiveState({
+export function resolveModalActiveState({
     visibleRows,
     isMultiselect,
     modalActiveRowId,
@@ -304,7 +303,7 @@ function resolveModalActiveState({
     };
 }
 
-function moveModalActiveState({
+export function moveModalActiveState({
     visibleRows,
     isMultiselect,
     modalActiveRowId,
@@ -331,7 +330,7 @@ function moveModalActiveState({
     };
 }
 
-function toggleModalRowSelection({
+export function toggleModalRowSelection({
     isMultiselect,
     modalSelectedRowIds,
     modalSelectedRowId,
@@ -367,7 +366,7 @@ function toggleModalRowSelection({
     };
 }
 
-function applyModalSelection({
+export function applyModalSelection({
     isMultiselect,
     rows,
     modalSelectedRowIds,
@@ -399,24 +398,3 @@ function applyModalSelection({
         shouldEmit: true
     };
 }
-
-export {
-    applyModalSelection,
-    commitMultiselectVocDraft,
-    commitSingleVocDraft,
-    formatVocRowLabel,
-    hasVocValue,
-    modalSortControlClass,
-    normalizeMultiVocValue,
-    normalizeSingleVocValue,
-    replaceVocDraftActiveToken,
-    resolveHighlightedInlineIndex,
-    resolveInlineQuery,
-    resolveInputDisplayValue,
-    resolveModalActiveState,
-    resolveModalOpenState,
-    resolveModalRows,
-    moveModalActiveState,
-    toggleModalRowSelection,
-    toggleModalSortState
-};

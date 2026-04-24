@@ -1,24 +1,6 @@
 import { asRecord, isRecord } from './object_record.ts';
 import type { UnknownRecord } from './object_record.ts';
-
-type KnownWidgetType =
-    | 'button'
-    | 'date'
-    | 'datetime'
-    | 'float'
-    | 'img'
-    | 'int'
-    | 'ip'
-    | 'ip_mask'
-    | 'list'
-    | 'split_button'
-    | 'str'
-    | 'table'
-    | 'text'
-    | 'time'
-    | 'voc';
-
-type WidgetType = KnownWidgetType | (string & {});
+import type { KnownWidgetType, WidgetType } from './widget_types.ts';
 
 type CommonWidgetAttrs = {
     default?: unknown;

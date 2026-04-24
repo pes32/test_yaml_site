@@ -1,4 +1,6 @@
 import { computed, nextTick, ref, watch, type Ref } from 'vue';
+import useCommitFieldBase from '../composables/useCommitFieldBase.ts';
+import { validateRegexValue } from '../composables/field_validation.ts';
 import useWidgetField from '../composables/useWidgetField.ts';
 
 type IpLikeWidgetConfig = Record<string, unknown> & {
@@ -189,23 +191,6 @@ function isAllowedIpKey(key: string, allowMask: boolean): boolean {
   return false;
 }
 
-function validateRegexValue(rawValue: unknown, regex: unknown, errText?: string): string {
-  if (!regex) return '';
-  try {
-    const re = regex instanceof RegExp || typeof regex === 'string'
-      ? (typeof regex === 'string' ? new RegExp(regex) : regex)
-      : null;
-    if (!re) {
-      return '';
-    }
-    return rawValue !== '' && !re.test(String(rawValue))
-      ? errText || 'Неверный формат'
-      : '';
-  } catch {
-    return '';
-  }
-}
-
 function validateIPv4(ip: string): boolean {
   if (!ip) return true;
   const parts = ip.split('.');
@@ -241,25 +226,14 @@ function useIpLikeField(
   const inputRef: Ref<HTMLInputElement | null> = ref(null);
   const inputValue = ref('');
   const error = ref('');
-  const isFocused = ref(false);
-
-  const hasValue = computed(() => Boolean(inputValue.value));
-  const labelFloats = computed(() => hasValue.value || isFocused.value);
+  const fieldBase = useCommitFieldBase(props, inputValue, field);
   const displayError = computed(() =>
     field.tableCellCommitError.value || error.value || ''
-  );
-  const showPlaceholder = computed(() =>
-    Boolean(!hasValue.value && isFocused.value && props.widgetConfig.placeholder)
   );
   const maxLength = computed(() => options.maskTemplate.length);
 
   function emitValue(): void {
     field.emitInput(inputValue.value);
-  }
-
-  function onFocus(): void {
-    isFocused.value = true;
-    field.activateDraftController();
   }
 
   function validateCommittedValue(): string {
@@ -372,12 +346,7 @@ function useIpLikeField(
   }
 
   function handleBlur(): void {
-    isFocused.value = false;
-    try {
-      commitDraft();
-    } finally {
-      field.deactivateDraftController();
-    }
+    fieldBase.commitOnBlur(commitDraft);
   }
 
   function setValue(value: unknown): void {
@@ -402,19 +371,19 @@ function useIpLikeField(
   return {
     displayError,
     error,
-    hasValue,
+    hasValue: fieldBase.hasValue,
     inputRef,
     inputValue,
-    isFocused,
-    labelFloats,
+    isFocused: fieldBase.isFocused,
+    labelFloats: fieldBase.labelFloats,
     maxLength,
-    showPlaceholder,
+    showPlaceholder: fieldBase.showPlaceholder,
     tableCellRootAttrs: field.tableCellRootAttrs,
     commitDraft,
     commitPendingState,
     getValue,
     handleBlur,
-    onFocus,
+    onFocus: fieldBase.onFocus,
     onInputHandler,
     onKeyDown,
     setValue

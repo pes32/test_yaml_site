@@ -177,6 +177,26 @@ def _invalid_gui_value(
     )
 
 
+def _invalid_gui_node_kind(
+    *,
+    page_name: str,
+    page_url: str,
+    file_rel: str,
+    node: Any,
+    node_path: str,
+    expected: str,
+    prefix: str = "Некорректное значение",
+) -> Diagnostic:
+    return _invalid_gui_value(
+        page_name=page_name,
+        page_url=page_url,
+        file_rel=file_rel,
+        line=_node_line(node),
+        node_path=node_path,
+        message=f"{prefix} '{node_path}': ожидается {expected}, получено {_node_kind(node)}",
+    )
+
+
 def _mapping_node_items(node: Any) -> dict[str, tuple[Any, Any]]:
     if not isinstance(node, MappingNode):
         return {}

@@ -21,12 +21,8 @@
 - `table_contract.ts` — внутренние типы table runtime: `TableRuntimeState`, `TableRuntimeComputed`, `TableRuntimeMethods`, `TableRuntimeDomSurface`, narrow runtime surfaces, `TableRuntimeVm`, `TableWidgetSetupBindings`, schema/rows/selection/context-menu/cell-widget contracts.
 - `table_errors.ts` — recoverable table errors.
 - `table_store.ts` — создание table-specific runtime store.
-- `table_runtime_state.ts` — начальные slices runtime state.
-- `table_runtime_services.ts` — helpers для host services.
-- `table_editing_state.ts` — state активного cell editor.
-- `table_context_menu_state.ts` — state context menu.
-- `table_lazy_load_state.ts` — lazy-loading state.
-- `table_measurement_state.ts` — sticky/header measurement state.
+- `table_runtime_state.ts` — glue для store mirrors и public command entrypoints; exposed component surface имеет `dispatchTableCommand(command, payload)` для table mutations.
+- `table_page_bridge.ts` — helpers для host services.
 
 ## Parsing And Pure Logic
 
@@ -40,8 +36,8 @@
 
 ## Runtime Modules
 
-- `createTableRuntime.ts` — orchestration entrypoint, который собирает runtime controller.
-- `useTableRuntime.ts` — typed Composition API controller для `TableWidget.vue`; возвращает setup bindings по table contract без generic `Proxy`.
+- `createTableRuntime.ts` — compatibility entrypoint для runtime registry exports.
+- `useTableRuntime.ts` — typed Composition API controller для `TableWidget.vue`; собирает explicit runtime layers и возвращает setup bindings по table contract.
 - `table_cell_runtime.ts` — embedded cell value/editor flow.
 - `table_clipboard_runtime.ts` — browser clipboard integration.
 - `table_data_runtime.ts` — table data mutation/load helpers, display model, sort, lazy/grouping data view.
@@ -68,7 +64,7 @@ Table cell editors резолвятся через общий `WidgetDefinitionR
 - `table_page_bridge.ts` — page/runtime bridge helpers.
 - `table_notifications.ts` — user-facing table notifications.
 - `table_debug.ts` — debug-only table helpers.
-- runtime method groups типизируются через `TableRuntimeMethodSubset` в `table_contract.ts`; отдельного helper layer нет.
+- runtime method groups типизируются через `TableRuntimeMethodSubset` в `table_contract.ts`.
 
 ## Restricted Surface
 

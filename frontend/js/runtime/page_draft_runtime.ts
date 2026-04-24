@@ -129,15 +129,6 @@ function resetDraftRuntime(state: PageDraftRuntimeState): PageDraftRuntimeState 
   return state;
 }
 
-const PageDraftRuntime = {
-  clearActiveWidgetLifecycle,
-  commitActiveWidgetLifecycle,
-  createEmptyDraftRuntimeState,
-  resetDraftRuntime,
-  runBoundaryAction,
-  setActiveWidgetLifecycle
-};
-
 export type {
   BoundaryActionKind,
   BoundaryActionResult,
@@ -146,7 +137,6 @@ export type {
 };
 
 export {
-  PageDraftRuntime,
   clearActiveWidgetLifecycle,
   commitActiveWidgetLifecycle,
   createEmptyDraftRuntimeState,
@@ -154,5 +144,3 @@ export {
   runBoundaryAction,
   setActiveWidgetLifecycle
 };
-
-export default PageDraftRuntime;

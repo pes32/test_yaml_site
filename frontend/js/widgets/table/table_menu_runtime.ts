@@ -1,25 +1,24 @@
 import { canAddGroupingLevel } from './table_grouping.ts';
 import { buildContextMenuSnapshot, isContextMenuSnapshotCurrent } from './table_context_menu_model.ts';
-import { buildCoreSelectionFromDisplay } from './table_selection_model.ts';
+import {
+    buildCoreSelectionFromDisplay,
+    runtimeDisplaySelection
+} from './table_selection_model.ts';
+import { TABLE_RUNTIME_SYNC } from './table_runtime_state.ts';
+import { columnIndexByKey, columnKeyAt } from './table_state_core.ts';
 import { WidgetUiCoords } from './table_widget_helpers.ts';
 import type {
+    TableContextMenuItem,
     TableContextMenuSnapshot,
     TableContextMenuTarget,
+    TableCoreSortState,
+    TableHeaderCell,
     TableRuntimeColumn,
     TableRuntimeMethodSubset,
+    TableSelectionRect,
     TableSortState
 } from './table_contract.ts';
 type TableContextMenuBodyMode = 'cell' | 'cells' | 'row' | null;
-type TableContextMenuItem = {
-    disabled: boolean;
-    icon: string | null;
-    iconClass?: string;
-    id: string;
-    kbd: string;
-    label: string;
-    separatorBefore: boolean;
-    visible: boolean;
-};
 type RowMoveDuplicateOpsOptions = {
     bodyMode: TableContextMenuBodyMode;
     isEditable: boolean;
@@ -29,10 +28,17 @@ type RowMoveDuplicateOpsOptions = {
 };
 type ContextMenuSnapshotLike = Partial<TableContextMenuSnapshot> & {
     anchorRow?: number;
+    anchorSourceRow?: number | null;
     bodyMode?: TableContextMenuBodyMode;
     groupingLevelsSnapshot?: number[];
     headerCol?: number | null;
     sortKeys?: TableSortState[];
+};
+type RuntimeContextMenuSnapshotOverrides = {
+    anchorCol: number;
+    anchorRow: number;
+    bodyMode: TableContextMenuBodyMode;
+    headerCol: number | null;
 };
 type BuildMenuItemsOptions = {
     groupingActive?: boolean;
@@ -53,6 +59,32 @@ type BuildMenuItemsOptions = {
     target: TableContextMenuTarget | null;
     wordWrapEnabled?: boolean;
 };
+
+const SORT_MENU_IDS = new Set(['sort_asc', 'sort_desc', 'sort_reset']);
+const GROUP_MENU_IDS = new Set(['group_add_level', 'group_clear']);
+const STICKY_MENU_IDS = new Set(['toggle_sticky_header']);
+const LINE_NUMBER_MENU_IDS = new Set(['toggle_line_numbers', 'recalculate_line_numbers']);
+const WRAP_MENU_IDS = new Set(['toggle_word_wrap']);
+const CONTEXT_MENU_ACTION_HANDLERS = {
+    add_row_above: 'addRowAboveFromSnapshot',
+    add_row_below: 'addRowBelowFromSnapshot',
+    delete_row: 'deleteRowFromSnapshot',
+    move_row_up: 'moveRowUpFromSnapshot',
+    move_row_down: 'moveRowDownFromSnapshot',
+    duplicate_row_above: 'duplicateRowAboveFromSnapshot',
+    duplicate_row_below: 'duplicateRowBelowFromSnapshot',
+    copy: 'copySelection',
+    cut: 'cutSelection',
+    paste: 'pasteFromClipboard',
+    clear: 'clearSelectionFromSnapshot',
+    sort_reset: 'applySortResetFromMenu',
+    group_add_level: 'onGroupAddLevelFromSnapshot',
+    group_clear: 'onGroupClearFromSnapshot',
+    toggle_sticky_header: 'toggleStickyHeaderFromSnapshot',
+    toggle_line_numbers: 'toggleLineNumbersFromSnapshot',
+    toggle_word_wrap: 'toggleWordWrapFromSnapshot',
+    recalculate_line_numbers: 'recalculateLineNumbersFromSnapshot'
+} as const;
 function isApplePlatform(): boolean {
     return (
         typeof navigator !== 'undefined' &&
@@ -97,6 +129,21 @@ function normalizeMenuSeparators(items: readonly TableContextMenuItem[]): TableC
     }
     return list;
 }
+
+function menuItem(
+    options: Pick<TableContextMenuItem, 'id' | 'label'> &
+        Partial<Omit<TableContextMenuItem, 'id' | 'label'>>
+): TableContextMenuItem {
+    return {
+        disabled: false,
+        icon: null,
+        kbd: '',
+        separatorBefore: false,
+        visible: true,
+        ...options
+    };
+}
+
 function buildMenuItems(options: BuildMenuItemsOptions): TableContextMenuItem[] {
     const target = options.target || null;
     const snapshot = options.snapshot || {};
@@ -140,109 +187,73 @@ function buildMenuItems(options: BuildMenuItemsOptions): TableContextMenuItem[] 
             const sortKeys = Array.isArray(snapshot.sortKeys) ? snapshot.sortKeys : [];
             const activeHere = sortKeys.some((item) => item?.col === col);
             items.push(
-                {
+                menuItem({
                     id: 'sort_asc',
                     icon: 'sort.svg',
                     iconClass: 'widget-table-ctx__sort-asc',
-                    label: 'По возрастанию',
-                    kbd: '',
-                    visible: true,
-                    disabled: false,
-                    separatorBefore: false
-                },
-                {
+                    label: 'По возрастанию'
+                }),
+                menuItem({
                     id: 'sort_desc',
                     icon: 'sort.svg',
-                    label: 'По убыванию',
-                    kbd: '',
-                    visible: true,
-                    disabled: false,
-                    separatorBefore: false
-                },
-                {
+                    label: 'По убыванию'
+                }),
+                menuItem({
                     id: 'sort_reset',
-                    icon: null,
                     label: 'Сбросить',
-                    kbd: '',
-                    visible: true,
-                    disabled: !activeHere,
-                    separatorBefore: false
-                }
+                    disabled: !activeHere
+                })
             );
         } else if (canResetAnySort) {
-            items.push({
+            items.push(menuItem({
                 id: 'sort_reset',
-                icon: null,
                 label: 'Сбросить сортировку',
-                kbd: '',
-                visible: true,
-                disabled: false,
-                separatorBefore: false
-            });
+            }));
         }
         if (canToggleSticky) {
-            items.push({
+            items.push(menuItem({
                 id: 'toggle_sticky_header',
-                icon: null,
                 label: stickyHeaderEnabled ? 'Открепить заголовки' : 'Закрепить заголовки',
-                kbd: '',
-                visible: true,
                 disabled: tableUiLocked,
                 separatorBefore: items.length > 0
-            });
-            items.push({
+            }));
+            items.push(menuItem({
                 id: 'toggle_word_wrap',
-                icon: null,
                 label: wordWrapEnabled ? 'Отключить перенос по словам' : 'Перенос по словам',
-                kbd: '',
-                visible: true,
-                disabled: tableUiLocked,
-                separatorBefore: false
-            });
-            items.push({
+                disabled: tableUiLocked
+            }));
+            items.push(menuItem({
                 id: 'toggle_line_numbers',
-                icon: null,
                 label: lineNumbersEnabled ? 'Отключить нумерацию строк' : 'Включить нумерацию строк',
-                kbd: '',
-                visible: true,
-                disabled: tableUiLocked,
-                separatorBefore: false
-            });
+                disabled: tableUiLocked
+            }));
         }
         if (isLineNumberHeader) {
-            items.push({
+            items.push(menuItem({
                 id: 'recalculate_line_numbers',
-                icon: null,
                 label: 'Пересчитать нумерацию',
-                kbd: '',
-                visible: true,
                 disabled: tableUiLocked,
                 separatorBefore: items.length > 0
-            });
+            }));
         }
         if (!isGlobalHeader && col != null && col >= 0 && canAddLevel && !isLineNumberHeader) {
             const isDuplicateLevel = Array.isArray(snapshot.groupingLevelsSnapshot) &&
                 snapshot.groupingLevelsSnapshot.includes(col);
-            items.push({
+            items.push(menuItem({
                 id: 'group_add_level',
                 icon: 'grouping.svg',
                 label: 'Группировка',
-                kbd: '',
-                visible: true,
                 disabled: tableUiLocked || isDuplicateLevel,
                 separatorBefore: separatorBeforeGroupingBlock()
-            });
+            }));
         }
         if (!isGlobalHeader && groupingActive) {
-            items.push({
+            items.push(menuItem({
                 id: 'group_clear',
-                icon: null,
                 label: 'Снять группировку',
-                kbd: '',
-                visible: true,
                 disabled: tableUiLocked,
                 separatorBefore: separatorBeforeGroupingBlock()
-            });
+            }));
         }
         if (items.length > 0) {
             return normalizeMenuSeparators(items);
@@ -256,38 +267,30 @@ function buildMenuItems(options: BuildMenuItemsOptions): TableContextMenuItem[] 
     const items: TableContextMenuItem[] = [];
     if (canAddRows) {
         items.push(
-            {
+            menuItem({
                 id: 'add_row_above',
                 icon: 'plus.svg',
-                label: 'Добавить строку выше',
-                kbd: '',
-                visible: true,
-                disabled: false,
-                separatorBefore: false
-            },
-            {
+                label: 'Добавить строку выше'
+            }),
+            menuItem({
                 id: 'add_row_below',
                 icon: 'plus.svg',
                 label: 'Добавить строку ниже',
-                kbd: rowMode ? rowKbd.below : '',
-                visible: true,
-                disabled: false,
-                separatorBefore: false
-            }
+                kbd: rowMode ? rowKbd.below : ''
+            })
         );
     }
     if (canDeleteRow) {
-        items.push({
+        items.push(menuItem({
             id: 'delete_row',
             icon: 'delete.svg',
             label: 'Удалить строку',
             kbd: rowKbd.deleteRow,
-            visible: true,
-            disabled: len <= 1,
-            separatorBefore: false
-        });
+            disabled: len <= 1
+        }));
     }
-    const anchorRow = snapshot.anchorRow ?? 0;
+    const anchorSourceRow =
+        snapshot.anchorSourceRow == null ? (snapshot.anchorRow ?? 0) : snapshot.anchorSourceRow;
     const rowMoveOk = !groupingActive && !tableUiLocked && rowMoveDuplicateOpsAllowed({
         isEditable: options.isEditable,
         tableDataLength: len,
@@ -297,83 +300,66 @@ function buildMenuItems(options: BuildMenuItemsOptions): TableContextMenuItem[] 
     });
     if (rowMoveOk) {
         items.push(
-            {
+            menuItem({
                 id: 'move_row_up',
                 icon: 'arrow_3.svg',
                 label: 'Переместить строку вверх',
                 kbd: `${alt}↑`,
-                visible: true,
-                disabled: anchorRow <= 0,
-                separatorBefore: false
-            },
-            {
+                disabled: anchorSourceRow <= 0
+            }),
+            menuItem({
                 id: 'move_row_down',
                 icon: 'arrow_3.svg',
                 iconClass: 'widget-table-ctx__arrow-down',
                 label: 'Переместить строку вниз',
                 kbd: `${alt}↓`,
-                visible: true,
-                disabled: anchorRow < 0 || anchorRow >= len - 1,
-                separatorBefore: false
-            },
-            {
+                disabled: anchorSourceRow < 0 || anchorSourceRow >= len - 1
+            }),
+            menuItem({
                 id: 'duplicate_row_above',
                 icon: 'plus.svg',
                 label: 'Дублировать строку выше',
-                kbd: `${isApple ? '⇧+⌥+' : 'Shift+Alt+'}↑`,
-                visible: true,
-                disabled: false,
-                separatorBefore: false
-            },
-            {
+                kbd: `${isApple ? '⇧+⌥+' : 'Shift+Alt+'}↑`
+            }),
+            menuItem({
                 id: 'duplicate_row_below',
                 icon: 'plus.svg',
                 label: 'Дублировать строку ниже',
-                kbd: `${isApple ? '⇧+⌥+' : 'Shift+Alt+'}↓`,
-                visible: true,
-                disabled: false,
-                separatorBefore: false
-            }
+                kbd: `${isApple ? '⇧+⌥+' : 'Shift+Alt+'}↓`
+            })
         );
     }
     const clipboardEnabled = !groupingActive && !tableUiLocked;
     items.push(
-        {
+        menuItem({
             id: 'copy',
             icon: 'content_copy.svg',
             label: 'Копировать',
             kbd: `${mod}C`,
-            visible: true,
             disabled: nCols === 0 || len === 0 || !clipboardEnabled,
             separatorBefore: items.length > 0
-        },
-        {
+        }),
+        menuItem({
             id: 'cut',
             icon: 'content_cut.svg',
             label: 'Вырезать',
             kbd: `${mod}X`,
-            visible: true,
-            disabled: nCols === 0 || len === 0 || !clipboardEnabled,
-            separatorBefore: false
-        },
-        {
+            disabled: nCols === 0 || len === 0 || !clipboardEnabled
+        }),
+        menuItem({
             id: 'paste',
             icon: 'content_paste_.svg',
             label: 'Вставить',
             kbd: `${mod}V`,
-            visible: true,
-            disabled: nCols === 0 || len === 0 || !clipboardEnabled,
-            separatorBefore: false
-        },
-        {
+            disabled: nCols === 0 || len === 0 || !clipboardEnabled
+        }),
+        menuItem({
             id: 'clear',
             icon: 'delete.svg',
             label: 'Очистить',
             kbd: 'Del',
-            visible: true,
-            disabled: nCols === 0 || len === 0 || !clipboardEnabled,
-            separatorBefore: false
-        }
+            disabled: nCols === 0 || len === 0 || !clipboardEnabled
+        })
     );
     return normalizeMenuSeparators(items);
 }
@@ -384,7 +370,7 @@ const MenuRuntimeMethods = {
         if (r0 === r1 && c0 === c1) return 'cell';
         return 'cells';
     },
-    computePasteAnchorRect(rect) {
+    computePasteAnchorRect(rect: TableSelectionRect) {
         if (WidgetUiCoords && WidgetUiCoords.computePasteAnchorRect) {
             return WidgetUiCoords.computePasteAnchorRect(rect, this.selFocus);
         }
@@ -394,64 +380,57 @@ const MenuRuntimeMethods = {
         }
         return { r: r0, c: c0 };
     },
-    cloneRect(rect) {
+    cloneRect(rect: TableSelectionRect) {
         return WidgetUiCoords && WidgetUiCoords.cloneRect
             ? WidgetUiCoords.cloneRect(rect)
             : { r0: rect.r0, r1: rect.r1, c0: rect.c0, c1: rect.c1 };
     },
     buildSelectionSnapshotFromDisplay() {
         return buildCoreSelectionFromDisplay(
-            {
-                anchor: this.selAnchor,
-                focus: this.selFocus,
-                fullWidthRows: this.selFullWidthRows
-            },
+            runtimeDisplaySelection(this),
             this.tableColumns,
             this.tableViewModelSnapshot()
         );
     },
-    buildContextMenuSnapshot(kind, anchorRow, anchorCol, headerCol) {
+    buildBaseContextMenuSnapshot(overrides: RuntimeContextMenuSnapshotOverrides) {
         const rect = this.cloneRect(this.getSelRect());
         const pasteAnchor = this.computePasteAnchorRect(this.getSelRect());
+        return buildContextMenuSnapshot({
+            columns: this.tableColumns,
+            groupingLevels: this.groupingState.levels || [],
+            lineNumbersEnabled: this.lineNumbersRuntimeEnabled,
+            pasteAnchor: { r: pasteAnchor.r, c: pasteAnchor.c },
+            rect,
+            selectionSnapshot: this.buildSelectionSnapshotFromDisplay(),
+            sessionId: this.contextMenuSessionId,
+            sortKeys: this.sortKeys || [],
+            stickyHeaderEnabled: this.stickyHeaderEnabled,
+            viewModel: this.tableViewModelSnapshot(),
+            wordWrapEnabled: this.wordWrapEnabled,
+            ...(overrides || {})
+        });
+    },
+    buildContextMenuSnapshot(
+        kind: 'body' | 'header',
+        anchorRow: number,
+        anchorCol: number,
+        headerCol: number | null
+    ) {
         const bodyMode =
             kind === 'header' ? null : this.computeBodyModeForMenu();
-        return buildContextMenuSnapshot({
+        return this.buildBaseContextMenuSnapshot({
             anchorCol,
             anchorRow,
             bodyMode,
-            columns: this.tableColumns,
-            groupingLevels: this.groupingState.levels || [],
-            rect,
-            headerCol: headerCol != null ? headerCol : null,
-            lineNumbersEnabled: this.lineNumbersRuntimeEnabled,
-            pasteAnchor: { r: pasteAnchor.r, c: pasteAnchor.c },
-            selectionSnapshot: this.buildSelectionSnapshotFromDisplay(),
-            sessionId: this.contextMenuSessionId,
-            sortKeys: this.sortKeys || [],
-            stickyHeaderEnabled: this.stickyHeaderEnabled,
-            viewModel: this.tableViewModelSnapshot(),
-            wordWrapEnabled: this.wordWrapEnabled
+            headerCol: headerCol != null ? headerCol : null
         });
     },
     buildClipboardActionSnapshot() {
-        const rect = this.cloneRect(this.getSelRect());
-        const pasteAnchor = this.computePasteAnchorRect(this.getSelRect());
-        return buildContextMenuSnapshot({
+        return this.buildBaseContextMenuSnapshot({
             anchorCol: this.selFocus.c,
             anchorRow: this.selFocus.r,
             bodyMode: this.computeBodyModeForMenu(),
-            columns: this.tableColumns,
-            groupingLevels: this.groupingState.levels || [],
-            rect,
-            headerCol: null,
-            lineNumbersEnabled: this.lineNumbersRuntimeEnabled,
-            pasteAnchor: { r: pasteAnchor.r, c: pasteAnchor.c },
-            selectionSnapshot: this.buildSelectionSnapshotFromDisplay(),
-            sessionId: this.contextMenuSessionId,
-            sortKeys: this.sortKeys || [],
-            stickyHeaderEnabled: this.stickyHeaderEnabled,
-            viewModel: this.tableViewModelSnapshot(),
-            wordWrapEnabled: this.wordWrapEnabled
+            headerCol: null
         });
     },
     clampMenuPosition(event: MouseEvent) {
@@ -480,21 +459,23 @@ const MenuRuntimeMethods = {
     },
     _attachContextMenuGlobalListeners() {
         this._detachContextMenuGlobalListeners();
-        this._contextMenuClickHandler = (event: MouseEvent) => {
+        const clickHandler = (event: Event) => {
             const element = this.$refs.contextMenuEl;
             if (element && event.target instanceof Node && element.contains(event.target)) return;
             this.hideContextMenu();
         };
-        this._contextMenuKeydownHandler = (event: KeyboardEvent) => {
+        const keydownHandler = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
                 event.stopPropagation();
                 this.hideContextMenu();
             }
         };
-        document.addEventListener('mousedown', this._contextMenuClickHandler, true);
-        document.addEventListener('keydown', this._contextMenuKeydownHandler, true);
+        this._contextMenuClickHandler = clickHandler;
+        this._contextMenuKeydownHandler = keydownHandler;
+        document.addEventListener('mousedown', clickHandler, true);
+        document.addEventListener('keydown', keydownHandler, true);
     },
-    onTbodyMouseDownCapture(event) {
+    onTbodyMouseDownCapture(event: MouseEvent) {
         if (!this.isEditable) return;
         if (event.button !== 2) return;
         const target = event.target;
@@ -507,7 +488,7 @@ const MenuRuntimeMethods = {
             }
         }, 0);
     },
-    onBodyContextMenu(event, row, col) {
+    onBodyContextMenu(event: MouseEvent, row: number, col: number) {
         if (!this.isEditable) return;
         event.preventDefault();
         this._tableContextMenuMouseDown = false;
@@ -529,7 +510,12 @@ const MenuRuntimeMethods = {
             this.buildContextMenuSnapshot('body', normalizedRow, normalizedCol, null)
         );
     },
-    onTableHeaderContextMenu(event, rowIndex, cell, colIndex) {
+    onTableHeaderContextMenu(
+        event: MouseEvent,
+        rowIndex: number,
+        cell: TableHeaderCell | null,
+        colIndex: number | null | undefined
+    ) {
         void rowIndex;
         if (!cell || cell.colspan !== 1 || colIndex == null) return;
         const numCols = this.tableColumns.length;
@@ -549,17 +535,13 @@ const MenuRuntimeMethods = {
             canToggleWordWrap ||
             isLineNumber;
         if (!showMenu) return;
-        event.preventDefault();
-        this._openContextMenuPrepare();
-        this.exitCellEdit();
-        this.contextMenuSessionId += 1;
-        this.showContextMenuSnapshot(
+        this.openContextMenuFromEvent(
             event,
             { kind: 'header', col: colIndex },
             this.buildContextMenuSnapshot('header', -1, -1, colIndex)
         );
     },
-    onColumnNumberHeaderContextMenu(event, colIndex) {
+    onColumnNumberHeaderContextMenu(event: MouseEvent, colIndex: number) {
         const normalizedCol = this.normCol(colIndex);
         this.onTableHeaderContextMenu(
             event,
@@ -575,25 +557,36 @@ const MenuRuntimeMethods = {
             normalizedCol
         );
     },
-    onGroupHeaderContextMenu(event) {
+    onGroupHeaderContextMenu(event: MouseEvent) {
         if (this.tableColumns.length === 0) return;
-        event.preventDefault();
-        this._openContextMenuPrepare();
-        this.exitCellEdit();
-        this.contextMenuSessionId += 1;
-        this.showContextMenuSnapshot(
+        this.openContextMenuFromEvent(
             event,
             { kind: 'header', col: -1 },
             this.buildContextMenuSnapshot('header', -1, -1, null)
         );
     },
-    showContextMenuSnapshot(event, target, snapshot) {
+    openContextMenuFromEvent(
+        event: MouseEvent,
+        target: TableContextMenuTarget,
+        snapshot: TableContextMenuSnapshot
+    ) {
+        event.preventDefault();
+        this._openContextMenuPrepare();
+        this.exitCellEdit();
+        this.contextMenuSessionId += 1;
+        this.showContextMenuSnapshot(event, target, snapshot);
+    },
+    showContextMenuSnapshot(
+        event: MouseEvent,
+        target: TableContextMenuTarget,
+        snapshot: TableContextMenuSnapshot
+    ) {
         this.contextMenuTarget = target;
         this.contextMenuPosition = this.clampMenuPosition(event);
         this.dispatchTableCoreCommand(
             { snapshot, type: 'OPEN_CONTEXT_MENU' },
             'open context menu',
-            { skipRows: true, skipSort: true, skipGrouping: true, skipSelection: true, skipEditing: true }
+            TABLE_RUNTIME_SYNC.CONTEXT_MENU_ONLY
         );
         this._attachContextMenuGlobalListeners();
     },
@@ -609,7 +602,7 @@ const MenuRuntimeMethods = {
         this.dispatchTableCoreCommand(
             { type: 'CLOSE_CONTEXT_MENU' },
             'close context menu',
-            { skipRows: true, skipSort: true, skipGrouping: true, skipSelection: true, skipEditing: true }
+            TABLE_RUNTIME_SYNC.CONTEXT_MENU_ONLY
         );
         this.$nextTick(() => {
             if (this.tableColumns.length > 0 && this.tableData.length > 0) {
@@ -617,26 +610,21 @@ const MenuRuntimeMethods = {
             }
         });
     },
-    onContextMenuItemActivate(item) {
+    onContextMenuItemActivate(item: TableContextMenuItem | null | undefined) {
         if (!item || item.disabled) return;
         const snapshot = this.contextMenuContext;
         if (!snapshot) return;
         this.runContextMenuAction(item.id, snapshot);
     },
-    runContextMenuAction(id, snapshot) {
-        const sortIds = new Set(['sort_asc', 'sort_desc', 'sort_reset']);
-        const groupIds = new Set(['group_add_level', 'group_clear']);
-        const stickyIds = new Set(['toggle_sticky_header']);
-        const lineNumberIds = new Set(['toggle_line_numbers', 'recalculate_line_numbers']);
-        const wrapIds = new Set(['toggle_word_wrap']);
+    runContextMenuAction(id: string, snapshot: TableContextMenuSnapshot) {
         if (
             !this.isEditable &&
             id !== 'copy' &&
-            !sortIds.has(id) &&
-            !groupIds.has(id) &&
-            !stickyIds.has(id) &&
-            !lineNumberIds.has(id) &&
-            !wrapIds.has(id)
+            !SORT_MENU_IDS.has(id) &&
+            !GROUP_MENU_IDS.has(id) &&
+            !STICKY_MENU_IDS.has(id) &&
+            !LINE_NUMBER_MENU_IDS.has(id) &&
+            !WRAP_MENU_IDS.has(id)
         ) {
             return;
         }
@@ -646,138 +634,106 @@ const MenuRuntimeMethods = {
             this.hideContextMenu();
             return;
         }
-        switch (id) {
-            case 'add_row_above':
-                this.addRowAboveFromSnapshot(snapshot);
-                break;
-            case 'add_row_below':
-                this.addRowBelowFromSnapshot(snapshot);
-                break;
-            case 'delete_row':
-                this.deleteRowFromSnapshot(snapshot);
-                break;
-            case 'move_row_up':
-                this.moveRowUpFromSnapshot(snapshot);
-                break;
-            case 'move_row_down':
-                this.moveRowDownFromSnapshot(snapshot);
-                break;
-            case 'duplicate_row_above':
-                this.duplicateRowAboveFromSnapshot(snapshot);
-                break;
-            case 'duplicate_row_below':
-                this.duplicateRowBelowFromSnapshot(snapshot);
-                break;
-            case 'copy':
-                this.copySelection(snapshot);
-                break;
-            case 'cut':
-                this.cutSelection(snapshot);
-                break;
-            case 'paste':
-                this.pasteFromClipboard(snapshot);
-                break;
-            case 'clear':
-                this.clearSelectionFromSnapshot(snapshot);
-                break;
-            case 'sort_asc':
-                this.applySortFromMenu(snapshot, 'asc');
-                break;
-            case 'sort_desc':
-                this.applySortFromMenu(snapshot, 'desc');
-                break;
-            case 'sort_reset':
-                this.applySortResetFromMenu(snapshot);
-                break;
-            case 'group_add_level':
-                this.onGroupAddLevelFromSnapshot(snapshot);
-                break;
-            case 'group_clear':
-                this.onGroupClearFromSnapshot();
-                break;
-            case 'toggle_sticky_header':
-                this.toggleStickyHeaderFromSnapshot();
-                break;
-            case 'toggle_line_numbers':
-                this.toggleLineNumbersFromSnapshot(snapshot);
-                break;
-            case 'toggle_word_wrap':
-                this.toggleWordWrapFromSnapshot();
-                break;
-            case 'recalculate_line_numbers':
-                this.recalculateLineNumbersFromSnapshot(snapshot);
-                break;
-            default:
-                break;
+        if (id === 'sort_asc' || id === 'sort_desc') {
+            this.applySortFromMenu(snapshot, id === 'sort_desc' ? 'desc' : 'asc');
+            return;
         }
+
+        const handlerName = CONTEXT_MENU_ACTION_HANDLERS[
+            id as keyof typeof CONTEXT_MENU_ACTION_HANDLERS
+        ];
+        if (!handlerName) {
+            return;
+        }
+
+        const handler = this[handlerName] as ((value: TableContextMenuSnapshot) => void) | undefined;
+        handler?.call(this, snapshot);
     },
-    toggleStickyHeaderFromSnapshot() {
+    toggleStickyHeaderFromSnapshot(snapshot: TableContextMenuSnapshot) {
         this.hideContextMenu();
-        this.stickyHeaderRuntimeEnabled = !this.stickyHeaderRuntimeEnabled;
+        this.stickyHeaderRuntimeEnabled = !snapshot.stickyHeaderEnabled;
     },
-    toggleWordWrapFromSnapshot() {
+    toggleWordWrapFromSnapshot(snapshot: TableContextMenuSnapshot) {
         this.hideContextMenu();
-        this.wordWrapRuntimeEnabled = !this.wordWrapRuntimeEnabled;
+        this.wordWrapRuntimeEnabled = !snapshot.wordWrapEnabled;
         if (this.wordWrapEnabled) {
             this.$nextTick(() => this.clearAllCellOverflowHints());
         }
     },
-    applySortFromMenu(snapshot, direction) {
+    applySortFromMenu(snapshot: TableContextMenuSnapshot, direction: 'asc' | 'desc') {
         if (this.tableUiLocked) return;
-        const col = snapshot.headerCol;
-        if (col == null || col < 0) return;
+        const colKey = snapshot.headerColumnKey;
+        if (!colKey) return;
         this.hideContextMenu();
         this._sortCycleRowOrder = this.tableData.slice();
-        this.applySortKeysFromRuntime(
-            [{ col, dir: direction === 'asc' ? 'asc' : 'desc' }],
+        this.applySortKeysFromCore(
+            [{ colKey, dir: direction === 'asc' ? 'asc' : 'desc' }],
             'sort'
         );
     },
-    applySortResetFromMenu(snapshot) {
+    applySortResetFromMenu(snapshot: TableContextMenuSnapshot) {
         if (this.tableUiLocked) return;
-        const col = snapshot.headerCol;
+        const colKey = snapshot.headerColumnKey;
         this.hideContextMenu();
-        if (col == null || col < 0) {
-            if (!this.sortKeys.length) return;
-            this.applySortKeysFromRuntime([], 'sort reset');
+        const sortKeyColumns = Array.isArray(snapshot.sortKeyColumnsSnapshot)
+            ? snapshot.sortKeyColumnsSnapshot
+            : [];
+        if (!colKey) {
+            if (!sortKeyColumns.length) return;
+            this.applySortKeysFromCore([], 'sort reset');
             return;
         }
-        const next = this.sortKeys.filter((item: TableSortState) => item.col !== col);
-        if (next.length === this.sortKeys.length) return;
-        this.applySortKeysFromRuntime(next, 'sort reset');
+        const next = sortKeyColumns.filter((item: TableCoreSortState) => item.colKey !== colKey);
+        if (next.length === sortKeyColumns.length) return;
+        this.applySortKeysFromCore(next, 'sort reset');
     },
-    onGroupAddLevelFromSnapshot(snapshot) {
-        const col = snapshot.headerCol;
+    onGroupAddLevelFromSnapshot(snapshot: TableContextMenuSnapshot) {
+        const colKey = snapshot.headerColumnKey;
         this.hideContextMenu();
-        if (col == null || col < 0) return;
-        if (this.isLineNumberColumn(this.tableColumns[col])) return;
-        if (this.groupingState.levels.indexOf(col) >= 0) return;
+        if (!colKey) return;
+        const col = columnIndexByKey(this.tableColumns, colKey);
+        if (col < 0 || this.isLineNumberColumn(this.tableColumns[col])) return;
+        const snapshotLevels = Array.isArray(snapshot.groupingLevelKeysSnapshot)
+            ? snapshot.groupingLevelKeysSnapshot.slice()
+            : [];
+        if (snapshotLevels.indexOf(colKey) >= 0) return;
         const prevLevels = this.groupingState.levels.slice();
         const prevExpanded = new Set(this.groupingState.expanded);
         const prevPending = this._lazyPendingRows.slice();
         const prevFull = this.isFullyLoaded;
         this.tableUiLocked = true;
         try {
-            if (!this.isFullyLoaded) {
-                const ok = this.flushLazyFullLoadInternal();
-                if (!ok) {
-                    this._lazyPendingRows = prevPending;
-                    this.isFullyLoaded = prevFull;
-                    this.showTableError(
-                        'Не удалось полностью загрузить данные для группировки.'
-                    );
-                    return;
-                }
+            if (!this.flushLazyFullLoadOrWarn(
+                'Не удалось полностью загрузить данные для группировки.'
+            )) {
+                this._lazyPendingRows = prevPending;
+                this.isFullyLoaded = prevFull;
+                return;
             }
-            this.groupingState = {
-                levels: prevLevels.concat(col),
-                expanded: new Set()
-            };
+            this.dispatchTableCoreCommand(
+                {
+                    colKeys: snapshotLevels.concat(colKey),
+                    expandedPathKeys: [],
+                    type: 'SET_GROUP_LEVELS'
+                },
+                'group add level',
+                TABLE_RUNTIME_SYNC.GROUPING_ONLY
+            );
             this.sortTableDataInPlace();
             this.refreshGroupingViewFromData();
             this.onInput();
         } catch (error) {
-            this.groupingState = { levels: prevLevels, expanded: prevExpanded };
+            this.dispatchTableCoreCommand(
+                {
+                    colKeys: prevLevels
+                        .map((col) => columnKeyAt(this.tableColumns, col))
+                        .filter((colKey): colKey is string => colKey != null),
+                    expandedPathKeys: [...prevExpanded],
+                    type: 'SET_GROUP_LEVELS'
+                },
+                'group add level rollback',
+                TABLE_RUNTIME_SYNC.GROUPING_ONLY
+            );
             this.refreshGroupingViewFromData();
             this.showTableError('Не удалось применить группировку.', {
                 cause: error,
@@ -789,10 +745,17 @@ const MenuRuntimeMethods = {
             this.tableUiLocked = false;
         }
     },
-    onGroupClearFromSnapshot() {
+    onGroupClearFromSnapshot(snapshot: TableContextMenuSnapshot) {
         this.hideContextMenu();
-        this.groupingViewCache = null;
-        this.groupingState = { levels: [], expanded: new Set() };
+        const snapshotLevels = Array.isArray(snapshot.groupingLevelKeysSnapshot)
+            ? snapshot.groupingLevelKeysSnapshot
+            : [];
+        if (!snapshotLevels.length) return;
+        this.dispatchTableCoreCommand(
+            { colKeys: [], expandedPathKeys: [], type: 'SET_GROUP_LEVELS' },
+            'clear grouping',
+            TABLE_RUNTIME_SYNC.GROUPING_ONLY
+        );
         this.onInput();
         this.$nextTick(() => this._scheduleStickyTheadUpdate());
     }

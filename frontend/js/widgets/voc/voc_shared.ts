@@ -1,7 +1,4 @@
 type VocWidgetState = {
-    _clickOutside: ((event: MouseEvent) => void) | null;
-    _clickOutsideTimerId: number;
-    _scrollUpdate: (() => void) | null;
     highlightedIndex: number;
     inputValue: string;
     isDropdownOpen: boolean;
@@ -39,10 +36,7 @@ function createVocWidgetState(): VocWidgetState {
         modalSortDirection: '',
         modalActiveRowId: '',
         modalSelectedRowId: '',
-        modalSelectedRowIds: [],
-        _scrollUpdate: null,
-        _clickOutside: null,
-        _clickOutsideTimerId: 0
+        modalSelectedRowIds: []
     };
 }
 

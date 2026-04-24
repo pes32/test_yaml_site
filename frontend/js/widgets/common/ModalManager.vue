@@ -96,6 +96,7 @@ import { injectPageHostRuntimeServices } from '../../runtime/widget_runtime_brid
 import type { ParsedGuiSection, ParsedGuiTab } from '../../runtime/page_contract.ts';
 import ItemIcon from './ItemIcon.vue';
 import ModalButtons from './ModalButtons.vue';
+import { getModalWidgetAttrs, getModalWidgetValue } from './modal_widget_access.ts';
 import SectionCard from './SectionCard.vue';
 
 defineOptions({
@@ -231,20 +232,11 @@ function getSectionsForTab(tabIndex: number): ParsedGuiSection[] {
 }
 
 function getWidgetAttrs(widgetName: string) {
-  if (typeof hostServices?.getWidgetAttrsByName === 'function') {
-    return hostServices.getWidgetAttrsByName(widgetName);
-  }
-
-  return {
-    widget: 'str',
-    label: widgetName
-  };
+  return getModalWidgetAttrs(hostServices, widgetName);
 }
 
 function getWidgetValue(widgetName: string) {
-  return typeof hostServices?.getWidgetRuntimeValueByName === 'function'
-    ? hostServices.getWidgetRuntimeValueByName(widgetName)
-    : undefined;
+  return getModalWidgetValue(hostServices, widgetName);
 }
 
 function onWidgetExecute(payload: unknown): void {

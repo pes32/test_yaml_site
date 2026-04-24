@@ -1,3 +1,13 @@
+import type { ScrollRoot } from './scroll_root.ts';
+import { restoreScrollRootTop } from './scroll_root.ts';
+import {
+  buildViewId,
+  getNumberRecordValue,
+  resolveTabbedViewPart,
+  setNumberRecordValue,
+  toggleBooleanRecordFlag
+} from './view_state_helpers.ts';
+
 type ModalConfigRecord = Record<string, unknown> & {
   id?: unknown;
   name?: unknown;
@@ -16,11 +26,6 @@ type ModalRuntimeState = {
   restoreTargetViewId: string;
   scrollTopByView: Record<string, number>;
   status: ModalRuntimeStatus;
-};
-
-type ScrollRoot = {
-  scrollTop?: number;
-  scrollTo?: (options: { top: number; left: number; behavior: 'auto' }) => void;
 };
 
 function createEmptyModalRuntimeState(): ModalRuntimeState {
@@ -82,11 +87,10 @@ function getActiveModalViewId(state: ModalRuntimeState | null | undefined): stri
       ? modalConfig.name
       : state?.activeModalId || 'modal';
   const modalTabs = getModalTabs(state);
-  const tabPart = modalTabs.length
-    ? `tab-${Number(state?.activeTabIndex) || 0}`
-    : 'content';
-
-  return `${modalId}-${tabPart}`;
+  return buildViewId(
+    modalId,
+    resolveTabbedViewPart(modalTabs.length > 0, Number(state?.activeTabIndex) || 0)
+  );
 }
 
 function beginModalRequest(state: ModalRuntimeState, modalId: string): number {
@@ -168,12 +172,11 @@ function getModalSectionCollapseId(
   sectionIndex: number
 ): string {
   const modalTabs = getModalTabs(state);
-  if (!modalTabs.length) {
-    return `modal-section-content-${sectionIndex}`;
-  }
-
-  const normalizedTabIndex = modalTabs.length === 1 ? 0 : tabIndex;
-  return `modal-section-${normalizedTabIndex}-${sectionIndex}`;
+  return buildViewId(
+    'modal-section',
+    modalTabs.length ? (modalTabs.length === 1 ? 0 : tabIndex) : 'content',
+    sectionIndex
+  );
 }
 
 function isModalSectionCollapsed(
@@ -192,10 +195,7 @@ function toggleModalSectionCollapse(
   sectionIndex: number
 ): void {
   const sectionId = getModalSectionCollapseId(state, tabIndex, sectionIndex);
-  state.collapsedSections = {
-    ...(state.collapsedSections || {}),
-    [sectionId]: !state.collapsedSections[sectionId]
-  };
+  state.collapsedSections = toggleBooleanRecordFlag(state.collapsedSections, sectionId);
 }
 
 function rememberActiveModalScroll(
@@ -207,10 +207,11 @@ function rememberActiveModalScroll(
     return;
   }
 
-  state.scrollTopByView = {
-    ...(state.scrollTopByView || {}),
-    [viewId]: scrollRoot.scrollTop || 0
-  };
+  state.scrollTopByView = setNumberRecordValue(
+    state.scrollTopByView,
+    viewId,
+    scrollRoot.scrollTop || 0
+  );
 }
 
 function consumeRestoreTargetViewId(state: ModalRuntimeState): string {
@@ -232,15 +233,9 @@ function restoreActiveModalScroll(
     return;
   }
 
-  const top = Object.prototype.hasOwnProperty.call(state.scrollTopByView || {}, viewId)
-    ? state.scrollTopByView[viewId]
-    : 0;
+  const top = getNumberRecordValue(state.scrollTopByView, viewId);
 
-  if (typeof scrollRoot.scrollTo === 'function') {
-    scrollRoot.scrollTo({ top, left: 0, behavior: 'auto' });
-  } else {
-    scrollRoot.scrollTop = top;
-  }
+  restoreScrollRootTop(scrollRoot, top);
 }
 
 function resetModalRuntimeState(state: ModalRuntimeState): ModalRuntimeState {
@@ -274,6 +269,7 @@ const ModalRuntimeStore = {
   rememberActiveModalScroll,
   resetModalRuntimeState,
   restoreActiveModalScroll,
+  asModalConfig,
   setActiveModalTab,
   toggleModalSectionCollapse
 };
@@ -282,6 +278,7 @@ export type { ModalConfigRecord, ModalRuntimeState, ModalRuntimeStatus, ScrollRo
 
 export {
   ModalRuntimeStore,
+  asModalConfig,
   beginModalRequest,
   closeModal,
   completeModalRequest,

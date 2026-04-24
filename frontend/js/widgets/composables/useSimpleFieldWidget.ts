@@ -1,4 +1,6 @@
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
+import useCommitFieldBase from './useCommitFieldBase.ts';
+import { validateRegexValue } from './field_validation.ts';
 import useWidgetField from './useWidgetField.ts';
 
 type SimpleFieldWidgetConfig = Record<string, unknown> & {
@@ -129,35 +131,19 @@ function useSimpleFieldWidget(
   const value = ref('');
   const regexError = ref('');
   const typeError = ref('');
-  const isFocused = ref(false);
-
-  const hasValue = computed(() => Boolean(value.value));
-  const labelFloats = computed(() => hasValue.value || isFocused.value);
-  const showPlaceholder = computed(() =>
-    Boolean(!hasValue.value && isFocused.value && props.widgetConfig.placeholder)
-  );
+  const fieldBase = useCommitFieldBase(props, value, field);
   const fieldError = computed(() =>
     regexError.value || typeError.value || field.tableCellCommitError.value || ''
   );
 
-  function resolveRegexError(): string {
-    const regex = props.widgetConfig.regex;
-    if (!regex || props.widgetConfig.readonly) {
-      return '';
-    }
-
-    try {
-      const pattern = typeof regex === 'string' ? new RegExp(regex) : regex;
-      return value.value !== '' && !pattern.test(value.value)
-        ? props.widgetConfig.err_text || 'Неверный формат'
-        : '';
-    } catch {
-      return '';
-    }
-  }
-
   function validateRegex(): void {
-    regexError.value = resolveRegexError();
+    regexError.value = props.widgetConfig.readonly
+      ? ''
+      : validateRegexValue(
+        value.value,
+        props.widgetConfig.regex,
+        props.widgetConfig.err_text
+      );
   }
 
   function validateForCommit(): string {
@@ -182,11 +168,6 @@ function useSimpleFieldWidget(
     validateRegex();
   }
 
-  function onFocus(): void {
-    isFocused.value = true;
-    field.activateDraftController();
-  }
-
   function onInput(event?: Event): void {
     const nextValue = eventValue(event);
     syncLiveValue(nextValue == null ? value.value : nextValue);
@@ -208,12 +189,7 @@ function useSimpleFieldWidget(
   }
 
   function onBlur(): void {
-    isFocused.value = false;
-    try {
-      commitDraft();
-    } finally {
-      field.deactivateDraftController();
-    }
+    fieldBase.commitOnBlur(commitDraft);
   }
 
   function onEnterCommit(event: KeyboardEvent): void {
@@ -236,35 +212,25 @@ function useSimpleFieldWidget(
     commitDraft();
   }
 
-  function shouldSkipCommittedSync(): boolean {
-    return field.tableCellMode.value
-      ? isFocused.value
-      : field.isDraftEditing.value;
-  }
-
   watch(
     () => props.widgetConfig.value,
     (nextValue) => {
-      if (nextValue === undefined || shouldSkipCommittedSync()) {
+      if (nextValue === undefined) {
         return;
       }
-      setValue(nextValue);
+      field.syncCommittedValue(nextValue, setValue);
     },
     { immediate: true }
   );
 
-  onMounted(() => {
-    validateRegex();
-  });
-
   return {
     fieldError,
-    hasValue,
+    hasValue: fieldBase.hasValue,
     isDraftEditing: field.isDraftEditing,
-    isFocused,
-    labelFloats,
+    isFocused: fieldBase.isFocused,
+    labelFloats: fieldBase.labelFloats,
     regexError,
-    showPlaceholder,
+    showPlaceholder: fieldBase.showPlaceholder,
     tableCellRootAttrs: field.tableCellRootAttrs,
     typeError,
     value,
@@ -274,7 +240,7 @@ function useSimpleFieldWidget(
     onBlur,
     onCommitShortcut,
     onEnterCommit,
-    onFocus,
+    onFocus: fieldBase.onFocus,
     onInput,
     setValue,
     validateRegex

@@ -31,6 +31,14 @@ function isChoiceColumnType(type: unknown): boolean {
     return key === 'list' || key === 'voc';
 }
 
+function tableColumnAt(
+    columns: TableRuntimeColumn[] | null | undefined,
+    colIndex: number
+): TableRuntimeColumn | undefined {
+    const list = Array.isArray(columns) ? columns : [];
+    return list[colIndex];
+}
+
 function getCellDisplayActions(
     column: TableRuntimeColumn | null | undefined
 ): TableCellDisplayAction[] {
@@ -270,20 +278,14 @@ function defaultCellValueForColumn(
     colIndex: number,
     options: DefaultCellValueOptions = {}
 ): unknown {
-    const list = Array.isArray(columns) ? columns : [];
-    const column = list[colIndex];
+    const column = tableColumnAt(columns, colIndex);
     const value = defaultCellValueFromColumn(column, options);
     if (Array.isArray(value)) return value.slice();
     return value == null ? '' : value;
 }
 
-function blankCellValueForColumn(
-    columns: TableRuntimeColumn[],
-    colIndex: number,
-    options: DefaultCellValueOptions = {}
-): unknown {
-    const list = Array.isArray(columns) ? columns : [];
-    const column = list[colIndex];
+function blankCellValueForColumn(columns: TableRuntimeColumn[], colIndex: number, options: DefaultCellValueOptions = {}): unknown {
+    const column = tableColumnAt(columns, colIndex);
     return options.isListColumnMultiselect === true && column && isChoiceColumnType(column.type)
         ? []
         : '';

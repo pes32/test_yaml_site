@@ -25,39 +25,37 @@ COMMAND_HANDLERS: Dict[str, CommandHandler] = {}
 def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG001
     """Регистрирует /api/* маршруты."""
 
-    def _snapshot():
-        return config_service.get_snapshot()
-
-    def _page_diagnostics(page_config: Dict[str, Any]) -> List[Dict[str, Any]]:
-        return list(page_config.get("diagnostics") or [])
-
     @app.route("/api/config")
     def api_get_config():
-        snapshot = _snapshot()
+        snapshot = config_service.get_snapshot()
         return snapshot_success(snapshot, snapshot)
 
     @app.route("/api/pages")
     def api_get_pages():
-        snapshot = _snapshot()
+        snapshot = config_service.get_snapshot()
         return snapshot_success(snapshot, pages_data_payload(snapshot), diagnostics=[])
 
     @app.route("/api/page/<path:page_name>")
     def api_get_page(page_name):
-        snapshot = _snapshot()
-        page_config = snapshot.get("pages", {}).get(page_name)
+        snapshot = config_service.get_snapshot()
+        page_config = (snapshot.get("pages") or {}).get(str(page_name or "").strip())
         if not page_config:
             return snapshot_error(snapshot, code="page_not_found", message="Страница не найдена", status=404)
 
-        return snapshot_success(snapshot, page_data_payload(page_config), diagnostics=_page_diagnostics(page_config))
+        return snapshot_success(
+            snapshot,
+            page_data_payload(page_config),
+            diagnostics=list((page_config or {}).get("diagnostics") or []),
+        )
 
     @app.route("/api/attrs")
     def api_get_attrs():
-        snapshot = _snapshot()
+        snapshot = config_service.get_snapshot()
         page_name = (request.args.get("page") or "").strip()
         if not page_name:
             return snapshot_error(snapshot, code="page_required", message="Не указан параметр page")
 
-        page_config = snapshot.get("pages", {}).get(page_name)
+        page_config = (snapshot.get("pages") or {}).get(page_name)
         if not page_config:
             return snapshot_error(snapshot, code="page_not_found", message="Страница не найдена", status=404)
 
@@ -86,18 +84,22 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
             resolved_names=resolved_names,
             missing_names=missing_names,
         ).model_dump(by_alias=True)
-        return snapshot_success(snapshot, data, diagnostics=_page_diagnostics(page_config))
+        return snapshot_success(
+            snapshot,
+            data,
+            diagnostics=list((page_config or {}).get("diagnostics") or []),
+        )
 
     @app.route("/api/modal-gui")
     def api_modal_gui():
         """Нормализованная ленивая загрузка модалки из snapshot страницы."""
-        snapshot = _snapshot()
+        snapshot = config_service.get_snapshot()
         page_name = (request.args.get("page") or "").strip()
         modal_id = (request.args.get("id") or "").strip()
         if not page_name or not modal_id:
             return snapshot_error(snapshot, code="modal_query_required", message="Укажите query-параметры page и id")
 
-        page_config = snapshot.get("pages", {}).get(page_name)
+        page_config = (snapshot.get("pages") or {}).get(page_name)
         if not page_config:
             return snapshot_error(snapshot, code="page_not_found", message="Страница не найдена", status=404)
 
@@ -107,7 +109,7 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
                 snapshot,
                 code="modal_not_found",
                 message=f"Модалка '{modal_id}' не найдена",
-                diagnostics=_page_diagnostics(page_config),
+                diagnostics=list((page_config or {}).get("diagnostics") or []),
                 status=404,
             )
 
@@ -125,7 +127,11 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
                 "widget_names": widget_names,
             },
         ).model_dump(by_alias=True)
-        return snapshot_success(snapshot, data, diagnostics=_page_diagnostics(page_config))
+        return snapshot_success(
+            snapshot,
+            data,
+            diagnostics=list((page_config or {}).get("diagnostics") or []),
+        )
 
     @app.route("/api/reload", methods=["POST"])
     def api_reload_config():
@@ -156,11 +162,16 @@ def register_api_routes(app, config_service, LOG_FILE_PATH: str):  # noqa: ARG00
                 )
         except Exception as exc:  # pragma: no cover
             logger.exception("Ошибка при принудительном обновлении конфигурации")
-            return snapshot_error(_snapshot(), code="reload_failed_unexpected", message=str(exc), status=500)
+            return snapshot_error(
+                config_service.get_snapshot(),
+                code="reload_failed_unexpected",
+                message=str(exc),
+                status=500,
+            )
 
     @app.route("/api/execute", methods=["POST"])
     def api_execute():
-        snapshot = _snapshot()
+        snapshot = config_service.get_snapshot()
         data = request.get_json(silent=True) or {}
         try:
             payload = ExecuteRequest.model_validate(data)

@@ -38,6 +38,13 @@
     max-height: min(var(--gui-modal-max-h), calc(100dvh - 2 * var(--space-md)));
 }
 
+.gui-modal.voc-modal-content {
+    --gui-modal-max-w: 1100px;
+    --gui-modal-max-h: 720px;
+    height: min(720px, calc(100vh - 2 * var(--space-md)));
+    height: min(720px, calc(100dvh - 2 * var(--space-md)));
+}
+
 .gui-modal .modal-header,
 .gui-modal .modal-footer {
     flex-shrink: 0;
@@ -120,6 +127,11 @@
     overflow: hidden;
 }
 
+.gui-modal .voc-modal-body-inner {
+    gap: var(--space-md);
+    padding: 0 20px 20px;
+}
+
 /* Как на странице: табы под контентом по z-index, чтобы липкие заголовки таблиц не прятались под полосой табов */
 .gui-modal .gui-modal-body-inner > .page-tabs {
     flex: 0 0 auto;
@@ -189,6 +201,34 @@
     max-height: 100%;
     overflow-x: auto;
     overflow-y: auto;
+}
+
+.gui-modal .voc-modal-table-wrap {
+    width: 100%;
+}
+
+.voc-modal-search-input {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.voc-modal-row {
+    cursor: pointer;
+}
+
+.voc-modal-checkbox-cell {
+    width: 52px;
+    min-width: 52px;
+}
+
+.voc-modal-cell--selected {
+    background-color: var(--color-table-hover);
+}
+
+.voc-modal-cell--active {
+    background-color: var(--color-dropdown-active);
+    box-shadow: inset 0 2px 0 0 var(--color-text-main), inset 0 -2px 0 0 var(--color-text-main);
 }
 
 .confirm-modal-content {

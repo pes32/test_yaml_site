@@ -15,7 +15,7 @@ def register_page_routes(app, config_service):
         return success_payload(
             data=page_data_payload(page_config),
             snapshot=snapshot,
-            diagnostics=page_config.get("diagnostics") or [],
+            diagnostics=list((page_config or {}).get("diagnostics") or []),
         )
 
     def _render_page(snapshot, page_config):
@@ -30,11 +30,12 @@ def register_page_routes(app, config_service):
     @app.route("/")
     def index():
         snapshot = config_service.get_snapshot()
-        page_name = snapshot["pages_by_url"].get("/") or ("main" if "main" in snapshot["pages"] else None)
+        pages = snapshot.get("pages") or {}
+        page_name = (snapshot.get("pages_by_url") or {}).get("/") or ("main" if "main" in pages else None)
         if not page_name:
             abort(404)
 
-        page_config = snapshot["pages"].get(page_name)
+        page_config = pages.get(page_name)
         if not page_config:
             abort(404)
 
@@ -43,7 +44,7 @@ def register_page_routes(app, config_service):
     @app.route("/page/<path:page_name>")
     def page(page_name):
         snapshot = config_service.get_snapshot()
-        page_config = snapshot["pages"].get(page_name)
+        page_config = (snapshot.get("pages") or {}).get(str(page_name or "").strip())
         if not page_config:
             return "Страница не найдена", 404
 
@@ -52,11 +53,11 @@ def register_page_routes(app, config_service):
     @app.route("/<path:requested_path>")
     def page_by_path(requested_path):
         snapshot = config_service.get_snapshot()
-        page_name = snapshot["pages_by_url"].get(request.path)
+        page_name = (snapshot.get("pages_by_url") or {}).get(request.path)
         if not page_name:
             return "Страница не найдена", 404
 
-        page_config = snapshot["pages"].get(page_name)
+        page_config = (snapshot.get("pages") or {}).get(page_name)
         if not page_config:
             return "Страница не найдена", 404
 

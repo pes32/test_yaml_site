@@ -1,0 +1,12 @@
+{% macro vite_asset_links(bundle, include_modulepreload=True) -%}
+    {% if bundle and bundle.get('css') %}
+        {% for css_file in bundle.get('css', []) %}
+    <link href="{{ url_for('static', filename='dist/' ~ css_file) }}" rel="stylesheet">
+        {% endfor %}
+    {% endif %}
+    {% if include_modulepreload and bundle and bundle.get('imports') %}
+        {% for js_file in bundle.get('imports', []) %}
+    <link rel="modulepreload" href="{{ url_for('static', filename='dist/' ~ js_file) }}">
+        {% endfor %}
+    {% endif %}
+{%- endmacro %}

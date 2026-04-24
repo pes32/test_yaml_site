@@ -1,11 +1,36 @@
 /**
  * Методы выделения ячеек для TableWidget (подмешиваются в methods).
  */
-import type { TableRuntimeMethodSubset, TableSelectionRuntimeSurface } from './table_contract.ts';
-import { selectionRectFromDisplay } from './table_selection_model.ts';
-import { clamp, getRowCells } from './table_utils.ts';
+import type {
+    TableRuntimeMethodSubset,
+    TableSelectionRuntimeSurface,
+    TableSelectionState
+} from './table_contract.ts';
+import {
+    buildCoreSelectionFromDisplay,
+    displayCellToCore,
+    runtimeDisplaySelection,
+    setSelectionCommandFromCore,
+    selectionRectFromDisplay
+} from './table_selection_model.ts';
+import { TABLE_RUNTIME_SYNC } from './table_runtime_state.ts';
+import { clamp } from './table_utils.ts';
 
 type SelectionVm = TableSelectionRuntimeSurface;
+type ClearCellPatchOptions = {
+    canMutateColumnIndex: (colIndex: number) => boolean;
+    emptyCellValueForColumn: (colIndex: number) => unknown;
+    tableColumns: SelectionVm['tableColumns'];
+    viewModel: ReturnType<SelectionVm['tableViewModelSnapshot']>;
+};
+type ClearCellPatchRuntimeSurface = Pick<
+    SelectionVm,
+    | 'canMutateColumnIndex'
+    | 'emptyCellValueForColumn'
+    | 'getSelRect'
+    | 'tableColumns'
+    | 'tableViewModelSnapshot'
+>;
 
 function getSelectionAnchor(vm: SelectionVm) {
     return vm.selAnchor || { r: 0, c: 0 };
@@ -15,7 +40,62 @@ function getSelectionFocus(vm: SelectionVm) {
     return vm.selFocus || { r: 0, c: 0 };
 }
 
+function dispatchDisplaySelection(
+    vm: SelectionVm,
+    nextSelection: {
+        anchor: { c: number; r: number };
+        focus: { c: number; r: number };
+        fullWidthRows: { r0: number; r1: number } | null;
+    },
+    phase: string
+) {
+    const coreSelection = buildCoreSelectionFromDisplay(
+        nextSelection,
+        vm.tableColumns,
+        vm.tableViewModelSnapshot()
+    );
+    vm.dispatchTableCoreCommand(
+        setSelectionCommandFromCore(coreSelection),
+        phase,
+        TABLE_RUNTIME_SYNC.SELECTION_ONLY
+    );
+}
+
+function buildClearCellPatches(
+    rect: { c0: number; c1: number; r0: number; r1: number },
+    options: ClearCellPatchOptions
+) {
+    const patches = [];
+    for (let row = rect.r0; row <= rect.r1; row += 1) {
+        for (let col = rect.c0; col <= rect.c1; col += 1) {
+            if (!options.canMutateColumnIndex(col)) continue;
+            const cell = displayCellToCore({ r: row, c: col }, options.tableColumns, options.viewModel);
+            if (!cell) continue;
+            patches.push({
+                cell,
+                value: options.emptyCellValueForColumn(col)
+            });
+        }
+    }
+    return patches;
+}
+
+function buildClearCellPatchesForRuntime(
+    vm: ClearCellPatchRuntimeSurface,
+    rect = vm.getSelRect()
+) {
+    return buildClearCellPatches(rect, {
+        canMutateColumnIndex: (colIndex) => vm.canMutateColumnIndex(colIndex),
+        emptyCellValueForColumn: (colIndex) => vm.emptyCellValueForColumn(colIndex),
+        tableColumns: vm.tableColumns,
+        viewModel: vm.tableViewModelSnapshot()
+    });
+}
+
 const SelectionMethods = {
+        setDisplaySelection(nextSelection: TableSelectionState, phase?: string) {
+            dispatchDisplaySelection(this, nextSelection, phase || 'set selection');
+        },
         normRow(r: number) {
             const max = this.tableData.length - 1;
             if (max < 0) return 0;
@@ -30,15 +110,16 @@ const SelectionMethods = {
         setSelFullWidthRowSpan(r0: number, r1: number) {
             const lo = this.normRow(Math.min(r0, r1));
             const hi = this.normRow(Math.max(r0, r1));
-            this.selFullWidthRows = { r0: lo, r1: hi };
+            const nextSelection = {
+                anchor: getSelectionAnchor(this),
+                focus: getSelectionFocus(this),
+                fullWidthRows: { r0: lo, r1: hi }
+            };
+            dispatchDisplaySelection(this, nextSelection, 'set full row selection');
         },
         getSelRect() {
             return selectionRectFromDisplay(
-                {
-                    anchor: getSelectionAnchor(this),
-                    focus: getSelectionFocus(this),
-                    fullWidthRows: this.selFullWidthRows
-                },
+                runtimeDisplaySelection(this),
                 this.tbodyRowCount ? this.tbodyRowCount() : this.tableData.length,
                 this.tableColumns.length
             );
@@ -123,9 +204,8 @@ const SelectionMethods = {
             };
         },
         setSelectionSingle(r: number, c: number) {
-            this.selFullWidthRows = null;
-            this.selAnchor = { r: this.normRow(r), c: this.normCol(c) };
-            this.selFocus = { r: this.selAnchor.r, c: this.selAnchor.c };
+            const cell = { r: this.normRow(r), c: this.normCol(c) };
+            dispatchDisplaySelection(this, { anchor: cell, focus: cell, fullWidthRows: null }, 'set selection');
         },
         isExactFullRowR(r: number) {
             const n = this.tableColumns.length;
@@ -145,33 +225,6 @@ const SelectionMethods = {
             if (this.listColumnIsMultiselect(column)) return [];
             return '';
         },
-        clearSelectedCells() {
-            const { r0, r1, c0, c1 } = this.getSelRect();
-            for (let r = r0; r <= r1; r++) {
-                const dataIndex =
-                    typeof this.resolveDataRowIndex === 'function'
-                        ? this.resolveDataRowIndex(r)
-                        : r;
-                if (dataIndex < 0) continue;
-                const row = this.tableData[dataIndex];
-                const base = [...getRowCells(row)];
-                for (let c = c0; c <= c1; c++) {
-                    if (
-                        typeof this.canMutateColumnIndex === 'function' &&
-                        !this.canMutateColumnIndex(c)
-                    ) {
-                        continue;
-                    }
-                    base[c] = this.emptyCellValueForColumn(c);
-                }
-                if (row && typeof row === 'object' && row.id != null && !Array.isArray(row)) {
-                    this.tableData.splice(dataIndex, 1, { id: row.id, cells: base });
-                } else {
-                    this.tableData.splice(dataIndex, 1, { id: `row_${dataIndex}`, cells: base });
-                }
-            }
-            this.onInput();
-        },
         cellTabindex(row: number, col: number) {
             if (!this.isEditable) return -1;
             return getSelectionFocus(this).r === row && getSelectionFocus(this).c === col ? 0 : -1;
@@ -182,15 +235,32 @@ const SelectionMethods = {
             const nc = this.normCol(focus.c + dc);
             if (nr === focus.r && nc === focus.c) return false;
             if (this.selFullWidthRows && dr !== 0 && dc === 0) {
-                this.selFocus = { r: nr, c: focus.c };
-                this.setSelFullWidthRowSpan(getSelectionAnchor(this).r, nr);
+                const anchor = getSelectionAnchor(this);
+                const nextSelection = {
+                    anchor,
+                    focus: { r: nr, c: focus.c },
+                    fullWidthRows: {
+                        r0: Math.min(anchor.r, nr),
+                        r1: Math.max(anchor.r, nr)
+                    }
+                };
+                dispatchDisplaySelection(this, nextSelection, 'extend full row selection');
                 return true;
             }
-            this.selFullWidthRows = null;
-            this.selFocus = { r: nr, c: nc };
+            const nextSelection = {
+                anchor: getSelectionAnchor(this),
+                focus: { r: nr, c: nc },
+                fullWidthRows: null
+            };
+            dispatchDisplaySelection(this, nextSelection, 'extend selection');
             return true;
         }
-    } satisfies TableRuntimeMethodSubset;
+    } satisfies TableRuntimeMethodSubset<SelectionVm>;
 
-export { SelectionMethods };
+export {
+    buildClearCellPatches,
+    buildClearCellPatchesForRuntime,
+    runtimeDisplaySelection,
+    SelectionMethods
+};
 export default SelectionMethods;

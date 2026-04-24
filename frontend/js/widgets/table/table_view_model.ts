@@ -70,8 +70,13 @@ function buildTableViewModel(
     };
 }
 
-function sourceIndexAtDisplayIndex(viewModel: TableViewModel, displayIndex: number): number {
+function rowIdAtDisplayIndex(viewModel: TableViewModel, displayIndex: number): string | null {
     const rowId = viewModel.displayIndexToRowId[displayIndex];
+    return rowId ? String(rowId) : null;
+}
+
+function sourceIndexAtDisplayIndex(viewModel: TableViewModel, displayIndex: number): number {
+    const rowId = rowIdAtDisplayIndex(viewModel, displayIndex);
     if (!rowId) return -1;
     const sourceIndex = viewModel.rowIdToSourceIndex.get(rowId);
     return sourceIndex == null ? -1 : sourceIndex;
@@ -97,5 +102,6 @@ export {
     buildTableViewModel,
     displayIndexForCell,
     rowAtDisplayIndex,
+    rowIdAtDisplayIndex,
     sourceIndexAtDisplayIndex
 };

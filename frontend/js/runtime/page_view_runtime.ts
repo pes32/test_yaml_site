@@ -1,5 +1,13 @@
 import { collectActiveWidgetNames } from './page_selectors.ts';
 import type { PageAttrConfig, PageViewHost } from './page_contract.ts';
+import { restoreScrollRootTop } from './scroll_root.ts';
+import {
+    buildViewId,
+    getNumberRecordValue,
+    resolveTabbedViewPart,
+    setNumberRecordValue,
+    toggleBooleanRecordFlag
+} from './view_state_helpers.ts';
 import widgetFactory from '../widgets/factory.ts';
 
 function normalizeActiveState(vm: PageViewHost) {
@@ -25,9 +33,7 @@ function normalizeActiveState(vm: PageViewHost) {
 }
 
 function setActiveViewFromHash(vm: PageViewHost) {
-    const hash = typeof window !== 'undefined'
-        ? (window.location.hash || '')
-        : '';
+    const hash = typeof window !== 'undefined' ? (window.location.hash || '') : '';
     const match = hash.match(/^#menu-(\d+)(?:-tab-(\d+))?$/);
 
     if (!match) {
@@ -50,10 +56,11 @@ function updateHash(vm: PageViewHost) {
         return;
     }
 
-    let nextHash = `#menu-${vm.activeMenuIndex}`;
-    if (vm.activeTabs.length) {
-        nextHash += `-tab-${vm.activeTabIndex}`;
-    }
+    const nextHash = `#${buildViewId(
+        'menu',
+        vm.activeMenuIndex,
+        vm.activeTabs.length ? resolveTabbedViewPart(true, vm.activeTabIndex) : false
+    )}`;
 
     if (window.location.hash !== nextHash) {
         history.replaceState(null, '', nextHash);
@@ -83,8 +90,11 @@ function getActiveViewId(vm: PageViewHost): string {
         return '';
     }
 
-    const tabPart = vm.activeTabs.length ? `tab-${vm.activeTabIndex}` : 'content';
-    return `menu-${vm.activeMenuIndex}-${tabPart}`;
+    return buildViewId(
+        'menu',
+        vm.activeMenuIndex,
+        resolveTabbedViewPart(vm.activeTabs.length > 0, vm.activeTabIndex)
+    );
 }
 
 function rememberActiveViewScroll(vm: PageViewHost) {
@@ -96,10 +106,11 @@ function rememberActiveViewScroll(vm: PageViewHost) {
         return;
     }
 
-    vm.viewScrollTopById = {
-        ...vm.viewScrollTopById,
-        [viewId]: scrollRoot.scrollTop || 0
-    };
+    vm.viewScrollTopById = setNumberRecordValue(
+        vm.viewScrollTopById,
+        viewId,
+        scrollRoot.scrollTop || 0
+    );
 }
 
 function restoreActiveViewScroll(
@@ -118,15 +129,9 @@ function restoreActiveViewScroll(
             return;
         }
 
-        const top = Object.prototype.hasOwnProperty.call(vm.viewScrollTopById, viewId)
-            ? vm.viewScrollTopById[viewId]
-            : 0;
+        const top = getNumberRecordValue(vm.viewScrollTopById, viewId);
 
-        if (typeof scrollRoot.scrollTo === 'function') {
-            scrollRoot.scrollTo({ top, left: 0, behavior: 'auto' });
-        } else {
-            scrollRoot.scrollTop = top;
-        }
+        restoreScrollRootTop(scrollRoot, top);
 
         if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
             window.scrollTo(0, 0);
@@ -138,6 +143,7 @@ async function prefetchWidgetsByNames(vm: PageViewHost, names: string[]) {
     const widgetTypes = (Array.isArray(names) ? names : [])
         .map((name) => vm.getWidgetConfig(name))
         .map((config: PageAttrConfig) => config && typeof config.widget === 'string' ? config.widget : '')
+        .filter((type) => type !== 'table')
         .filter(Boolean);
 
     if (!widgetTypes.length) {
@@ -152,20 +158,22 @@ async function prefetchActiveViewWidgets(vm: PageViewHost) {
     await prefetchWidgetsByNames(vm, widgetNames);
 }
 
-async function finishInitialViewActivation(vm: PageViewHost) {
-    setActiveViewFromHash(vm);
-    void prefetchActiveViewWidgets(vm);
+async function syncActiveView(vm: PageViewHost) {
     await vm.waitForViewUpdate();
     restoreActiveViewScroll(vm);
     await vm.fetchActiveViewAttrs();
+}
+
+async function finishInitialViewActivation(vm: PageViewHost) {
+    setActiveViewFromHash(vm);
+    void prefetchActiveViewWidgets(vm);
+    await syncActiveView(vm);
     registerHashListener(vm);
 }
 
 async function refreshActiveViewAfterNavigation(vm: PageViewHost) {
     void prefetchActiveViewWidgets(vm);
-    await vm.waitForViewUpdate();
-    restoreActiveViewScroll(vm);
-    await vm.fetchActiveViewAttrs();
+    await syncActiveView(vm);
 }
 
 async function handleHashChange(vm: PageViewHost) {
@@ -173,11 +181,20 @@ async function handleHashChange(vm: PageViewHost) {
         rememberActiveViewScroll(vm);
         setActiveViewFromHash(vm);
         void prefetchActiveViewWidgets(vm);
-        await vm.waitForViewUpdate();
-        restoreActiveViewScroll(vm);
-        await vm.fetchActiveViewAttrs();
+        await syncActiveView(vm);
         return null;
     });
+}
+
+async function activateViewFromNavigation(
+    vm: PageViewHost,
+    selectActiveView: () => void
+) {
+    rememberActiveViewScroll(vm);
+    selectActiveView();
+    normalizeActiveState(vm);
+    updateHash(vm);
+    await refreshActiveViewAfterNavigation(vm);
 }
 
 function handleMenuClick(vm: PageViewHost, index: number) {
@@ -186,12 +203,10 @@ function handleMenuClick(vm: PageViewHost, index: number) {
     }
 
     void vm.runBoundaryAction('navigation', async () => {
-        rememberActiveViewScroll(vm);
-        vm.activeMenuIndex = index;
-        vm.activeTabIndex = 0;
-        normalizeActiveState(vm);
-        updateHash(vm);
-        await refreshActiveViewAfterNavigation(vm);
+        await activateViewFromNavigation(vm, () => {
+            vm.activeMenuIndex = index;
+            vm.activeTabIndex = 0;
+        });
         return null;
     });
 }
@@ -202,18 +217,20 @@ function handleTabClick(vm: PageViewHost, index: number) {
     }
 
     void vm.runBoundaryAction('navigation', async () => {
-        rememberActiveViewScroll(vm);
-        vm.activeTabIndex = index;
-        normalizeActiveState(vm);
-        updateHash(vm);
-        await refreshActiveViewAfterNavigation(vm);
+        await activateViewFromNavigation(vm, () => {
+            vm.activeTabIndex = index;
+        });
         return null;
     });
 }
 
 function getSectionCollapseId(vm: PageViewHost, sectionIndex: number): string {
-    const tabPart = vm.activeTabs.length ? vm.activeTabIndex : 'content';
-    return `page-section-${vm.activeMenuIndex}-${tabPart}-${sectionIndex}`;
+    return buildViewId(
+        'page-section',
+        vm.activeMenuIndex,
+        resolveTabbedViewPart(vm.activeTabs.length > 0, vm.activeTabIndex),
+        sectionIndex
+    );
 }
 
 function isSectionCollapsed(vm: PageViewHost, sectionIndex: number): boolean {
@@ -222,35 +239,10 @@ function isSectionCollapsed(vm: PageViewHost, sectionIndex: number): boolean {
 
 function toggleSectionCollapse(vm: PageViewHost, sectionIndex: number) {
     const sectionId = getSectionCollapseId(vm, sectionIndex);
-    vm.collapsedSections = {
-        ...vm.collapsedSections,
-        [sectionId]: !vm.collapsedSections[sectionId]
-    };
+    vm.collapsedSections = toggleBooleanRecordFlag(vm.collapsedSections, sectionId);
 }
 
-const PageViewRuntime = {
-    finishInitialViewActivation,
-    getActiveViewId,
-    getSectionCollapseId,
-    handleHashChange,
-    handleMenuClick,
-    handleTabClick,
-    isSectionCollapsed,
-    normalizeActiveState,
-    prefetchActiveViewWidgets,
-    prefetchWidgetsByNames,
-    refreshActiveViewAfterNavigation,
-    registerHashListener,
-    rememberActiveViewScroll,
-    restoreActiveViewScroll,
-    setActiveViewFromHash,
-    toggleSectionCollapse,
-    unregisterHashListener,
-    updateHash
-};
-
 export {
-    PageViewRuntime,
     finishInitialViewActivation,
     getActiveViewId,
     getSectionCollapseId,

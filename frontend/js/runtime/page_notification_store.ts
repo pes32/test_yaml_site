@@ -70,23 +70,12 @@ function resetNotifications(state: PageNotificationState): PageNotificationState
   return state;
 }
 
-const PageNotificationStore = {
-  clearNotificationTimer,
-  closeNotification,
-  createEmptyNotificationState,
-  resetNotifications,
-  showNotification
-};
-
 export type { NotificationType, PageNotificationRecord, PageNotificationState };
 
 export {
-  PageNotificationStore,
   clearNotificationTimer,
   closeNotification,
   createEmptyNotificationState,
   resetNotifications,
   showNotification
 };
-
-export default PageNotificationStore;

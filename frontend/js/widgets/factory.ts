@@ -1,25 +1,9 @@
 import { defineAsyncComponent, type Component } from 'vue';
+import type { KnownWidgetType } from '../shared/widget_types.ts';
 import ImgWidget from './fields/ImgWidget.vue';
 import IpLikeWidget from './fields/IpLikeWidget.vue';
 import SimpleFieldWidget from './fields/SimpleFieldWidget.vue';
 import ButtonWidget from './fields/ButtonWidget.vue';
-
-type KnownWidgetType =
-  | 'button'
-  | 'date'
-  | 'datetime'
-  | 'float'
-  | 'img'
-  | 'int'
-  | 'ip'
-  | 'ip_mask'
-  | 'list'
-  | 'split_button'
-  | 'str'
-  | 'table'
-  | 'text'
-  | 'time'
-  | 'voc';
 
 type WidgetComponent = Component;
 type WidgetLoaderModule = { default: WidgetComponent };
@@ -134,37 +118,21 @@ const TABLE_CAPABILITIES: WidgetCapabilities = Object.freeze({
   runtimeFeatures: ['attrsAccess', 'errorHandling', 'notifications'] as const
 });
 
+const SIMPLE_FIELD_WIDGET_TYPES = ['str', 'int', 'float', 'text'] as const;
+const IP_WIDGET_TYPES = ['ip', 'ip_mask'] as const;
+const DATE_TIME_WIDGET_TYPES = ['datetime', 'date', 'time'] as const;
+
 const DEFAULT_WIDGET_DEFINITIONS: ReadonlyArray<WidgetDefinitionRecord> = Object.freeze([
-  {
-    type: 'str',
+  ...SIMPLE_FIELD_WIDGET_TYPES.map((type) => ({
+    type,
     component: SimpleFieldWidget,
     capabilities: FIELD_WIDGET_CAPABILITIES
-  },
-  {
-    type: 'int',
-    component: SimpleFieldWidget,
-    capabilities: FIELD_WIDGET_CAPABILITIES
-  },
-  {
-    type: 'float',
-    component: SimpleFieldWidget,
-    capabilities: FIELD_WIDGET_CAPABILITIES
-  },
-  {
-    type: 'ip',
+  })),
+  ...IP_WIDGET_TYPES.map((type) => ({
+    type,
     component: IpLikeWidget,
     capabilities: FIELD_WIDGET_CAPABILITIES
-  },
-  {
-    type: 'ip_mask',
-    component: IpLikeWidget,
-    capabilities: FIELD_WIDGET_CAPABILITIES
-  },
-  {
-    type: 'text',
-    component: SimpleFieldWidget,
-    capabilities: FIELD_WIDGET_CAPABILITIES
-  },
+  })),
   {
     type: 'button',
     component: ButtonWidget,
@@ -190,24 +158,14 @@ const DEFAULT_WIDGET_DEFINITIONS: ReadonlyArray<WidgetDefinitionRecord> = Object
     loader: () => import('./SplitButtonWidget.vue'),
     capabilities: BUTTON_CAPABILITIES
   },
-  {
-    type: 'datetime',
+  ...DATE_TIME_WIDGET_TYPES.map((type) => ({
+    type,
     loader: () => import('./datetime/DateTimeInputWidget.vue'),
     capabilities: FIELD_WIDGET_CAPABILITIES
-  },
-  {
-    type: 'date',
-    loader: () => import('./datetime/DateTimeInputWidget.vue'),
-    capabilities: FIELD_WIDGET_CAPABILITIES
-  },
-  {
-    type: 'time',
-    loader: () => import('./datetime/DateTimeInputWidget.vue'),
-    capabilities: FIELD_WIDGET_CAPABILITIES
-  },
+  })),
   {
     type: 'table',
-    loader: () => import('./table/index.ts'),
+    loader: () => import('./table/TableWidget.vue'),
     capabilities: TABLE_CAPABILITIES
   }
 ]);
@@ -404,7 +362,12 @@ class WidgetDefinitionRegistry {
         return;
       }
 
-      await Promise.resolve(loader()).catch(() => {});
+      const loaded = await Promise.resolve(loader())
+        .then(resolveLoadedComponent)
+        .catch(() => null);
+      if (loaded) {
+        this.asyncComponents.set(type, loaded);
+      }
     };
 
     return {

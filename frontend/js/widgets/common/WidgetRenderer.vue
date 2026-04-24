@@ -15,6 +15,7 @@ import widgetFactory, {
   type WidgetDefinition,
   type WidgetLifecycleHandle
 } from '../factory.ts';
+import TableWidget from '../table/TableWidget.vue';
 import {
   assertRuntimeFeatureServices,
   injectPageHostRuntimeServices,
@@ -101,7 +102,11 @@ provideWidgetRuntimeBridge(widgetDefinition, hostServices, {
   }
 });
 
-const widgetComponent = computed(() => widgetDefinition.value.resolveComponent());
+const widgetComponent = computed(() =>
+  resolvedWidgetType.value === 'table'
+    ? TableWidget
+    : widgetDefinition.value.resolveComponent()
+);
 
 const widgetListeners = computed<Record<string, (payload: unknown) => void>>(() => {
   const listeners: Record<string, (payload: unknown) => void> = {};
@@ -147,16 +152,20 @@ function getWidgetInstanceDebugRegistry(): WidgetInstanceDebugRegistry | null {
   return debugWindow.__YAMLS_WIDGET_INSTANCE_DEBUG__ || null;
 }
 
+function createWidgetInstanceDebugEntry(instance: unknown): WidgetInstanceDebugEntry {
+  return {
+    instance,
+    type: resolvedWidgetType.value,
+    widgetName: props.widgetName
+  };
+}
+
 function registerWidgetDebugInstance(instance: unknown | null = widgetInstance.value): void {
   if (!instance) {
     return;
   }
 
-  getWidgetInstanceDebugRegistry()?.register({
-    instance,
-    type: resolvedWidgetType.value,
-    widgetName: props.widgetName
-  });
+  getWidgetInstanceDebugRegistry()?.register(createWidgetInstanceDebugEntry(instance));
 }
 
 function unregisterWidgetDebugInstance(instance: unknown | null = widgetInstance.value): void {
@@ -164,11 +173,7 @@ function unregisterWidgetDebugInstance(instance: unknown | null = widgetInstance
     return;
   }
 
-  getWidgetInstanceDebugRegistry()?.unregister({
-    instance,
-    type: resolvedWidgetType.value,
-    widgetName: props.widgetName
-  });
+  getWidgetInstanceDebugRegistry()?.unregister(createWidgetInstanceDebugEntry(instance));
 }
 
 watch(

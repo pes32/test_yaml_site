@@ -21,6 +21,7 @@
 
 <script setup lang="ts">
 import { injectPageHostRuntimeServices } from '../../runtime/widget_runtime_bridge.ts';
+import { getModalWidgetAttrs, getModalWidgetValue } from './modal_widget_access.ts';
 import WidgetRenderer from './WidgetRenderer.vue';
 
 defineOptions({
@@ -49,19 +50,10 @@ function getCloseButtonConfig() {
 }
 
 function getWidgetAttrs(widgetName: string) {
-  if (typeof hostServices?.getWidgetAttrsByName === 'function') {
-    return hostServices.getWidgetAttrsByName(widgetName);
-  }
-
-  return {
-    widget: 'str',
-    label: widgetName
-  };
+  return getModalWidgetAttrs(hostServices, widgetName);
 }
 
 function getWidgetValue(widgetName: string) {
-  return typeof hostServices?.getWidgetRuntimeValueByName === 'function'
-    ? hostServices.getWidgetRuntimeValueByName(widgetName)
-    : undefined;
+  return getModalWidgetValue(hostServices, widgetName);
 }
 </script>

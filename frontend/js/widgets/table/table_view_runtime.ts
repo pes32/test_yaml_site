@@ -4,6 +4,7 @@ import { formatCellValue as formatTableCellValue } from './table_format.ts';
 import { parseTableAttrs } from './table_parse_attrs.ts';
 import { scheduleUpdate } from './table_scroll.ts';
 import { bindStickyThead, unbindStickyThead, updateStickyThead } from './table_sticky_header.ts';
+import { columnIndexByKey } from './table_state_core.ts';
 import { WidgetMeasure, WidgetUiCoords } from './table_widget_helpers.ts';
 import { safeCellValue } from './table_utils.ts';
 
@@ -111,10 +112,34 @@ const ViewRuntimeMethods = {
         return safeCellValue(row, cellIndex);
     },
 
+    dataRowByIdentity(rowId: string) {
+        const key = String(rowId || '');
+        if (!key) return null;
+        return this.tableData.find((row) => row && String(row.id || '') === key) || null;
+    },
+
+    cellValueByIdentity(rowId: string, colKey: string, fallbackCol: number) {
+        const colIndex = columnIndexByKey(this.tableColumns, String(colKey || ''));
+        const safeCol = colIndex >= 0 ? colIndex : this.normCol(fallbackCol);
+        return this.safeCell(this.dataRowByIdentity(rowId), safeCol);
+    },
+
     formatCellValue(value: unknown, column: TableRuntimeColumn | null | undefined) {
         return formatTableCellValue(
             value,
             ((column || {}) as { format?: string; type?: string })
+        );
+    },
+
+    formatCellValueByIdentity(
+        rowId: string,
+        colKey: string,
+        column: TableRuntimeColumn | null | undefined,
+        fallbackCol: number
+    ) {
+        return this.formatCellValue(
+            this.cellValueByIdentity(rowId, colKey, fallbackCol),
+            column
         );
     },
 

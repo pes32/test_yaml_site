@@ -1,79 +1,66 @@
-/**
- * Клавиатура редактируемой таблицы: цепочка обработчиков + диспетчер.
- */
 import type { TableRuntimeVm } from './table_contract.ts';
 import { rowMoveDuplicateOpsAllowed } from './table_menu_runtime.ts';
 import { tableLog } from './table_debug.ts';
-import { getCellFromEvent } from './table_dom.ts';
+import { getCellByDisplayAddress, getCellFromEvent } from './table_dom.ts';
 import { buildJumpOpts, jumpTarget } from './table_jump.ts';
 import { resolveEditingBoundary } from './table_editing_model.ts';
+import { buildClearCellPatchesForRuntime } from './table_selection.ts';
+import { dispatchRuntimeCellPatches } from './table_runtime_commands.ts';
+import { TABLE_RUNTIME_SYNC } from './table_runtime_state.ts';
 
-    type KeyboardVm = TableRuntimeVm;
-    type KeyboardCtx = {
-        col: number;
-        dropdownOpen?: Element | null;
-        row: number;
-        td?: HTMLElement | null;
-    };
+type KeyboardVm = TableRuntimeVm;
+type KeyboardCtx = {
+    col: number;
+    dropdownOpen?: Element | null;
+    row: number;
+    td?: HTMLElement | null;
+};
 
-    function callJump(vm: KeyboardVm, jumpRow: number, jumpCol: number, dr: number, dc: number) {
-        return jumpTarget(buildJumpOpts(vm, jumpRow, jumpCol, dr, dc));
-    }
+const FALLBACK_FOCUS = { r: 0, c: 0 };
 
-    function editFocus(vm: KeyboardVm) {
-        return vm.editingCell;
-    }
+function callJump(vm: KeyboardVm, jumpRow: number, jumpCol: number, dr: number, dc: number) {
+    return jumpTarget(buildJumpOpts(vm, jumpRow, jumpCol, dr, dc));
+}
 
-    function getFocusCell(vm: KeyboardVm) {
-        return vm.selFocus || { r: 0, c: 0 };
-    }
+function editFocus(vm: KeyboardVm) {
+    return vm.editingCell;
+}
 
-    function getAnchorCell(vm: KeyboardVm) {
-        return vm.selAnchor || getFocusCell(vm);
-    }
+function getFocusCell(vm: KeyboardVm) {
+    return vm.selFocus || FALLBACK_FOCUS;
+}
 
-    function findEmbeddedWidgetRoot(target: EventTarget | null) {
-        const element = target as HTMLElement | null;
-        return element && element.closest
-            ? element.closest('[data-table-embedded-widget="true"]')
-            : null;
-    }
+function getAnchorCell(vm: KeyboardVm) {
+    return vm.selAnchor || getFocusCell(vm);
+}
 
-    function normalizeConsumeKeys(root: Element | null) {
-        if (!root) return [];
-        const raw = root.getAttribute('data-table-consume-keys') || '';
-        return String(raw)
-            .split(',')
-            .map((part) => part.trim().toLowerCase())
-            .filter(Boolean);
-    }
+function findEmbeddedWidgetRoot(target: EventTarget | null) {
+    return (target as HTMLElement | null)?.closest?.('[data-table-embedded-widget="true"]') || null;
+}
 
-    function consumeKeyMatches(token: string, key: string) {
-        if (!token || !key) return false;
-        if (token === 'enter') return key === 'Enter';
-        if (token === 'tab') return key === 'Tab';
-        if (token === 'arrows') {
-            return (
-                key === 'ArrowLeft' ||
-                key === 'ArrowRight' ||
-                key === 'ArrowUp' ||
-                key === 'ArrowDown'
-            );
-        }
-        return token === String(key || '').toLowerCase();
-    }
+function normalizeConsumeKeys(root: Element | null) {
+    return String(root?.getAttribute('data-table-consume-keys') || '')
+        .split(',')
+        .map((part) => part.trim().toLowerCase())
+        .filter(Boolean);
+}
 
-    function embeddedWidgetConsumesKey(target: EventTarget | null, key: string) {
-        const root = findEmbeddedWidgetRoot(target);
-        if (!root) return false;
-        const consume = normalizeConsumeKeys(root);
-        for (let i = 0; i < consume.length; i++) {
-            if (consumeKeyMatches(consume[i], key)) return true;
-        }
-        return false;
-    }
+function consumeKeyMatches(token: string, key: string) {
+    if (!token || !key) return false;
+    if (token === 'enter') return key === 'Enter';
+    if (token === 'tab') return key === 'Tab';
+    return token === 'arrows'
+        ? ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(key)
+        : token === String(key || '').toLowerCase();
+}
 
-    function handleTabNavigation(vm: KeyboardVm, event: KeyboardEvent /* , ctx */) {
+function embeddedWidgetConsumesKey(target: EventTarget | null, key: string) {
+    return normalizeConsumeKeys(findEmbeddedWidgetRoot(target)).some((token) =>
+        consumeKeyMatches(token, key)
+    );
+}
+
+function handleTabNavigation(vm: KeyboardVm, event: KeyboardEvent) {
         if (event.key !== 'Tab') return false;
         const ed = editFocus(vm);
         const focus = getFocusCell(vm);
@@ -108,10 +95,9 @@ import { resolveEditingBoundary } from './table_editing_model.ts';
         return true;
     }
 
-    function tbodyRowCount(vm: KeyboardVm): number {
-        if (typeof vm.tbodyRowCount === 'function') return vm.tbodyRowCount();
-        return vm.tableData.length;
-    }
+function tbodyRowCount(vm: KeyboardVm): number {
+    return typeof vm.tbodyRowCount === 'function' ? vm.tbodyRowCount() : vm.tableData.length;
+}
 
     function handleClipboardShortcuts(vm: KeyboardVm, event: KeyboardEvent, ctx?: KeyboardCtx) {
         if (!vm.isEditable) return false;
@@ -200,9 +186,14 @@ import { resolveEditingBoundary } from './table_editing_model.ts';
                 row <= rect.r1;
             const r0 = useExistingRowRange ? rect.r0 : row;
             const r1 = useExistingRowRange ? rect.r1 : row;
-            vm.selFullWidthRows = { r0, r1 };
-            vm.selAnchor = { r: r0, c: col };
-            vm.selFocus = { r: row, c: col };
+            vm.setDisplaySelection(
+                {
+                    anchor: { r: r0, c: col },
+                    focus: { r: row, c: col },
+                    fullWidthRows: { r0, r1 }
+                },
+                'full row selection'
+            );
             vm.exitCellEdit();
             vm.focusSelectionCell(row, col);
         }
@@ -215,7 +206,16 @@ import { resolveEditingBoundary } from './table_editing_model.ts';
         if (vm.isMultiCellSelection()) {
             if (vm.groupingActive) return false;
             event.preventDefault();
-            vm.clearSelectedCells();
+            const patches = buildClearCellPatchesForRuntime(vm);
+            if (!patches.length) return true;
+            vm.dispatchTableCommand(
+                { patches, type: 'PATCH_CELLS' },
+                {},
+                'clear selection',
+                TABLE_RUNTIME_SYNC.ROWS_AND_SELECTION
+            );
+            vm.onInput();
+            vm.$nextTick?.(() => vm._scheduleStickyTheadUpdate());
             return true;
         }
         if (!vm.editingCell) {
@@ -223,7 +223,14 @@ import { resolveEditingBoundary } from './table_editing_model.ts';
             const focus = getFocusCell(vm);
             const sr = focus.r;
             const sc = focus.c;
-            vm.patchCellValue(sr, sc, vm.emptyCellValueForColumn(sc));
+            const cell = vm.coreCellFromDisplay(sr, sc);
+            if (cell) {
+                dispatchRuntimeCellPatches(
+                    vm,
+                    [{ cell, value: vm.emptyCellValueForColumn(sc) }],
+                    'clear focused cell'
+                );
+            }
             return true;
         }
         return false;
@@ -317,13 +324,8 @@ import { resolveEditingBoundary } from './table_editing_model.ts';
         }
 
         let tdForDropdown = ctxCell ? ctxCell.td : null;
-        if (!tdForDropdown && typeof vm.getTableEl === 'function') {
-            const te = vm.getTableEl();
-            if (te) {
-                tdForDropdown = te.querySelector(
-                    `tbody td[data-row="${row}"][data-col="${col}"]`
-                );
-            }
+        if (!tdForDropdown) {
+            tdForDropdown = getCellByDisplayAddress(vm, row, col);
         }
         if (
             tdForDropdown &&
@@ -404,6 +406,65 @@ import { resolveEditingBoundary } from './table_editing_model.ts';
         return true;
     }
 
+    function arrowDelta(key: string) {
+        const dr = key === 'ArrowUp' ? -1 : key === 'ArrowDown' ? 1 : 0;
+        const dc = key === 'ArrowLeft' ? -1 : key === 'ArrowRight' ? 1 : 0;
+        return dr === 0 && dc === 0 ? null : { dc, dr };
+    }
+
+    function commandArrowJumpOrigin(vm: KeyboardVm, dr: number, dc: number) {
+        const anchor = getAnchorCell(vm);
+        let jumpRow = anchor.r;
+        let jumpCol = anchor.c;
+        const rect = vm.getSelRect();
+        if (
+            dr !== 0 &&
+            dc === 0 &&
+            (
+                (vm.selectionIsFullRowBlock && vm.selectionIsFullRowBlock()) ||
+                vm.selFullWidthRows ||
+                (vm.selectionIsSingleColumnRect && vm.selectionIsSingleColumnRect())
+            )
+        ) {
+            jumpRow = dr === 1 ? rect.r1 : rect.r0;
+            jumpCol = getFocusCell(vm).c;
+        } else if (
+            dr === 0 &&
+            dc !== 0 &&
+            (
+                (vm.selectionIsFullRowBlock && vm.selectionIsFullRowBlock()) ||
+                vm.selFullWidthRows ||
+                (vm.selectionIsSingleRowRect && vm.selectionIsSingleRowRect())
+            )
+        ) {
+            jumpRow = getFocusCell(vm).r;
+            jumpCol = dc === 1 ? rect.c1 : rect.c0;
+        }
+        return { anchor, jumpCol, jumpRow };
+    }
+
+    function handleCommandArrowNavigation(
+        vm: KeyboardVm,
+        event: KeyboardEvent,
+        extendSelection: boolean
+    ) {
+        const delta = arrowDelta(event.key);
+        if (!delta) return false;
+        event.preventDefault();
+        const { anchor, jumpCol, jumpRow } = commandArrowJumpOrigin(vm, delta.dr, delta.dc);
+        const jump = callJump(vm, jumpRow, jumpCol, delta.dr, delta.dc);
+        if (jump) {
+            if (extendSelection) {
+                vm.applyJumpExtendSelection(jump, anchor.r, delta.dr, delta.dc);
+                tableLog('keydown extend-jump', jump, delta);
+            } else {
+                vm.applyJumpNavigate(jump);
+                tableLog('keydown jump', jump);
+            }
+        }
+        return true;
+    }
+
     function handleArrowNavigation(vm: KeyboardVm, event: KeyboardEvent, ctx: KeyboardCtx) {
         const row = ctx.row;
         const col = ctx.col;
@@ -426,97 +487,20 @@ import { resolveEditingBoundary } from './table_editing_model.ts';
         }
 
         if (cmdOrCtrl && event.shiftKey && !event.altKey) {
-            const dr =
-                event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0;
-            const dc =
-                event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0;
-            if (dr === 0 && dc === 0) return false;
-            event.preventDefault();
-            const anchor = getAnchorCell(vm);
-            const ar = anchor.r;
-            const ac = anchor.c;
-            let jumpRow = ar;
-            let jumpCol = ac;
-            const br = vm.getSelRect();
-            if (dr !== 0 && dc === 0) {
-                if (
-                    (vm.selectionIsFullRowBlock && vm.selectionIsFullRowBlock()) ||
-                    vm.selFullWidthRows ||
-                    (vm.selectionIsSingleColumnRect &&
-                        vm.selectionIsSingleColumnRect())
-                ) {
-                    jumpRow = dr === 1 ? br.r1 : br.r0;
-                    jumpCol = getFocusCell(vm).c;
-                }
-            } else if (dr === 0 && dc !== 0) {
-                if (
-                    (vm.selectionIsFullRowBlock && vm.selectionIsFullRowBlock()) ||
-                    vm.selFullWidthRows ||
-                    (vm.selectionIsSingleRowRect && vm.selectionIsSingleRowRect())
-                ) {
-                    jumpRow = getFocusCell(vm).r;
-                    jumpCol = dc === 1 ? br.c1 : br.c0;
-                }
-            }
-            const j = callJump(vm, jumpRow, jumpCol, dr, dc);
-            if (j) {
-                vm.applyJumpExtendSelection(j, ar, dr, dc);
-                tableLog('keydown extend-jump', j, { dr, dc });
-            }
-            return true;
+            return handleCommandArrowNavigation(vm, event, true);
         }
 
         if (cmdOrCtrl && !event.shiftKey && !event.altKey) {
-            const dr =
-                event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0;
-            const dc =
-                event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0;
-            if (dr === 0 && dc === 0) return false;
-            event.preventDefault();
-            const anchor = getAnchorCell(vm);
-            const ar = anchor.r;
-            const ac = anchor.c;
-            let jumpRow = ar;
-            let jumpCol = ac;
-            const br2 = vm.getSelRect();
-            if (dr !== 0 && dc === 0) {
-                if (
-                    (vm.selectionIsFullRowBlock && vm.selectionIsFullRowBlock()) ||
-                    vm.selFullWidthRows ||
-                    (vm.selectionIsSingleColumnRect &&
-                        vm.selectionIsSingleColumnRect())
-                ) {
-                    jumpRow = dr === 1 ? br2.r1 : br2.r0;
-                    jumpCol = getFocusCell(vm).c;
-                }
-            } else if (dr === 0 && dc !== 0) {
-                if (
-                    (vm.selectionIsFullRowBlock && vm.selectionIsFullRowBlock()) ||
-                    vm.selFullWidthRows ||
-                    (vm.selectionIsSingleRowRect && vm.selectionIsSingleRowRect())
-                ) {
-                    jumpRow = getFocusCell(vm).r;
-                    jumpCol = dc === 1 ? br2.c1 : br2.c0;
-                }
-            }
-            const j = callJump(vm, jumpRow, jumpCol, dr, dc);
-            if (j) {
-                vm.applyJumpNavigate(j);
-                tableLog('keydown jump', j);
-            }
-            return true;
+            return handleCommandArrowNavigation(vm, event, false);
         }
 
         if (t && t.tagName === 'SELECT' && !event.shiftKey) return false;
 
         if (event.shiftKey && !cmdOrCtrl) {
             event.preventDefault();
-            const dr =
-                event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0;
-            const dc =
-                event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0;
-            if (dr === 0 && dc === 0) return false;
-            if (!vm.extendSelectionWithArrow(dr, dc)) return false;
+            const delta = arrowDelta(event.key);
+            if (!delta) return false;
+            if (!vm.extendSelectionWithArrow(delta.dr, delta.dc)) return false;
             vm.exitCellEdit();
             const focus = getFocusCell(vm);
             vm.focusSelectionCell(focus.r, focus.c);
@@ -589,9 +573,4 @@ import { resolveEditingBoundary } from './table_editing_model.ts';
         }
     }
 
-const TableKeyboard = {
-    handleKeydown: TableWidgetHandleKeydown
-};
-
 export { TableWidgetHandleKeydown };
-export default TableKeyboard;

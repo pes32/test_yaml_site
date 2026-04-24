@@ -18,9 +18,8 @@ Companion docs:
 
 - public entrypoints: `index.ts`, `table_api.ts`;
 - UI root: `TableWidget.vue`;
-- orchestration: `createTableRuntime.ts`, `useTableRuntime.ts`;
-- contracts/state: `table_contract.ts`, `table_store.ts`, `table_runtime_state.ts`, `table_runtime_services.ts`, `table_errors.ts`;
-- local state slices: `table_editing_state.ts`, `table_context_menu_state.ts`, `table_lazy_load_state.ts`, `table_measurement_state.ts`;
+- orchestration: `createTableRuntime.ts`, `useTableRuntime.ts`, `table_runtime_registry.ts`, `table_runtime_computed.ts`, `table_runtime_watch.ts`, `table_runtime_lifecycle.ts`;
+- contracts/state: `table_contract.ts`, `table_store.ts`, `table_runtime_state.ts`, `table_errors.ts`;
 - parsing/pure logic: `table_parse_attrs.ts`, `table_selectors.ts`, `table_clipboard.ts`, `table_format.ts`, `table_sort.ts`, `table_grouping.ts`, `table_utils.ts`;
 - runtime behavior: `table_cell_runtime.ts`, `table_clipboard_runtime.ts`, `table_data_runtime.ts`, `table_editing_runtime.ts`, `table_interactions.ts`, `table_jump.ts`, `table_keyboard.ts`, `table_menu_runtime.ts`, `table_row_runtime.ts`, `table_selection.ts`, `table_view_runtime.ts`, `table_widget_helpers.ts`;
 - DOM/page integration: `table_dom.ts`, `table_measurement.ts`, `table_scroll.ts`, `table_sticky_header.ts`, `table_page_bridge.ts`, `table_notifications.ts`, `table_debug.ts`.
@@ -30,15 +29,16 @@ Companion docs:
 Актуальный contract:
 
 - `table_contract.ts` разделяет `TableRuntimeState`, `TableRuntimeComputed`, `TableRuntimeMethods`, `TableRuntimeDomSurface`, `TableRuntimeVm` и `TableWidgetSetupBindings`;
-- runtime modules can depend on narrower internal surfaces such as `TableSelectionRuntimeSurface`, `TableEditingRuntimeSurface`, `TableDataViewRuntimeSurface`, `TableContextMenuRuntimeSurface`, `TableLazyRuntimeSurface` and `TableStickyRuntimeSurface`;
+- runtime modules depend on narrower internal surfaces and explicit cross-module method contracts; the registry remains an initialization map, not the typing contract for behavior;
 - runtime state содержит обязательные поля loading/grouping/sorting/display/menu/sticky/word-wrap path, а не loose `Record<string, unknown>`;
 - каждый helper экспортирует явный module interface;
-- `createTableRuntime.ts` собирает computed/watch/method groups в одном месте;
-- `TableWidget.vue` работает через `useTableRuntime()` и controller, а не через разрозненные method-mixins;
+- runtime registry разделён на computed/watch/lifecycle/method modules;
+- `TableWidget.vue` работает через `useTableRuntime()` и explicit runtime layers, а не через разрозненные method-mixins;
 - порядок импортов не является частью поведения runtime;
 - table modules импортируют друг друга напрямую или получают host services через bridge.
 
-Runtime method groups типизируются через `TableRuntimeMethodSubset` в `table_contract.ts`; отдельного helper layer для `ThisType` больше нет.
+Runtime method groups типизируются через `TableRuntimeMethodSubset` и `TableRuntimeMethodContracts` в `table_contract.ts`; repeated controller accessors в `useTableRuntime.ts` заменены proxy-binding helpers для state/props/dom/computed.
+Context-menu snapshots carry stable row/column identity (`rowId`, `columnKey`) plus source-row position for row actions; menu actions validate current state before applying core commands.
 
 ## External Contract
 
@@ -66,8 +66,10 @@ Table store хранит только table-specific runtime state:
 - loading/lazy state;
 - selection state;
 - editing state;
-- measurement/sticky state;
-- runtime preferences.
+- menu snapshot state;
+- sticky state;
+- validation state;
+- view runtime state.
 
 Runtime preferences включают UI-состояния, которые могут стартовать из YAML, но дальше управляются пользователем в текущей сессии таблицы: sticky header, word wrap и line numbering. `line_numbers` в YAML остаётся default-состоянием, а включение/отключение из context menu не меняет persisted table values.
 

@@ -255,24 +255,6 @@ function normalizeListOptions(source: unknown): NormalizedListOption[] {
   return source.map((item, index) => normalizeListOption(item, index, duplicateValueCounts));
 }
 
-const widgetContract = {
-  STATEFUL_WIDGET_TYPES,
-  formatNowValueForWidgetType,
-  isChoiceWidgetMultiselect,
-  isListMultiselect,
-  isStatefulWidgetConfig,
-  isStatefulWidgetType,
-  isVocMultiselect,
-  normalizeListOption,
-  normalizeListOptions,
-  normalizeScalarStringValue,
-  normalizeStatefulWidgetValue,
-  normalizeStringArrayValue,
-  normalizeWidgetType,
-  normalizedStatefulValueEquals,
-  resolveInitialWidgetValue
-};
-
 export type {
   ListOptionRecord,
   NormalizeStatefulWidgetValueOptions,
@@ -299,5 +281,3 @@ export {
   normalizedStatefulValueEquals,
   resolveInitialWidgetValue
 };
-
-export default widgetContract;

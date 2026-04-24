@@ -1,5 +1,6 @@
 """Attr validation and attr-reference extraction."""
 from __future__ import annotations
+from dataclasses import dataclass
 from typing import Any
 from yaml.nodes import MappingNode, ScalarNode, SequenceNode
 from .config_attr_schema import ATTR_WIDGET_SCHEMA
@@ -18,50 +19,68 @@ from .config_shared import (
     _node_line,
     _relpath,
 )
+
+
+@dataclass(frozen=True)
+class _AttrValidationContext:
+    page_name: str
+    page_url: str
+    file_rel: str
+
+    def push(
+        self,
+        diagnostics: list,
+        level: str,
+        code: str,
+        message: str,
+        *,
+        line: int | None,
+        node_path: str,
+    ) -> None:
+        diagnostics.append(
+            _attr_option_diagnostic(
+                level,
+                code,
+                message,
+                page_name=self.page_name,
+                page_url=self.page_url,
+                file_rel=self.file_rel,
+                line=line,
+                node_path=node_path,
+            )
+        )
+
 def _validate_voc_columns_config(
     attr_name: str,
     columns_value: Any,
     *,
-    page_name: str,
-    page_url: str,
-    file_rel: str,
+    ctx: _AttrValidationContext,
     line: int | None,
 ) -> list:
     diagnostics: list = []
     if not isinstance(columns_value, list):
         return diagnostics
     if not columns_value:
-        diagnostics.append(
-            _attr_option_diagnostic(
-                "error",
-                "voc_columns_required",
-                f"attrs '{attr_name}.columns' должен содержать хотя бы один заголовок",
-                page_name=page_name,
-                page_url=page_url,
-                file_rel=file_rel,
-                line=line,
-                node_path=f"{attr_name}.columns",
-            )
+        ctx.push(
+            diagnostics,
+            "error",
+            "voc_columns_required",
+            f"attrs '{attr_name}.columns' должен содержать хотя бы один заголовок",
+            line=line,
+            node_path=f"{attr_name}.columns",
         )
         return diagnostics
     for index, item in enumerate(columns_value):
         label = str(item or "").strip() if isinstance(item, str) else ""
         if label:
             continue
-        diagnostics.append(
-            _attr_option_diagnostic(
-                "error",
-                "invalid_voc_column_label",
-                (
-                    f"attrs '{attr_name}.columns[{index}]' должен содержать "
-                    "непустую строку заголовка"
-                ),
-                page_name=page_name,
-                page_url=page_url,
-                file_rel=file_rel,
-                line=line,
-                node_path=f"{attr_name}.columns[{index}]",
-            )
+        ctx.push(
+            diagnostics,
+            "error",
+            "invalid_voc_column_label",
+            f"attrs '{attr_name}.columns[{index}]' должен содержать непустую строку заголовка",
+            line=line,
+            node_path=f"{attr_name}.columns[{index}]",
         )
     return diagnostics
 def _validate_voc_source_config(
@@ -70,9 +89,7 @@ def _validate_voc_source_config(
     source_value: Any,
     source_node: Any,
     *,
-    page_name: str,
-    page_url: str,
-    file_rel: str,
+    ctx: _AttrValidationContext,
 ) -> list:
     diagnostics: list = []
     if not isinstance(columns_value, list) or not columns_value:
@@ -80,39 +97,31 @@ def _validate_voc_source_config(
     column_count = len(columns_value)
     source_path = f"{attr_name}.source"
     def add_row_width_error(*, line: int | None, row_index: int, actual_count: int) -> None:
-        diagnostics.append(
-            _attr_option_diagnostic(
-                "error",
-                "invalid_voc_source_row_width",
-                (
-                    f"attrs '{source_path}' строка {row_index + 1} содержит {actual_count} "
-                    f"значений, ожидалось {column_count}"
-                ),
-                page_name=page_name,
-                page_url=page_url,
-                file_rel=file_rel,
-                line=line,
-                node_path=source_path,
-            )
+        ctx.push(
+            diagnostics,
+            "error",
+            "invalid_voc_source_row_width",
+            (
+                f"attrs '{source_path}' строка {row_index + 1} содержит {actual_count} "
+                f"значений, ожидалось {column_count}"
+            ),
+            line=line,
+            node_path=source_path,
         )
     if isinstance(source_value, str):
         if not isinstance(source_node, ScalarNode):
             return diagnostics
         if _voc_source_is_unsupported_scalar(source_value, source_node):
-            diagnostics.append(
-                _attr_option_diagnostic(
-                    "warning",
-                    "unsupported_voc_scalar_source",
-                    (
-                        f"attrs '{source_path}' использует scalar-source без разделителей "
-                        "строк или ячеек; такой формат не разбирается и публикуется как пустой набор строк"
-                    ),
-                    page_name=page_name,
-                    page_url=page_url,
-                    file_rel=file_rel,
-                    line=_node_line(source_node),
-                    node_path=source_path,
-                )
+            ctx.push(
+                diagnostics,
+                "warning",
+                "unsupported_voc_scalar_source",
+                (
+                    f"attrs '{source_path}' использует scalar-source без разделителей "
+                    "строк или ячеек; такой формат не разбирается и публикуется как пустой набор строк"
+                ),
+                line=_node_line(source_node),
+                node_path=source_path,
             )
             return diagnostics
         skipped_empty_rows = 0
@@ -129,20 +138,13 @@ def _validate_voc_source_config(
                     actual_count=len(cells),
                 )
         if skipped_empty_rows:
-            diagnostics.append(
-                _attr_option_diagnostic(
-                    "warning",
-                    "voc_source_empty_rows_skipped",
-                    (
-                        f"attrs '{source_path}' содержит пустые строки, которые были "
-                        "пропущены при разборе"
-                    ),
-                    page_name=page_name,
-                    page_url=page_url,
-                    file_rel=file_rel,
-                    line=_node_line(source_node),
-                    node_path=source_path,
-                )
+            ctx.push(
+                diagnostics,
+                "warning",
+                "voc_source_empty_rows_skipped",
+                f"attrs '{source_path}' содержит пустые строки, которые были пропущены при разборе",
+                line=_node_line(source_node),
+                node_path=source_path,
             )
         return diagnostics
     if isinstance(source_value, list):
@@ -168,9 +170,7 @@ def _build_duplicate_scalar_list_source_warning(
     attr_name: str,
     source_value: Any,
     *,
-    page_name: str,
-    page_url: str,
-    file_rel: str,
+    ctx: _AttrValidationContext,
     line: int | None,
 ):
     if not isinstance(source_value, list):
@@ -196,9 +196,9 @@ def _build_duplicate_scalar_list_source_warning(
             f"attrs '{attr_name}.source' содержит дублирующиеся scalar-options "
             f"({duplicate_preview}); для устойчивой identity используйте object-options с явным id"
         ),
-        page_name=page_name,
-        page_url=page_url,
-        file_rel=file_rel,
+        page_name=ctx.page_name,
+        page_url=ctx.page_url,
+        file_rel=ctx.file_rel,
         line=line,
         node_path=f"{attr_name}.source",
     )
@@ -213,18 +213,15 @@ def _validate_attr_config(
 ) -> tuple[dict[str, Any], list]:
     diagnostics: list = []
     normalized_config = dict(attr_config) if isinstance(attr_config, dict) else {}
+    ctx = _AttrValidationContext(page_name, page_url, file_rel)
     if not isinstance(attr_config, dict) or not isinstance(attr_node, MappingNode):
-        diagnostics.append(
-            _attr_option_diagnostic(
-                "error",
-                "invalid_attr_option_value",
-                f"attrs '{attr_name}' должен быть словарём с описанием widget",
-                page_name=page_name,
-                page_url=page_url,
-                file_rel=file_rel,
-                line=_node_line(attr_node),
-                node_path=attr_name,
-            )
+        ctx.push(
+            diagnostics,
+            "error",
+            "invalid_attr_option_value",
+            f"attrs '{attr_name}' должен быть словарём с описанием widget",
+            line=_node_line(attr_node),
+            node_path=attr_name,
         )
         return normalized_config, diagnostics
     node_items = _mapping_node_items(attr_node)
@@ -234,17 +231,13 @@ def _validate_attr_config(
         widget_type = "str"
         normalized_config["widget"] = "str"
     if not widget_type or widget_type not in ATTR_WIDGET_SCHEMA:
-        diagnostics.append(
-            _attr_option_diagnostic(
-                "error",
-                "unknown_attr_widget",
-                f"attrs '{attr_name}' использует неизвестный widget '{widget_type or '<empty>'}'",
-                page_name=page_name,
-                page_url=page_url,
-                file_rel=file_rel,
-                line=_node_line(node_items.get("widget", (None, attr_node))[1]),
-                node_path=f"{attr_name}.widget",
-            )
+        ctx.push(
+            diagnostics,
+            "error",
+            "unknown_attr_widget",
+            f"attrs '{attr_name}' использует неизвестный widget '{widget_type or '<empty>'}'",
+            line=_node_line(node_items.get("widget", (None, attr_node))[1]),
+            node_path=f"{attr_name}.widget",
         )
         return normalized_config, diagnostics
     allowed = ATTR_WIDGET_SCHEMA[widget_type]["allowed"]
@@ -252,47 +245,31 @@ def _validate_attr_config(
         key_node, value_node = node_items.get(option_name, (None, None))
         line = _node_line(key_node) or _node_line(value_node) or _node_line(attr_node)
         if option_name not in allowed:
-            diagnostics.append(
-                _attr_option_diagnostic(
-                    "error",
-                    "unsupported_attr_option",
-                    (
-                        f"attrs '{attr_name}' для widget '{widget_type}' не поддерживает "
-                        f"опцию '{option_name}'"
-                    ),
-                    page_name=page_name,
-                    page_url=page_url,
-                    file_rel=file_rel,
-                    line=line,
-                    node_path=f"{attr_name}.{option_name}",
-                )
+            ctx.push(
+                diagnostics,
+                "error",
+                "unsupported_attr_option",
+                f"attrs '{attr_name}' для widget '{widget_type}' не поддерживает опцию '{option_name}'",
+                line=line,
+                node_path=f"{attr_name}.{option_name}",
             )
             continue
         validation_error = _validate_attr_option_value(widget_type, option_name, option_value)
         if validation_error:
-            diagnostics.append(
-                _attr_option_diagnostic(
-                    "error",
-                    "invalid_attr_option_value",
-                    (
-                        f"attrs '{attr_name}.{option_name}' имеет некорректное значение: "
-                        f"{validation_error}"
-                    ),
-                    page_name=page_name,
-                    page_url=page_url,
-                    file_rel=file_rel,
-                    line=line,
-                    node_path=f"{attr_name}.{option_name}",
-                )
+            ctx.push(
+                diagnostics,
+                "error",
+                "invalid_attr_option_value",
+                f"attrs '{attr_name}.{option_name}' имеет некорректное значение: {validation_error}",
+                line=line,
+                node_path=f"{attr_name}.{option_name}",
             )
     if widget_type == "list" and "source" in normalized_config:
         source_node = node_items.get("source", (None, None))[1]
         duplicate_warning = _build_duplicate_scalar_list_source_warning(
             attr_name,
             normalized_config.get("source"),
-            page_name=page_name,
-            page_url=page_url,
-            file_rel=file_rel,
+            ctx=ctx,
             line=_node_line(source_node),
         )
         if duplicate_warning:
@@ -301,26 +278,20 @@ def _validate_attr_config(
         columns_node = node_items.get("columns", (None, None))[1]
         source_node = node_items.get("source", (None, None))[1]
         if "columns" not in normalized_config:
-            diagnostics.append(
-                _attr_option_diagnostic(
-                    "error",
-                    "voc_columns_required",
-                    f"attrs '{attr_name}' для widget 'voc' требует опцию 'columns'",
-                    page_name=page_name,
-                    page_url=page_url,
-                    file_rel=file_rel,
-                    line=_node_line(attr_node),
-                    node_path=f"{attr_name}.columns",
-                )
+            ctx.push(
+                diagnostics,
+                "error",
+                "voc_columns_required",
+                f"attrs '{attr_name}' для widget 'voc' требует опцию 'columns'",
+                line=_node_line(attr_node),
+                node_path=f"{attr_name}.columns",
             )
         else:
             diagnostics.extend(
                 _validate_voc_columns_config(
                     attr_name,
                     normalized_config.get("columns"),
-                    page_name=page_name,
-                    page_url=page_url,
-                    file_rel=file_rel,
+                    ctx=ctx,
                     line=_node_line(columns_node) or _node_line(attr_node),
                 )
             )
@@ -331,9 +302,7 @@ def _validate_attr_config(
                     normalized_config.get("columns"),
                     normalized_config.get("source"),
                     source_node,
-                    page_name=page_name,
-                    page_url=page_url,
-                    file_rel=file_rel,
+                    ctx=ctx,
                 )
             )
             if _voc_source_is_unsupported_scalar(

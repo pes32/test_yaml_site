@@ -12,8 +12,11 @@ import type {
     LegacyYamlAttrCompat
 } from '../../shared/attr_config.ts';
 import type { UnknownRecord } from '../../shared/object_record.ts';
-type WidgetAttrsMap = AttrConfigMap;
-type TableWidgetConfig = CommonWidgetAttrs & LegacyYamlAttrCompat & {
+import type { TableWidgetSetupMethodKey } from './table_setup_keys.ts';
+export type { UnknownRecord } from '../../shared/object_record.ts';
+export type { TableWidgetSetupMethodKey } from './table_setup_keys.ts';
+export type WidgetAttrsMap = AttrConfigMap;
+export type TableWidgetConfig = CommonWidgetAttrs & LegacyYamlAttrCompat & {
     data?: unknown;
     lazy_chunk_size?: number | string;
     lazy_fail_full_load?: boolean;
@@ -26,33 +29,16 @@ type TableWidgetConfig = CommonWidgetAttrs & LegacyYamlAttrCompat & {
     table_lazy?: boolean;
     zebra?: boolean;
 };
-type TableRowIdentity = string;
-type TableRowId = TableRowIdentity;
-type TableColumnKey = string;
-type TableCellAddress = {
-    c: number;
-    r: number;
-};
-type TableCoreCellAddress = {
-    colKey: TableColumnKey;
-    rowId: TableRowId;
-};
-type TableSelectionRect = {
-    c0: number;
-    c1: number;
-    r0: number;
-    r1: number;
-};
-type TableSortDirection = 'asc' | 'desc';
-type TableSortState = {
-    col: number;
-    dir: TableSortDirection;
-};
-type TableCoreSortState = {
-    colKey: TableColumnKey;
-    dir: TableSortDirection;
-};
-type TableHeaderCell = {
+export type TableRowIdentity = string;
+export type TableRowId = TableRowIdentity;
+export type TableColumnKey = string;
+export type TableCellAddress = { c: number; r: number };
+export type TableCoreCellAddress = { colKey: TableColumnKey; rowId: TableRowId };
+export type TableSelectionRect = { c0: number; c1: number; r0: number; r1: number };
+export type TableSortDirection = 'asc' | 'desc';
+export type TableSortState = { col: number; dir: TableSortDirection };
+export type TableCoreSortState = { colKey: TableColumnKey; dir: TableSortDirection };
+export type TableHeaderCell = {
     colspan: number;
     label: string;
     leafColIndex: number | null;
@@ -60,7 +46,7 @@ type TableHeaderCell = {
     runtimeColIndex: number | null;
     width?: string | null;
 };
-type TableRuntimeColumn = {
+export type TableRuntimeColumn = {
     attr?: string | null;
     embeddedWidget?: boolean;
     format?: string | null;
@@ -77,17 +63,17 @@ type TableRuntimeColumn = {
     widgetRef?: string | null;
     width?: string | null;
 };
-type TableCoreColumn = TableRuntimeColumn & {
+export type TableCoreColumn = TableRuntimeColumn & {
     columnKey: TableColumnKey;
 };
-type TableColumnAttrConfig = Partial<AttrConfigRecord> & {
+export type TableColumnAttrConfig = Partial<AttrConfigRecord> & {
     columns?: unknown[];
     editable?: boolean;
     multiselect?: boolean;
     placeholder?: unknown;
     readonly?: boolean;
 };
-type TableCellOptions = {
+export type TableCellOptions = {
     columns?: unknown[];
     default?: unknown;
     editable?: boolean;
@@ -97,7 +83,7 @@ type TableCellOptions = {
     regex?: unknown;
     source?: unknown;
 };
-type TableCellWidgetConfig = TableCellOptions & {
+export type TableCellWidgetConfig = TableCellOptions & {
     label: unknown;
     readonly: boolean;
     sup_text: string;
@@ -109,10 +95,10 @@ type TableCellWidgetConfig = TableCellOptions & {
     value: unknown;
     widget: string | undefined;
 };
-type TableCellWidgetPayload = UnknownRecord & {
+export type TableCellWidgetPayload = UnknownRecord & {
     value?: unknown;
 };
-type TableCellWidgetInstance = ComponentPublicInstance & {
+export type TableCellWidgetInstance = ComponentPublicInstance & {
     onArrowClick?: () => void;
     openDatePicker?: () => void;
     openPicker?: () => void;
@@ -120,18 +106,18 @@ type TableCellWidgetInstance = ComponentPublicInstance & {
     toggleDropdown?: () => void;
     [key: string]: unknown;
 };
-type TableCellDisplayActionKind = 'date' | 'list' | 'time' | string;
-type TableCellDisplayAction = {
+export type TableCellDisplayActionKind = 'date' | 'list' | 'time' | string;
+export type TableCellDisplayAction = {
     icon: string;
     kind: TableCellDisplayActionKind;
     label: string;
 };
-type TableLeafMeta = {
+export type TableLeafMeta = {
     isLineNumber: boolean;
     leafColIndex: number | null;
     runtimeColIndex: number;
 };
-type TableSchema = {
+export type TableSchema = {
     dependencies: string[];
     headerRows: TableHeaderCell[][];
     isLineNumbersEnabled: boolean;
@@ -140,11 +126,8 @@ type TableSchema = {
     runtimeColumns: TableRuntimeColumn[];
     runtimeToLeafMeta: TableLeafMeta[];
 };
-type TableDataRow = {
-    cells: unknown[];
-    id: TableRowIdentity;
-};
-type TableGroupDisplayRow = {
+export type TableDataRow = { cells: unknown[]; id: TableRowIdentity };
+export type TableGroupDisplayRow = {
     colIndex: number;
     columnLabel: string;
     depth: number;
@@ -154,56 +137,38 @@ type TableGroupDisplayRow = {
     pathKey: string;
     value: string;
 };
-type TableDataDisplayRow = {
+export type TableDataDisplayRow = {
     dataIndex: number;
     depth: number;
     kind: 'data';
     pathKey: string;
     rowId: TableRowIdentity;
 };
-type TableDisplayRow = TableDataDisplayRow | TableGroupDisplayRow;
-type TableGroupingState = {
-    expanded: Set<string>;
-    levels: number[];
-};
-type TableGroupingViewCache = {
-    displayRows: TableDisplayRow[];
-    validPathKeys: Set<string>;
-};
-type TableSelectionState = {
+export type TableDisplayRow = TableDataDisplayRow | TableGroupDisplayRow;
+export type TableGroupingState = { expanded: Set<string>; levels: number[] };
+export type TableSelectionState = {
     anchor: TableCellAddress;
     focus: TableCellAddress;
     fullWidthRows: { r0: number; r1: number } | null;
 };
-type TableCoreSelectionState = {
+export type TableCoreSelectionState = {
     anchor: TableCoreCellAddress | null;
     focus: TableCoreCellAddress | null;
     fullWidthRowIds: TableRowId[] | null;
 };
-type TableEditingSession = {
-    activeCell: TableCellAddress | null;
-    validationErrors: Record<string, string>;
-};
-type TableCoreEditingSession = {
+export type TableEditingSession = { activeCell: TableCellAddress | null };
+export type TableCoreEditingSession = {
     activeCell: TableCoreCellAddress | null;
     draftValue: unknown;
     validationErrors: Record<string, string>;
 };
-type TableContextMenuTarget =
-    | {
-          kind: 'body';
-          col: number;
-          row: number;
-      }
-    | {
-          kind: 'header';
-          col: number;
-      };
-type TableContextMenuSnapshot = {
+export type TableContextMenuTarget = { kind: 'body'; col: number; row: number } | { kind: 'header'; col: number };
+export type TableContextMenuSnapshot = {
     anchorCol: number;
     anchorColumnKey?: TableColumnKey | null;
     anchorRow: number;
     anchorRowId?: TableRowId | null;
+    anchorSourceRow?: number | null;
     bodyMode: 'cell' | 'cells' | 'row' | null;
     groupingLevelsSnapshot: number[];
     groupingLevelKeysSnapshot?: TableColumnKey[];
@@ -221,7 +186,7 @@ type TableContextMenuSnapshot = {
     stickyHeaderEnabled: boolean;
     wordWrapEnabled: boolean;
 };
-type TableContextMenuItem = {
+export type TableContextMenuItem = {
     disabled: boolean;
     icon: string | null;
     iconClass?: string;
@@ -231,67 +196,49 @@ type TableContextMenuItem = {
     separatorBefore: boolean;
     visible: boolean;
 };
-type TableContextMenuState = {
+export type TableContextMenuState = {
     context: TableContextMenuSnapshot | null;
     open: boolean;
-    position: {
-        x: number;
-        y: number;
-    };
+    position: { x: number; y: number };
     sessionId: number;
     target: TableContextMenuTarget | null;
 };
-type TableClipboardPayload = {
-    matrix: unknown[][];
-    pasteAnchor: TableCellAddress;
-    rect: TableSelectionRect;
-};
-type TableCoreContextMenuState = {
-    context: TableContextMenuSnapshot | null;
-    open: boolean;
-    sessionId: number;
-};
-type TableCoreState = {
+export type TableClipboardPayload = { matrix: unknown[][]; pasteAnchor: TableCellAddress; rect: TableSelectionRect };
+export type TableCoreContextMenuState = { context: TableContextMenuSnapshot | null; open: boolean; sessionId: number };
+export type TableCoreCellPatch = { cell: TableCoreCellAddress; value: unknown };
+export type TableCoreState = {
     activeCell: TableCoreCellAddress | null;
     columns: TableCoreColumn[];
     contextMenu: TableCoreContextMenuState;
     editing: TableCoreEditingSession | null;
-    grouping: {
-        expanded: Set<string>;
-        levelKeys: TableColumnKey[];
-    };
+    grouping: { expanded: Set<string>; levelKeys: TableColumnKey[] };
     rows: TableDataRow[];
     selection: TableCoreSelectionState;
     sortKeys: TableCoreSortState[];
 };
-type TableCommand =
+export type TableCommand =
     | { type: 'SET_ACTIVE_CELL'; cell: TableCoreCellAddress | null }
-    | {
-          type: 'SET_SELECTION_RECT';
-          anchor: TableCoreCellAddress | null;
-          focus: TableCoreCellAddress | null;
-          fullWidthRowIds?: TableRowId[] | null;
-      }
+    | { type: 'SET_SELECTION_RECT'; anchor: TableCoreCellAddress | null; focus: TableCoreCellAddress | null; fullWidthRowIds?: TableRowId[] | null }
     | { type: 'ENTER_EDIT_MODE'; cell: TableCoreCellAddress; draftValue: unknown }
     | { type: 'COMMIT_EDIT'; value: unknown }
     | { type: 'CANCEL_EDIT' }
-    | {
-          type: 'INSERT_ROWS';
-          afterRowId?: TableRowId | null;
-          beforeRowId?: TableRowId | null;
-          rows: TableDataRow[];
-      }
+    | { type: 'PATCH_CELLS'; patches: TableCoreCellPatch[] }
+    | { type: 'REPLACE_ROWS'; rows: TableDataRow[] }
+    | { type: 'INSERT_ROWS'; afterRowId?: TableRowId | null; beforeRowId?: TableRowId | null; rows: TableDataRow[] }
     | { type: 'DELETE_ROWS'; rowIds: TableRowId[] }
-    | { type: 'PASTE_TSV'; anchor: TableCoreCellAddress; matrix: unknown[][] }
+    | { type: 'MOVE_ROW'; delta: number; rowId: TableRowId }
+    | { type: 'PASTE_TSV'; anchor: TableCoreCellAddress; appendRows?: TableDataRow[]; matrix: unknown[][]; mutableColKeys?: TableColumnKey[] | null; targetRowIds?: TableRowId[] | null }
     | { type: 'SORT_COLUMNS'; sortKeys: TableCoreSortState[] }
     | { type: 'CLEAR_SORT'; colKey?: TableColumnKey | null }
     | { type: 'ADD_GROUP_LEVEL'; colKey: TableColumnKey }
     | { type: 'REMOVE_GROUP_LEVEL'; colKey: TableColumnKey }
+    | { type: 'SET_GROUP_LEVELS'; colKeys: TableColumnKey[]; expandedPathKeys?: string[] }
+    | { type: 'SET_GROUP_EXPANDED'; expandedPathKeys: string[] }
     | { type: 'REBUILD_GROUPING' }
     | { type: 'APPEND_LOADED_ROWS'; rows: TableDataRow[] }
     | { type: 'OPEN_CONTEXT_MENU'; snapshot: TableContextMenuSnapshot }
     | { type: 'CLOSE_CONTEXT_MENU' };
-type TableViewModel = {
+export type TableViewModel = {
     displayIndexToRowId: Array<TableRowId | null>;
     displayRows: TableDisplayRow[];
     orderedRowIds: TableRowId[];
@@ -299,7 +246,7 @@ type TableViewModel = {
     rowIdToSourceIndex: Map<TableRowId, number>;
     validPathKeys: Set<string>;
 };
-type TableEditorHandle = {
+export type TableEditorHandle = {
     blur?: () => void;
     commitDraft: () => unknown;
     commitPendingState: (context: { colKey: TableColumnKey; rowId: TableRowId }) => unknown;
@@ -307,69 +254,62 @@ type TableEditorHandle = {
     getValue: () => unknown;
     setValue: (value: unknown) => void;
 };
-type TableLazyLoadState = {
+export type TableLazyLoadState = {
     isFullyLoaded: boolean;
     isLoadingChunk: boolean;
     lazyEnabled: boolean;
     lazyPendingRows: TableDataRow[];
     lazySessionId: number;
 };
-type TableMeasurementState = {
+export type TableMeasurementState = {
     stickyPinnedRowCount: number;
     stickyPinnedTableWidth: number;
     stickyPinnedWidthsByRow: number[][] | null;
     stickyTheadPinned: boolean;
 };
-type TableRuntimeErrorSeverity = 'fatal' | 'recoverable';
-type TableRuntimeError = {
+export type TableStickyState = TableMeasurementState & { headerRuntimeEnabled: boolean };
+export type TableValidationState = { cellErrors: Record<string, string> };
+export type TableViewRuntimeState = { lineNumbersRuntimeEnabled: boolean; wordWrapRuntimeEnabled: boolean };
+export type TableRuntimeErrorSeverity = 'fatal' | 'recoverable';
+export type TableRuntimeError = {
     cause?: unknown;
     code: string;
     details?: UnknownRecord;
     message: string;
     severity: TableRuntimeErrorSeverity;
 };
-type TableRuntimeServices = {
+export type TableRuntimeServices = {
     getAllAttrsMap(): WidgetAttrsMap;
     getListOptions(sourceName: string): unknown[];
     handleRecoverableError(error: TableRuntimeError): void;
     notify(message: string, type?: string): void;
     reportError(error: TableRuntimeError): void;
 };
-type TableStore = {
-    contextMenu: TableContextMenuState;
+export type TableStore = {
     editing: TableEditingSession;
-    grouping: {
-        state: TableGroupingState;
-        viewCache: TableGroupingViewCache | null;
-    };
-    loading: TableLazyLoadState & {
-        tableUiLocked: boolean;
-    };
-    measurement: TableMeasurementState;
-    preferences: {
-        lineNumbersRuntimeEnabled: boolean;
-        stickyHeaderRuntimeEnabled: boolean;
-        wordWrapRuntimeEnabled: boolean;
-    };
+    grouping: { state: TableGroupingState };
+    loading: TableLazyLoadState & { tableUiLocked: boolean };
+    menu: TableContextMenuState;
     selection: TableSelectionState;
-    sorting: {
-        sortKeys: TableSortState[];
-    };
+    sorting: { sortKeys: TableSortState[] };
+    sticky: TableStickyState;
+    validation: TableValidationState;
+    view: TableViewRuntimeState;
 };
-type TableRuntimeRefs = Record<string, Element | ComponentPublicInstance | Array<Element | ComponentPublicInstance> | null | undefined> & {
+export type TableRuntimeRefs = Record<string, Element | ComponentPublicInstance | Array<Element | ComponentPublicInstance> | null | undefined> & {
     contextMenuEl?: HTMLElement | null;
     lazySentinelRow?: HTMLTableRowElement | null;
     tableRoot?: HTMLTableElement | null;
     tableThead?: HTMLTableSectionElement | null;
 };
-type TableRuntimeDomSurface = {
+export type TableRuntimeDomSurface = {
     $el?: Element | null;
     $emit: (event: 'input', payload?: unknown) => void;
     $nextTick: <T = void>(callback?: () => T) => Promise<unknown>;
     $refs: TableRuntimeRefs;
     $root?: (ComponentPublicInstance & { showNotification?: (message: string, type?: string) => void }) | null;
 };
-type TableRuntimeState = {
+export type TableRuntimeState = {
     _contextMenuClickHandler: ((event: Event) => void) | null;
     _contextMenuKeydownHandler: ((event: KeyboardEvent) => void) | null;
     _lazyDebounceTimer: ReturnType<typeof setTimeout> | null;
@@ -411,17 +351,13 @@ type TableRuntimeState = {
     tableStore: TableStore;
     value: unknown[];
 };
-type TableRuntimePropsSurface = {
-    widgetConfig: TableWidgetConfig;
-    widgetName: string;
-};
-type TableRuntimeComputed = {
+export type TableRuntimePropsSurface = { widgetConfig: TableWidgetConfig; widgetName: string };
+export type TableRuntimeComputed = {
     _lazyPendingRows: TableDataRow[];
     contextMenuItems: TableContextMenuItem[];
     displayRows: TableDisplayRow[];
     groupingActive: boolean;
     groupingState: TableGroupingState;
-    groupingViewCache: TableGroupingViewCache | null;
     hasColumnNumbers: boolean;
     hasExplicitTableWidth: boolean;
     headerSortEnabled: boolean;
@@ -444,133 +380,125 @@ type TableRuntimeComputed = {
     wordWrapEnabled: boolean;
     wordWrapRuntimeEnabled: boolean;
 };
-type TableRuntimeComputedRefs = {
+export type TableRuntimeComputedRefs = {
     readonly [K in keyof TableRuntimeComputed]: ComputedRef<TableRuntimeComputed[K]>;
 };
-type TableMutationOptions = {
-    force?: boolean;
-    skipEmit?: boolean;
-    skipGroupingSync?: boolean;
-    skipGroupingViewRefresh?: boolean;
-    skipSort?: boolean;
+export type TableShowErrorOptions = { cause?: unknown; details?: unknown };
+export type TableRuntimeMethod = CallableFunction;
+export type TableRuntimeMethodSubset<This = TableRuntimeVm> = Record<string, TableRuntimeMethod> &
+    ThisType<This>;
+export type TableRuntimeMethodContracts = {
+    _detachContextMenuGlobalListeners(): void;
+    _scheduleStickyTheadUpdate(): void;
+    _updateStickyThead(): void;
+    _teardownLazyObserver(): void;
+    _unbindStickyThead(): void;
+    canMutateColumnIndex(colIndex: number): boolean;
+    coreCellFromDisplay(rowIndex: number, colIndex: number): TableCoreCellAddress | null;
+    dataRowByIdentity(rowId: string): TableDataRow | null;
+    displayCellFromIdentity(rowId: string, colKey: string, fallback: TableCellAddress): TableCellAddress;
+    dispatchTableCoreCommand(command: TableCommand, phase?: string, options?: Record<string, unknown>): TableCoreState;
+    emptyCellValueForColumn(colIndex: number): unknown;
+    getAllAttrsMap(): WidgetAttrsMap;
+    getColumnAttrConfig(column: TableRuntimeColumn | null | undefined): TableColumnAttrConfig;
+    getColumnTableCellOptions(column: TableRuntimeColumn | null | undefined): Record<string, unknown>;
+    getListOptions(sourceName: unknown): unknown[];
+    getSelRect(): TableSelectionRect;
+    listColumnIsMultiselect(column: TableRuntimeColumn | null | undefined): boolean;
+    navigateTableByTabFromCell(rowIndex: number, cellIndex: number, shiftKey: boolean): boolean | void;
+    normCol(col: number): number;
+    normRow(row: number): number;
+    normalizeCellWidgetValue(column: TableRuntimeColumn | null | undefined, currentValue: unknown): unknown;
+    onCellWidgetValidation(rowIndex: number, cellIndex: number, message: unknown): void;
+    onHeaderSortClick(colIdx: number | null | undefined, event?: { shiftKey?: boolean }): void;
+    onInput(): void;
+    onTableHeaderContextMenu(event: MouseEvent, rowIndex: number, cell: TableHeaderCell | null, colIndex: number | null | undefined): void;
+    safeCell(row: unknown, colIndex: number): unknown;
+    runtimeColumnKeys(): string[];
+    refreshGroupingViewFromData(): void;
+    syncRuntimeFromCoreState(coreState: TableCoreState, options?: Record<string, unknown>): void;
+    tableCellConsumeKeys(column: TableRuntimeColumn | null | undefined): string;
+    tableCoreStateSnapshot(): TableCoreState;
+    tableViewModelSnapshot(coreState?: TableCoreState | null): TableViewModel;
 };
-type TableShowErrorOptions = {
-    cause?: unknown;
-    details?: unknown;
-};
-type TableRuntimeLooseValue = ReturnType<typeof JSON.parse>;
-type TableRuntimeMethodSubset = Record<string, (this: TableRuntimeLooseValue, ...args: TableRuntimeLooseValue[]) => unknown>;
-type TableRuntimeMethods = typeof import('./createTableRuntime.ts').tableRuntimeMethods;
-type TableWidgetEmit = (event: 'input', payload: unknown) => void;
-type TableWidgetVm = TableRuntimeState &
-    TableRuntimePropsSurface &
-    TableRuntimeComputed &
-    Record<string, TableRuntimeLooseValue>;
-type TableRuntimeVm = TableRuntimeDomSurface & TableWidgetVm;
-type TableRuntimeModuleSurface = TableRuntimeVm;
-type TableDomRuntimeSurface = TableRuntimeModuleSurface;
-type TableSelectionRuntimeSurface = TableRuntimeModuleSurface;
-type TableStickyRuntimeSurface = TableRuntimeModuleSurface;
-type TableWidgetSetupBindings = ToRefs<TableRuntimeState> &
-    {
-        readonly widgetConfig: Ref<TableWidgetConfig>;
-        readonly widgetName: Ref<string>;
-    } &
-    TableRuntimeComputedRefs &
-    TableRuntimeMethods;
-type TableWidgetPublicSurface = {
-    readonly contextMenuOpen: boolean;
-    readonly stickyHeaderEnabled: boolean;
-    readonly tableData: TableDataRow[];
+export type TableWidgetPublicRuntimeMethods = {
+    dispatchTableCommand(command: string | TableCommand, payload?: Record<string, unknown>, phase?: string, options?: Record<string, unknown>): unknown;
     getTableEl(): HTMLTableElement | null;
     getValue(): unknown[][];
     initializeTable(): void;
     onTableEditableKeydown(event: KeyboardEvent): void;
     setValue(value: unknown): void;
 };
-type TableRuntimeComputedGetter<T> = (this: TableRuntimeVm) => T;
-type TableRuntimeComputedDefinition<T> =
+export type TableRuntimeMethods = Record<string, TableRuntimeMethod> &
+    TableRuntimeMethodContracts &
+    TableWidgetPublicRuntimeMethods;
+export type TableWidgetEmit = (event: 'input', payload: unknown) => void;
+export type TableWidgetVm = TableRuntimeState & TableRuntimePropsSurface & TableRuntimeComputed;
+export type TableRuntimeVm = TableRuntimeDomSurface & TableWidgetVm & TableRuntimeMethods;
+export type TableWidgetSetupMethods = Pick<TableRuntimeMethods, TableWidgetSetupMethodKey>;
+export type TableSelectionRuntimeSurface = Pick<
+    TableRuntimeState,
+    | '_tableFocusWithin'
+    | 'selAnchor'
+    | 'selFocus'
+    | 'selFullWidthRows'
+    | 'tableColumns'
+    | 'tableData'
+> &
+    Pick<TableRuntimeComputed, 'isEditable'> & {
+        blankCellValueForColumn(colIndex: number): unknown;
+        canMutateColumnIndex(colIndex: number): boolean;
+        cellHasCommitError(row: number, col: number): boolean;
+        dispatchTableCoreCommand(command: TableCommand, phase?: string, options?: Record<string, unknown>): unknown;
+        emptyCellValueForColumn(colIndex: number): unknown;
+        getSelectionCellCount(): number;
+        getSelRect(): TableSelectionRect;
+        isCellInSelection(row: number, col: number): boolean;
+        isMultiCellSelection(): boolean;
+        listColumnIsMultiselect(column: TableRuntimeColumn | null | undefined): boolean;
+        normCol(col: number): number;
+        normRow(row: number): number;
+        selectionIsFullRowBlock(): boolean;
+        tableViewModelSnapshot(): TableViewModel;
+        tbodyRowCount(): number;
+    };
+export type TableStickyRuntimeSurface = TableRuntimeDomSurface &
+    Pick<
+        TableRuntimeState,
+        | '_stickyOnScroll'
+        | '_stickyPinnedRowCount'
+        | '_stickyPinnedTableWidth'
+        | '_stickyPinnedWidthsByRow'
+        | '_stickyRaf'
+        | '_stickyRo'
+        | '_stickyScrollRoot'
+        | '_stickyTheadPinned'
+        | 'headerRows'
+        | 'tableColumns'
+    > & {
+        stickyHeaderEnabled: TableRuntimeComputed['stickyHeaderEnabled'];
+        onHeaderSortClick(colIdx: number | null | undefined, event?: { shiftKey?: boolean }): void;
+        onTableHeaderContextMenu(event: MouseEvent, rowIndex: number, cell: TableHeaderCell | null, colIndex: number | null | undefined): void;
+    };
+export type TableWidgetSetupBindings = ToRefs<TableRuntimeState> &
+    { readonly widgetConfig: Ref<TableWidgetConfig>; readonly widgetName: Ref<string> } &
+    TableRuntimeComputedRefs &
+    TableWidgetSetupMethods;
+export type TableWidgetPublicSurface = {
+    readonly contextMenuOpen: boolean;
+    readonly stickyHeaderEnabled: boolean;
+    readonly tableData: TableDataRow[];
+} & TableWidgetPublicRuntimeMethods;
+export type TableRuntimeComputedGetter<T> = (this: TableRuntimeVm) => T;
+export type TableRuntimeComputedDefinition<T> =
     | TableRuntimeComputedGetter<T>
-    | {
-          get: TableRuntimeComputedGetter<T>;
-          set?: (this: TableRuntimeVm, value: T) => void;
-      };
-type TableRuntimeComputedDefinitions = {
+    | { get: TableRuntimeComputedGetter<T>; set?: (this: TableRuntimeVm, value: T) => void };
+export type TableRuntimeComputedDefinitions = {
     [K in keyof TableRuntimeComputed]: TableRuntimeComputedDefinition<TableRuntimeComputed[K]>;
 };
-type TableRuntimeWatchHandlers = {
+export type TableRuntimeWatchHandlers = {
     stickyHeaderEnabled(this: TableRuntimeVm, value: TableRuntimeComputed['stickyHeaderEnabled']): void;
     tableLazyUiActive(this: TableRuntimeVm, value: TableRuntimeComputed['tableLazyUiActive']): void;
     widgetConfig(this: TableRuntimeVm): void;
     widgetName(this: TableRuntimeVm): void;
-};
-export type {
-    TableCellDisplayAction,
-    TableCellDisplayActionKind,
-    TableCellAddress,
-    TableColumnKey,
-    TableClipboardPayload,
-    TableCellOptions,
-    TableCellWidgetConfig,
-    TableCellWidgetInstance,
-    TableCellWidgetPayload,
-    TableColumnAttrConfig,
-    TableCommand,
-    TableContextMenuItem,
-    TableContextMenuSnapshot,
-    TableContextMenuState,
-    TableContextMenuTarget,
-    TableCoreCellAddress,
-    TableCoreColumn,
-    TableCoreContextMenuState,
-    TableCoreEditingSession,
-    TableCoreSelectionState,
-    TableCoreSortState,
-    TableCoreState,
-    TableDataDisplayRow,
-    TableDataRow,
-    TableDisplayRow,
-    TableDomRuntimeSurface,
-    TableEditingSession,
-    TableEditorHandle,
-    TableGroupDisplayRow,
-    TableGroupingState,
-    TableGroupingViewCache,
-    TableHeaderCell,
-    TableLazyLoadState,
-    TableLeafMeta,
-    TableMeasurementState,
-    TableRowIdentity,
-    TableRowId,
-    TableRuntimeColumn,
-    TableRuntimeError,
-    TableRuntimeErrorSeverity,
-    TableRuntimeComputed,
-    TableRuntimeComputedDefinition,
-    TableRuntimeComputedDefinitions,
-    TableRuntimeComputedRefs,
-    TableRuntimeDomSurface,
-    TableRuntimeMethodSubset,
-    TableRuntimeMethods,
-    TableRuntimePropsSurface,
-    TableRuntimeState,
-    TableRuntimeVm,
-    TableRuntimeServices,
-    TableRuntimeWatchHandlers,
-    TableSchema,
-    TableSelectionRect,
-    TableSelectionRuntimeSurface,
-    TableSelectionState,
-    TableStickyRuntimeSurface,
-    TableSortDirection,
-    TableSortState,
-    TableStore,
-    TableViewModel,
-    TableWidgetConfig,
-    TableWidgetEmit,
-    TableWidgetPublicSurface,
-    TableWidgetSetupBindings,
-    TableWidgetVm,
-    UnknownRecord,
-    WidgetAttrsMap
 };

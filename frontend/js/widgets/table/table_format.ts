@@ -85,18 +85,9 @@ function formatCellValue(value: unknown, column: TableRuntimeColumn | null | und
     return asString;
 }
 
-const TableFormat = {
-    formatCellValue,
-    parseNumericFormatHint,
-    formatNumberWithHint,
-    addThousands
-};
-
 export {
     addThousands,
     formatCellValue,
     formatNumberWithHint,
     parseNumericFormatHint
 };
-
-export default TableFormat;

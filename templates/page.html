@@ -1,17 +1,8 @@
 <!DOCTYPE html>
 <html lang="ru">
-<head>
-    {% set page_bundle = vite_entry_assets('src/entry/page.ts') %}
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>YAML System - {{ page_config.title if page_config.title else (page_config.name if page_config.name else 'main') }}</title>
-    <link rel="icon" href="{{ url_for('favicon') }}">
-    {% if page_bundle and page_bundle.get('css') %}
-        {% for css_file in page_bundle.get('css', []) %}
-    <link href="{{ url_for('static', filename='dist/' ~ css_file) }}" rel="stylesheet">
-        {% endfor %}
-    {% endif %}
-</head>
+{% from "_html_head.html" import app_head %}
+{% set page_bundle = vite_entry_assets('src/entry/page.ts') %}
+{{ app_head('YAML System - ' ~ (page_config.title if page_config.title else (page_config.name if page_config.name else 'main')), page_bundle) }}
 <body data-page-name="{{ page_config.name }}">
     {% include "_app_header.html" %}
     <div id="app"></div>

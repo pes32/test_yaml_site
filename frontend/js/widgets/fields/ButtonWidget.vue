@@ -21,11 +21,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, onMounted, ref } from 'vue';
+import { computed } from 'vue';
 import ActionButtonContent from '../action-button/ActionButtonContent.vue';
 import { parseButtonAction } from '../../runtime/action_runtime.ts';
-import useActionButtonVisual from '../action-button/useActionButtonVisual.ts';
-import useActionExecution from '../action-button/useActionExecution.ts';
+import useActionWidgetBase from '../action-button/useActionWidgetBase.ts';
 import type { ActionWidgetEmit, ActionWidgetProps } from '../action-button/types.ts';
 
 defineOptions({
@@ -34,18 +33,6 @@ defineOptions({
 
 const props = defineProps<ActionWidgetProps>();
 const emit = defineEmits<ActionWidgetEmit>();
-
-const getConfirmModal = inject<() => unknown | null>('getConfirmModal', () => null);
-const openUiModal = inject<((modalName: string) => Promise<unknown> | unknown) | null>(
-  'openUiModal',
-  null
-);
-const closeUiModal = inject<(() => Promise<unknown> | unknown) | null>(
-  'closeUiModal',
-  null
-);
-
-const value = ref<unknown>('');
 const buttonAction = computed(() => parseButtonAction(props.widgetConfig));
 
 const {
@@ -54,15 +41,13 @@ const {
   buttonTitle,
   iconName,
   iconStyle,
+  getValue,
+  executeAction,
+  setValue,
   standaloneButtonStyle,
-  supportingText
-} = useActionButtonVisual(props, { fallbackTitle: 'Кнопка' });
-
-const { executeAction } = useActionExecution(props, emit, {
-  closeUiModal,
-  getConfirmModal,
-  openUiModal
-});
+  supportingText,
+  value
+} = useActionWidgetBase(props, emit, { fallbackTitle: 'Кнопка' });
 
 function onButtonClick(): void {
   if (!buttonAction.value) {
@@ -70,20 +55,6 @@ function onButtonClick(): void {
   }
   void executeAction(buttonAction.value);
 }
-
-function setValue(nextValue: unknown): void {
-  value.value = nextValue;
-}
-
-function getValue(): unknown {
-  return value.value;
-}
-
-onMounted(() => {
-  if (props.widgetConfig.default !== undefined) {
-    value.value = props.widgetConfig.default;
-  }
-});
 
 defineExpose({
   getValue,

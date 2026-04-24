@@ -1,6 +1,7 @@
 import type {
     TableColumnKey,
     TableCommand,
+    TableCoreCellPatch,
     TableContextMenuSnapshot,
     TableCoreCellAddress,
     TableCoreColumn,
@@ -221,9 +222,65 @@ function normalizeSortKeys(state: TableCoreState): TableCoreSortState[] {
     return next;
 }
 
+function contextSnapshotReferencesExistingState(state: TableCoreState): boolean {
+    const context = state.contextMenu?.context || null;
+    if (!state.contextMenu?.open || !context) return false;
+    if (context.sessionId !== state.contextMenu.sessionId) return false;
+
+    const rowIds = new Set(state.rows.map((row) => String(row.id)));
+    const columnKeys = new Set(state.columns.map((column) => column.columnKey));
+    const rowIdExists = (rowId: TableColumnKey | null | undefined) =>
+        rowId == null || rowIds.has(String(rowId));
+    const columnKeyExists = (colKey: TableColumnKey | null | undefined) =>
+        colKey == null || columnKeys.has(String(colKey));
+
+    if (!rowIdExists(context.anchorRowId)) return false;
+    if (!rowIdExists(context.pasteAnchorRowId)) return false;
+    if (!columnKeyExists(context.anchorColumnKey)) return false;
+    if (!columnKeyExists(context.headerColumnKey)) return false;
+    if (!columnKeyExists(context.pasteAnchorColumnKey)) return false;
+
+    if (
+        Array.isArray(context.groupingLevelKeysSnapshot) &&
+        context.groupingLevelKeysSnapshot.some((colKey) => !columnKeyExists(colKey))
+    ) {
+        return false;
+    }
+    if (
+        Array.isArray(context.sortKeyColumnsSnapshot) &&
+        context.sortKeyColumnsSnapshot.some((item) => !columnKeyExists(item.colKey))
+    ) {
+        return false;
+    }
+    if (context.selectionSnapshot) {
+        const { anchor, focus, fullWidthRowIds } = context.selectionSnapshot;
+        if (!rowIdExists(anchor?.rowId) || !columnKeyExists(anchor?.colKey)) return false;
+        if (!rowIdExists(focus?.rowId) || !columnKeyExists(focus?.colKey)) return false;
+        if (
+            Array.isArray(fullWidthRowIds) &&
+            fullWidthRowIds.some((rowId) => !rowIdExists(rowId))
+        ) {
+            return false;
+        }
+    }
+    if (context.bodyMode != null) {
+        if (context.anchorRowId == null && (context.anchorRow < 0 || context.anchorRow >= state.rows.length)) {
+            return false;
+        }
+        if (
+            context.pasteAnchorRowId == null &&
+            (context.pasteAnchor.r < 0 || context.pasteAnchor.r >= state.rows.length)
+        ) {
+            return false;
+        }
+    }
+    return true;
+}
+
 function normalizeTableCoreState(state: TableCoreState): TableCoreState {
     const rows = cloneRows(state.rows || []);
     const columns = withUniqueColumnKeys(state.columns || []);
+    const contextMenuOpen = Boolean(state.contextMenu?.open);
     const next: TableCoreState = {
         ...state,
         activeCell: state.activeCell && cellExists({ ...state, rows, columns }, state.activeCell)
@@ -231,8 +288,8 @@ function normalizeTableCoreState(state: TableCoreState): TableCoreState {
             : firstCell({ ...state, rows, columns }),
         columns,
         contextMenu: {
-            context: state.contextMenu?.open ? state.contextMenu.context : null,
-            open: Boolean(state.contextMenu?.open),
+            context: contextMenuOpen ? state.contextMenu.context : null,
+            open: contextMenuOpen,
             sessionId: state.contextMenu?.sessionId || 0
         },
         editing:
@@ -255,6 +312,13 @@ function normalizeTableCoreState(state: TableCoreState): TableCoreState {
     };
     next.selection = normalizeSelection(next);
     next.sortKeys = normalizeSortKeys(next);
+    if (!contextSnapshotReferencesExistingState(next)) {
+        next.contextMenu = {
+            context: null,
+            open: false,
+            sessionId: next.contextMenu.sessionId
+        };
+    }
     return next;
 }
 
@@ -272,6 +336,36 @@ function replaceCellValue(
         const cells = getRowCells(row).slice();
         cells[colIndex] = value;
         return { id: String(row.id), cells };
+    });
+}
+
+function patchCellValues(
+    rows: readonly TableDataRow[],
+    columns: readonly TableCoreColumn[],
+    patches: readonly TableCoreCellPatch[]
+): TableDataRow[] {
+    if (!Array.isArray(patches) || patches.length === 0) return cloneRows(rows);
+    const columnIndexByKeyMap = new Map(columns.map((column, index) => [column.columnKey, index]));
+    const patchesByRow = new Map<string, TableCoreCellPatch[]>();
+    for (const patch of patches) {
+        if (!patch?.cell) continue;
+        const rowId = String(patch.cell.rowId);
+        const colIndex = columnIndexByKeyMap.get(patch.cell.colKey);
+        if (colIndex == null) continue;
+        if (!patchesByRow.has(rowId)) patchesByRow.set(rowId, []);
+        patchesByRow.get(rowId)?.push(patch);
+    }
+    if (!patchesByRow.size) return cloneRows(rows);
+    return rows.map((row) => {
+        const rowId = String(row.id);
+        const rowPatches = patchesByRow.get(rowId);
+        if (!rowPatches?.length) return { id: rowId, cells: getRowCells(row).slice() };
+        const cells = getRowCells(row).slice();
+        rowPatches.forEach((patch) => {
+            const colIndex = columnIndexByKeyMap.get(patch.cell.colKey);
+            if (colIndex != null) cells[colIndex] = patch.value;
+        });
+        return { id: rowId, cells };
     });
 }
 
@@ -293,29 +387,81 @@ function insertRows(state: TableCoreState, command: Extract<TableCommand, { type
     return rows;
 }
 
+function moveRowRelative(
+    rows: readonly TableDataRow[],
+    rowId: string,
+    delta: number
+): TableDataRow[] {
+    const next = cloneRows(rows);
+    const sourceIndex = rowIndexById(next, rowId);
+    if (sourceIndex < 0) return next;
+    const targetIndex = sourceIndex + Math.trunc(delta || 0);
+    if (targetIndex < 0 || targetIndex >= next.length || targetIndex === sourceIndex) return next;
+    const [movedRow] = next.splice(sourceIndex, 1);
+    next.splice(targetIndex, 0, movedRow);
+    return next;
+}
+
 function applyPasteToCoreRows(
     state: TableCoreState,
-    anchor: TableCoreCellAddress,
-    matrix: readonly unknown[][]
+    command: Extract<TableCommand, { type: 'PASTE_TSV' }>
 ): TableDataRow[] {
+    const { anchor, matrix } = command;
     const rowIndex = rowIndexById(state.rows, anchor.rowId);
     const colIndex = state.columns.findIndex((column) => column.columnKey === anchor.colKey);
     if (rowIndex < 0 || colIndex < 0 || !matrix.length) return cloneRows(state.rows);
-    return state.rows.map((row, index) => {
+    const rows = cloneRows(state.rows);
+    const appendRows = cloneRows(command.appendRows || []);
+    const mutableColKeys =
+        Array.isArray(command.mutableColKeys)
+            ? new Set(command.mutableColKeys)
+            : null;
+    const targetRowIds = Array.isArray(command.targetRowIds)
+        ? command.targetRowIds.map((rowId) => String(rowId))
+        : [];
+    if (targetRowIds.length) {
+        rows.push(...appendRows);
+        const matrixByRowId = new Map<string, unknown[]>();
+        targetRowIds.forEach((rowId, index) => {
+            const source = matrix[index];
+            if (Array.isArray(source)) matrixByRowId.set(rowId, source);
+        });
+        return rows.map((row) =>
+            pasteValuesIntoRow(
+                row,
+                state.columns,
+                colIndex,
+                matrixByRowId.get(String(row.id)),
+                mutableColKeys
+            )
+        );
+    }
+    const neededRows = rowIndex + matrix.length;
+    while (rows.length < neededRows && appendRows.length > 0) rows.push(appendRows.shift()!);
+    return rows.map((row, index) => {
         const rowOffset = index - rowIndex;
-        if (rowOffset < 0 || rowOffset >= matrix.length) {
-            return { id: String(row.id), cells: getRowCells(row).slice() };
-        }
-        const source = matrix[rowOffset];
-        const cells = getRowCells(row).slice();
+        const source = rowOffset >= 0 && rowOffset < matrix.length ? matrix[rowOffset] : null;
+        return pasteValuesIntoRow(row, state.columns, colIndex, source, mutableColKeys);
+    });
+}
+
+function pasteValuesIntoRow(
+    row: TableDataRow,
+    columns: readonly TableCoreColumn[],
+    colIndex: number,
+    source: unknown[] | null | undefined,
+    mutableColKeys: Set<TableColumnKey> | null
+): TableDataRow {
+    const cells = getRowCells(row).slice();
+    if (Array.isArray(source)) {
         for (let offset = 0; offset < source.length; offset += 1) {
             const targetCol = colIndex + offset;
-            if (targetCol >= 0 && targetCol < state.columns.length) {
-                cells[targetCol] = source[offset];
-            }
+            const colKey = columns[targetCol]?.columnKey || '';
+            if (!colKey || (mutableColKeys && !mutableColKeys.has(colKey))) continue;
+            cells[targetCol] = source[offset];
         }
-        return { id: String(row.id), cells };
-    });
+    }
+    return { id: String(row.id), cells };
 }
 
 function dispatchTableCommand(state: TableCoreState, command: TableCommand): TableCoreState {
@@ -348,6 +494,16 @@ function dispatchTableCommand(state: TableCoreState, command: TableCommand): Tab
             });
         case 'CANCEL_EDIT':
             return normalizeTableCoreState({ ...current, editing: null });
+        case 'PATCH_CELLS':
+            return normalizeTableCoreState({
+                ...current,
+                rows: patchCellValues(current.rows, current.columns, command.patches)
+            });
+        case 'REPLACE_ROWS':
+            return normalizeTableCoreState({
+                ...current,
+                rows: cloneRows(command.rows || [])
+            });
         case 'INSERT_ROWS':
             return normalizeTableCoreState({ ...current, rows: insertRows(current, command) });
         case 'DELETE_ROWS': {
@@ -357,10 +513,15 @@ function dispatchTableCommand(state: TableCoreState, command: TableCommand): Tab
                 rows: current.rows.filter((row) => !removed.has(String(row.id)))
             });
         }
+        case 'MOVE_ROW':
+            return normalizeTableCoreState({
+                ...current,
+                rows: moveRowRelative(current.rows, command.rowId, command.delta)
+            });
         case 'PASTE_TSV':
             return normalizeTableCoreState({
                 ...current,
-                rows: applyPasteToCoreRows(current, command.anchor, command.matrix)
+                rows: applyPasteToCoreRows(current, command)
             });
         case 'SORT_COLUMNS':
             return normalizeTableCoreState({ ...current, sortKeys: command.sortKeys });
@@ -387,6 +548,22 @@ function dispatchTableCommand(state: TableCoreState, command: TableCommand): Tab
                 grouping: {
                     ...current.grouping,
                     levelKeys: current.grouping.levelKeys.filter((colKey) => colKey !== command.colKey)
+                }
+            });
+        case 'SET_GROUP_LEVELS':
+            return normalizeTableCoreState({
+                ...current,
+                grouping: {
+                    expanded: new Set(command.expandedPathKeys || []),
+                    levelKeys: command.colKeys
+                }
+            });
+        case 'SET_GROUP_EXPANDED':
+            return normalizeTableCoreState({
+                ...current,
+                grouping: {
+                    ...current.grouping,
+                    expanded: new Set(command.expandedPathKeys || [])
                 }
             });
         case 'REBUILD_GROUPING':

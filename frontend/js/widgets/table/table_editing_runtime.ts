@@ -1,16 +1,23 @@
-import { getRowCells } from './table_utils.ts';
 import { tableDebugState, tableLog } from './table_debug.ts';
 import {
     commitEditorHandle,
     createDomTableEditorHandle,
     isTableEditorHandle
 } from './table_editing_model.ts';
-import { displayCellToCore } from './table_selection_model.ts';
+import {
+    dispatchRuntimeCellPatches,
+    type RuntimePatchOptions
+} from './table_runtime_commands.ts';
+import { TABLE_RUNTIME_SYNC } from './table_runtime_state.ts';
+import { getCellByDisplayAddress } from './table_dom.ts';
 import type {
+    TableCellAddress,
     TableEditorHandle,
     TableCellWidgetInstance,
+    TableCoreCellAddress,
     TableRuntimeColumn,
-    TableRuntimeMethodSubset
+    TableRuntimeMethodSubset,
+    TableRuntimeVm
 } from './table_contract.ts';
 
 function readEventValue(event: Event | { target?: { value?: unknown } } | unknown): unknown {
@@ -27,75 +34,175 @@ function readEventValue(event: Event | { target?: { value?: unknown } } | unknow
     return event;
 }
 
+function normalizeIpInputValue(value: unknown): string {
+    const filtered = String(value || '').replace(/[^\d.]/g, '');
+    return filtered
+        .split('.')
+        .slice(0, 4)
+        .map((part: string) => part.replace(/\D/g, '').slice(0, 3))
+        .join('.');
+}
+
 function isTableCellWidgetInstance(value: unknown): value is TableCellWidgetInstance {
     return !!value && typeof value === 'object' && '$' in value;
 }
 
+type CellIdentityRuntime = TableRuntimeVm;
+
+type EnterCellEditOptions = {
+    caretEnd?: boolean;
+};
+
+function displayCellFromIdentityFallback(
+    runtime: CellIdentityRuntime,
+    rowId: string,
+    colKey: string,
+    fallbackRow: number,
+    fallbackCol: number
+): TableCellAddress {
+    return runtime.displayCellFromIdentity(rowId, colKey, {
+        r: fallbackRow,
+        c: fallbackCol
+    });
+}
+
+function columnIndexFromIdentityFallback(
+    runtime: CellIdentityRuntime,
+    colKey: string,
+    fallbackCol: number
+): number {
+    const colIndex = runtime.runtimeColumnKeys().indexOf(String(colKey || ''));
+    return colIndex >= 0 ? colIndex : runtime.normCol(fallbackCol);
+}
+
+function patchCellByCoreAddress(
+    runtime: {
+        canMutateColumnIndex(colIndex: number): boolean;
+        runtimeColumnKeys(): string[];
+        tableUiLocked: boolean;
+    } & Parameters<typeof dispatchRuntimeCellPatches>[0],
+    cell: TableCoreCellAddress | null | undefined,
+    value: unknown,
+    options: RuntimePatchOptions = {}
+): void {
+    if (runtime.tableUiLocked || !cell?.rowId || !cell.colKey) return;
+    const colIndex = runtime.runtimeColumnKeys().indexOf(cell.colKey);
+    if (colIndex < 0 || !runtime.canMutateColumnIndex(colIndex)) return;
+    dispatchRuntimeCellPatches(
+        runtime,
+        [{ cell, value }],
+        'patch cell',
+        { skipGroupingViewRefresh: true, ...(options || {}) }
+    );
+}
+
+function patchCellByDisplayAddress(
+    runtime: {
+        coreCellFromDisplay(rowIndex: number, colIndex: number): TableCoreCellAddress | null;
+        normCol(col: number): number;
+        normRow(row: number): number;
+    } & Parameters<typeof patchCellByCoreAddress>[0],
+    row: number,
+    col: number,
+    value: unknown,
+    options: RuntimePatchOptions = {}
+): void {
+    const normalizedRow = runtime.normRow(row);
+    const normalizedCol = runtime.normCol(col);
+    patchCellByCoreAddress(
+        runtime,
+        runtime.coreCellFromDisplay(normalizedRow, normalizedCol),
+        value,
+        options
+    );
+}
+
+function patchCellByIdentity(
+    runtime: Parameters<typeof patchCellByCoreAddress>[0],
+    rowId: string,
+    colKey: string,
+    value: unknown,
+    options: RuntimePatchOptions = {}
+): void {
+    patchCellByCoreAddress(
+        runtime,
+        { colKey: String(colKey || ''), rowId: String(rowId || '') },
+        value,
+        options
+    );
+}
+
 const EditingRuntimeMethods = {
     onCellInput(rowIndex: number, cellIndex: number, event: Event | { target?: { value?: unknown } } | unknown) {
-        if (!this.canMutateColumnIndex(cellIndex)) return;
         const newValue = readEventValue(event);
-        const dataIndex = this.resolveDataRowIndex(rowIndex);
-        if (dataIndex < 0) return;
-        const rowObject = this.tableData[dataIndex];
-        const cells = [...getRowCells(rowObject)];
-        cells[cellIndex] = newValue;
-        this.applyTableMutation(
-            () => {
-                this.tableData.splice(dataIndex, 1, { id: rowObject.id, cells });
-            },
-            { skipSort: true, skipGroupingViewRefresh: true }
-        );
-        tableLog('cell input', dataIndex, cellIndex);
+        patchCellByDisplayAddress(this, rowIndex, cellIndex, newValue, {
+            skipGroupingViewRefresh: true
+        });
+        tableLog('cell input', rowIndex, cellIndex);
+    },
+
+    onCellInputByIdentity(
+        rowId: string,
+        colKey: string,
+        event: Event | { target?: { value?: unknown } } | unknown
+    ) {
+        const newValue = readEventValue(event);
+        patchCellByIdentity(this, rowId, colKey, newValue, {
+            skipGroupingViewRefresh: true
+        });
+        tableLog('cell input', rowId, colKey);
     },
 
     onIpInput(rowIndex: number, cellIndex: number, event: Event | { target?: { value?: unknown } } | unknown) {
-        if (!this.canMutateColumnIndex(cellIndex)) return;
-        const raw = String(readEventValue(event) || '');
-        let filtered = raw.replace(/[^\d.]/g, '');
-        const parts = filtered
-            .split('.')
-            .slice(0, 4)
-            .map((part: string) => part.replace(/\D/g, '').slice(0, 3));
-        filtered = parts.join('.');
-        const dataIndex = this.resolveDataRowIndex(rowIndex);
-        if (dataIndex < 0) return;
-        const rowObject = this.tableData[dataIndex];
-        const cells = [...getRowCells(rowObject)];
-        cells[cellIndex] = filtered;
-        this.applyTableMutation(
-            () => {
-                this.tableData.splice(dataIndex, 1, { id: rowObject.id, cells });
-            },
-            { skipSort: true, skipGroupingViewRefresh: true }
-        );
-        tableLog('cell ip input', dataIndex, cellIndex);
+        const filtered = normalizeIpInputValue(readEventValue(event));
+        patchCellByDisplayAddress(this, rowIndex, cellIndex, filtered, {
+            skipGroupingViewRefresh: true
+        });
+        tableLog('cell ip input', rowIndex, cellIndex);
+    },
+
+    onIpInputByIdentity(
+        rowId: string,
+        colKey: string,
+        event: Event | { target?: { value?: unknown } } | unknown
+    ) {
+        const filtered = normalizeIpInputValue(readEventValue(event));
+        patchCellByIdentity(this, rowId, colKey, filtered, {
+            skipGroupingViewRefresh: true
+        });
+        tableLog('cell ip input', rowId, colKey);
     },
 
     onCellFormat(rowIndex: number, cellIndex: number, column: TableRuntimeColumn | null | undefined) {
         try {
+            const coreCell = this.coreCellFromDisplay(rowIndex, cellIndex);
+            if (!coreCell) return;
+            this.onCellFormatByIdentity(coreCell.rowId, coreCell.colKey, cellIndex, column);
+        } catch (error) {}
+    },
+
+    onCellFormatByIdentity(
+        rowId: string,
+        colKey: string,
+        fallbackCol: number,
+        column: TableRuntimeColumn | null | undefined
+    ) {
+        try {
             if (!column) return;
             if (!column.format && column.type !== 'int' && column.type !== 'float') return;
-            const dataIndex = this.resolveDataRowIndex(rowIndex);
-            if (dataIndex < 0) return;
-            const rowObject = this.tableData[dataIndex];
-            const raw = this.safeCell(rowObject, cellIndex);
+            const colIndex = columnIndexFromIdentityFallback(this, colKey, fallbackCol);
+            const raw = this.safeCell(this.dataRowByIdentity(rowId), colIndex);
             if (raw === '') return;
             const formatted = this.formatCellValue(raw, column);
             if (formatted !== raw) {
-                const cells = [...getRowCells(rowObject)];
-                cells[cellIndex] = formatted;
-                this.applyTableMutation(
-                    () => {
-                        this.tableData.splice(dataIndex, 1, { id: rowObject.id, cells });
-                    },
-                    { skipSort: true, skipGroupingViewRefresh: true }
-                );
+                patchCellByIdentity(this, rowId, colKey, formatted, {
+                    skipGroupingViewRefresh: true
+                });
             }
         } catch (error) {}
     },
 
-    onCellInputViewMouseDown(event, row, col) {
+    onCellInputViewMouseDown(event: MouseEvent, row: number, col: number) {
         if (!this.isCellEditing(row, col)) event.preventDefault();
     },
 
@@ -107,7 +214,7 @@ const EditingRuntimeMethods = {
         });
     },
 
-    isCellEditing(row, col) {
+    isCellEditing(row: number, col: number) {
         const editing = this.editingCell;
         return !!(editing && editing.r === row && editing.c === col);
     },
@@ -118,10 +225,7 @@ const EditingRuntimeMethods = {
             const row = editing.r;
             const col = editing.c;
             const active = document.activeElement;
-            const tableEl = this.getTableEl();
-            const cell = tableEl
-                ? tableEl.querySelector(`tbody td[data-row="${this.normRow(row)}"][data-col="${this.normCol(col)}"]`)
-                : null;
+            const cell = getCellByDisplayAddress(this, this.normRow(row), this.normCol(col));
             if (
             active instanceof HTMLElement &&
             cell &&
@@ -132,56 +236,49 @@ const EditingRuntimeMethods = {
                 active.blur();
             }
             const columnDef = this.tableColumns[col];
-            this.commitCellEditorHandle(row, col);
-            this.applyTrimToEditedTextCell(row, col);
-            if (columnDef) this.onCellFormat(row, col, columnDef);
+            const coreCell = this.coreCellFromDisplay(row, col);
+            if (coreCell) {
+                this.commitCellEditorHandleByIdentity(coreCell.rowId, coreCell.colKey, row, col);
+                this.applyTrimToEditedTextCellByIdentity(coreCell.rowId, coreCell.colKey, row, col);
+                if (columnDef) this.onCellFormatByIdentity(coreCell.rowId, coreCell.colKey, col, columnDef);
+            }
         }
         this.dispatchTableCoreCommand(
             { type: 'CANCEL_EDIT' },
             'close editor',
-            { skipRows: true, skipSort: true, skipGrouping: true, skipSelection: true, skipContextMenu: true }
+            TABLE_RUNTIME_SYNC.EDITING_ONLY
         );
     },
 
-    applyTrimToEditedTextCell(row, col) {
-        const column = this.tableColumns[col];
+    applyTrimToEditedTextCell(row: number, col: number) {
+        const coreCell = this.coreCellFromDisplay(row, col);
+        if (!coreCell) return;
+        this.applyTrimToEditedTextCellByIdentity(coreCell.rowId, coreCell.colKey, row, col);
+    },
+
+    applyTrimToEditedTextCellByIdentity(
+        rowId: string,
+        colKey: string,
+        fallbackRow: number,
+        fallbackCol: number
+    ) {
+        const displayCell = displayCellFromIdentityFallback(this, rowId, colKey, fallbackRow, fallbackCol);
+        const column = this.tableColumns[displayCell.c];
         if (!column) return;
         if (this.cellUsesEmbeddedWidget(column)) return;
-        const editor = this.getCellEditorElement(row, col);
+        const editor = this.getCellEditorElement(displayCell.r, displayCell.c);
         if (!(editor instanceof HTMLInputElement)) return;
         const raw = String(editor.value ?? '');
         const trimmed = raw.trim();
         if (trimmed === raw) return;
         editor.value = trimmed;
-        this.patchCellValue(row, col, trimmed);
+        patchCellByIdentity(this, rowId, colKey, trimmed);
     },
 
-    patchCellValue(row, col, value) {
-        if (this.tableUiLocked) return;
+    getCellEditorElement(row: number, col: number) {
         const normalizedRow = this.normRow(row);
         const normalizedCol = this.normCol(col);
-        if (!this.canMutateColumnIndex(normalizedCol)) return;
-        const dataIndex = this.resolveDataRowIndex(normalizedRow);
-        if (dataIndex < 0) return;
-        const rowObject = this.tableData[dataIndex];
-        const cells = [...getRowCells(rowObject)];
-        cells[normalizedCol] = value;
-        this.applyTableMutation(
-            () => {
-                this.tableData.splice(dataIndex, 1, { id: rowObject.id, cells });
-            },
-            { skipSort: true, skipGroupingViewRefresh: true }
-        );
-    },
-
-    getCellEditorElement(row, col) {
-        const tableEl = this.getTableEl();
-        if (!tableEl) return null;
-        const normalizedRow = this.normRow(row);
-        const normalizedCol = this.normCol(col);
-        const td = tableEl.querySelector(
-            `tbody td[data-row="${normalizedRow}"][data-col="${normalizedCol}"]`
-        );
+        const td = getCellByDisplayAddress(this, normalizedRow, normalizedCol);
         if (!td) return null;
         const editor = td.querySelector(
             '[data-table-editor-target="true"]:not([disabled]), input.cell-input:not([disabled]), select:not([disabled])'
@@ -189,38 +286,52 @@ const EditingRuntimeMethods = {
         return editor instanceof HTMLElement ? editor : null;
     },
 
-    getCellEditorHandle(row, col): TableEditorHandle | null {
-        const widget = this.getCellWidgetInstance(row, col);
+    getCellEditorHandle(row: number, col: number): TableEditorHandle | null {
+        const coreCell = this.coreCellFromDisplay(row, col);
+        if (!coreCell) return null;
+        return this.getCellEditorHandleByIdentity(coreCell.rowId, coreCell.colKey, row, col);
+    },
+
+    getCellEditorHandleByIdentity(
+        rowId: string,
+        colKey: string,
+        fallbackRow: number,
+        fallbackCol: number
+    ): TableEditorHandle | null {
+        const displayCell = displayCellFromIdentityFallback(this, rowId, colKey, fallbackRow, fallbackCol);
+        const widget = this.getCellWidgetInstance(displayCell.r, displayCell.c);
         if (isTableEditorHandle(widget)) return widget;
-        const editor = this.getCellEditorElement(row, col);
+        const editor = this.getCellEditorElement(displayCell.r, displayCell.c);
         if (!editor) return null;
         return createDomTableEditorHandle(editor, {
-            commitValue: (value) => this.patchCellValue(row, col, value)
+            commitValue: (value) => patchCellByIdentity(this, rowId, colKey, value)
         });
     },
 
-    commitCellEditorHandle(row, col) {
-        const handle = this.getCellEditorHandle(row, col);
-        const coreCell = displayCellToCore(
-            { r: row, c: col },
-            this.tableColumns,
-            this.tableViewModelSnapshot()
-        );
-        if (!handle || !coreCell) return undefined;
+    commitCellEditorHandle(row: number, col: number) {
+        const coreCell = this.coreCellFromDisplay(row, col);
+        if (!coreCell) return undefined;
+        return this.commitCellEditorHandleByIdentity(coreCell.rowId, coreCell.colKey, row, col);
+    },
+
+    commitCellEditorHandleByIdentity(
+        rowId: string,
+        colKey: string,
+        fallbackRow: number,
+        fallbackCol: number
+    ) {
+        const handle = this.getCellEditorHandleByIdentity(rowId, colKey, fallbackRow, fallbackCol);
+        if (!handle) return undefined;
         return commitEditorHandle(handle, {
-            colKey: coreCell.colKey,
-            rowId: coreCell.rowId
+            colKey: String(colKey || ''),
+            rowId: String(rowId || '')
         });
     },
 
-    getCellEditorActionElement(row, col, kind) {
-        const tableEl = this.getTableEl();
-        if (!tableEl) return null;
+    getCellEditorActionElement(row: number, col: number, kind: string | null | undefined) {
         const normalizedRow = this.normRow(row);
         const normalizedCol = this.normCol(col);
-        const td = tableEl.querySelector(
-            `tbody td[data-row="${normalizedRow}"][data-col="${normalizedCol}"]`
-        );
+        const td = getCellByDisplayAddress(this, normalizedRow, normalizedCol);
         if (!td) return null;
         if (!kind) {
             const trigger = td.querySelector('[data-table-action-trigger]:not([disabled])');
@@ -232,32 +343,24 @@ const EditingRuntimeMethods = {
         return trigger instanceof HTMLElement ? trigger : null;
     },
 
-    focusSelectionCell(row, col) {
+    focusSelectionCell(row: number, col: number) {
         this.exitCellEdit();
-        const tableEl = this.getTableEl();
-        if (!tableEl) return;
         const normalizedCol = this.normCol(col);
         const normalizedRow = this.normRow(row);
-        const td = tableEl.querySelector(
-            `tbody td[data-row="${normalizedRow}"][data-col="${normalizedCol}"]`
-        );
-        if (!(td instanceof HTMLElement)) return;
+        const td = getCellByDisplayAddress(this, normalizedRow, normalizedCol);
+        if (!td) return;
         this._tableProgrammaticFocus = true;
         td.focus();
         this.endProgrammaticFocusSoon();
     },
 
-    focusSelectionCellWithRetry(row, col) {
+    focusSelectionCellWithRetry(row: number, col: number) {
         const normalizedRow = this.normRow(row);
         const normalizedCol = this.normCol(col);
         const attempt = () => {
             this.exitCellEdit();
-            const tableEl = this.getTableEl();
-            if (!tableEl) return false;
-            const td = tableEl.querySelector(
-                `tbody td[data-row="${normalizedRow}"][data-col="${normalizedCol}"]`
-            );
-            if (!(td instanceof HTMLElement)) return false;
+            const td = getCellByDisplayAddress(this, normalizedRow, normalizedCol);
+            if (!td) return false;
             this._tableProgrammaticFocus = true;
             td.focus();
             this.endProgrammaticFocusSoon();
@@ -278,7 +381,7 @@ const EditingRuntimeMethods = {
         });
     },
 
-    enterCellEditAt(row, col, options) {
+    enterCellEditAt(row: number, col: number, options?: EnterCellEditOptions) {
         const normalizedOptions = options || {};
         const normalizedRow = this.normRow(row);
         const normalizedCol = this.normCol(col);
@@ -286,18 +389,14 @@ const EditingRuntimeMethods = {
             this.editingCell = null;
             return;
         }
-        const coreCell = displayCellToCore(
-            { r: normalizedRow, c: normalizedCol },
-            this.tableColumns,
-            this.tableViewModelSnapshot()
-        );
+        const coreCell = this.coreCellFromDisplay(normalizedRow, normalizedCol);
         if (!coreCell) return;
-        const dataIndex = this.resolveDataRowIndex(normalizedRow);
-        const draftValue = dataIndex >= 0 ? this.tableData[dataIndex]?.cells[normalizedCol] : undefined;
+        const sourceRow = this.dataRowByIdentity(coreCell.rowId);
+        const draftValue = this.safeCell(sourceRow, normalizedCol);
         this.dispatchTableCoreCommand(
             { cell: coreCell, draftValue, type: 'ENTER_EDIT_MODE' },
             'open editor',
-            { skipRows: true, skipSort: true, skipGrouping: true, skipSelection: true, skipContextMenu: true }
+            TABLE_RUNTIME_SYNC.EDITING_ONLY
         );
         this._tableProgrammaticFocus = true;
         this.$nextTick(() => {
@@ -320,14 +419,14 @@ const EditingRuntimeMethods = {
         });
     },
 
-    getCellWidgetInstance(row, col) {
+    getCellWidgetInstance(row: number, col: number) {
         const name = this.cellWidgetRefName(row, col);
         const ref = this.$refs ? this.$refs[name] : null;
         const candidate = Array.isArray(ref) ? ref[0] : ref;
         return isTableCellWidgetInstance(candidate) ? candidate : null;
     },
 
-    invokeCellWidgetAction(row, col, actionKind) {
+    invokeCellWidgetAction(row: number, col: number, actionKind: string) {
         const widget = this.getCellWidgetInstance(row, col);
         if (!widget) return false;
         const kind = String(actionKind || '').trim();
@@ -362,7 +461,7 @@ const EditingRuntimeMethods = {
         return true;
     },
 
-    activateCellEditorAction(row, col, actionKind, attempt = 0) {
+    activateCellEditorAction(row: number, col: number, actionKind: string, attempt = 0) {
         const normalizedRow = this.normRow(row);
         const normalizedCol = this.normCol(col);
         this.$nextTick(() => {
@@ -385,23 +484,18 @@ const EditingRuntimeMethods = {
                 }
                 return;
             }
-            if (typeof requestAnimationFrame === 'function') {
-                requestAnimationFrame(() =>
-                    this.activateCellEditorAction(
-                        normalizedRow,
-                        normalizedCol,
-                        actionKind,
-                        attempt + 1
-                    )
+            const retry = () =>
+                this.activateCellEditorAction(
+                    normalizedRow,
+                    normalizedCol,
+                    actionKind,
+                    attempt + 1
                 );
+            if (typeof requestAnimationFrame === 'function') {
+                requestAnimationFrame(retry);
                 return;
             }
-            this.activateCellEditorAction(
-                normalizedRow,
-                normalizedCol,
-                actionKind,
-                attempt + 1
-            );
+            retry();
         });
     }
 } satisfies TableRuntimeMethodSubset;

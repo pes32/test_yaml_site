@@ -8,6 +8,7 @@ import type {
     TableViewModel
 } from './table_contract.ts';
 import { columnKeyAt, sortKeysFromRuntime } from './table_state_core.ts';
+import { rowIdAtDisplayIndex, sourceIndexAtDisplayIndex } from './table_view_model.ts';
 
 type BuildContextMenuSnapshotOptions = {
     anchorCol: number;
@@ -27,11 +28,6 @@ type BuildContextMenuSnapshotOptions = {
     wordWrapEnabled: boolean;
 };
 
-function rowIdFromDisplay(viewModel: TableViewModel, displayRow: number): string | null {
-    if (displayRow < 0) return null;
-    return viewModel.displayIndexToRowId[displayRow] || null;
-}
-
 function cloneRuntimeSortKeys(sortKeys: readonly TableSortState[]): TableSortState[] {
     return Array.isArray(sortKeys)
         ? sortKeys.map((item) => ({ col: item.col, dir: item.dir === 'desc' ? 'desc' : 'asc' }))
@@ -47,13 +43,19 @@ function groupingLevelKeys(
         .filter((colKey): colKey is string => colKey != null);
 }
 
+function sourceRowOrNull(viewModel: TableViewModel, displayRow: number): number | null {
+    const sourceRow = sourceIndexAtDisplayIndex(viewModel, displayRow);
+    return sourceRow >= 0 ? sourceRow : null;
+}
+
 function buildContextMenuSnapshot(options: BuildContextMenuSnapshotOptions): TableContextMenuSnapshot {
     const sortKeys = cloneRuntimeSortKeys(options.sortKeys);
     return {
         anchorCol: options.anchorCol,
         anchorColumnKey: columnKeyAt(options.columns, options.anchorCol),
         anchorRow: options.anchorRow,
-        anchorRowId: rowIdFromDisplay(options.viewModel, options.anchorRow),
+        anchorRowId: rowIdAtDisplayIndex(options.viewModel, options.anchorRow),
+        anchorSourceRow: sourceRowOrNull(options.viewModel, options.anchorRow),
         bodyMode: options.bodyMode,
         groupingLevelKeysSnapshot: groupingLevelKeys(options.columns, options.groupingLevels),
         groupingLevelsSnapshot: (options.groupingLevels || []).slice(),
@@ -63,7 +65,7 @@ function buildContextMenuSnapshot(options: BuildContextMenuSnapshotOptions): Tab
         lineNumbersEnabled: options.lineNumbersEnabled,
         pasteAnchor: { r: options.pasteAnchor.r, c: options.pasteAnchor.c },
         pasteAnchorColumnKey: columnKeyAt(options.columns, options.pasteAnchor.c),
-        pasteAnchorRowId: rowIdFromDisplay(options.viewModel, options.pasteAnchor.r),
+        pasteAnchorRowId: rowIdAtDisplayIndex(options.viewModel, options.pasteAnchor.r),
         rect: { ...options.rect },
         selectionSnapshot: options.selectionSnapshot,
         sessionId: options.sessionId,
@@ -81,5 +83,5 @@ function isContextMenuSnapshotCurrent(
     return !!snapshot && snapshot.sessionId === sessionId;
 }
 
-export { buildContextMenuSnapshot, isContextMenuSnapshotCurrent, rowIdFromDisplay };
+export { buildContextMenuSnapshot, isContextMenuSnapshotCurrent, rowIdAtDisplayIndex };
 export type { BuildContextMenuSnapshotOptions };

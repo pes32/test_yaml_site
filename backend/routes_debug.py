@@ -26,9 +26,6 @@ logger = logging.getLogger(__name__)
 def register_debug_routes(app, config_service, log_file_path: str):
     """Регистрирует debug-панель и API."""
 
-    def _snapshot():
-        return config_service.get_snapshot()
-
     @app.route("/debug")
     def debug_panel():
         return render_template("debug.html")
@@ -36,7 +33,7 @@ def register_debug_routes(app, config_service, log_file_path: str):
     @app.route("/api/debug/structure")
     def api_debug_structure():
         """Структура API приложения — все зарегистрированные маршруты."""
-        snapshot = _snapshot()
+        snapshot = config_service.get_snapshot()
         routes = []
         for rule in app.url_map.iter_rules():
             if rule.endpoint and rule.endpoint != "static":
@@ -55,7 +52,7 @@ def register_debug_routes(app, config_service, log_file_path: str):
     @app.route("/api/debug/logs")
     def api_debug_logs():
         """Последние 1000 строк лога."""
-        snapshot = _snapshot()
+        snapshot = config_service.get_snapshot()
         path = log_file_path or os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs", "app.log")
         try:
             with open(path, "r", encoding="utf-8", errors="replace") as handle:
@@ -72,7 +69,7 @@ def register_debug_routes(app, config_service, log_file_path: str):
     @app.route("/api/debug/pages")
     def api_debug_pages():
         """Информация о зарегистрированных страницах (YAML)."""
-        snapshot = _snapshot()
+        snapshot = config_service.get_snapshot()
         pages = []
         for name, cfg in snapshot.get("pages", {}).items():
             pages.append({
@@ -95,7 +92,7 @@ def register_debug_routes(app, config_service, log_file_path: str):
     @app.route("/api/debug/snapshot")
     def api_debug_snapshot():
         """Краткая диагностика текущего snapshot."""
-        snapshot = _snapshot()
+        snapshot = config_service.get_snapshot()
         data = DebugSnapshotDataResponse(
             meta=snapshot.get("meta") or {},
             page_count=len(snapshot.get("pages") or {}),
@@ -108,7 +105,7 @@ def register_debug_routes(app, config_service, log_file_path: str):
     @app.route("/api/debug/sql", methods=["POST"])
     def api_debug_sql():
         """Read-only SQL helper для debug-панели."""
-        snapshot = _snapshot()
+        snapshot = config_service.get_snapshot()
         data = request.get_json(silent=True) or {}
 
         try:

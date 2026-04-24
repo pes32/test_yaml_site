@@ -1,6 +1,5 @@
 import { computed, onMounted, reactive, ref, type ComputedRef, type Ref } from 'vue';
 import frontendApiClient from './runtime/api_client.ts';
-import { runDebugResource } from './runtime/debug_resource.ts';
 import type {
     DebugApiRoute,
     DebugSqlResponse as DebugSqlResult,
@@ -61,6 +60,23 @@ type DebugAppBindings = DebugAppPublicSurface & {
 };
 
 const DEBUG_ERROR_SCOPES: DebugErrorScope[] = ['api', 'logs', 'pages', 'sql'];
+
+async function runDebugResource(options: {
+    clearError(): void;
+    reportError(error: unknown): void;
+    run(): Promise<void>;
+    setLoading(value: boolean): void;
+}): Promise<void> {
+    options.setLoading(true);
+    options.clearError();
+    try {
+        await options.run();
+    } catch (error) {
+        options.reportError(error);
+    } finally {
+        options.setLoading(false);
+    }
+}
 
 function useDebugApp(): DebugAppBindings {
     const activeTab = ref(0);
@@ -168,39 +184,52 @@ function useDebugApp(): DebugAppBindings {
         }
     }
 
-    async function loadApi(): Promise<void> {
+    async function runScopedLoader(
+        scope: DebugErrorScope,
+        loading: Ref<boolean>,
+        message: string,
+        run: () => Promise<void>
+    ): Promise<void> {
         await runDebugResource({
-            clearError: () => clearScopeError('api'),
-            reportError: (error) => reportScopeError('api', error, 'Не удалось загрузить структуру API'),
-            run: async () => {
-                const data = await frontendApiClient.fetchDebugStructure();
-                apiRoutes.value = data.routes;
-            },
+            clearError: () => clearScopeError(scope),
+            reportError: (error) => reportScopeError(scope, error, message),
+            run,
             setLoading: (value) => {
-                apiLoading.value = value;
+                loading.value = value;
             }
         });
+    }
+
+    async function loadApi(): Promise<void> {
+        await runScopedLoader(
+            'api',
+            apiLoading,
+            'Не удалось загрузить структуру API',
+            async () => {
+                const data = await frontendApiClient.fetchDebugStructure();
+                apiRoutes.value = data.routes;
+            }
+        );
     }
 
     async function loadLogs(): Promise<void> {
-        await runDebugResource({
-            clearError: () => clearScopeError('logs'),
-            reportError: (error) => reportScopeError('logs', error, 'Не удалось загрузить debug-лог'),
-            run: async () => {
+        await runScopedLoader(
+            'logs',
+            logsLoading,
+            'Не удалось загрузить debug-лог',
+            async () => {
                 const data = await frontendApiClient.fetchDebugLogs();
                 logLines.value = data.lines;
-            },
-            setLoading: (value) => {
-                logsLoading.value = value;
             }
-        });
+        );
     }
 
     async function loadPages(): Promise<void> {
-        await runDebugResource({
-            clearError: () => clearScopeError('pages'),
-            reportError: (error) => reportScopeError('pages', error, 'Не удалось загрузить YAML-страницы'),
-            run: async () => {
+        await runScopedLoader(
+            'pages',
+            pagesLoading,
+            'Не удалось загрузить YAML-страницы',
+            async () => {
                 const data = await frontendApiClient.fetchDebugPages();
                 pages.value = data.pages;
                 diagnostics.value = data.diagnostics;
@@ -211,11 +240,8 @@ function useDebugApp(): DebugAppBindings {
                         'Snapshot сообщает об ошибке'
                     );
                 }
-            },
-            setLoading: (value) => {
-                pagesLoading.value = value;
             }
-        });
+        );
     }
 
     async function runSql(): Promise<void> {
@@ -223,10 +249,11 @@ function useDebugApp(): DebugAppBindings {
             return;
         }
 
-        await runDebugResource({
-            clearError: () => clearScopeError('sql'),
-            reportError: (error) => reportScopeError('sql', error, 'Не удалось выполнить SQL-запрос'),
-            run: async () => {
+        await runScopedLoader(
+            'sql',
+            sqlLoading,
+            'Не удалось выполнить SQL-запрос',
+            async () => {
                 sqlResult.value = null;
                 const data = await frontendApiClient.executeDebugSql(sqlQuery.value);
                 sqlResult.value = {
@@ -241,11 +268,8 @@ function useDebugApp(): DebugAppBindings {
                     truncated: data.truncated
                 };
                 diagnostics.value = data.diagnostics;
-            },
-            setLoading: (value) => {
-                sqlLoading.value = value;
             }
-        });
+        );
     }
 
     onMounted(() => {

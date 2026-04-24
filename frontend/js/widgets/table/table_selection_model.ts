@@ -1,5 +1,7 @@
 import type {
     TableCellAddress,
+    TableCommand,
+    TableContextMenuSnapshot,
     TableCoreCellAddress,
     TableCoreSelectionState,
     TableRuntimeColumn,
@@ -9,6 +11,7 @@ import type {
 } from './table_contract.ts';
 import { clamp } from './table_utils.ts';
 import { columnIndexByKey, columnKeyAt } from './table_state_core.ts';
+import { rowIdAtDisplayIndex } from './table_view_model.ts';
 
 type TableSelectionIdentity = {
     anchor: TableCoreCellAddress | null;
@@ -24,6 +27,27 @@ function normalizeDisplayCell(
     return {
         r: clamp(cell?.r || 0, 0, Math.max(0, rowCount - 1)),
         c: clamp(cell?.c || 0, 0, Math.max(0, colCount - 1))
+    };
+}
+
+function runtimeDisplaySelection(
+    vm: Pick<TableSelectionState, 'anchor' | 'focus' | 'fullWidthRows'> | {
+        selAnchor: TableCellAddress;
+        selFocus: TableCellAddress;
+        selFullWidthRows: TableSelectionState['fullWidthRows'];
+    }
+): TableSelectionState {
+    if ('anchor' in vm) {
+        return {
+            anchor: vm.anchor,
+            focus: vm.focus,
+            fullWidthRows: vm.fullWidthRows
+        };
+    }
+    return {
+        anchor: vm.selAnchor,
+        focus: vm.selFocus,
+        fullWidthRows: vm.selFullWidthRows
     };
 }
 
@@ -50,11 +74,6 @@ function selectionRectFromDisplay(
         c0: Math.min(anchor.c, focus.c),
         c1: Math.max(anchor.c, focus.c)
     };
-}
-
-function rowIdAtDisplayIndex(viewModel: TableViewModel, displayIndex: number): string | null {
-    const rowId = viewModel.displayIndexToRowId[displayIndex];
-    return rowId ? String(rowId) : null;
 }
 
 function displayCellToCore(
@@ -92,6 +111,17 @@ function buildCoreSelectionFromDisplay(
         anchor: displayCellToCore(selection.anchor, columns, viewModel),
         focus: displayCellToCore(selection.focus, columns, viewModel),
         fullWidthRowIds: fullWidthRowIdsFromDisplay(selection, viewModel)
+    };
+}
+
+function setSelectionCommandFromCore(
+    selection: TableCoreSelectionState
+): Extract<TableCommand, { type: 'SET_SELECTION_RECT' }> {
+    return {
+        anchor: selection.anchor,
+        focus: selection.focus,
+        fullWidthRowIds: selection.fullWidthRowIds,
+        type: 'SET_SELECTION_RECT'
     };
 }
 
@@ -149,16 +179,64 @@ function restoreSelectionIdentity(
     return restoreDisplaySelectionFromCore(identity, columns, viewModel, fallback);
 }
 
+function fallbackSelectionFromSnapshot(snapshot: TableContextMenuSnapshot): TableSelectionState {
+    const rect = snapshot.rect;
+    return {
+        anchor: { r: rect.r0, c: rect.c0 },
+        focus: { r: rect.r1, c: rect.c1 },
+        fullWidthRows: snapshot.bodyMode === 'row' ? { r0: rect.r0, r1: rect.r1 } : null
+    };
+}
+
+function displaySelectionFromSnapshot(
+    snapshot: TableContextMenuSnapshot,
+    columns: readonly TableRuntimeColumn[],
+    viewModel: TableViewModel
+): TableSelectionState {
+    const fallback = fallbackSelectionFromSnapshot(snapshot);
+    return snapshot.selectionSnapshot
+        ? restoreDisplaySelectionFromCore(snapshot.selectionSnapshot, columns, viewModel, fallback)
+        : fallback;
+}
+
+function selectionRectFromSnapshot(
+    snapshot: TableContextMenuSnapshot,
+    columns: readonly TableRuntimeColumn[],
+    viewModel: TableViewModel,
+    rowCount: number
+): TableSelectionRect {
+    return selectionRectFromDisplay(
+        displaySelectionFromSnapshot(snapshot, columns, viewModel),
+        rowCount,
+        columns.length
+    );
+}
+
+function displayCellFromCoreIdentity(
+    cell: TableCoreCellAddress | null | undefined,
+    columns: readonly TableRuntimeColumn[],
+    viewModel: TableViewModel,
+    fallback: TableCellAddress
+): TableCellAddress {
+    return coreCellToDisplay(cell, columns, viewModel) || fallback;
+}
+
 export {
     buildCoreSelectionFromDisplay,
     captureSelectionIdentity,
     coreCellToDisplay,
+    displayCellFromCoreIdentity,
     displayCellToCore,
+    displaySelectionFromSnapshot,
+    fallbackSelectionFromSnapshot,
     fullWidthRowIdsFromDisplay,
     normalizeDisplayCell,
+    runtimeDisplaySelection,
     restoreDisplaySelectionFromCore,
     restoreSelectionIdentity,
     rowIdAtDisplayIndex,
-    selectionRectFromDisplay
+    setSelectionCommandFromCore,
+    selectionRectFromDisplay,
+    selectionRectFromSnapshot
 };
 export type { TableSelectionIdentity };

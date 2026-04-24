@@ -1,44 +1,42 @@
 import type { AttrConfigMap, AttrConfigRecord } from '../shared/attr_config.ts';
 import type { UnknownRecord } from '../shared/object_record.ts';
+export type { AttrConfigMap } from '../shared/attr_config.ts';
+export type { UnknownRecord } from '../shared/object_record.ts';
 
-type FrontendDiagnostic = UnknownRecord;
+export type FrontendDiagnostic = UnknownRecord;
 
-type PageAttrConfig = AttrConfigRecord;
+export type PageAttrConfig = AttrConfigRecord;
 
-type PageConfigRecord = UnknownRecord & {
+export type PageConfigRecord = UnknownRecord & {
     gui?: unknown;
     name?: unknown;
     parsedGui?: unknown;
 };
 
-type ParsedGuiSection = UnknownRecord & {
+export type ParsedGuiSection = UnknownRecord & {
     icon?: string;
     name?: string;
     rows?: unknown[];
 };
 
-type ParsedGuiTab = UnknownRecord & {
+export type ParsedGuiTab = UnknownRecord & {
     content?: ParsedGuiSection[];
     icon?: string;
     name?: string;
 };
 
-type ParsedGuiMenu = UnknownRecord & {
+export type ParsedGuiMenu = UnknownRecord & {
     content?: ParsedGuiSection[];
     icon?: string;
     name?: string;
     tabs?: ParsedGuiTab[];
 };
 
-type ParsedGuiModal = UnknownRecord;
+export type ParsedGuiModal = UnknownRecord;
 
-type ParsedGuiState = {
-    menus: ParsedGuiMenu[];
-    modals: Record<string, ParsedGuiModal>;
-    rootContentOnly: boolean;
-};
+export type ParsedGuiState = { menus: ParsedGuiMenu[]; modals: Record<string, ParsedGuiModal>; rootContentOnly: boolean };
 
-type PageConfigState = {
+export type PageConfigState = {
     pageName: string;
     snapshotVersion: string;
     diagnostics: FrontendDiagnostic[];
@@ -46,21 +44,16 @@ type PageConfigState = {
     attrsByName: AttrConfigMap;
 };
 
-type PageSessionState = {
+export type PageSessionState = {
     widgetValues: Record<string, unknown>;
     loadedAttrNames: string[];
     loadedModalIds: string[];
     parsedGui: ParsedGuiState | null;
 };
 
-type PagePayload = {
-    page?: unknown;
-    attrs?: unknown;
-    diagnostics?: unknown;
-    snapshotVersion?: unknown;
-};
+export type PagePayload = { page?: unknown; attrs?: unknown; diagnostics?: unknown; snapshotVersion?: unknown };
 
-type AttrsPayload = {
+export type AttrsPayload = {
     attrs?: unknown;
     diagnostics?: unknown;
     missingNames?: unknown;
@@ -69,12 +62,12 @@ type AttrsPayload = {
     snapshotVersion?: unknown;
 };
 
-type ModalPayload = AttrsPayload & {
+export type ModalPayload = AttrsPayload & {
     dependencies?: unknown;
     modal?: unknown;
 };
 
-type PageRuntimeServices = {
+export type PageRuntimeServices = {
     getAllAttrsMap(): AttrConfigMap;
     getCurrentPageNameFromRuntime(): string;
     getModalRuntimeController(): unknown;
@@ -87,36 +80,17 @@ type PageRuntimeServices = {
     showAppNotification(message: string, type?: string): unknown;
 };
 
-type PageRuntimeEventPayloads = {
-    hashNavigation: {
-        hash: string;
-    };
-    menuNavigation: {
-        menuIndex: number;
-        tabIndex: number;
-    };
-    sectionToggle: {
-        collapsed: boolean;
-        sectionId: string;
-    };
+export type PageRuntimeEventPayloads = {
+    hashNavigation: { hash: string };
+    menuNavigation: { menuIndex: number; tabIndex: number };
+    sectionToggle: { collapsed: boolean; sectionId: string };
 };
 
-type PageBoundaryActionResult<T> =
-    | {
-        status: 'executed';
-        value: T;
-    }
-    | {
-        status: string;
-        value?: T;
-    };
+export type PageBoundaryActionResult<T> = { status: 'executed'; value: T } | { status: string; value?: T };
 
-type PageScrollRoot = {
-    scrollTop: number;
-    scrollTo?(options: ScrollToOptions): void;
-};
+export type PageScrollRoot = { scrollTop: number; scrollTo?(options: ScrollToOptions): void };
 
-type PageViewHost = {
+export type PageViewHost = {
     $nextTick(callback?: () => void): Promise<void>;
     activeMenu: ParsedGuiMenu | null;
     activeMenuIndex: number;
@@ -136,32 +110,7 @@ type PageViewHost = {
     pageConfig: PageConfigRecord | null;
     runBoundaryAction<T>(kind: string, action: () => Promise<T> | T): Promise<PageBoundaryActionResult<T>>;
     sessionState: PageSessionState;
-    uiState: UnknownRecord & {
-        hashListenerBound?: boolean;
-    };
+    uiState: UnknownRecord & { hashListenerBound?: boolean };
     viewScrollTopById: Record<string, number>;
     waitForViewUpdate(): Promise<void>;
-};
-
-export type {
-    AttrConfigMap,
-    AttrsPayload,
-    FrontendDiagnostic,
-    ModalPayload,
-    PageAttrConfig,
-    PageBoundaryActionResult,
-    PageConfigRecord,
-    PageConfigState,
-    PagePayload,
-    PageRuntimeEventPayloads,
-    PageRuntimeServices,
-    PageScrollRoot,
-    PageSessionState,
-    PageViewHost,
-    ParsedGuiMenu,
-    ParsedGuiModal,
-    ParsedGuiSection,
-    ParsedGuiState,
-    ParsedGuiTab,
-    UnknownRecord
 };

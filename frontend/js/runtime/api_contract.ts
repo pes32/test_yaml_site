@@ -1,8 +1,9 @@
 import type { UnknownRecord } from '../shared/object_record.ts';
+export type { UnknownRecord } from '../shared/object_record.ts';
 
-type ApiDiagnostic = UnknownRecord;
+export type ApiDiagnostic = UnknownRecord;
 
-type FrontendApiErrorOptions = {
+export type FrontendApiErrorOptions = {
     code?: unknown;
     diagnostics?: unknown;
     payload?: unknown;
@@ -10,7 +11,7 @@ type FrontendApiErrorOptions = {
     status?: unknown;
 };
 
-type ApiEnvelope = UnknownRecord & {
+export type ApiEnvelope = UnknownRecord & {
     data?: unknown;
     diagnostics?: unknown;
     error?: unknown;
@@ -19,13 +20,13 @@ type ApiEnvelope = UnknownRecord & {
     snapshot_version?: unknown;
 };
 
-type PageSummary = {
+export type PageSummary = {
     name: string;
     title: string;
     url: string;
 };
 
-type ExecuteRequestPayload = {
+export type ExecuteRequestPayload = {
     command: string;
     output_attrs?: string[];
     page?: string;
@@ -33,14 +34,14 @@ type ExecuteRequestPayload = {
     widget?: string;
 };
 
-type PageResponse = {
+export type PageResponse = {
     attrs: UnknownRecord;
     diagnostics: ApiDiagnostic[];
     page: UnknownRecord | null;
     snapshotVersion: string;
 };
 
-type AttrsResponse = {
+export type AttrsResponse = {
     attrs: UnknownRecord;
     diagnostics: ApiDiagnostic[];
     missingNames: string[];
@@ -49,12 +50,12 @@ type AttrsResponse = {
     snapshotVersion: string;
 };
 
-type ModalResponse = AttrsResponse & {
+export type ModalResponse = AttrsResponse & {
     dependencies: UnknownRecord;
     modal: UnknownRecord | null;
 };
 
-type ExecuteResponse = {
+export type ExecuteResponse = {
     command: string;
     data: unknown;
     diagnostics: ApiDiagnostic[];
@@ -65,32 +66,32 @@ type ExecuteResponse = {
     widget: string | null;
 };
 
-type DebugApiRoute = {
+export type DebugApiRoute = {
     endpoint: string;
     methods: string[];
     rule: string;
 };
 
-type DebugSqlRow = UnknownRecord;
+export type DebugSqlRow = UnknownRecord;
 
-type DebugStructureResponse = {
+export type DebugStructureResponse = {
     routes: DebugApiRoute[];
     snapshot: UnknownRecord;
 };
 
-type DebugLogsResponse = {
+export type DebugLogsResponse = {
     lines: string[];
     total: number;
 };
 
-type DebugPagesResponse = {
+export type DebugPagesResponse = {
     diagnostics: ApiDiagnostic[];
     lastError: string | null;
     pages: PageSummary[];
     snapshot: UnknownRecord;
 };
 
-type DebugSnapshotResponse = {
+export type DebugSnapshotResponse = {
     diagnostics: ApiDiagnostic[];
     lastError: string | null;
     meta: UnknownRecord;
@@ -98,7 +99,7 @@ type DebugSnapshotResponse = {
     pagesByUrl: UnknownRecord;
 };
 
-type DebugSqlResponse = {
+export type DebugSqlResponse = {
     columns: string[];
     diagnostics: ApiDiagnostic[];
     durationMs: number;
@@ -108,24 +109,4 @@ type DebugSqlResponse = {
     rows: DebugSqlRow[];
     snapshotVersion: string;
     truncated: boolean;
-};
-
-export type {
-    ApiDiagnostic,
-    ApiEnvelope,
-    AttrsResponse,
-    DebugApiRoute,
-    DebugLogsResponse,
-    DebugPagesResponse,
-    DebugSnapshotResponse,
-    DebugSqlResponse,
-    DebugSqlRow,
-    DebugStructureResponse,
-    ExecuteRequestPayload,
-    ExecuteResponse,
-    FrontendApiErrorOptions,
-    ModalResponse,
-    PageResponse,
-    PageSummary,
-    UnknownRecord
 };

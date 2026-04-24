@@ -1,6 +1,6 @@
 import { normalizeScalarStringValue } from './widget_contract.ts';
 
-type VocRow = {
+export type VocRow = {
   id: string;
   rowIndex: number;
   cells: string[];
@@ -8,7 +8,7 @@ type VocRow = {
   searchText: string;
 };
 
-type ParsedVocDraft = {
+export type ParsedVocDraft = {
   normalizedText: string;
   trailingSeparator: boolean;
   completedTokens: string[];
@@ -16,7 +16,7 @@ type ParsedVocDraft = {
   allTokens: string[];
 };
 
-type SingleVocDraftCommit = {
+export type SingleVocDraftCommit = {
   emit: boolean;
   emittedValue: string;
   kind: string;
@@ -25,12 +25,12 @@ type SingleVocDraftCommit = {
   valueType: string;
 };
 
-type ResolvedVocManualTokens = {
+export type ResolvedVocManualTokens = {
   invalidToken: string;
   resolvedValues: string[];
 };
 
-function normalizeVocColumns(columns: unknown): string[] {
+export function normalizeVocColumns(columns: unknown): string[] {
   if (!Array.isArray(columns)) {
     return [];
   }
@@ -40,7 +40,7 @@ function normalizeVocColumns(columns: unknown): string[] {
     .filter(Boolean);
 }
 
-function canParseVocStringSource(source: unknown): boolean {
+export function canParseVocStringSource(source: unknown): boolean {
   const text = String(source ?? '');
   return text.includes('\n') || text.includes(';');
 }
@@ -68,7 +68,7 @@ function normalizeVocSourceRows(source: unknown): string[][] {
   return [];
 }
 
-function normalizeVocRows(columns: unknown, source: unknown): VocRow[] {
+export function normalizeVocRows(columns: unknown, source: unknown): VocRow[] {
   const normalizedColumns = normalizeVocColumns(columns);
   const columnCount = normalizedColumns.length;
   if (!columnCount) {
@@ -95,11 +95,11 @@ function normalizeVocRows(columns: unknown, source: unknown): VocRow[] {
     .filter((row): row is VocRow => Boolean(row));
 }
 
-function normalizeVocQuery(query: unknown): string {
+export function normalizeVocQuery(query: unknown): string {
   return String(query ?? '').trim().toLocaleLowerCase();
 }
 
-function filterVocRows(rows: unknown, query: unknown): VocRow[] {
+export function filterVocRows(rows: unknown, query: unknown): VocRow[] {
   const normalizedQuery = normalizeVocQuery(query);
   const list = Array.isArray(rows) ? rows as VocRow[] : [];
   if (!normalizedQuery) {
@@ -111,12 +111,12 @@ function filterVocRows(rows: unknown, query: unknown): VocRow[] {
   );
 }
 
-function formatVocRowLabel(row: VocRow | null | undefined): string {
+export function formatVocRowLabel(row: VocRow | null | undefined): string {
   const cells = row && Array.isArray(row.cells) ? row.cells : [];
   return cells.filter(Boolean).join(' | ');
 }
 
-function findFirstVocRowByValue(rows: unknown, value: unknown): VocRow | null {
+export function findFirstVocRowByValue(rows: unknown, value: unknown): VocRow | null {
   const normalizedValue = String(value ?? '');
   if (!normalizedValue) {
     return null;
@@ -124,7 +124,7 @@ function findFirstVocRowByValue(rows: unknown, value: unknown): VocRow | null {
   return (Array.isArray(rows) ? rows as VocRow[] : []).find((row) => row && row.value === normalizedValue) || null;
 }
 
-function describeVocValueType(value: unknown): string {
+export function describeVocValueType(value: unknown): string {
   if (value === null) {
     return 'null';
   }
@@ -134,7 +134,7 @@ function describeVocValueType(value: unknown): string {
   return typeof value;
 }
 
-function resolveSingleVocDraftCommit(
+export function resolveSingleVocDraftCommit(
   rows: unknown,
   inputValue: unknown,
   committedValue: unknown,
@@ -189,7 +189,7 @@ function resolveSingleVocDraftCommit(
   };
 }
 
-function restoreVocRowIdsByValues(rows: unknown, values: unknown): Set<string> {
+export function restoreVocRowIdsByValues(rows: unknown, values: unknown): Set<string> {
   const list = Array.isArray(rows) ? rows as VocRow[] : [];
   const targetValues = Array.isArray(values)
     ? values.map((item) => String(item ?? ''))
@@ -217,20 +217,20 @@ function restoreVocRowIdsByValues(rows: unknown, values: unknown): Set<string> {
   return selectedIds;
 }
 
-function serializeVocValues(values: unknown): string {
+export function serializeVocValues(values: unknown): string {
   return (Array.isArray(values) ? values : [])
     .map((item) => String(item ?? '').trim())
     .filter((item) => item !== '')
     .join(', ');
 }
 
-function normalizeVocDraftSeparators(text: unknown): string {
+export function normalizeVocDraftSeparators(text: unknown): string {
   return String(text ?? '')
     .replace(/\r\n?/g, '\n')
     .replace(/[\t\n]+/g, ',');
 }
 
-function parseVocDraft(text: unknown): ParsedVocDraft {
+export function parseVocDraft(text: unknown): ParsedVocDraft {
   const normalizedText = normalizeVocDraftSeparators(text);
   const trailingSeparator = /,\s*$/.test(normalizedText);
   const parts = normalizedText.split(',');
@@ -247,7 +247,7 @@ function parseVocDraft(text: unknown): ParsedVocDraft {
   };
 }
 
-function replaceVocDraftActiveToken(text: unknown, nextToken: unknown): string {
+export function replaceVocDraftActiveToken(text: unknown, nextToken: unknown): string {
   const draft = parseVocDraft(text);
   const baseTokens = draft.completedTokens.slice();
   if (nextToken != null && String(nextToken).trim() !== '') {
@@ -256,7 +256,7 @@ function replaceVocDraftActiveToken(text: unknown, nextToken: unknown): string {
   return baseTokens.length ? `${baseTokens.join(', ')}, ` : '';
 }
 
-function resolveVocManualTokens(rows: unknown, tokens: unknown): ResolvedVocManualTokens {
+export function resolveVocManualTokens(rows: unknown, tokens: unknown): ResolvedVocManualTokens {
   const list = Array.isArray(rows) ? rows as VocRow[] : [];
   const resolvedValues: string[] = [];
   let invalidToken = '';
@@ -279,56 +279,9 @@ function resolveVocManualTokens(rows: unknown, tokens: unknown): ResolvedVocManu
   };
 }
 
-function rowsToSourceOrderValues(rows: unknown, selectedIds: unknown): string[] {
+export function rowsToSourceOrderValues(rows: unknown, selectedIds: unknown): string[] {
   const ids = selectedIds instanceof Set ? selectedIds : new Set<string>();
   return (Array.isArray(rows) ? rows as VocRow[] : [])
     .filter((row) => row && ids.has(row.id))
     .map((row) => row.value);
 }
-
-const vocContract = {
-  canParseVocStringSource,
-  filterVocRows,
-  describeVocValueType,
-  findFirstVocRowByValue,
-  formatVocRowLabel,
-  normalizeVocColumns,
-  normalizeVocDraftSeparators,
-  normalizeVocQuery,
-  normalizeVocRows,
-  parseVocDraft,
-  replaceVocDraftActiveToken,
-  resolveSingleVocDraftCommit,
-  resolveVocManualTokens,
-  restoreVocRowIdsByValues,
-  rowsToSourceOrderValues,
-  serializeVocValues
-};
-
-export type {
-  ParsedVocDraft,
-  ResolvedVocManualTokens,
-  SingleVocDraftCommit,
-  VocRow
-};
-
-export {
-  canParseVocStringSource,
-  filterVocRows,
-  describeVocValueType,
-  findFirstVocRowByValue,
-  formatVocRowLabel,
-  normalizeVocColumns,
-  normalizeVocDraftSeparators,
-  normalizeVocQuery,
-  normalizeVocRows,
-  parseVocDraft,
-  replaceVocDraftActiveToken,
-  resolveSingleVocDraftCommit,
-  resolveVocManualTokens,
-  restoreVocRowIdsByValues,
-  rowsToSourceOrderValues,
-  serializeVocValues
-};
-
-export default vocContract;

@@ -6,12 +6,23 @@
 - `tableSchema` хранит canonical schema и header rows.
 - flat runtime state (`selAnchor`, `selFocus`, `selFullWidthRows`) хранит active selection.
 - flat runtime state (`editingCell`, `cellValidationErrors`) хранит active editing session.
-- `tableStore.grouping` хранит grouping levels и display cache.
+- `tableStore.grouping` хранит grouping levels и expanded path state.
 - `tableStore.loading` хранит lazy-loading flags, pending rows и UI lock.
-- `tableStore.preferences` хранит runtime toggles для sticky header, word wrap и line numbers.
+- `tableStore.sticky` хранит sticky header flag и sticky measurement snapshot.
+- `tableStore.view` хранит runtime toggles для word wrap и line numbers.
+- `tableStore.validation` хранит mirror commit-validation map.
 
-`tableStore.selection`, `tableStore.editing`, `tableStore.contextMenu` и `tableStore.measurement`
-не считаются runtime source of truth, пока call-sites читают parallel flat state. Удалять эти slices можно только отдельным cleanup после проверки public `createStore()` shape.
+`tableStore.selection`, `tableStore.editing`, `tableStore.menu`, `tableStore.sticky` и `tableStore.validation`
+синхронизируются из flat runtime state после core transitions. Они пока остаются mirror-state,
+а не единственным source of truth, пока call-sites читают parallel flat state. Удалять flat fields
+или переводить call-sites на store можно только отдельным cleanup после проверки public `createStore()` shape.
+
+## Normalize Pass
+
+- `normalizeTableRuntimeState()` строит core snapshot, прогоняет `normalizeTableCoreState()` и синхронизирует исправленные selection/editing/context/grouping/sort поля обратно в runtime.
+- После опасных transitions (`initializeTable`, `setValue`, sort, grouping rebuild, row mutation, paste, lazy append, finish edit, context menu close) runtime обязан пройти normalize-pass или typed core command.
+- Open context menu snapshot закрывается, если session mismatch или snapshot ссылается на удалённый rowId/columnKey.
+- Row context actions читают `anchorRowId`/`anchorSourceRow`, clipboard actions восстанавливают rect и paste anchor из snapshot identity перед записью.
 
 ## Row Identity
 

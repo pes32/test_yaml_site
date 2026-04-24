@@ -11,6 +11,17 @@ from .contracts import Diagnostic, NormalizedModal, RawModalDocument, SourceFile
 from .gui_dsl import collect_widget_names_from_modal, extract_embedded_modals, normalize_modal_runtime
 
 
+def _duplicate_modal_warning(code: str, modal_id: str, page_name: str, file_rel: str, label: str) -> Diagnostic:
+    return make_diagnostic(
+        "warning",
+        code,
+        f"{label} '{modal_id}' объявлена повторно; используется последняя версия",
+        page=page_name,
+        file=file_rel,
+        node_path=modal_id,
+    )
+
+
 def _normalize_modal_document(filepath: str, modal_id: str) -> NormalizedModal:
     raw = RawModalDocument.model_validate(load_yaml_root(filepath)).root
 
@@ -88,13 +99,12 @@ def _collect_file_modals(
         previous = modals.get(modal_id)
         if previous:
             diagnostics.append(
-                make_diagnostic(
-                    "warning",
+                _duplicate_modal_warning(
                     "duplicate_file_modal",
-                    f"Модалка '{modal_id}' объявлена повторно; используется последняя версия",
-                    page=page_name,
-                    file=_relpath(filepath),
-                    node_path=modal_id,
+                    modal_id,
+                    page_name,
+                    _relpath(filepath),
+                    "Модалка",
                 )
             )
         modals[modal_id] = modal
@@ -112,13 +122,12 @@ def _collect_embedded_modals(gui: dict[str, Any], page_name: str, gui_file: str)
         previous = modals.get(modal_id)
         if previous:
             diagnostics.append(
-                make_diagnostic(
-                    "warning",
+                _duplicate_modal_warning(
                     "duplicate_embedded_modal",
-                    f"Встроенная модалка '{modal_id}' объявлена повторно; используется последняя версия",
-                    page=page_name,
-                    file=_relpath(gui_file),
-                    node_path=modal_id,
+                    modal_id,
+                    page_name,
+                    _relpath(gui_file),
+                    "Встроенная модалка",
                 )
             )
         modals[modal_id] = NormalizedModal.model_validate(raw_modal)

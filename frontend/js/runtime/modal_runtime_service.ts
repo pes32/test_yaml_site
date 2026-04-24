@@ -1,5 +1,7 @@
 import widgetFactory from '../widgets/factory.ts';
+import frontendApiClient from './api_client.ts';
 import { ensureAttrsLoaded as ensureAttrsLoadedFlow } from './attrs_loader.ts';
+import { logDiagnosticsToConsole } from './diagnostics.ts';
 import { FRONTEND_ERROR_SCOPES } from './error_model.ts';
 import {
   ModalRuntimeStore,
@@ -16,14 +18,36 @@ import {
   isModalSectionCollapsed,
   rememberActiveModalScroll,
   restoreActiveModalScroll,
+  asModalConfig,
   setActiveModalTab,
   toggleModalSectionCollapse,
   type ModalConfigRecord,
   type ModalRuntimeState
 } from './modal_runtime_store.ts';
-import { ensureModalDefinition as ensureModalDefinitionFlow } from './modal_flow.ts';
+import {
+  collectWidgetNamesFromSections,
+  getModalMap,
+  getParsedGuiState
+} from './page_selectors.ts';
+import PageRuntimeStore from './page_store.ts';
+import PageSessionStore from './page_session_store.ts';
+import type {
+  AttrConfigMap,
+  ModalPayload,
+  PageConfigState,
+  PageSessionState,
+  ParsedGuiModal
+} from './page_contract.ts';
 
-type ModalRuntimeVm = Record<string, unknown> & {
+type ModalDefinitionHost = {
+  allAttrs: AttrConfigMap;
+  configState: PageConfigState;
+  diagnostics: unknown[];
+  getCurrentPageName(): string;
+  sessionState: PageSessionState;
+};
+
+type ModalRuntimeVm = Record<string, unknown> & ModalDefinitionHost & {
   getWidgetConfig?: (widgetName: string) => { widget?: unknown } | null;
   handleRecoverableError?: (error: unknown, options?: Record<string, unknown>) => unknown;
   prefetchWidgetsByNames?: (names: string[]) => Promise<unknown> | void;
@@ -38,10 +62,37 @@ type ModalRuntimeController = {
   toggleModalSectionCollapse: (tabIndex: number, sectionIndex: number) => void;
 };
 
-function asModalConfig(state: ModalRuntimeState | null | undefined): ModalConfigRecord | null {
-  return state && state.modalConfig && typeof state.modalConfig === 'object'
-    ? state.modalConfig
-    : null;
+async function ensureModalDefinition(
+  vm: ModalDefinitionHost,
+  modalName: string
+): Promise<ParsedGuiModal | null> {
+  const parsedGui = getParsedGuiState(vm.sessionState);
+  const modalMap = getModalMap(vm.sessionState);
+
+  if (modalMap[modalName]) {
+    PageSessionStore.markModalLoaded(vm.sessionState, modalName);
+    return modalMap[modalName];
+  }
+
+  const payload = await frontendApiClient.fetchModal(vm.getCurrentPageName(), modalName) as ModalPayload;
+  const normalized = PageRuntimeStore.mergeModalPayload(vm.configState, payload);
+  const modal = normalized?.modal || null;
+  if (!modal) {
+    return null;
+  }
+
+  PageSessionStore.mergeLoadedAttrNames(vm.sessionState, normalized.resolvedNames || []);
+  PageSessionStore.initializeWidgetValues(vm.sessionState, vm.allAttrs);
+  PageSessionStore.setParsedGui(vm.sessionState, {
+    ...parsedGui,
+    modals: {
+      ...modalMap,
+      [modalName]: modal
+    }
+  });
+  PageSessionStore.markModalLoaded(vm.sessionState, modalName);
+  logDiagnosticsToConsole('modal', vm.diagnostics || []);
+  return modal;
 }
 
 function getModalConfig(state: ModalRuntimeState | null | undefined): ModalConfigRecord | null {
@@ -70,48 +121,11 @@ function collectModalWidgetNames(state: ModalRuntimeState | null | undefined): s
     return [];
   }
 
-  const names = new Set<string>();
-  const collectRows = (rows: unknown) => {
-    if (!Array.isArray(rows)) {
-      return;
-    }
-
-    rows.forEach((row) => {
-      if (!row || typeof row === 'string' || typeof row !== 'object') {
-        return;
-      }
-
-      const widgets = (row as Record<string, unknown>).widgets;
-      if (!Array.isArray(widgets)) {
-        return;
-      }
-
-      widgets.forEach((widgetName) => {
-        const token = String(widgetName || '').trim();
-        if (token) {
-          names.add(token);
-        }
-      });
-    });
-  };
-
-  const collectSections = (sections: unknown) => {
-    if (!Array.isArray(sections)) {
-      return;
-    }
-
-    sections.forEach((section) => {
-      if (!section || typeof section !== 'object') {
-        return;
-      }
-      collectRows((section as Record<string, unknown>).rows);
-    });
-  };
-
-  collectSections(modalConfig.content);
+  const names = new Set<string>(collectWidgetNamesFromSections(modalConfig.content));
   (Array.isArray(modalConfig.tabs) ? modalConfig.tabs : []).forEach((tab) => {
     if (tab && typeof tab === 'object') {
-      collectSections((tab as Record<string, unknown>).content);
+      collectWidgetNamesFromSections((tab as Record<string, unknown>).content)
+        .forEach((name) => names.add(name));
     }
   });
   (Array.isArray(modalConfig.buttons) ? modalConfig.buttons : []).forEach((buttonName) => {
@@ -153,7 +167,7 @@ async function openModal(
   const requestToken = beginModalRequest(state, modalName);
 
   try {
-    const modal = await ensureModalDefinitionFlow(vm as Parameters<typeof ensureModalDefinitionFlow>[0], modalName);
+    const modal = await ensureModalDefinition(vm, modalName);
     if (!modal) {
       throw new Error(`Не удалось определить конфигурацию модального окна "${modalName}"`);
     }
@@ -204,30 +218,9 @@ function createModalRuntimeController(
   };
 }
 
-const ModalRuntimeService = {
-  closeModal,
-  collectModalWidgetNames,
-  createEmptyModalRuntimeState,
-  createModalRuntimeController,
-  getActiveModalViewId,
-  getModalConfig,
-  getModalSectionCollapseId,
-  getModalTabs,
-  getModalTitle,
-  isModalOpen,
-  isModalSectionCollapsed,
-  openModal,
-  rememberActiveModalScroll,
-  restoreActiveModalScroll,
-  sectionsForTab,
-  setActiveModalTab,
-  toggleModalSectionCollapse
-};
-
 export type { ModalConfigRecord, ModalRuntimeController, ModalRuntimeState };
 
 export {
-  ModalRuntimeService,
   ModalRuntimeStore,
   closeModal,
   collectModalWidgetNames,
@@ -247,5 +240,3 @@ export {
   setActiveModalTab,
   toggleModalSectionCollapse
 };
-
-export default ModalRuntimeService;

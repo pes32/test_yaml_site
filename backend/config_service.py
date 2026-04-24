@@ -8,7 +8,8 @@ import threading
 import time
 from typing import Any, Dict
 
-from .config import ROOT_DIR, ConfigLoadError, SnapshotValidationError, build_config_snapshot, make_diagnostic
+from .config_shared import ROOT_DIR, ConfigLoadError, SnapshotValidationError, make_diagnostic
+from .config_snapshot import build_config_snapshot
 
 logger = logging.getLogger(__name__)
 

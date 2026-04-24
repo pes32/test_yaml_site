@@ -8,19 +8,21 @@ import { tableLog } from './table_debug.ts';
 import type {
     TableCellAddress,
     TableCommand,
+    TableContextMenuSnapshot,
+    TableCoreSelectionState,
+    TableCoreSortState,
     TableCoreState,
     TableDataRow,
     TableRuntimeColumn,
     TableRuntimeMethodSubset,
-    TableSelectionState,
-    TableSortState
+    TableSortState,
+    TableViewModel
 } from './table_contract.ts';
 import {
     buildGroupedDataOrder,
     pruneExpanded,
     TABLE_LAZY_THRESHOLD
 } from './table_grouping.ts';
-import { warnTableInvariants } from './table_invariants.ts';
 import {
     appendRowsDedup,
     normalizeLazyChunkSize,
@@ -31,22 +33,26 @@ import {
     buildCoreSelectionFromDisplay,
     captureSelectionIdentity as captureCoreSelectionIdentity,
     coreCellToDisplay,
-    displayCellToCore,
-    restoreDisplaySelectionFromCore,
-    restoreSelectionIdentity as restoreCoreSelectionIdentity
+    runtimeDisplaySelection,
+    restoreSelectionIdentity as restoreCoreSelectionIdentity,
+    setSelectionCommandFromCore
 } from './table_selection_model.ts';
-import { coreSortToRuntimeSort } from './table_sort_model.ts';
-import { SelectionMethods } from './table_selection.ts';
 import {
-    columnIndexByKey,
+    TABLE_RUNTIME_SYNC,
+    checkRuntimeTableInvariants,
+    dispatchRuntimeTableCommand,
+    dispatchRuntimeTableCoreCommand,
+    normalizeRuntimeTableState,
+    runtimeTableCoreStateSnapshot,
+    runtimeTableViewModelSnapshot,
+    syncRuntimeFromTableCoreState,
+    type RuntimeStateSyncOptions
+} from './table_runtime_state.ts';
+import {
     columnKeyAt,
-    createTableCoreStateFromRuntime,
-    dispatchTableCommand,
-    normalizeTableCoreState,
     sortKeysFromRuntime,
     withUniqueColumnKeys
 } from './table_state_core.ts';
-import { buildTableViewModel } from './table_view_model.ts';
 import {
     assignRowLineNumber,
     cloneTableData,
@@ -61,150 +67,80 @@ import {
     stripTableDataForEmit,
     validateExternalTableRows
 } from './table_utils.ts';
+
+type TableRuntimeErrorOptions = {
+    cause?: unknown;
+    details?: unknown;
+};
+
+type TableSelectionIdentitySnapshot = {
+    anchorCol: number;
+    anchorRowId: string;
+    focusCol: number;
+    focusRowId: string;
+    selection: TableCoreSelectionState | null;
+    useFullWidthRows: boolean;
+};
+
+type HeaderSortEvent = {
+    shiftKey?: boolean;
+};
+
 const DataRuntimeMethods = {
     tableCoreStateSnapshot() {
-        const core = createTableCoreStateFromRuntime({
-            activeCell: this.selFocus,
-            columns: this.tableColumns,
-            contextMenuContext: this.contextMenuContext,
-            contextMenuOpen: this.contextMenuOpen,
-            contextMenuSessionId: this.contextMenuSessionId,
-            editingCell: this.editingCell,
-            groupingState: this.groupingState,
-            rows: this.tableData,
-            selection: {
-                anchor: this.selAnchor,
-                focus: this.selFocus,
-                fullWidthRows: this.selFullWidthRows
-            },
-            sortKeys: this.sortKeys
-        });
-        const viewModel = this.tableViewModelSnapshot(core);
-        const selection = {
-            anchor: this.selAnchor,
-            focus: this.selFocus,
-            fullWidthRows: this.selFullWidthRows
-        };
-        core.selection = {
-            ...buildCoreSelectionFromDisplay(selection, this.tableColumns, viewModel)
-        };
-        core.activeCell = displayCellToCore(this.selFocus, this.tableColumns, viewModel);
-        if (this.editingCell) {
-            const editingCell = displayCellToCore(this.editingCell, this.tableColumns, viewModel);
-            core.editing = editingCell
-                ? {
-                      activeCell: editingCell,
-                      draftValue:
-                          this.tableData[this.resolveDataRowIndex(this.editingCell.r)]?.cells[
-                              this.editingCell.c
-                          ],
-                      validationErrors: { ...this.cellValidationErrors }
-                  }
-                : null;
-        }
-        return normalizeTableCoreState(core);
+        return runtimeTableCoreStateSnapshot(this);
     },
-    tableViewModelSnapshot(coreState) {
-        const core = coreState || this.tableCoreStateSnapshot();
-        return buildTableViewModel(core.rows, core.columns, {
-            expanded: core.grouping.expanded,
-            groupingLevelKeys: core.grouping.levelKeys,
-            listColumnIsMultiselect: (column: Record<string, unknown>) =>
-                this.listColumnIsMultiselect(column as TableRuntimeColumn),
-            sortKeys: core.sortKeys
-        });
+    tableViewModelSnapshot(coreState?: TableCoreState | null): TableViewModel {
+        return runtimeTableViewModelSnapshot(this, coreState);
     },
-    syncRuntimeFromCoreState(coreState, options = {}) {
-        const core = normalizeTableCoreState(coreState as TableCoreState);
-        const normalizedOptions = options || {};
-        if (normalizedOptions.skipRows !== true) {
-            this.tableData.splice(0, this.tableData.length, ...core.rows);
-        }
-        if (normalizedOptions.skipSort !== true) {
-            this.sortKeys = coreSortToRuntimeSort(this.tableColumns, core.sortKeys);
-        }
-        if (normalizedOptions.skipGrouping !== true) {
-            this.groupingState = {
-                expanded: new Set(core.grouping.expanded || []),
-                levels: core.grouping.levelKeys
-                    .map((colKey: string) => columnIndexByKey(this.tableColumns, colKey))
-                    .filter((index: number, pos: number, list: number[]) =>
-                        index >= 0 && list.indexOf(index) === pos
-                    )
-            };
-        }
-        if (normalizedOptions.skipSelection !== true) {
-            const viewModel = this.tableViewModelSnapshot(core);
-            const fallback: TableSelectionState = {
-                anchor: this.selAnchor,
-                focus: this.selFocus,
-                fullWidthRows: this.selFullWidthRows
-            };
-            const selection = restoreDisplaySelectionFromCore(
-                core.selection,
-                this.tableColumns,
-                viewModel,
-                fallback
-            );
-            this.selAnchor = selection.anchor;
-            this.selFocus = selection.focus;
-            this.selFullWidthRows = selection.fullWidthRows;
-        }
-        if (normalizedOptions.skipEditing !== true) {
-            const viewModel = this.tableViewModelSnapshot(core);
-            this.editingCell = coreCellToDisplay(
-                core.editing?.activeCell || null,
-                this.tableColumns,
-                viewModel
-            );
-            if (core.editing) this.cellValidationErrors = { ...core.editing.validationErrors };
-        }
-        if (normalizedOptions.skipContextMenu !== true) {
-            this.contextMenuOpen = core.contextMenu.open;
-            this.contextMenuContext = core.contextMenu.context;
-            this.contextMenuSessionId = core.contextMenu.sessionId;
-            if (!core.contextMenu.open) this.contextMenuTarget = null;
-        }
+    syncRuntimeFromCoreState(coreState: TableCoreState, options: RuntimeStateSyncOptions = {}) {
+        syncRuntimeFromTableCoreState(this, coreState, options);
     },
-    dispatchTableCoreCommand(command, phase, options = {}) {
-        const next = dispatchTableCommand(
-            this.tableCoreStateSnapshot(),
-            command as TableCommand
-        );
-        this.syncRuntimeFromCoreState(next, options);
-        this.checkTableInvariants?.(phase || command.type);
-        return next;
+    normalizeTableRuntimeState(phase?: string, options: RuntimeStateSyncOptions = {}) {
+        return normalizeRuntimeTableState(this, phase, options);
     },
-    checkTableInvariants(phase) {
-        const core = this.tableCoreStateSnapshot();
-        const viewModel = this.tableViewModelSnapshot(core);
-        warnTableInvariants(core, viewModel, { phase: String(phase || 'table mutation') });
+    dispatchTableCoreCommand(
+        command: TableCommand,
+        phase?: string,
+        options: RuntimeStateSyncOptions = {}
+    ) {
+        return dispatchRuntimeTableCoreCommand(this, command, phase, options);
+    },
+    dispatchTableCommand(
+        command: string | TableCommand,
+        payload: Record<string, unknown> = {},
+        phase?: string,
+        options: RuntimeStateSyncOptions = {}
+    ) {
+        return dispatchRuntimeTableCommand(this, command, payload, phase, options);
+    },
+    checkTableInvariants(phase?: string) {
+        checkRuntimeTableInvariants(this, phase);
     },
     runtimeColumnKeys() {
         return withUniqueColumnKeys(this.tableColumns).map((column) => column.columnKey);
+    },
+    runtimeColumnKey(colIndex: number) {
+        return columnKeyAt(this.tableColumns, this.normCol(colIndex)) || '';
     },
     runtimeSortKeySnapshots() {
         return sortKeysFromRuntime(this.tableColumns, this.sortKeys);
     },
     getAllAttrsMap() {
-        if (typeof this.getAllAttrsMapFromRuntime === 'function') {
-            const attrs = this.getAllAttrsMapFromRuntime();
-            if (attrs && typeof attrs === 'object') {
-                return attrs;
-            }
-        }
-        return {};
+        if (typeof this.getAllAttrsMapFromRuntime !== 'function') return {};
+        const attrs = this.getAllAttrsMapFromRuntime();
+        return attrs && typeof attrs === 'object' ? attrs : {};
     },
-    isLineNumberColumn(column) {
+    isLineNumberColumn(column: TableRuntimeColumn | null | undefined) {
         return isLineNumberColumn(column);
     },
     lineNumberColumnIndex() {
         return getLineNumberColumnIndex(this.tableColumns);
     },
-    resolveTableLazyEnabled(rowCount) {
+    resolveTableLazyEnabled(rowCount: number) {
         return selectResolveTableLazyEnabled(this.widgetConfig, rowCount, TABLE_LAZY_THRESHOLD);
     },
-    defaultCellValueFromColumn(column) {
+    defaultCellValueFromColumn(column: TableRuntimeColumn | null | undefined) {
         const tableCellOptions =
             column && column.tableCellOptions && typeof column.tableCellOptions === 'object'
                 ? column.tableCellOptions
@@ -216,7 +152,7 @@ const DataRuntimeMethods = {
             tableCellOptions
         });
     },
-    defaultCellValueForColumn(colIndex) {
+    defaultCellValueForColumn(colIndex: number) {
         return selectDefaultCellValueForColumn(this.tableColumns, colIndex, {
             isLineNumberColumn: (column) => this.isLineNumberColumn(column),
             isListColumnMultiselect: this.listColumnIsMultiselect(this.tableColumns[colIndex]),
@@ -227,12 +163,12 @@ const DataRuntimeMethods = {
                     : {}
         });
     },
-    blankCellValueForColumn(colIndex) {
+    blankCellValueForColumn(colIndex: number) {
         return selectBlankCellValueForColumn(this.tableColumns, colIndex, {
             isListColumnMultiselect: this.listColumnIsMultiselect(this.tableColumns[colIndex])
         });
     },
-    normalizeExternalRowsOrWarn(rows) {
+    normalizeExternalRowsOrWarn(rows: unknown): TableDataRow[] | null {
         const check = validateExternalTableRows(rows, this.tableColumns);
         if (!check.ok) {
             this.showTableError(
@@ -280,33 +216,18 @@ const DataRuntimeMethods = {
         this.stickyHeaderRuntimeEnabled = !!(this.widgetConfig && this.widgetConfig.sticky_header === true);
         this.wordWrapRuntimeEnabled = false;
         this.groupingState = { levels: [], expanded: new Set() };
-        this.groupingViewCache = null;
         this.parseTableAttrs(this.widgetConfig.table_attrs);
-        let incoming = [];
-        if (Array.isArray(this.widgetConfig.value)) {
-            incoming = cloneTableData(this.widgetConfig.value);
-        } else if (
-            this.widgetConfig.source &&
-            typeof this.widgetConfig.source === 'object' &&
-            Array.isArray(this.widgetConfig.source)
-        ) {
-            incoming = cloneTableData(this.widgetConfig.source);
-        } else if (this.widgetConfig.data) {
-            incoming = cloneTableData(this.widgetConfig.data);
-        }
+        const incomingSource = Array.isArray(this.widgetConfig.value)
+            ? this.widgetConfig.value
+            : Array.isArray(this.widgetConfig.source)
+              ? this.widgetConfig.source
+              : this.widgetConfig.data;
+        const incoming = cloneTableData(incomingSource || []);
         const cols = this.tableColumns.length;
-        const lazyThreshold = TABLE_LAZY_THRESHOLD;
-        let normalized = [];
+        let normalized: TableDataRow[] = [];
         if (cols > 0) {
             normalized = this.normalizeExternalRowsOrWarn(incoming) || [];
-            this.lazyEnabled = this.resolveTableLazyEnabled(normalized.length);
-            const lazyRows = splitLazyInitialRows(normalized, {
-                enabled: this.lazyEnabled,
-                threshold: lazyThreshold
-            });
-            this._lazyPendingRows = lazyRows.pendingRows;
-            normalized = lazyRows.visibleRows;
-            this.isFullyLoaded = lazyRows.isFullyLoaded;
+            normalized = this.prepareRowsForLazyDisplay(normalized, TABLE_LAZY_THRESHOLD);
             if (normalized.length === 0 && this.isEditable) {
                 this.tableData = [this.makeEmptyRow()];
             } else {
@@ -318,7 +239,7 @@ const DataRuntimeMethods = {
             this.isFullyLoaded = true;
         }
         this.ensureMinTableRows();
-        this.checkTableInvariants?.('initialize table');
+        this.normalizeTableRuntimeState?.('initialize table');
         this.onInput();
         this.$nextTick(() => {
             this._setupLazyObserver();
@@ -329,10 +250,9 @@ const DataRuntimeMethods = {
     makeEmptyRow() {
         const cols = this.tableColumns.length;
         if (cols === 0) return { id: generateTableRowId(), cells: [] };
-        const cells = [];
-        for (let columnIndex = 0; columnIndex < cols; columnIndex += 1) {
-            cells.push(this.defaultCellValueForColumn(columnIndex));
-        }
+        const cells = Array.from({ length: cols }, (_item, columnIndex) =>
+            this.defaultCellValueForColumn(columnIndex)
+        );
         const lineNumberIndex = this.lineNumberColumnIndex();
         if (lineNumberIndex >= 0) {
             const nextLine = nextLineNumber(this.tableData, this.tableColumns) || this.tableData.length + 1;
@@ -348,7 +268,17 @@ const DataRuntimeMethods = {
             this.tableData.push(this.makeEmptyRow());
         }
     },
-    showTableError(message, options = {}) {
+    prepareRowsForLazyDisplay(rows: TableDataRow[], lazyThreshold: number) {
+        this.lazyEnabled = this.resolveTableLazyEnabled(rows.length);
+        const lazyRows = splitLazyInitialRows(rows, {
+            enabled: this.lazyEnabled,
+            threshold: lazyThreshold
+        });
+        this._lazyPendingRows = lazyRows.pendingRows;
+        this.isFullyLoaded = lazyRows.isFullyLoaded;
+        return lazyRows.visibleRows;
+    },
+    showTableError(message: unknown, options: TableRuntimeErrorOptions = {}) {
         const normalizedMessage = String(message || 'Ошибка таблицы').trim() || 'Ошибка таблицы';
         const sourceError = options && options.cause ? options.cause : new Error(normalizedMessage);
         if (typeof this.handleRecoverableAppErrorFromRuntime === 'function') {
@@ -375,12 +305,11 @@ const DataRuntimeMethods = {
             config: this.widgetConfig
         });
     },
-    setValue(value) {
+    setValue(value: unknown) {
         const incoming = Array.isArray(value)
             ? cloneTableData(value)
             : [];
         const cols = this.tableColumns.length;
-        const lazyThreshold = TABLE_LAZY_THRESHOLD;
         let normalized: TableDataRow[] = [];
         if (cols > 0) {
             const nextRows = this.normalizeExternalRowsOrWarn(incoming);
@@ -390,41 +319,32 @@ const DataRuntimeMethods = {
         this.sortKeys = [];
         this._sortCycleRowOrder = null;
         this.groupingState = { levels: [], expanded: new Set() };
-        this.groupingViewCache = null;
         this.cellValidationErrors = {};
         this.lazySessionId = (this.lazySessionId || 0) + 1;
         this._lazyPendingRows = [];
         this.isFullyLoaded = true;
         this._teardownLazyObserver();
         if (cols > 0) {
-            this.lazyEnabled = this.resolveTableLazyEnabled(normalized.length);
-            const lazyRows = splitLazyInitialRows(normalized, {
-                enabled: this.lazyEnabled,
-                threshold: lazyThreshold
-            });
-            this._lazyPendingRows = lazyRows.pendingRows;
-            normalized = lazyRows.visibleRows;
-            this.isFullyLoaded = lazyRows.isFullyLoaded;
-            this.tableData = normalized;
+            this.tableData = this.prepareRowsForLazyDisplay(normalized, TABLE_LAZY_THRESHOLD);
         } else {
             this.lazyEnabled = false;
             this.tableData = [];
         }
         this.ensureMinTableRows();
-        this.checkTableInvariants?.('set value');
+        this.normalizeTableRuntimeState?.('set value');
         this.onInput();
     },
     getValue() {
         return stripTableDataForEmit(this.tableData, this.tableColumns);
     },
-    toggleLineNumbersFromSnapshot(snapshot) {
+    toggleLineNumbersFromSnapshot(snapshot: TableContextMenuSnapshot) {
         if (snapshot && snapshot.sessionId !== this.contextMenuSessionId) {
             this.hideContextMenu();
             return;
         }
         if (this.tableUiLocked) return;
         const oldLineNumberIndex = this.lineNumberColumnIndex();
-        const nextEnabled = !this.lineNumbersRuntimeEnabled;
+        const nextEnabled = !snapshot.lineNumbersEnabled;
         const mapRuntimeColumn = (colIndex: number): number => {
             const col = this.normCol(colIndex);
             if (oldLineNumberIndex >= 0 && !nextEnabled) {
@@ -452,7 +372,7 @@ const DataRuntimeMethods = {
         const fullWidthRows = this.selFullWidthRows
             ? { ...this.selFullWidthRows }
             : null;
-        const mappedSortKeys = this.sortKeys
+        const mappedSortKeys = snapshot.sortKeys
             .map((item: TableSortState): TableSortState | null => {
                 if (oldLineNumberIndex >= 0 && !nextEnabled && item.col === oldLineNumberIndex) {
                     return null;
@@ -463,7 +383,7 @@ const DataRuntimeMethods = {
                 };
             })
             .filter(Boolean);
-        const mappedGroupingLevels = this.groupingState.levels
+        const mappedGroupingLevels = snapshot.groupingLevelsSnapshot
             .map((col: number): number | null => {
                 if (oldLineNumberIndex >= 0 && !nextEnabled && col === oldLineNumberIndex) {
                     return null;
@@ -485,22 +405,53 @@ const DataRuntimeMethods = {
                 row.cells[nextLineNumberIndex] = index + 1;
             });
         }
-        this.tableData.splice(0, this.tableData.length, ...normalized);
-        this.selFullWidthRows = fullWidthRows;
-        this.selAnchor = {
-            r: this.normRow(anchorRow),
-            c: this.normCol(anchorCol)
+        const nextSelection = {
+            fullWidthRows,
+            anchor: {
+                r: this.normRow(anchorRow),
+                c: this.normCol(anchorCol)
+            },
+            focus: {
+                r: this.normRow(focusRow),
+                c: this.normCol(focusCol)
+            }
         };
-        this.selFocus = {
-            r: this.normRow(focusRow),
-            c: this.normCol(focusCol)
-        };
-        this.sortKeys = mappedSortKeys as typeof this.sortKeys;
-        this.groupingState = {
-            levels: mappedGroupingLevels as number[],
-            expanded: new Set()
-        };
+        this.dispatchTableCoreCommand(
+            { rows: normalized, type: 'REPLACE_ROWS' },
+            'toggle line numbers rows',
+            TABLE_RUNTIME_SYNC.ROWS_ONLY
+        );
+        this.dispatchTableCoreCommand(
+            {
+                sortKeys: sortKeysFromRuntime(this.tableColumns, mappedSortKeys as TableSortState[]),
+                type: 'SORT_COLUMNS'
+            },
+            'toggle line numbers sort',
+            TABLE_RUNTIME_SYNC.SORT_ONLY
+        );
+        this.dispatchTableCoreCommand(
+            {
+                colKeys: mappedGroupingLevels
+                    .map((col: number) => columnKeyAt(this.tableColumns, col))
+                    .filter((colKey: string | null): colKey is string => colKey != null),
+                expandedPathKeys: [],
+                type: 'SET_GROUP_LEVELS'
+            },
+            'toggle line numbers grouping',
+            TABLE_RUNTIME_SYNC.GROUPING_ONLY
+        );
+        const coreSelection = buildCoreSelectionFromDisplay(
+            nextSelection,
+            this.tableColumns,
+            this.tableViewModelSnapshot()
+        );
+        this.dispatchTableCoreCommand(
+            setSelectionCommandFromCore(coreSelection),
+            'toggle line numbers selection',
+            TABLE_RUNTIME_SYNC.SELECTION_ONLY
+        );
         this.refreshGroupingViewFromData();
+        this.normalizeTableRuntimeState?.('toggle line numbers');
         this.onInput();
         this.$nextTick(() => {
             this.focusSelectionCell(this.selFocus.r, this.selFocus.c);
@@ -511,9 +462,9 @@ const DataRuntimeMethods = {
         if (!this.sortKeys.length) {
             return;
         }
-        this.checkTableInvariants?.('sort');
+        this.normalizeTableRuntimeState?.('sort');
     },
-    applyColumnSort(colIdx, direction) {
+    applyColumnSort(colIdx: number, direction: 'asc' | 'desc') {
         this.applySortKeysFromRuntime(
             [{ col: colIdx, dir: direction === 'desc' ? 'desc' : 'asc' }],
             'sort'
@@ -529,21 +480,28 @@ const DataRuntimeMethods = {
         }
         this.tableData.splice(0, this.tableData.length, ...snapshot.slice());
     },
-    applySortKeysFromRuntime(nextSortKeys, phase) {
+    applySortKeysFromRuntime(nextSortKeys: TableSortState[] | null | undefined, phase?: string) {
+        this.applySortKeysFromCore(
+            sortKeysFromRuntime(this.tableColumns, nextSortKeys || []),
+            phase || 'sort'
+        );
+    },
+    applySortKeysFromCore(nextSortKeys: TableCoreSortState[] | null | undefined, phase?: string) {
         const selectionIdentity = this.captureSelectionIdentity();
         this.dispatchTableCoreCommand(
             {
-                sortKeys: sortKeysFromRuntime(this.tableColumns, nextSortKeys || []),
+                sortKeys: nextSortKeys || [],
                 type: 'SORT_COLUMNS'
             },
             phase || 'sort',
-            { skipRows: true, skipEditing: true, skipContextMenu: true }
+            TABLE_RUNTIME_SYNC.SORT_AND_GROUPING
         );
         this.restoreSelectionIdentity(selectionIdentity);
         this.refreshGroupingViewFromData();
+        this.normalizeTableRuntimeState?.(phase || 'sort');
         this.onInput();
     },
-    normRow(rowIndex) {
+    normRow(rowIndex: number) {
         const length = this.displayRows.length || this.tableData.length;
         const max = Math.max(0, length - 1);
         return clamp(rowIndex, 0, max);
@@ -551,63 +509,68 @@ const DataRuntimeMethods = {
     tbodyRowCount() {
         return this.displayRows.length || this.tableData.length;
     },
-    resolveDataRowIndex(viewRow) {
+    resolveDataRowIndex(viewRow: number) {
         const displayRow = this.displayRows[viewRow];
         if (displayRow && displayRow.kind === 'data') return displayRow.dataIndex;
         if (!this.displayRows.length) return this.normRow(viewRow);
         return -1;
     },
-    dataRowByDisplayIndex(viewRow) {
+    dataRowByDisplayIndex(viewRow: number) {
         const dataIndex = this.resolveDataRowIndex(viewRow);
         if (dataIndex < 0) return null;
         return this.tableData[dataIndex];
     },
-    groupExpanded(pathKey) {
+    displayCellFromIdentity(
+        rowId: string,
+        colKey: string,
+        fallback: TableCellAddress
+    ): TableCellAddress {
+        const cell = coreCellToDisplay(
+            {
+                colKey: String(colKey || ''),
+                rowId: String(rowId || '')
+            },
+            this.tableColumns,
+            this.tableViewModelSnapshot()
+        );
+        if (cell) return cell;
+        return {
+            r: this.normRow(fallback?.r ?? 0),
+            c: this.normCol(fallback?.c ?? 0)
+        };
+    },
+    groupExpanded(pathKey: string) {
         return this.groupingState.expanded.has(pathKey);
     },
-    toggleGroupExpand(pathKey) {
+    toggleGroupExpand(pathKey: string) {
         const next = new Set(this.groupingState.expanded);
         if (next.has(pathKey)) next.delete(pathKey);
         else next.add(pathKey);
-        this.groupingState = Object.assign({}, this.groupingState, { expanded: next });
+        this.dispatchTableCoreCommand(
+            { expandedPathKeys: [...next], type: 'SET_GROUP_EXPANDED' },
+            'toggle group',
+            TABLE_RUNTIME_SYNC.GROUPING_ONLY
+        );
         this.refreshGroupingViewFromData();
     },
     refreshGroupingViewFromData() {
+        this.normalizeTableRuntimeState?.('rebuild grouping');
         if (!this.groupingActive || !this.isFullyLoaded) {
-            this.groupingViewCache = null;
             this.$nextTick(() => this._scheduleStickyTheadUpdate());
             return;
         }
         let expanded = this.groupingState.expanded;
-        let viewModel = this.tableViewModelSnapshot();
+        const viewModel = this.tableViewModelSnapshot();
         const pruned = pruneExpanded(expanded, viewModel.validPathKeys);
         if (pruned.size !== expanded.size || [...expanded].some((key) => !pruned.has(key))) {
             expanded = pruned;
-            this.groupingState = Object.assign({}, this.groupingState, { expanded });
-            viewModel = this.tableViewModelSnapshot();
+            this.dispatchTableCoreCommand(
+                { expandedPathKeys: [...expanded], type: 'SET_GROUP_EXPANDED' },
+                'prune grouping',
+                TABLE_RUNTIME_SYNC.GROUPING_ONLY
+            );
         }
-        this.groupingViewCache = {
-            displayRows: viewModel.displayRows,
-            validPathKeys: viewModel.validPathKeys
-        };
         this.checkTableInvariants?.('rebuild display model');
-        this.$nextTick(() => this._scheduleStickyTheadUpdate());
-    },
-    applyTableMutation(mutator, options) {
-        const normalizedOptions = options || {};
-        if (this.tableUiLocked && !normalizedOptions.force) return;
-        mutator();
-        if (!normalizedOptions.skipSort && this.sortKeys.length) {
-            this.sortTableDataInPlace();
-        }
-        const skipGrouping =
-            normalizedOptions.skipGroupingViewRefresh === true ||
-            normalizedOptions.skipGroupingSync === true;
-        if (!skipGrouping && this.groupingActive && this.isFullyLoaded) {
-            this.refreshGroupingViewFromData();
-        }
-        this.checkTableInvariants?.('table mutation');
-        if (!normalizedOptions.skipEmit) this.onInput();
         this.$nextTick(() => this._scheduleStickyTheadUpdate());
     },
     _lazyChunkSize() {
@@ -656,7 +619,11 @@ const DataRuntimeMethods = {
             .filter((row: TableDataRow | null): row is TableDataRow => row != null);
         const merged = appendRowsDedup(this.tableData, normalizedRows);
         merged.duplicateRowIds.forEach((id) => tableLog('duplicate row id on merge', id));
-        this.tableData.splice(0, this.tableData.length, ...merged.rows);
+        this.dispatchTableCoreCommand(
+            { rows: merged.rows, type: 'REPLACE_ROWS' },
+            'append rows',
+            TABLE_RUNTIME_SYNC.ROWS_GROUPING_SELECTION
+        );
     },
     _requestLazyChunk() {
         if (this.tableUiLocked || !this.tableLazyUiActive || this.isLoadingChunk) return;
@@ -672,12 +639,8 @@ const DataRuntimeMethods = {
         const chunk = nextChunk.chunk;
         this._lazyPendingRows = nextChunk.remaining;
         try {
-            this.applyTableMutation(
-                () => {
-                    this._appendRowsDedup(chunk);
-                },
-                { skipSort: false, skipEmit: true, force: true }
-            );
+            this._appendRowsDedup(chunk);
+            this.normalizeTableRuntimeState?.('lazy append');
         } finally {
             this.isLoadingChunk = false;
         }
@@ -695,24 +658,20 @@ const DataRuntimeMethods = {
             return false;
         }
         const rest = this._lazyPendingRows.slice();
-        this.applyTableMutation(
-            () => {
-                this._lazyPendingRows = [];
-                this._appendRowsDedup(rest);
-            },
-            { skipSort: false, skipEmit: true, force: true }
-        );
+        this._lazyPendingRows = [];
+        this._appendRowsDedup(rest);
+        this.normalizeTableRuntimeState?.('lazy full load');
         this.isFullyLoaded = true;
         this._teardownLazyObserver();
         return true;
     },
-    clearSelectedCells() {
-        if (this.groupingActive || this.tableUiLocked) return;
-        if (typeof SelectionMethods.clearSelectedCells === 'function') {
-            SelectionMethods.clearSelectedCells.call(this);
-        }
+    flushLazyFullLoadOrWarn(message: string) {
+        if (this.isFullyLoaded) return true;
+        const ok = this.flushLazyFullLoadInternal();
+        if (!ok) this.showTableError(message);
+        return ok;
     },
-    onHeaderSortClick(colIdx, event) {
+    onHeaderSortClick(colIdx: number | null | undefined, event?: HeaderSortEvent) {
         if (!this.headerSortEnabled || this.tableUiLocked) return;
         if (colIdx == null) return;
         if (colIdx < 0 || colIdx >= this.tableColumns.length) return;
@@ -766,19 +725,17 @@ const DataRuntimeMethods = {
             this.tableColumns[colIdx] && this.tableColumns[colIdx].attr
         );
     },
-    selectedDataRowIdFromViewRow(viewRow) {
+    selectedDataRowIdFromViewRow(viewRow: number) {
         return this.tableViewModelSnapshot().displayIndexToRowId[viewRow] || '';
     },
     captureSelectionIdentity() {
-        const selection = captureCoreSelectionIdentity(
-            {
-                anchor: this.selAnchor,
-                focus: this.selFocus,
-                fullWidthRows: this.selFullWidthRows
-            },
-            this.tableColumns,
-            this.tableViewModelSnapshot()
-        );
+        const selection = this.buildSelectionSnapshotFromDisplay
+            ? this.buildSelectionSnapshotFromDisplay()
+            : captureCoreSelectionIdentity(
+                  runtimeDisplaySelection(this),
+                  this.tableColumns,
+                  this.tableViewModelSnapshot()
+              );
         return {
             selection,
             anchorCol: this.selAnchor.c,
@@ -788,18 +745,14 @@ const DataRuntimeMethods = {
             useFullWidthRows: !!this.selFullWidthRows
         };
     },
-    restoreSelectionIdentity(snapshot) {
+    restoreSelectionIdentity(snapshot: TableSelectionIdentitySnapshot | null | undefined) {
         if (!snapshot) return;
         if (snapshot.selection) {
             const selection = restoreCoreSelectionIdentity(
                 snapshot.selection,
                 this.tableColumns,
                 this.tableViewModelSnapshot(),
-                {
-                    anchor: this.selAnchor,
-                    focus: this.selFocus,
-                    fullWidthRows: this.selFullWidthRows
-                }
+                runtimeDisplaySelection(this)
             );
             this.selAnchor = selection.anchor;
             this.selFocus = selection.focus;
@@ -816,14 +769,18 @@ const DataRuntimeMethods = {
             snapshot.useFullWidthRows
         );
     },
-    restoreSelectionByRowIds(focusRowId, anchorRowId, focusCol, anchorCol, useFullWidthRows) {
+    restoreSelectionByRowIds(
+        focusRowId: string,
+        anchorRowId: string,
+        focusCol: number,
+        anchorCol: number,
+        useFullWidthRows: boolean
+    ) {
         const rowIndexById = this.tableViewModelSnapshot().rowIdToDisplayIndex;
-        const nextFocusRow = rowIndexById.has(focusRowId)
-            ? rowIndexById.get(focusRowId)
-            : 0;
-        const nextAnchorRow = rowIndexById.has(anchorRowId)
-            ? rowIndexById.get(anchorRowId)
-            : nextFocusRow;
+        const displayRow = (rowId: string, fallback: number) =>
+            rowIndexById.get(rowId) ?? fallback;
+        const nextFocusRow = displayRow(focusRowId, 0);
+        const nextAnchorRow = displayRow(anchorRowId, nextFocusRow);
         const focusColumn = this.normCol(focusCol != null ? focusCol : 0);
         const anchorColumn = this.normCol(anchorCol != null ? anchorCol : focusColumn);
         this.selFullWidthRows = null;
@@ -832,9 +789,12 @@ const DataRuntimeMethods = {
         if (useFullWidthRows && this.tableColumns.length > 0) {
             this.setSelFullWidthRowSpan(nextAnchorRow, nextFocusRow);
         }
-        this.$nextTick(() => this.focusSelectionCell(nextFocusRow, focusColumn));
+        this.normalizeTableRuntimeState?.('restore selection', {
+            ...TABLE_RUNTIME_SYNC.SELECTION_ONLY
+        });
+        this.$nextTick(() => this.focusSelectionCell(this.selFocus.r, this.selFocus.c));
     },
-    recalculateLineNumbersFromSnapshot(snapshot) {
+    recalculateLineNumbersFromSnapshot(snapshot: TableContextMenuSnapshot) {
         if (snapshot.sessionId !== this.contextMenuSessionId) {
             this.hideContextMenu();
             return;
@@ -852,15 +812,9 @@ const DataRuntimeMethods = {
         const useFullWidthRows = !!this.selFullWidthRows;
         this.tableUiLocked = true;
         try {
-            if (!this.isFullyLoaded) {
-                const ok = this.flushLazyFullLoadInternal();
-                if (!ok) {
-                    this.showTableError(
-                        'Не удалось полностью загрузить данные для пересчёта нумерации.'
-                    );
-                    return;
-                }
-            }
+            if (!this.flushLazyFullLoadOrWarn(
+                'Не удалось полностью загрузить данные для пересчёта нумерации.'
+            )) return;
             const order =
                 this.groupingActive
                     ? buildGroupedDataOrder(
@@ -875,28 +829,25 @@ const DataRuntimeMethods = {
                 if (!row || row.id == null) return;
                 nextNumbers.set(String(row.id), index + 1);
             });
-            const updated = this.tableData.map((row: TableDataRow): TableDataRow => {
-                const nextRow = assignRowLineNumber(
-                    row,
-                    this.tableColumns,
-                    nextNumbers.get(String(row.id))
-                );
-                return nextRow &&
-                    typeof nextRow === 'object' &&
-                    !Array.isArray(nextRow) &&
-                    Array.isArray((nextRow as { cells?: unknown[] }).cells) &&
-                    (nextRow as { id?: unknown }).id != null
-                    ? {
-                          id: String((nextRow as { id: unknown }).id),
-                          cells: (nextRow as { cells: unknown[] }).cells
-                      }
-                    : row;
-            });
-            this.tableData.splice(0, this.tableData.length, ...updated);
-            this.sortKeys = [];
+            const updated = this.tableData.map((row: TableDataRow) =>
+                assignRowLineNumber(row, this.tableColumns, nextNumbers.get(String(row.id))) as TableDataRow
+            );
+            this.dispatchTableCoreCommand(
+                { rows: updated, type: 'REPLACE_ROWS' },
+                'recalculate line numbers rows',
+                TABLE_RUNTIME_SYNC.ROWS_ONLY
+            );
+            this.dispatchTableCoreCommand(
+                { sortKeys: [], type: 'SORT_COLUMNS' },
+                'recalculate line numbers sort reset',
+                TABLE_RUNTIME_SYNC.SORT_ONLY
+            );
             this._sortCycleRowOrder = null;
-            this.groupingState = { levels: [], expanded: new Set() };
-            this.groupingViewCache = null;
+            this.dispatchTableCoreCommand(
+                { colKeys: [], expandedPathKeys: [], type: 'SET_GROUP_LEVELS' },
+                'recalculate line numbers grouping reset',
+                TABLE_RUNTIME_SYNC.GROUPING_ONLY
+            );
             this.onInput();
             this.restoreSelectionByRowIds(
                 focusRowId,
@@ -905,6 +856,7 @@ const DataRuntimeMethods = {
                 anchorCol,
                 useFullWidthRows
             );
+            this.normalizeTableRuntimeState?.('recalculate line numbers');
         } catch (error) {
             this.showTableError('Не удалось пересчитать нумерацию.', {
                 cause: error,

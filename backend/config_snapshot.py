@@ -24,10 +24,10 @@ from .config_shared import (
     load_yaml_dict,
     make_diagnostic,
 )
-from .config_validation import (
+from .config_attr_validation import _validate_attr_config
+from .config_gui_validation import (
     _build_duplicate_attr_diagnostics,
     _build_unused_attr_diagnostics,
-    _validate_attr_config,
     _validate_page_documents,
 )
 from .contracts import (

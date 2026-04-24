@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { openDemoTab, table, tableCell, widget } from '../../support/app';
+import { openDemoTab, table, tableCell, waitForPageReady, widget } from '../../support/app';
 
 async function editNativeTableCell(name: string, page: Page, row: number, col: number, value: string) {
   const cell = tableCell(page, name, row, col);
@@ -23,6 +23,7 @@ type TableWidgetRuntimeInspection = {
   contextMenuOpenValue: boolean;
   exposed: {
     contextMenuOpenBoolean: boolean;
+    dispatchTableCommand: boolean;
     getValue: boolean;
     initializeTable: boolean;
     onTableEditableKeydown: boolean;
@@ -97,6 +98,7 @@ async function inspectTableWidgetRuntime(page: Page, name: string): Promise<Tabl
       contextMenuOpenValue: publicInstance.contextMenuOpen === true,
       exposed: {
         contextMenuOpenBoolean: typeof publicInstance.contextMenuOpen === 'boolean',
+        dispatchTableCommand: typeof publicInstance.dispatchTableCommand === 'function',
         getValue: typeof publicInstance.getValue === 'function',
         initializeTable: typeof publicInstance.initializeTable === 'function',
         onTableEditableKeydown: typeof publicInstance.onTableEditableKeydown === 'function',
@@ -119,6 +121,17 @@ test.describe('behavior: demo table widgets', () => {
   test.beforeEach(async ({ page }) => {
     await installWidgetInstanceDebugRegistry(page);
     await openDemoTab(page, 'Таблицы', 'Демо-таблицы');
+  });
+
+  test('preloads and mounts table widgets on initial table tab', async ({ page }) => {
+    await page.goto('/widget_demo#menu-1-tab-0');
+    const modulePreloads = await page.locator('link[rel="modulepreload"]').evaluateAll((links) =>
+      links.map((link) => (link as HTMLLinkElement).href)
+    );
+    expect(modulePreloads.some((href) => href.includes('/widget-table-'))).toBe(true);
+    await waitForPageReady(page);
+    expect(await table(page, 'demo_table_2').count()).toBe(1);
+    await expect(table(page, 'demo_table_2')).toBeVisible();
   });
 
   test('renders every demo table and applies table-level YAML flags', async ({ page }) => {
@@ -184,6 +197,7 @@ test.describe('behavior: demo table widgets', () => {
       contextMenuOpenValue: false,
       exposed: {
         contextMenuOpenBoolean: true,
+        dispatchTableCommand: true,
         getValue: true,
         initializeTable: true,
         onTableEditableKeydown: true,
