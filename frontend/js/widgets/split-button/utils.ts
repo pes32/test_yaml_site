@@ -3,6 +3,9 @@ import type {
   SplitButtonActionItem
 } from './types.ts';
 import { normalizeActionItem } from '../../runtime/action_runtime.ts';
+import numberUtils from '../../shared/number_utils.ts';
+
+const { clampNumber: clamp, parsePixelValue } = numberUtils;
 
 const FOCUSABLE_SELECTOR = [
   'a[href]',
@@ -14,22 +17,6 @@ const FOCUSABLE_SELECTOR = [
 ].join(', ');
 
 const MAX_VISIBLE_ACTION_ROWS = 10;
-
-function parsePixelValue(value: unknown): number {
-  const parsed = Number.parseFloat(String(value ?? ''));
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function clamp(value: number, minValue: number, maxValue: number): number {
-  const safeMin = Number.isFinite(minValue) ? minValue : 0;
-  const safeMax = Number.isFinite(maxValue) ? maxValue : safeMin;
-  const upperBound = safeMax < safeMin ? safeMin : safeMax;
-  return Math.min(Math.max(value, safeMin), upperBound);
-}
-
-function toTrimmedString(value: unknown): string {
-  return value == null ? '' : String(value).trim();
-}
 
 function buildActionDescriptors(items: readonly unknown[]): SplitButtonActionDescriptor[] {
   const seen = new Map<string, number>();
@@ -84,6 +71,5 @@ export {
   clamp,
   getFocusableItems,
   getViewportPadding,
-  parsePixelValue,
-  toTrimmedString
+  parsePixelValue
 };

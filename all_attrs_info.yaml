@@ -39,7 +39,8 @@
 #   sort: false                                                          # Для table. Отключить сортировку
 #   zebra: false                                                         # Для table. Отключить зебру
 #   line_numbers: true                                                   # Для table. Вкл. нумерацию строк
-#   table_lazy: true | false                                             # Для table. Вкл. ленивую загрузку
+#   toolbar: true                                                        # Для table. Вкл. панель форматирования Table v2
+#   abc: true                                                            # Для table. Вкл. буквенные заголовки колонок Table v2
 #   dialog:                                                              # Для button/split_button - диалог с параметрами
 #     title: "Заголовок"
 #     text: "Текст"
@@ -303,7 +304,8 @@
 #   sort: false
 #   zebra: false
 #   line_numbers: true
-#   table_lazy: true | false
+#   toolbar: true
+#   abc: true
 #   source: [["a", "b"], ["c", "d"]]
 #   data: [["a", "b"], ["c", "d"]]   # скрытый алиас, реально читается TableWidget
 #   readonly: true
@@ -313,7 +315,7 @@
 #
 #
 # Важно:
-# - если `table_lazy` не задан, lazy включается автоматически при rowCount > 100.
+# - lazy включается автоматически при rowCount > 100.
 #
 # -----------------------------------------------------------------------------
 # 3. СИНТАКСИС table_attrs

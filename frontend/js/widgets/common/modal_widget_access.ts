@@ -23,4 +23,11 @@ function getModalWidgetValue(
         : undefined;
 }
 
-export { getModalWidgetAttrs, getModalWidgetValue };
+function createModalWidgetAccess(hostServices: PageHostRuntimeServices | null | undefined) {
+    return {
+        getWidgetAttrs: (widgetName: string) => getModalWidgetAttrs(hostServices, widgetName),
+        getWidgetValue: (widgetName: string) => getModalWidgetValue(hostServices, widgetName)
+    };
+}
+
+export { createModalWidgetAccess, getModalWidgetAttrs, getModalWidgetValue };

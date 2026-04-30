@@ -19,6 +19,7 @@ import type {
 } from './api_contract.ts';
 import { asRecord } from '../shared/object_record.ts';
 import { uniqueNames } from '../shared/string_list.ts';
+import { asString } from '../shared/string_value.ts';
 
 class FrontendApiError extends Error {
     code: string;
@@ -36,10 +37,6 @@ class FrontendApiError extends Error {
         this.snapshotVersion = typeof options.snapshotVersion === 'string' ? options.snapshotVersion : '';
         this.payload = options.payload || null;
     }
-}
-
-function asString(value: unknown): string {
-    return typeof value === 'string' ? value : '';
 }
 
 function readErrorRecord(payload: unknown): UnknownRecord {
@@ -130,44 +127,50 @@ function readEnvelopeSnapshotVersion(payload: unknown): string {
     return asString(asRecord<ApiEnvelope>(payload).snapshot_version);
 }
 
+function readEnvelopeMeta(payload: unknown) {
+    return {
+        diagnostics: readEnvelopeDiagnostics(payload),
+        snapshotVersion: readEnvelopeSnapshotVersion(payload)
+    };
+}
+
 function normalizePageResponse(payload: unknown): PageResponse {
     const data = readEnvelopeData(payload);
     const page = asRecord(data.page);
     return {
         page: Object.keys(page).length ? page : null,
         attrs: asRecord(data.attrs),
-        diagnostics: readEnvelopeDiagnostics(payload),
-        snapshotVersion: readEnvelopeSnapshotVersion(payload)
+        ...readEnvelopeMeta(payload)
+    };
+}
+
+function normalizeAttrsPayload(data: UnknownRecord) {
+    const attrs = asRecord(data.attrs);
+    return {
+        page: asString(data.page),
+        attrs,
+        resolvedNames: uniqueNames(data.resolved_names || Object.keys(attrs)),
+        missingNames: uniqueNames(data.missing_names)
     };
 }
 
 function normalizeAttrsResponse(payload: unknown): AttrsResponse {
     const data = readEnvelopeData(payload);
-    const attrs = asRecord(data.attrs);
     return {
-        page: asString(data.page),
-        attrs,
-        resolvedNames: uniqueNames(data.resolved_names || Object.keys(attrs)),
-        missingNames: uniqueNames(data.missing_names),
-        diagnostics: readEnvelopeDiagnostics(payload),
-        snapshotVersion: readEnvelopeSnapshotVersion(payload)
+        ...normalizeAttrsPayload(data),
+        ...readEnvelopeMeta(payload)
     };
 }
 
 function normalizeModalResponse(payload: unknown): ModalResponse {
     const data = readEnvelopeData(payload);
-    const attrs = asRecord(data.attrs);
     const dependencies = asRecord(data.dependencies);
     const modal = asRecord(data.modal);
     return {
-        page: asString(data.page),
+        ...normalizeAttrsPayload(data),
         modal: Object.keys(modal).length ? modal : null,
-        attrs,
-        resolvedNames: uniqueNames(data.resolved_names || Object.keys(attrs)),
-        missingNames: uniqueNames(data.missing_names),
         dependencies,
-        diagnostics: readEnvelopeDiagnostics(payload),
-        snapshotVersion: readEnvelopeSnapshotVersion(payload)
+        ...readEnvelopeMeta(payload)
     };
 }
 
@@ -180,8 +183,7 @@ function normalizeExecuteResponse(payload: unknown): ExecuteResponse {
         widget: asString(data.widget) || null,
         message: asString(data.message) || 'Команда выполнена',
         data: Object.prototype.hasOwnProperty.call(data, 'data') ? data.data : null,
-        diagnostics: readEnvelopeDiagnostics(payload),
-        snapshotVersion: readEnvelopeSnapshotVersion(payload)
+        ...readEnvelopeMeta(payload)
     };
 }
 
@@ -200,8 +202,7 @@ function normalizePagesResponse(payload: unknown): { pages: PageSummary[]; diagn
         pages: Array.isArray(data.pages)
             ? data.pages.map(normalizePageSummary)
             : [],
-        diagnostics: readEnvelopeDiagnostics(payload),
-        snapshotVersion: readEnvelopeSnapshotVersion(payload)
+        ...readEnvelopeMeta(payload)
     };
 }
 
@@ -265,9 +266,16 @@ function normalizeDebugSqlResponse(payload: unknown): DebugSqlResponse {
         truncated: Boolean(data.truncated),
         maxRows: Number(data.max_rows) || 0,
         durationMs: Number(data.duration_ms) || 0,
-        diagnostics: readEnvelopeDiagnostics(payload),
-        snapshotVersion: readEnvelopeSnapshotVersion(payload)
+        ...readEnvelopeMeta(payload)
     };
+}
+
+async function requestNormalized<T>(
+    url: string,
+    normalize: (payload: unknown) => T,
+    options: RequestInit = {}
+): Promise<T> {
+    return normalize(await requestEnvelope(url, options));
 }
 
 function createFrontendApiClient() {
@@ -275,73 +283,65 @@ function createFrontendApiClient() {
         requestEnvelope,
 
         async fetchPage(pageName: string) {
-            return normalizePageResponse(
-                await requestEnvelope(`/api/page/${encodeURIComponent(pageName)}`)
-            );
+            return requestNormalized(`/api/page/${encodeURIComponent(pageName)}`, normalizePageResponse);
         },
 
         async fetchAttrs(pageName: string, names: unknown) {
             const query = encodeURIComponent((Array.isArray(names) ? names : []).join(','));
-            return normalizeAttrsResponse(
-                await requestEnvelope(`/api/attrs?page=${encodeURIComponent(pageName)}&names=${query}`)
+            return requestNormalized(
+                `/api/attrs?page=${encodeURIComponent(pageName)}&names=${query}`,
+                normalizeAttrsResponse
             );
         },
 
         async fetchModal(pageName: string, modalId: string) {
-            return normalizeModalResponse(
-                await requestEnvelope(
-                    `/api/modal-gui?page=${encodeURIComponent(pageName)}&id=${encodeURIComponent(modalId)}`
-                )
+            return requestNormalized(
+                `/api/modal-gui?page=${encodeURIComponent(pageName)}&id=${encodeURIComponent(modalId)}`,
+                normalizeModalResponse
             );
         },
 
         async fetchPages() {
-            return normalizePagesResponse(
-                await requestEnvelope('/api/pages')
-            );
+            return requestNormalized('/api/pages', normalizePagesResponse);
         },
 
         async executeCommand(payload: ExecuteRequestPayload) {
-            return normalizeExecuteResponse(
-                await requestEnvelope('/api/execute', {
+            return requestNormalized(
+                '/api/execute',
+                normalizeExecuteResponse,
+                {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
-                })
+                }
             );
         },
 
         async fetchDebugStructure() {
-            return normalizeDebugStructureResponse(
-                await requestEnvelope('/api/debug/structure')
-            );
+            return requestNormalized('/api/debug/structure', normalizeDebugStructureResponse);
         },
 
         async fetchDebugLogs() {
-            return normalizeDebugLogsResponse(
-                await requestEnvelope('/api/debug/logs')
-            );
+            return requestNormalized('/api/debug/logs', normalizeDebugLogsResponse);
         },
 
         async fetchDebugPages() {
-            return normalizeDebugPagesResponse(
-                await requestEnvelope('/api/debug/pages')
-            );
+            return requestNormalized('/api/debug/pages', normalizeDebugPagesResponse);
         },
 
         async fetchDebugSnapshot() {
-            return normalizeDebugSnapshotResponse(
-                await requestEnvelope('/api/debug/snapshot')
-            );
+            return requestNormalized('/api/debug/snapshot', normalizeDebugSnapshotResponse);
         },
 
         async executeDebugSql(query: string) {
-            return normalizeDebugSqlResponse(
-                await requestEnvelope('/api/debug/sql', {
+            return requestNormalized(
+                '/api/debug/sql',
+                normalizeDebugSqlResponse,
+                {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ query })
-                })
+                }
             );
         }
     };
@@ -369,21 +369,8 @@ export type {
 
 export {
     FrontendApiError,
-    createFrontendApiClient,
     frontendApiClient,
-    normalizeAttrsResponse,
-    normalizeDebugLogsResponse,
-    normalizeDebugPagesResponse,
-    normalizeDebugSqlResponse,
-    normalizeDebugSnapshotResponse,
-    normalizeDebugStructureResponse,
-    normalizeEnvelopeErrorMessage,
-    normalizeExecuteResponse,
-    normalizeModalResponse,
-    normalizePageSummary,
-    normalizePagesResponse,
-    normalizePageResponse,
-    requestEnvelope
+    normalizePageResponse
 };
 
 export default frontendApiClient;

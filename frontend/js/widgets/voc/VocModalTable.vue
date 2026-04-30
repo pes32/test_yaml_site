@@ -115,7 +115,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import TableSortIcons from '../table/TableSortIcons.vue';
+import TableSortIcons from '../common/SortIcons.vue';
 import type { VocRow } from '../../runtime/voc_contract.ts';
 
 type RowClassResolver = (row: VocRow | null | undefined) => Record<string, boolean>;

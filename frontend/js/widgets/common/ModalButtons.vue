@@ -21,7 +21,7 @@
 
 <script setup lang="ts">
 import { injectPageHostRuntimeServices } from '../../runtime/widget_runtime_bridge.ts';
-import { getModalWidgetAttrs, getModalWidgetValue } from './modal_widget_access.ts';
+import { createModalWidgetAccess } from './modal_widget_access.ts';
 import WidgetRenderer from './WidgetRenderer.vue';
 
 defineOptions({
@@ -44,16 +44,9 @@ const emit = defineEmits<{
 }>();
 
 const hostServices = injectPageHostRuntimeServices();
+const { getWidgetAttrs, getWidgetValue } = createModalWidgetAccess(hostServices);
 
 function getCloseButtonConfig() {
   return CLOSE_BUTTON_CONFIG;
-}
-
-function getWidgetAttrs(widgetName: string) {
-  return getModalWidgetAttrs(hostServices, widgetName);
-}
-
-function getWidgetValue(widgetName: string) {
-  return getModalWidgetValue(hostServices, widgetName);
 }
 </script>

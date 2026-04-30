@@ -17,6 +17,7 @@ export type { UnknownRecord } from '../../shared/object_record.ts';
 export type { TableWidgetSetupMethodKey } from './table_setup_keys.ts';
 export type WidgetAttrsMap = AttrConfigMap;
 export type TableWidgetConfig = CommonWidgetAttrs & LegacyYamlAttrCompat & {
+    abc?: boolean;
     data?: unknown;
     lazy_chunk_size?: number | string;
     lazy_fail_full_load?: boolean;
@@ -26,7 +27,7 @@ export type TableWidgetConfig = CommonWidgetAttrs & LegacyYamlAttrCompat & {
     source?: unknown;
     sticky_header?: boolean;
     table_attrs?: unknown;
-    table_lazy?: boolean;
+    toolbar?: boolean;
     zebra?: boolean;
 };
 export type TableRowIdentity = string;
@@ -34,6 +35,50 @@ export type TableRowId = TableRowIdentity;
 export type TableColumnKey = string;
 export type TableCellAddress = { c: number; r: number };
 export type TableCoreCellAddress = { colKey: TableColumnKey; rowId: TableRowId };
+export type TableCellMetaKey = string;
+export type TableHorizontalAlign = 'left' | 'center' | 'right';
+export type TableVerticalAlign = 'top' | 'middle' | 'bottom';
+export type TableCellDataType =
+    | 'general'
+    | 'text'
+    | 'int'
+    | 'float'
+    | 'exponent'
+    | 'date'
+    | 'time'
+    | 'datetime'
+    | 'ip'
+    | 'ip_mask';
+export type TableCellStyleMeta = {
+    bold?: boolean;
+    fillColor?: string | null;
+    fontSize?: number | null;
+    horizontalAlign?: TableHorizontalAlign | null;
+    italic?: boolean;
+    strike?: boolean;
+    textColor?: string | null;
+    underline?: boolean;
+    verticalAlign?: TableVerticalAlign | null;
+};
+export type TableCellTypeMeta = {
+    precision?: number | null;
+    thousands?: boolean;
+    type?: TableCellDataType | null;
+};
+export type TableCellMeta = {
+    dataType?: TableCellTypeMeta;
+    style?: TableCellStyleMeta;
+};
+export type TableCellMetaMap = Record<TableCellMetaKey, TableCellMeta>;
+export type TableToolbarState = {
+    activeButtons: string[];
+    canApplyNumericFormat: boolean;
+    fontSize: number;
+    precision: number | null;
+    thousands: boolean;
+    type: TableCellDataType;
+    typeLocked: boolean;
+};
 export type TableSelectionRect = { c0: number; c1: number; r0: number; r1: number };
 export type TableSortDirection = 'asc' | 'desc';
 export type TableSortState = { col: number; dir: TableSortDirection };
@@ -149,11 +194,13 @@ export type TableGroupingState = { expanded: Set<string>; levels: number[] };
 export type TableSelectionState = {
     anchor: TableCellAddress;
     focus: TableCellAddress;
+    fullHeightCols?: { c0: number; c1: number } | null;
     fullWidthRows: { r0: number; r1: number } | null;
 };
 export type TableCoreSelectionState = {
     anchor: TableCoreCellAddress | null;
     focus: TableCoreCellAddress | null;
+    fullHeightColumnKeys?: TableColumnKey[] | null;
     fullWidthRowIds: TableRowId[] | null;
 };
 export type TableEditingSession = { activeCell: TableCellAddress | null };
@@ -218,7 +265,7 @@ export type TableCoreState = {
 };
 export type TableCommand =
     | { type: 'SET_ACTIVE_CELL'; cell: TableCoreCellAddress | null }
-    | { type: 'SET_SELECTION_RECT'; anchor: TableCoreCellAddress | null; focus: TableCoreCellAddress | null; fullWidthRowIds?: TableRowId[] | null }
+    | { type: 'SET_SELECTION_RECT'; anchor: TableCoreCellAddress | null; focus: TableCoreCellAddress | null; fullHeightColumnKeys?: TableColumnKey[] | null; fullWidthRowIds?: TableRowId[] | null }
     | { type: 'ENTER_EDIT_MODE'; cell: TableCoreCellAddress; draftValue: unknown }
     | { type: 'COMMIT_EDIT'; value: unknown }
     | { type: 'CANCEL_EDIT' }
@@ -270,6 +317,29 @@ export type TableMeasurementState = {
 export type TableStickyState = TableMeasurementState & { headerRuntimeEnabled: boolean };
 export type TableValidationState = { cellErrors: Record<string, string> };
 export type TableViewRuntimeState = { lineNumbersRuntimeEnabled: boolean; wordWrapRuntimeEnabled: boolean };
+export type TableMetadataState = { cellMetaByKey: TableCellMetaMap };
+export type TableWidthsState = {
+    initialByColumnKey: Record<TableColumnKey, string | null>;
+    overrideByColumnKey: Record<TableColumnKey, string | null>;
+};
+export type TableHistorySnapshot = {
+    cellMetaByKey: TableCellMetaMap;
+    groupingState: TableGroupingState;
+    rows: TableDataRow[];
+    selection: TableCoreSelectionState;
+    sortKeys: TableSortState[];
+    validationErrors: Record<string, string>;
+    widthOverridesByColumnKey: Record<TableColumnKey, string | null>;
+};
+export type TableHistoryEntry = {
+    after: TableHistorySnapshot;
+    before: TableHistorySnapshot;
+    label: string;
+};
+export type TableHistoryState = {
+    future: TableHistoryEntry[];
+    past: TableHistoryEntry[];
+};
 export type TableRuntimeErrorSeverity = 'fatal' | 'recoverable';
 export type TableRuntimeError = {
     cause?: unknown;
@@ -289,18 +359,22 @@ export type TableStore = {
     editing: TableEditingSession;
     grouping: { state: TableGroupingState };
     loading: TableLazyLoadState & { tableUiLocked: boolean };
+    meta: TableMetadataState;
     menu: TableContextMenuState;
     selection: TableSelectionState;
     sorting: { sortKeys: TableSortState[] };
     sticky: TableStickyState;
     validation: TableValidationState;
     view: TableViewRuntimeState;
+    widths: TableWidthsState;
+    history: TableHistoryState;
 };
 export type TableRuntimeRefs = Record<string, Element | ComponentPublicInstance | Array<Element | ComponentPublicInstance> | null | undefined> & {
     contextMenuEl?: HTMLElement | null;
     lazySentinelRow?: HTMLTableRowElement | null;
     tableRoot?: HTMLTableElement | null;
     tableThead?: HTMLTableSectionElement | null;
+    tableToolbarHost?: HTMLElement | null;
 };
 export type TableRuntimeDomSurface = {
     $el?: Element | null;
@@ -317,7 +391,6 @@ export type TableRuntimeState = {
     _pasteInProgress: boolean;
     _shiftAnchorLocked: boolean;
     _shiftSelectGesture: boolean;
-    _sortCycleRowOrder: TableDataRow[] | null;
     _stickyOnScroll: (() => void) | null;
     _stickyPinnedRowCount: number;
     _stickyPinnedTableWidth: number;
@@ -342,6 +415,7 @@ export type TableRuntimeState = {
     selectedRowIndex: number;
     selAnchor: TableCellAddress;
     selFocus: TableCellAddress;
+    selFullHeightCols: { c0: number; c1: number } | null;
     selFullWidthRows: { r0: number; r1: number } | null;
     showAppNotificationFromRuntime: ((message: string, type?: string) => void) | null;
     tableColumns: TableRuntimeColumn[];
@@ -354,10 +428,14 @@ export type TableRuntimeState = {
 export type TableRuntimePropsSurface = { widgetConfig: TableWidgetConfig; widgetName: string };
 export type TableRuntimeComputed = {
     _lazyPendingRows: TableDataRow[];
+    columnLetterLabels: string[];
     contextMenuItems: TableContextMenuItem[];
+    canRedo: boolean;
+    canUndo: boolean;
     displayRows: TableDisplayRow[];
     groupingActive: boolean;
     groupingState: TableGroupingState;
+    hasColumnLetters: boolean;
     hasColumnNumbers: boolean;
     hasExplicitTableWidth: boolean;
     headerSortEnabled: boolean;
@@ -367,16 +445,21 @@ export type TableRuntimeComputed = {
     lazyEnabled: boolean;
     lazySessionId: number;
     lineNumbersRuntimeEnabled: boolean;
+    runtimeColumnKeyList: string[];
     sortColumnIndex: number | null;
     sortDirection: TableSortDirection;
     sortKeys: TableSortState[];
     stickyHeaderEnabled: boolean;
     stickyHeaderRuntimeEnabled: boolean;
+    tableRowIdToDataIndex: Map<TableRowIdentity, number>;
+    tableViewModel: TableViewModel;
     tableInlineStyle: Record<string, string | number>;
     tableLazyUiActive: boolean;
     tableMinRowCount: number;
+    toolbarState: TableToolbarState;
     tableUiLocked: boolean;
     tableZebra: boolean;
+    toolbarEnabled: boolean;
     wordWrapEnabled: boolean;
     wordWrapRuntimeEnabled: boolean;
 };
@@ -394,27 +477,69 @@ export type TableRuntimeMethodContracts = {
     _teardownLazyObserver(): void;
     _unbindStickyThead(): void;
     canMutateColumnIndex(colIndex: number): boolean;
+    columnLetter(index: number): string;
+    applyCellDataTypeToSelection(type: TableCellDataType): void;
+    applyCellStylePatchToSelection(patch: TableCellStyleMeta): void;
+    applyPrecisionDeltaToSelection(delta: number): void;
+    applyTableAutoWidthToSelection(): void;
+    captureHistorySnapshot(): TableHistorySnapshot;
+    captureInitialTableWidths(): void;
+    canApplyNumericFormatToSelection(): boolean;
+    cellDisplayActionsByIdentity(rowId: string, colKey: string, fallbackCol: number, column: TableRuntimeColumn): TableCellDisplayAction[];
+    cellDisplayActionsClassByIdentity(rowId: string, colKey: string, fallbackCol: number, column: TableRuntimeColumn): unknown;
+    cellDisplayClassByIdentity(rowId: string, colKey: string, fallbackCol: number, column: TableRuntimeColumn): unknown;
+    cellDisplayTextClassByIdentity(rowId: string, colKey: string, fallbackCol: number, column: TableRuntimeColumn): unknown;
+    cellTdStyleByIdentity(rowId: string, colKey: string, fallbackRow: number, fallbackCol: number): Record<string, string>;
+    cellUsesEmbeddedWidgetByIdentity(rowId: string, colKey: string, fallbackCol: number, column: TableRuntimeColumn): boolean;
+    cellUsesNativeInputByIdentity(rowId: string, colKey: string, fallbackCol: number, column: TableRuntimeColumn): boolean;
+    cellVisualTextStyleByIdentity(rowId: string, colKey: string, fallbackCol: number, column: TableRuntimeColumn | null | undefined): Record<string, string>;
+    cellWidgetComponentByIdentity(rowId: string, colKey: string, fallbackCol: number, column: TableRuntimeColumn): Component | null;
     coreCellFromDisplay(rowIndex: number, colIndex: number): TableCoreCellAddress | null;
+    effectiveCellColumnByIdentity(rowId: string, colKey: string, fallbackCol: number, column: TableRuntimeColumn | null | undefined): TableRuntimeColumn | null;
+    effectiveCellTypeByIdentity(rowId: string, colKey: string, fallbackCol: number, column: TableRuntimeColumn): string;
     dataRowByIdentity(rowId: string): TableDataRow | null;
     displayCellFromIdentity(rowId: string, colKey: string, fallback: TableCellAddress): TableCellAddress;
     dispatchTableCoreCommand(command: TableCommand, phase?: string, options?: Record<string, unknown>): TableCoreState;
     emptyCellValueForColumn(colIndex: number): unknown;
+    buildSelectionSnapshotFromDisplay(): TableCoreSelectionState;
+    clearAllCellOverflowHints(): void;
+    computeBodyModeForMenu(): 'cell' | 'cells' | 'row' | null;
     getAllAttrsMap(): WidgetAttrsMap;
     getColumnAttrConfig(column: TableRuntimeColumn | null | undefined): TableColumnAttrConfig;
     getColumnTableCellOptions(column: TableRuntimeColumn | null | undefined): Record<string, unknown>;
     getListOptions(sourceName: unknown): unknown[];
     getSelRect(): TableSelectionRect;
+    isLineNumberColumn(column: TableRuntimeColumn | null | undefined): boolean;
     listColumnIsMultiselect(column: TableRuntimeColumn | null | undefined): boolean;
     navigateTableByTabFromCell(rowIndex: number, cellIndex: number, shiftKey: boolean): boolean | void;
     normCol(col: number): number;
     normRow(row: number): number;
     normalizeCellWidgetValue(column: TableRuntimeColumn | null | undefined, currentValue: unknown): unknown;
     onCellWidgetValidation(rowIndex: number, cellIndex: number, message: unknown): void;
+    onColumnLetterHeaderClick(event: MouseEvent, colIndex: number): void;
+    onTableToolbarAction(action: string, value?: unknown): void;
+    tableToolbarState(): TableToolbarState;
+    redoTableAction(): void;
+    recordHistoryEntry(label: string, before: TableHistorySnapshot, after: TableHistorySnapshot): void;
+    resetTableWidthsForSelection(): void;
     onHeaderSortClick(colIdx: number | null | undefined, event?: { shiftKey?: boolean }): void;
     onInput(): void;
     onTableHeaderContextMenu(event: MouseEvent, rowIndex: number, cell: TableHeaderCell | null, colIndex: number | null | undefined): void;
     safeCell(row: unknown, colIndex: number): unknown;
+    runtimeColumnKey(colIndex: number): string;
     runtimeColumnKeys(): string[];
+    runtimeColumnWidth(columnIndex: number): string | null;
+    runtimeSortKeySnapshots(): TableCoreSortState[];
+    selectAllTable(): TableCellAddress;
+    selectFullRow(row: number, focusCol?: number): TableCellAddress;
+    selectedDataRowIdFromViewRow(viewRow: number): string | null;
+    selectedMutableCoreCells(): TableCoreCellAddress[];
+    setSelFullHeightColSpan(c0: number, c1: number): TableCellAddress;
+    restoreHistorySnapshot(snapshot: TableHistorySnapshot): void;
+    runWithHistory(label: string, action: () => void): void;
+    toggleLineNumbersFromSnapshot(snapshot: TableContextMenuSnapshot): void;
+    toggleThousandsForSelection(): void;
+    undoTableAction(): void;
     refreshGroupingViewFromData(): void;
     syncRuntimeFromCoreState(coreState: TableCoreState, options?: Record<string, unknown>): void;
     tableCellConsumeKeys(column: TableRuntimeColumn | null | undefined): string;
@@ -441,26 +566,34 @@ export type TableSelectionRuntimeSurface = Pick<
     | '_tableFocusWithin'
     | 'selAnchor'
     | 'selFocus'
+    | 'selFullHeightCols'
     | 'selFullWidthRows'
     | 'tableColumns'
     | 'tableData'
 > &
-    Pick<TableRuntimeComputed, 'isEditable'> & {
+    Pick<TableRuntimeComputed, 'columnLetterLabels' | 'isEditable' | 'tableUiLocked'> & {
+        $nextTick: <T = void>(callback?: () => T) => Promise<unknown>;
         blankCellValueForColumn(colIndex: number): unknown;
         canMutateColumnIndex(colIndex: number): boolean;
         cellHasCommitError(row: number, col: number): boolean;
         dispatchTableCoreCommand(command: TableCommand, phase?: string, options?: Record<string, unknown>): unknown;
         emptyCellValueForColumn(colIndex: number): unknown;
+        exitCellEdit(): void;
+        focusSelectionCell(row: number, col: number): void;
         getSelectionCellCount(): number;
         getSelRect(): TableSelectionRect;
         isCellInSelection(row: number, col: number): boolean;
+        isLineNumberColumn(column: TableRuntimeColumn | null | undefined): boolean;
         isMultiCellSelection(): boolean;
         listColumnIsMultiselect(column: TableRuntimeColumn | null | undefined): boolean;
         normCol(col: number): number;
         normRow(row: number): number;
         selectionIsFullRowBlock(): boolean;
+        selectionIsFullColumnBlock(): boolean;
+        selectAllTable(): TableCellAddress;
         tableViewModelSnapshot(): TableViewModel;
         tbodyRowCount(): number;
+        setSelFullHeightColSpan(c0: number, c1: number): TableCellAddress;
     };
 export type TableStickyRuntimeSurface = TableRuntimeDomSurface &
     Pick<

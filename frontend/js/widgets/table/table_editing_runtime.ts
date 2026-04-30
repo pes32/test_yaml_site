@@ -35,7 +35,9 @@ function readEventValue(event: Event | { target?: { value?: unknown } } | unknow
 }
 
 function normalizeIpInputValue(value: unknown): string {
-    const filtered = String(value || '').replace(/[^\d.]/g, '');
+    const filtered = String(value || '')
+        .replace(/[,\s|\\/]+/g, '.')
+        .replace(/[^\d.]/g, '');
     return filtered
         .split('.')
         .slice(0, 4)
@@ -188,12 +190,16 @@ const EditingRuntimeMethods = {
         column: TableRuntimeColumn | null | undefined
     ) {
         try {
-            if (!column) return;
-            if (!column.format && column.type !== 'int' && column.type !== 'float') return;
+            const effectiveColumn =
+                typeof this.effectiveCellColumnByIdentity === 'function'
+                    ? this.effectiveCellColumnByIdentity(rowId, colKey, fallbackCol, column)
+                    : column;
+            if (!effectiveColumn) return;
+            if (!effectiveColumn.format && effectiveColumn.type !== 'int' && effectiveColumn.type !== 'float') return;
             const colIndex = columnIndexFromIdentityFallback(this, colKey, fallbackCol);
             const raw = this.safeCell(this.dataRowByIdentity(rowId), colIndex);
             if (raw === '') return;
-            const formatted = this.formatCellValue(raw, column);
+            const formatted = this.formatCellValue(raw, effectiveColumn);
             if (formatted !== raw) {
                 patchCellByIdentity(this, rowId, colKey, formatted, {
                     skipGroupingViewRefresh: true
@@ -477,7 +483,7 @@ const EditingRuntimeMethods = {
                 trigger.click();
                 return;
             }
-            if (attempt >= 3) {
+            if (attempt >= 60) {
                 const input = this.getCellEditorElement(normalizedRow, normalizedCol);
                 if (input && typeof input.focus === 'function') {
                     input.focus();

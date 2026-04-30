@@ -6,7 +6,7 @@ import { sanitizeTableCellOptions } from './table_parse_attrs.ts';
 import { displayCellToCore } from './table_selection_model.ts';
 import { dispatchRuntimeCellPatches } from './table_runtime_commands.ts';
 import { setTableValidationError, tableValidationKey } from './table_validation_model.ts';
-import { widgetFactory } from '../factory.ts';
+import { tableEmbeddedWidgetComponent } from './table_embedded_widgets.ts';
 import type {
     TableCellDisplayAction,
     TableCellWidgetPayload,
@@ -123,7 +123,7 @@ const CellRuntimeMethods = {
 
     columnWidgetComponentByType(type: unknown) {
         const widgetType = resolveEmbeddedWidgetType(type);
-        return widgetType ? widgetFactory.getDefinition(widgetType).resolveComponent() : null;
+        return widgetType ? tableEmbeddedWidgetComponent(widgetType) : null;
     },
 
     cellWidgetComponent(column: TableRuntimeColumn | null | undefined) {
@@ -205,9 +205,13 @@ const CellRuntimeMethods = {
         });
         const isEditing = this.isCellEditing(cell.r, cell.c);
         const readonly = !this.cellAllowsEditing(cell.r, cell.c) || !isEditing;
+        const effectiveColumn =
+            typeof this.effectiveCellColumnByIdentity === 'function'
+                ? this.effectiveCellColumnByIdentity(rowId, colKey, safeCol, column)
+                : column;
         return buildCellWidgetConfig(this, {
             cellIndex: safeCol,
-            column,
+            column: effectiveColumn || column,
             currentValue,
             isEditing,
             readonly,
@@ -240,11 +244,23 @@ const CellRuntimeMethods = {
     },
 
     coreCellFromDisplay(rowIndex: number, colIndex: number) {
-        return displayCellToCore(
-            { r: this.normRow(rowIndex), c: this.normCol(colIndex) },
-            this.tableColumns,
-            this.tableViewModelSnapshot()
-        );
+        const row = this.normRow(rowIndex);
+        const col = this.normCol(colIndex);
+        const colKey = this.runtimeColumnKey(col);
+        if (!colKey) return null;
+        const displayRow = this.displayRows[row];
+        if (displayRow && displayRow.kind === 'data') {
+            return { colKey, rowId: displayRow.rowId };
+        }
+        if (displayRow) return null;
+        const sourceRow = this.tableData[row];
+        return sourceRow && sourceRow.id != null
+            ? { colKey, rowId: String(sourceRow.id) }
+            : displayCellToCore(
+                  { r: row, c: col },
+                  this.tableColumns,
+                  this.tableViewModelSnapshot()
+              );
     },
 
     setCellValidationError(rowIndex: number, colIndex: number, message: unknown) {
@@ -261,7 +277,17 @@ const CellRuntimeMethods = {
     },
 
     cellHasCommitError(rowIndex: number, colIndex: number) {
-        const key = tableValidationKey(this.coreCellFromDisplay(rowIndex, colIndex));
+        const row = this.normRow(rowIndex);
+        const col = this.normCol(colIndex);
+        const colKey = this.runtimeColumnKey(col);
+        const displayRow = this.displayRows[row];
+        const rowId =
+            displayRow && displayRow.kind === 'data'
+                ? displayRow.rowId
+                : !displayRow && this.tableData[row]?.id != null
+                  ? String(this.tableData[row].id)
+                  : '';
+        const key = rowId && colKey ? tableValidationKey({ rowId, colKey }) : '';
         return !!(key && this.cellValidationErrors[key]);
     },
 

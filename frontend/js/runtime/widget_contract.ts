@@ -1,4 +1,9 @@
 import { STATEFUL_WIDGET_TYPES, type StatefulWidgetType } from '../shared/widget_types.ts';
+import { formatNowValueForWidgetType } from '../shared/date_time_format.ts';
+import {
+  normalizeChoiceValue,
+  normalizeScalarStringValue
+} from '../shared/choice_value.ts';
 
 type WidgetConfigLike =
   | string
@@ -78,40 +83,6 @@ function isChoiceWidgetMultiselect(widgetConfig: WidgetConfigLike): boolean {
   return isListMultiselect(widgetConfig) || isVocMultiselect(widgetConfig);
 }
 
-function padDatePart(value: number): string {
-  return String(value).padStart(2, '0');
-}
-
-function formatNowValueForWidgetType(widgetType: string, now = new Date()): string {
-  const datePart = `${padDatePart(now.getDate())}.${padDatePart(now.getMonth() + 1)}.${now.getFullYear()}`;
-  const timePart = `${padDatePart(now.getHours())}:${padDatePart(now.getMinutes())}`;
-
-  if (widgetType === 'date') return datePart;
-  if (widgetType === 'time') return timePart;
-  if (widgetType === 'datetime') return `${datePart} ${timePart}`;
-  return '';
-}
-
-function normalizeScalarStringValue(value: unknown): string {
-  if (Array.isArray(value)) {
-    return value.length ? normalizeScalarStringValue(value[0]) : '';
-  }
-
-  return value == null ? '' : String(value);
-}
-
-function normalizeStringArrayValue(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.map((item) => normalizeScalarStringValue(item));
-  }
-
-  if (value == null || value === '') {
-    return [];
-  }
-
-  return [normalizeScalarStringValue(value)];
-}
-
 function normalizeStatefulWidgetValue(
   widgetConfig: WidgetConfigLike,
   value: unknown,
@@ -145,7 +116,7 @@ function normalizeStatefulWidgetValue(
   }
 
   if (isChoiceWidgetMultiselect(widgetConfig)) {
-    return normalizeStringArrayValue(rawValue);
+    return normalizeChoiceValue(rawValue, true, { coerceToString: true }) as string[];
   }
 
   return normalizeScalarStringValue(rawValue);
@@ -266,7 +237,6 @@ export type {
 
 export {
   STATEFUL_WIDGET_TYPES,
-  formatNowValueForWidgetType,
   isChoiceWidgetMultiselect,
   isListMultiselect,
   isStatefulWidgetConfig,
@@ -274,9 +244,7 @@ export {
   isVocMultiselect,
   normalizeListOption,
   normalizeListOptions,
-  normalizeScalarStringValue,
   normalizeStatefulWidgetValue,
-  normalizeStringArrayValue,
   normalizeWidgetType,
   normalizedStatefulValueEquals,
   resolveInitialWidgetValue

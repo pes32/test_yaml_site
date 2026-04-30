@@ -31,6 +31,10 @@ type PreparedPasteMatrix = {
     tiled: boolean;
 };
 
+type SerializeSelectionOptions = {
+    includeColumn?: (colIndex: number) => boolean;
+};
+
 function normalizeTsvInput(text: string | null | undefined): string {
     if (text == null) return '';
     let normalized = String(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -121,7 +125,8 @@ function serializeSelectionToTsv(
     tableData: unknown[],
     rect: { c0: number; c1: number; r0: number; r1: number },
     listMultiFn: ((colIdx: number) => boolean) | undefined,
-    getRowAtDisplayIndex?: (displayRow: number) => unknown
+    getRowAtDisplayIndex?: (displayRow: number) => unknown,
+    options: SerializeSelectionOptions = {}
 ): string {
     const { r0, r1, c0, c1 } = rect;
     const lines: string[] = [];
@@ -135,6 +140,7 @@ function serializeSelectionToTsv(
         const rawCells = getRowCells(row);
         const cells: string[] = [];
         for (let colIndex = c0; colIndex <= c1; colIndex += 1) {
+            if (options.includeColumn && !options.includeColumn(colIndex)) continue;
             cells.push(cellToTsvString(rawCells[colIndex], listMultiFn, colIndex));
         }
         lines.push(cells.join('\t'));

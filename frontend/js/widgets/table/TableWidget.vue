@@ -5,6 +5,20 @@
     </div>
 
     <div
+      v-if="toolbarEnabled"
+      ref="tableToolbarHost"
+      class="widget-table-toolbar-host"
+    >
+      <table-toolbar
+        :can-redo="canRedo"
+        :can-undo="canUndo"
+        :disabled="tableUiLocked"
+        :toolbar-state="toolbarState"
+        @action="onTableToolbarAction"
+      ></table-toolbar>
+    </div>
+
+    <div
       class="widget-table-container"
       :class="{ 'widget-table-container--locked': tableUiLocked }"
       @focusin.capture="onTableContainerFocusIn"
@@ -72,6 +86,22 @@
                 <span v-text="column.number != null ? column.number : ''"></span>
               </th>
             </tr>
+            <tr v-if="hasColumnLetters" class="widget-table__column-letters-row">
+              <th
+                v-for="(letter, index) in columnLetterLabels"
+                :key="'abc-' + index"
+                class="widget-table__column-letter"
+                :class="{ 'widget-table__column-letter--empty': !letter }"
+                tabindex="0"
+                :aria-label="letter ? 'Выбрать столбец ' + letter : 'Выбрать всю таблицу'"
+                @click="onColumnLetterHeaderClick($event, index)"
+                @keydown.enter.prevent="onColumnLetterHeaderClick($event, index)"
+                @keydown.space.prevent="onColumnLetterHeaderClick($event, index)"
+                @contextmenu="letter ? onColumnNumberHeaderContextMenu($event, index) : $event.preventDefault()"
+              >
+                <span v-text="letter"></span>
+              </th>
+            </tr>
           </thead>
           <tbody @mousedown.capture="onTbodyMouseDownCapture">
             <tr v-for="(drow, rowIndex) in displayRows" :key="drow.pathKey">
@@ -95,11 +125,10 @@
                   :data-row="rowIndex"
                   :data-row-id="drow.rowId"
                   :data-col="cellIndex"
-                  :data-col-key="runtimeColumnKey(cellIndex)"
+                  :data-col-key="runtimeColumnKeyList[cellIndex]"
                   :class="cellTdClass(rowIndex, cellIndex)"
                   :tabindex="cellTabindex(rowIndex, cellIndex)"
-                  :style="cellSelectionOutlineStyle(rowIndex, cellIndex)"
-                  style="cursor: pointer;"
+                  :style="cellTdStyleByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], rowIndex, cellIndex)"
                   @click="onTableCellClick($event, rowIndex, cellIndex)"
                   @dblclick.stop="onTableCellDblClick(rowIndex, cellIndex)"
                   @mouseenter="syncCellOverflowHint($event)"
@@ -107,28 +136,28 @@
                   @mousedown="onTableCellMouseDown($event, rowIndex, cellIndex)"
                   @contextmenu="onBodyContextMenu($event, rowIndex, cellIndex)"
                 >
-                  <template v-if="cellUsesEmbeddedWidget(column)">
+                  <template v-if="cellUsesEmbeddedWidgetByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], cellIndex, column)">
                     <div
                       v-if="isEditable && isCellEditing(rowIndex, cellIndex) && cellAllowsEditing(rowIndex, cellIndex)"
                       class="cell-editor-wrap"
                     >
                       <component
-                        :is="cellWidgetComponent(column)"
-                        :ref="cellWidgetRefNameByIdentity(drow.rowId, runtimeColumnKey(cellIndex), rowIndex, cellIndex)"
-                        :widget-config="cellWidgetConfigByIdentity(drow.rowId, runtimeColumnKey(cellIndex), rowIndex, cellIndex, column)"
-                        :widget-name="cellWidgetNameByIdentity(drow.rowId, runtimeColumnKey(cellIndex), rowIndex, cellIndex)"
-                        @input="onCellWidgetPayloadByIdentity(drow.rowId, runtimeColumnKey(cellIndex), $event)"
+                        :is="cellWidgetComponentByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], cellIndex, column)"
+                        :ref="cellWidgetRefNameByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], rowIndex, cellIndex)"
+                        :widget-config="cellWidgetConfigByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], rowIndex, cellIndex, column)"
+                        :widget-name="cellWidgetNameByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], rowIndex, cellIndex)"
+                        @input="onCellWidgetPayloadByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], $event)"
                       ></component>
                     </div>
-                    <div v-else class="widget-table__cell-display" :class="cellDisplayClass(column)">
+                    <div v-else class="widget-table__cell-display" :class="cellDisplayClassByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], cellIndex, column)">
                       <span
                         class="widget-table__cell-display-text widget-table__cell-value"
-                        :class="cellDisplayTextClass(column)"
-                        :style="cellDisplayTextStyle(column)"
-                        v-text="formatCellValueByIdentity(drow.rowId, runtimeColumnKey(cellIndex), column, cellIndex)"
+                        :class="cellDisplayTextClassByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], cellIndex, column)"
+                        :style="cellVisualTextStyleByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], cellIndex, column)"
+                        v-text="formatCellValueByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], column, cellIndex)"
                       ></span>
-                      <span v-if="cellDisplayActions(column).length" class="widget-table__cell-actions" :class="cellDisplayActionsClass(column)">
-                        <template v-for="action in cellDisplayActions(column)" :key="action.kind">
+                      <span v-if="cellDisplayActionsByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], cellIndex, column).length" class="widget-table__cell-actions" :class="cellDisplayActionsClassByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], cellIndex, column)">
+                        <template v-for="action in cellDisplayActionsByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], cellIndex, column)" :key="action.kind">
                           <button
                             v-if="cellAllowsEditing(rowIndex, cellIndex)"
                             type="button"
@@ -136,7 +165,7 @@
                             :class="cellDisplayActionClass(action)"
                             :aria-label="action.label"
                             @mousedown.stop.prevent
-                            @click.stop.prevent="onCellDisplayActionByIdentity(drow.rowId, runtimeColumnKey(cellIndex), rowIndex, cellIndex, action.kind)"
+                            @click.stop.prevent="onCellDisplayActionByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], rowIndex, cellIndex, action.kind)"
                           >
                             <dropdown-chevron-icon v-if="action.kind === 'list'"></dropdown-chevron-icon>
                             <img v-else :src="iconSrc(action.icon)" alt="" aria-hidden="true">
@@ -149,26 +178,28 @@
                       </span>
                     </div>
                   </template>
-                  <template v-else-if="isEditable && cellUsesNativeInput(column) && (!wordWrapEnabled || isCellEditing(rowIndex, cellIndex))">
+                  <template v-else-if="isEditable && cellUsesNativeInputByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], cellIndex, column) && (!wordWrapEnabled || isCellEditing(rowIndex, cellIndex))">
                     <input
                       type="text"
                       class="cell-input w-100"
                       :class="{ 'cell-input--view': !isCellEditing(rowIndex, cellIndex) }"
                       tabindex="-1"
-                      :value="cellValueByIdentity(drow.rowId, runtimeColumnKey(cellIndex), cellIndex)"
+                      :value="cellValueByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], cellIndex)"
                       :readOnly="!isCellEditing(rowIndex, cellIndex)"
                       @mousedown="onCellInputViewMouseDown($event, rowIndex, cellIndex)"
-                      @input="column.type === 'ip' ? onIpInputByIdentity(drow.rowId, runtimeColumnKey(cellIndex), $event) : onCellInputByIdentity(drow.rowId, runtimeColumnKey(cellIndex), $event)"
-                      @blur="column.type === 'ip' ? onNativeCellBlurByIdentity(drow.rowId, runtimeColumnKey(cellIndex), rowIndex, cellIndex) : onTextCellBlurByIdentity(drow.rowId, runtimeColumnKey(cellIndex), rowIndex, cellIndex, column)"
+                      :style="cellVisualTextStyleByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], cellIndex, column)"
+                      @input="effectiveCellTypeByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], cellIndex, column) === 'ip' ? onIpInputByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], $event) : onCellInputByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], $event)"
+                      @blur="effectiveCellTypeByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], cellIndex, column) === 'ip' ? onNativeCellBlurByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], rowIndex, cellIndex) : onTextCellBlurByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], rowIndex, cellIndex, column)"
                     >
                     <span
                       aria-hidden="true"
-                      class="widget-table__cell-text-proxy"
-                      v-text="formatCellValueByIdentity(drow.rowId, runtimeColumnKey(cellIndex), column, cellIndex)"
+                      class="widget-table__cell-text-proxy widget-table__cell-value"
+                      :style="cellVisualTextStyleByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], cellIndex, column)"
+                      v-text="formatCellValueByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], column, cellIndex)"
                     ></span>
                   </template>
                   <template v-else>
-                    <span class="widget-table__cell-value" v-text="formatCellValueByIdentity(drow.rowId, runtimeColumnKey(cellIndex), column, cellIndex)"></span>
+                    <span class="widget-table__cell-value" :style="cellVisualTextStyleByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], cellIndex, column)" v-text="formatCellValueByIdentity(drow.rowId, runtimeColumnKeyList[cellIndex], column, cellIndex)"></span>
                   </template>
                 </td>
               </template>
@@ -225,7 +256,8 @@ import type {
   TableWidgetPublicSurface
 } from './table_contract.ts';
 import DropdownChevronIcon from '../common/DropdownChevronIcon.vue';
-import TableSortIcons from './TableSortIcons.vue';
+import TableSortIcons from '../common/SortIcons.vue';
+import TableToolbar from './TableToolbar.vue';
 import { useTableRuntime } from './useTableRuntime.ts';
 
 defineOptions({
@@ -241,32 +273,37 @@ const tableRuntime = useTableRuntime({
 });
 
 const {
+  canRedo,
+  canUndo,
   cellAllowsEditing,
   cellDisplayActionClass,
-  cellDisplayActions,
-  cellDisplayActionsClass,
-  cellDisplayClass,
-  cellDisplayTextClass,
-  cellDisplayTextStyle,
-  cellSelectionOutlineStyle,
+  cellDisplayActionsByIdentity,
+  cellDisplayActionsClassByIdentity,
+  cellDisplayClassByIdentity,
+  cellDisplayTextClassByIdentity,
   cellTabindex,
+  cellTdStyleByIdentity,
   cellTdClass,
   cellValueByIdentity,
-  cellUsesEmbeddedWidget,
-  cellUsesNativeInput,
-  cellWidgetComponent,
+  cellUsesEmbeddedWidgetByIdentity,
+  cellUsesNativeInputByIdentity,
+  cellVisualTextStyleByIdentity,
+  cellWidgetComponentByIdentity,
   cellWidgetConfigByIdentity,
   cellWidgetNameByIdentity,
   cellWidgetRefNameByIdentity,
+  columnLetterLabels,
   clearCellOverflowHint,
   contextMenuItems,
   contextMenuOpen,
   contextMenuPosition,
   displayRows,
+  effectiveCellTypeByIdentity,
   formatCellValueByIdentity,
   groupExpanded,
   groupRowStyle,
   groupingActive,
+  hasColumnLetters,
   hasColumnNumbers,
   hasExplicitTableWidth,
   headerRows,
@@ -283,6 +320,7 @@ const {
   onCellInputByIdentity,
   onCellInputViewMouseDown,
   onCellWidgetPayloadByIdentity,
+  onColumnLetterHeaderClick,
   onColumnNumberHeaderContextMenu,
   onContextMenuItemActivate,
   onCtxIconError,
@@ -290,7 +328,7 @@ const {
   onHeaderSortClick,
   onIpInputByIdentity,
   onNativeCellBlurByIdentity,
-  runtimeColumnKey,
+  runtimeColumnKeyList,
   onTableCellClick,
   onTableCellDblClick,
   onTableCellMouseDown,
@@ -298,6 +336,7 @@ const {
   onTableContainerFocusOut,
   onTableEditableKeydown,
   onTableHeaderContextMenu,
+  onTableToolbarAction,
   onTbodyMouseDownCapture,
   onTextCellBlurByIdentity,
   showSortInHeaderCell,
@@ -311,6 +350,8 @@ const {
   tableLazyUiActive,
   tableUiLocked,
   tableZebra,
+  toolbarState,
+  toolbarEnabled,
   thAriaSort,
   toggleGroupExpand,
   widgetConfig,

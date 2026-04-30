@@ -218,6 +218,21 @@
     color: var(--color-text-main);
 }
 
+.widget-table__cell--line-number {
+    color: var(--color-text-muted);
+    background-color: var(--color-bg-muted);
+    text-align: center;
+    user-select: none;
+}
+
+.widget-table--editable .widget-table__cell--line-number {
+    cursor: pointer;
+}
+
+.widget-table--editable .widget-table__cell--line-number:hover {
+    background-color: var(--color-bg);
+}
+
 .widget-table__cell-action--list svg {
     width: var(--table-action-size);
     height: var(--table-action-size);

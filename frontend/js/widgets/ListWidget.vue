@@ -60,19 +60,12 @@ import {
 } from '../runtime/widget_contract.ts';
 import { useListValueModel } from './list/useListValueModel.ts';
 import {
-  closeDropdown as closeDropdownRuntime,
-  focusInput,
-  getInputElement as getInputElementRuntime,
   handleDropdownTableCellTab,
-  listItemId as resolveListItemId,
-  moveDropdownHighlightedIndex,
-  openDropdown as openDropdownRuntime,
   removeClickOutsideListener,
   removeScrollListener,
-  scheduleOutsideInteractionCommit,
-  setDropdownHighlightedIndex,
-  type DropdownRuntimeContext
+  scheduleOutsideInteractionCommit
 } from './dropdown/dropdown_runtime.ts';
+import { createChoiceDropdownRuntime } from './dropdown/choice_dropdown_runtime.ts';
 type ListWidgetConfig = ChoiceWidgetConfigBase & {
   editable?: boolean;
 };
@@ -175,50 +168,34 @@ const inputDisplayValue = computed(() => {
     ? inputValue.value
     : getOptionLabelByValue(value.value);
 });
-function getDropdownRefs() {
-  return resolveChoiceComboboxRefs(combobox.value);
-}
-const dropdownRuntimeContext: DropdownRuntimeContext = {
+const choiceDropdown = createChoiceDropdownRuntime({
   $nextTick: nextTick,
-  get $refs() {
-    return getDropdownRefs();
-  },
-  get highlightedIndex() {
-    return highlightedIndex.value;
-  },
-  set highlightedIndex(value) {
+  getRefs: () => resolveChoiceComboboxRefs(combobox.value),
+  getHighlightedIndex: () => highlightedIndex.value,
+  setHighlightedIndex: (value) => {
     highlightedIndex.value = Number(value) || 0;
   },
-  get inlineRows() {
-    return filteredOptions.value;
-  },
-  get isDropdownOpen() {
-    return isDropdownOpen.value;
-  },
-  set isDropdownOpen(value) {
+  getInlineRows: () => filteredOptions.value,
+  getIsDropdownOpen: () => isDropdownOpen.value,
+  setIsDropdownOpen: (value) => {
     isDropdownOpen.value = Boolean(value);
   },
-  get listId() {
-    return listId;
-  },
-  get menuPosition() {
-    return menuPosition.value as Record<string, string>;
-  },
-  set menuPosition(value) {
+  getListId: () => listId,
+  getMenuPosition: () => menuPosition.value as Record<string, string>,
+  setMenuPosition: (value) => {
     menuPosition.value = value;
   },
   onOutsideInteractionCommit,
   resolveHighlightedIndex,
-  get shouldShowInlineDropdown() {
-    return isDropdownOpen.value;
-  },
-  get widgetConfig() {
-    return props.widgetConfig;
-  }
-};
-function listItemId(index: number): string {
-  return resolveListItemId(dropdownRuntimeContext, Number(index));
-}
+  getShouldShowInlineDropdown: () => isDropdownOpen.value,
+  getWidgetConfig: () => props.widgetConfig
+});
+const dropdownRuntimeContext = choiceDropdown.context;
+const getInputElement = choiceDropdown.getInputElement;
+const listItemId = choiceDropdown.listItemId;
+const moveHighlightedIndex = choiceDropdown.moveHighlightedIndex;
+const setHighlightedIndex = choiceDropdown.setHighlightedIndex;
+
 function asListOption(item: unknown): NormalizedListOption | null {
   return item && typeof item === 'object'
     ? (item as NormalizedListOption)
@@ -239,25 +216,7 @@ function listOptionClass(item: unknown, index: number): Record<string, boolean> 
   };
 }
 function setHighlightedFromPointer(index: number): void {
-  highlightedIndex.value = Number(index) || 0;
-}
-function getInputElement(): HTMLInputElement | null {
-  return getInputElementRuntime(dropdownRuntimeContext);
-}
-function setHighlightedIndex(index: number, options: { scroll?: boolean } = {}): void {
-  setDropdownHighlightedIndex(
-    dropdownRuntimeContext,
-    index,
-    filteredOptions.value.length,
-    options
-  );
-}
-function moveHighlightedIndex(delta: number): void {
-  moveDropdownHighlightedIndex(
-    dropdownRuntimeContext,
-    filteredOptions.value.length,
-    delta
-  );
+  setHighlightedIndex(index, { scroll: false });
 }
 function resetHighlightToFirstFilteredOption(): void {
   void nextTick(() => {
@@ -414,7 +373,7 @@ function onArrowClick(): void {
   if (props.widgetConfig.readonly) {
     return;
   }
-  focusInput(dropdownRuntimeContext);
+  choiceDropdown.focusInput();
   if (isDropdownOpen.value) {
     closeDropdown();
   } else {
@@ -434,12 +393,12 @@ function selectOption(
   }
 }
 function openDropdown(options: { highlightFirstFiltered?: boolean } = {}): void {
-  openDropdownRuntime(dropdownRuntimeContext, {
+  choiceDropdown.openDropdown({
     highlightFirst: options.highlightFirstFiltered === true
   });
 }
 function closeDropdown(): void {
-  closeDropdownRuntime(dropdownRuntimeContext);
+  choiceDropdown.closeDropdown();
 }
 function onOutsideInteractionCommit(): void {
   if (!isMultiselect.value && isEditable.value) {

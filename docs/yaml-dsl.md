@@ -109,6 +109,15 @@ Backend валидирует:
 
 DOM-heavy поля `date`, `time`, `datetime`, `ip` и `ip_mask` сохраняют тот же lifecycle surface для page/table runtime: `getValue`, `setValue`, `commitDraft`, `commitPendingState`, а date/time widgets дополнительно открываются через picker methods, которые использует table cell runtime.
 
+### `table`
+
+Table v2 добавляет два YAML-флага:
+
+- `toolbar: true` показывает панель форматирования над таблицей;
+- `abc: true` показывает буквенную строку колонок.
+
+Флаг `table_lazy` не используется: lazy-режим включается автоматически для больших таблиц.
+
 ### `button` и `split_button`
 
 Публичный YAML-контракт:

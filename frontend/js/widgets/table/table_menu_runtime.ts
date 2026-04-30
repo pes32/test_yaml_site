@@ -6,6 +6,7 @@ import {
 } from './table_selection_model.ts';
 import { TABLE_RUNTIME_SYNC } from './table_runtime_state.ts';
 import { columnIndexByKey, columnKeyAt } from './table_state_core.ts';
+import { isApplePlatform } from './table_platform.ts';
 import { WidgetUiCoords } from './table_widget_helpers.ts';
 import type {
     TableContextMenuItem,
@@ -18,6 +19,7 @@ import type {
     TableSelectionRect,
     TableSortState
 } from './table_contract.ts';
+import { firstUserColumnIndex, type UserColumnRuntime } from './table_column_navigation.ts';
 type TableContextMenuBodyMode = 'cell' | 'cells' | 'row' | null;
 type RowMoveDuplicateOpsOptions = {
     bodyMode: TableContextMenuBodyMode;
@@ -85,12 +87,6 @@ const CONTEXT_MENU_ACTION_HANDLERS = {
     toggle_word_wrap: 'toggleWordWrapFromSnapshot',
     recalculate_line_numbers: 'recalculateLineNumbersFromSnapshot'
 } as const;
-function isApplePlatform(): boolean {
-    return (
-        typeof navigator !== 'undefined' &&
-        /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent || '')
-    );
-}
 function modLabel(isApple: boolean): string {
     return isApple ? '⌘' : 'Ctrl';
 }
@@ -372,13 +368,29 @@ const MenuRuntimeMethods = {
     },
     computePasteAnchorRect(rect: TableSelectionRect) {
         if (WidgetUiCoords && WidgetUiCoords.computePasteAnchorRect) {
-            return WidgetUiCoords.computePasteAnchorRect(rect, this.selFocus);
+            const anchor = WidgetUiCoords.computePasteAnchorRect(rect, this.selFocus);
+            return {
+                r: anchor.r,
+                c: this.selectionIsFullRowBlock()
+                    ? firstUserPasteColumn(this, anchor.c)
+                    : anchor.c
+            };
         }
         const { r0, r1, c0, c1 } = rect;
         if (r0 === r1 && c0 === c1) {
-            return { r: this.selFocus.r, c: this.selFocus.c };
+            return {
+                r: this.selFocus.r,
+                c: this.selectionIsFullRowBlock()
+                    ? firstUserPasteColumn(this, this.selFocus.c)
+                    : this.selFocus.c
+            };
         }
-        return { r: r0, c: c0 };
+        return {
+            r: r0,
+            c: this.selectionIsFullRowBlock()
+                ? firstUserPasteColumn(this, c0)
+                : c0
+        };
     },
     cloneRect(rect: TableSelectionRect) {
         return WidgetUiCoords && WidgetUiCoords.cloneRect
@@ -434,18 +446,7 @@ const MenuRuntimeMethods = {
         });
     },
     clampMenuPosition(event: MouseEvent) {
-        if (WidgetUiCoords && WidgetUiCoords.clampMenuPosition) return WidgetUiCoords.clampMenuPosition(event);
-        const x = (event.clientX || 0) + (window.scrollX || 0);
-        const y = (event.clientY || 0) + (window.scrollY || 0);
-        const pad = 8;
-        const width = typeof window !== 'undefined' ? window.innerWidth : 800;
-        const height = typeof window !== 'undefined' ? window.innerHeight : 600;
-        const menuWidth = 280;
-        const menuHeight = 400;
-        return {
-            x: Math.min(Math.max(pad, x), Math.max(pad, width - menuWidth - pad)),
-            y: Math.min(Math.max(pad, y), Math.max(pad, height - menuHeight - pad))
-        };
+        return WidgetUiCoords.clampMenuPosition(event);
     },
     _detachContextMenuGlobalListeners() {
         if (this._contextMenuClickHandler) {
@@ -499,7 +500,11 @@ const MenuRuntimeMethods = {
             this.getSelectionCellCount() > 0 &&
             this.isCellInSelection(normalizedRow, normalizedCol);
         if (!inside) {
-            this.setSelectionSingle(normalizedRow, normalizedCol);
+            if (this.isLineNumberColumn(this.tableColumns[normalizedCol])) {
+                this.selectFullRow(normalizedRow);
+            } else {
+                this.setSelectionSingle(normalizedRow, normalizedCol);
+            }
         }
         this.selectedRowIndex = normalizedRow;
         this.exitCellEdit();
@@ -665,7 +670,6 @@ const MenuRuntimeMethods = {
         const colKey = snapshot.headerColumnKey;
         if (!colKey) return;
         this.hideContextMenu();
-        this._sortCycleRowOrder = this.tableData.slice();
         this.applySortKeysFromCore(
             [{ colKey, dir: direction === 'asc' ? 'asc' : 'desc' }],
             'sort'
@@ -719,7 +723,6 @@ const MenuRuntimeMethods = {
                 'group add level',
                 TABLE_RUNTIME_SYNC.GROUPING_ONLY
             );
-            this.sortTableDataInPlace();
             this.refreshGroupingViewFromData();
             this.onInput();
         } catch (error) {
@@ -763,10 +766,13 @@ const MenuRuntimeMethods = {
 export {
     altLabel,
     buildMenuItems,
-    isApplePlatform,
     MenuRuntimeMethods,
     modLabel,
     normalizeMenuSeparators,
     rowMoveDuplicateOpsAllowed
 };
+
+function firstUserPasteColumn(vm: UserColumnRuntime, preferredCol: number): number {
+    return firstUserColumnIndex(vm, preferredCol, { requireMutable: true });
+}
 export default MenuRuntimeMethods;

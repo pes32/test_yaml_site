@@ -1,9 +1,8 @@
 import { ref, type ComputedRef, type Ref } from 'vue';
 import type { NormalizedListOption } from '../../runtime/widget_contract.ts';
+import type { LifecycleCommitResult } from '../../shared/lifecycle_commit.ts';
 
-type ListCommitResult =
-  | { status: 'noop' | 'committed' }
-  | { error: unknown; severity: 'recoverable' | 'fatal'; status: 'blocked' };
+type ListCommitResult = LifecycleCommitResult;
 
 type ListValue = string | string[];
 

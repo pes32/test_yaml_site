@@ -106,6 +106,39 @@ function collectWidgetNamesFromSections(sections: unknown): string[] {
     return Array.from(names);
 }
 
+function addWidgetNamesFromSections(names: Set<string>, sections: unknown): void {
+    collectWidgetNamesFromSections(sections).forEach((name) => names.add(name));
+}
+
+function collectWidgetNamesFromTabs(tabs: unknown): string[] {
+    const names = new Set<string>();
+    (Array.isArray(tabs) ? tabs : []).forEach((tab) => {
+        if (tab && typeof tab === 'object') {
+            addWidgetNamesFromSections(names, asRecord(tab).content);
+        }
+    });
+    return Array.from(names);
+}
+
+function collectWidgetNamesFromButtons(buttons: unknown): string[] {
+    return (Array.isArray(buttons) ? buttons : [])
+        .map((buttonName) => String(buttonName || '').trim())
+        .filter((buttonName) => buttonName && buttonName !== 'CLOSE');
+}
+
+function collectWidgetNamesFromModalConfig(modalConfig: unknown): string[] {
+    if (!modalConfig || typeof modalConfig !== 'object') {
+        return [];
+    }
+
+    const modalRecord = asRecord(modalConfig);
+    const names = new Set<string>();
+    addWidgetNamesFromSections(names, modalRecord.content);
+    collectWidgetNamesFromTabs(modalRecord.tabs).forEach((name) => names.add(name));
+    collectWidgetNamesFromButtons(modalRecord.buttons).forEach((name) => names.add(name));
+    return Array.from(names);
+}
+
 function collectActiveWidgetNames(
     activeMenu: ParsedGuiMenu | null | undefined,
     activeTabIndex: number
@@ -190,7 +223,10 @@ function getWidgetValue(
 export {
     EMPTY_PARSED_GUI,
     collectActiveWidgetNames,
+    collectWidgetNamesFromButtons,
+    collectWidgetNamesFromModalConfig,
     collectWidgetNamesFromSections,
+    collectWidgetNamesFromTabs,
     getActiveMenu,
     getActiveSections,
     getActiveTabs,

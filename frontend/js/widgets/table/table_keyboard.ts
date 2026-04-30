@@ -99,7 +99,7 @@ function tbodyRowCount(vm: KeyboardVm): number {
     return typeof vm.tbodyRowCount === 'function' ? vm.tbodyRowCount() : vm.tableData.length;
 }
 
-    function handleClipboardShortcuts(vm: KeyboardVm, event: KeyboardEvent, ctx?: KeyboardCtx) {
+function handleClipboardShortcuts(vm: KeyboardVm, event: KeyboardEvent, ctx?: KeyboardCtx) {
         if (!vm.isEditable) return false;
         if (vm.groupingActive || vm.tableUiLocked) return false;
         if (!(event.ctrlKey || event.metaKey) || event.altKey) return false;
@@ -137,6 +137,53 @@ function tbodyRowCount(vm: KeyboardVm): number {
             return true;
         }
         return false;
+    }
+
+    function isTextEditingTarget(vm: KeyboardVm, event: KeyboardEvent, ctx?: KeyboardCtx): boolean {
+        const target = event.target as HTMLElement | null;
+        return Boolean(
+            ctx &&
+            vm.isCellEditing(ctx.row, ctx.col) &&
+            target &&
+            (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')
+        );
+    }
+
+    function handleToolbarShortcuts(vm: KeyboardVm, event: KeyboardEvent, ctx?: KeyboardCtx) {
+        if (vm.tableUiLocked) return false;
+        if (!(event.ctrlKey || event.metaKey) || event.altKey) return false;
+        const key = String(event.key || '').toLowerCase();
+
+        if (key === 'z' && !event.shiftKey) {
+            if (isTextEditingTarget(vm, event, ctx)) return false;
+            event.preventDefault();
+            vm.onTableToolbarAction('undo');
+            return true;
+        }
+        if (key === 'y' || (key === 'z' && event.shiftKey)) {
+            if (isTextEditingTarget(vm, event, ctx)) return false;
+            event.preventDefault();
+            vm.onTableToolbarAction('redo');
+            return true;
+        }
+
+        if (event.shiftKey && key === 'x') {
+            event.preventDefault();
+            vm.onTableToolbarAction('strike');
+            return true;
+        }
+        if (event.shiftKey) return false;
+
+        const actionByKey: Record<string, string> = {
+            b: 'bold',
+            i: 'italic',
+            u: 'underline'
+        };
+        const action = actionByKey[key];
+        if (!action) return false;
+        event.preventDefault();
+        vm.onTableToolbarAction(action);
+        return true;
     }
 
     function handleEditingShortcuts(vm: KeyboardVm, event: KeyboardEvent /* , ctx */) {
@@ -539,6 +586,7 @@ function tbodyRowCount(vm: KeyboardVm): number {
     }
 
     const KEYBOARD_HANDLERS = [
+        handleToolbarShortcuts,
         handleTabNavigation,
         handleClipboardShortcuts,
         handleEditingShortcuts,

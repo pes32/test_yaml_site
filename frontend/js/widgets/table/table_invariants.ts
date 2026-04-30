@@ -16,8 +16,14 @@ type TableInvariantCheckOptions = {
 };
 
 function tableInvariantWarningsEnabled(): boolean {
-    const meta = import.meta as ImportMeta & { env?: { PROD?: boolean } };
-    return meta.env?.PROD !== true;
+    const meta = import.meta as ImportMeta & { env?: { VITE_TABLE_INVARIANTS?: string } };
+    if (meta.env?.VITE_TABLE_INVARIANTS === '1') return true;
+    if (typeof window === 'undefined') return false;
+    try {
+        return window.localStorage.getItem('yamls.tableInvariants') === '1';
+    } catch (error) {
+        return false;
+    }
 }
 
 function cellLabel(cell: TableCoreCellAddress | null): string {

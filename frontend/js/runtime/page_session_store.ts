@@ -17,10 +17,6 @@ import {
     resolveInitialWidgetValue
 } from './widget_contract.ts';
 
-function toStringList(items: unknown): string[] {
-    return uniqueNames(items);
-}
-
 function plainValueEquals(left: unknown, right: unknown, depth = 0): boolean {
     if (Object.is(left, right)) {
         return true;
@@ -90,7 +86,7 @@ function bootstrap(
 function mergeLoadedAttrNames(store: PageSessionState, names: unknown): string[] {
     store.loadedAttrNames = uniqueNames([
         ...(store.loadedAttrNames || []),
-        ...toStringList(names)
+        ...uniqueNames(names)
     ]);
     return store.loadedAttrNames;
 }

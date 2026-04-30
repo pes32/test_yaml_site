@@ -75,32 +75,35 @@ function shouldExposeFeature(
   return definitionRef.value.capabilities.runtimeFeatures.includes(feature);
 }
 
+function withRuntimeFeature<TResult>(
+  definitionRef: ComputedRef<WidgetDefinition>,
+  feature: WidgetRuntimeFeature,
+  fallback: TResult,
+  resolve: () => TResult | null | undefined
+): TResult {
+  return shouldExposeFeature(definitionRef, feature)
+    ? (resolve() ?? fallback)
+    : fallback;
+}
+
 function provideWidgetRuntimeBridge(
   definitionRef: ComputedRef<WidgetDefinition>,
   hostServices: PageHostRuntimeServices | null,
   lifecycleBridge: WidgetScopedLifecycleBridge | null
 ): void {
   provide('getConfirmModal', () =>
-    shouldExposeFeature(definitionRef, 'confirmModal')
-      ? hostServices?.getConfirmModal?.()
-      : null
+    withRuntimeFeature(definitionRef, 'confirmModal', null, () => hostServices?.getConfirmModal?.())
   );
 
-  provide('openUiModal', (modalName: string) => {
-    if (!shouldExposeFeature(definitionRef, 'modalControl')) {
-      return Promise.resolve(null);
-    }
+  provide('openUiModal', (modalName: string) =>
+    withRuntimeFeature(definitionRef, 'modalControl', Promise.resolve(null), () =>
+      hostServices?.openUiModal?.(modalName)
+    )
+  );
 
-    return hostServices?.openUiModal?.(modalName) ?? Promise.resolve(null);
-  });
-
-  provide('closeUiModal', () => {
-    if (!shouldExposeFeature(definitionRef, 'modalControl')) {
-      return;
-    }
-
-    return hostServices?.closeUiModal?.();
-  });
+  provide('closeUiModal', () =>
+    withRuntimeFeature(definitionRef, 'modalControl', undefined, () => hostServices?.closeUiModal?.())
+  );
 
   provide('showAppNotification', (message: string, type?: NotificationType) => {
     if (!shouldExposeFeature(definitionRef, 'notifications')) {
@@ -111,68 +114,48 @@ function provideWidgetRuntimeBridge(
   });
 
   provide('reportAppError', (error: unknown, options?: Record<string, unknown>) => {
-    if (!shouldExposeFeature(definitionRef, 'errorHandling')) {
-      return null;
-    }
-
-    return hostServices?.reportAppError?.(error, options) ?? null;
+    return withRuntimeFeature(definitionRef, 'errorHandling', null, () =>
+      hostServices?.reportAppError?.(error, options)
+    );
   });
 
   provide('handleRecoverableAppError', (error: unknown, options?: Record<string, unknown>) => {
-    if (!shouldExposeFeature(definitionRef, 'errorHandling')) {
-      return null;
-    }
-
-    return hostServices?.handleRecoverableAppError?.(error, options) ?? null;
+    return withRuntimeFeature(definitionRef, 'errorHandling', null, () =>
+      hostServices?.handleRecoverableAppError?.(error, options)
+    );
   });
 
   provide('getWidgetAttrsByName', (widgetName: string) => {
-    if (!shouldExposeFeature(definitionRef, 'attrsAccess')) {
-      return null;
-    }
-
-    return hostServices?.getWidgetAttrsByName?.(widgetName) ?? null;
+    return withRuntimeFeature(definitionRef, 'attrsAccess', null, () =>
+      hostServices?.getWidgetAttrsByName?.(widgetName)
+    );
   });
 
   provide('getWidgetRuntimeValueByName', (widgetName: string) => {
-    if (!shouldExposeFeature(definitionRef, 'attrsAccess')) {
-      return undefined;
-    }
-
-    return hostServices?.getWidgetRuntimeValueByName?.(widgetName);
+    return withRuntimeFeature(definitionRef, 'attrsAccess', undefined, () =>
+      hostServices?.getWidgetRuntimeValueByName?.(widgetName)
+    );
   });
 
-  provide('getAllAttrsMap', () => {
-    if (!shouldExposeFeature(definitionRef, 'attrsAccess')) {
-      return {};
-    }
+  provide('getAllAttrsMap', () =>
+    withRuntimeFeature(definitionRef, 'attrsAccess', {}, () => hostServices?.getAllAttrsMap?.())
+  );
 
-    return hostServices?.getAllAttrsMap?.() ?? {};
-  });
+  provide('getCurrentPageNameFromRuntime', () =>
+    withRuntimeFeature(definitionRef, 'attrsAccess', '', () =>
+      hostServices?.getCurrentPageNameFromRuntime?.()
+    )
+  );
 
-  provide('getCurrentPageNameFromRuntime', () => {
-    if (!shouldExposeFeature(definitionRef, 'attrsAccess')) {
-      return '';
-    }
+  provide('getModalRuntimeState', () =>
+    withRuntimeFeature(definitionRef, 'modalControl', null, () => hostServices?.getModalRuntimeState?.())
+  );
 
-    return hostServices?.getCurrentPageNameFromRuntime?.() ?? '';
-  });
-
-  provide('getModalRuntimeState', () => {
-    if (!shouldExposeFeature(definitionRef, 'modalControl')) {
-      return null;
-    }
-
-    return hostServices?.getModalRuntimeState?.() ?? null;
-  });
-
-  provide('getModalRuntimeController', () => {
-    if (!shouldExposeFeature(definitionRef, 'modalControl')) {
-      return null;
-    }
-
-    return hostServices?.getModalRuntimeController?.() ?? null;
-  });
+  provide('getModalRuntimeController', () =>
+    withRuntimeFeature(definitionRef, 'modalControl', null, () =>
+      hostServices?.getModalRuntimeController?.()
+    )
+  );
 
   provide('setActiveWidgetLifecycle', () => {
     if (!definitionRef.value.capabilities.draftCommit) {

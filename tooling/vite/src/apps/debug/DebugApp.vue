@@ -61,7 +61,7 @@
 
         <div class="tab-content page-tab-content u-wide page-tab-content--with-tabs">
           <div
-            v-show="activeTab === 0"
+            v-if="activeTab === 0"
             class="tab-pane"
             :class="{ active: activeTab === 0, show: activeTab === 0 }"
           >
@@ -78,7 +78,7 @@
           </div>
 
           <div
-            v-show="activeTab === 1"
+            v-if="activeTab === 1"
             class="tab-pane"
             :class="{ active: activeTab === 1, show: activeTab === 1 }"
           >
@@ -103,7 +103,7 @@
           </div>
 
           <div
-            v-show="activeTab === 2"
+            v-if="activeTab === 2"
             class="tab-pane"
             :class="{ active: activeTab === 2, show: activeTab === 2 }"
           >
@@ -125,7 +125,7 @@
           </div>
 
           <div
-            v-show="activeTab === 3"
+            v-if="activeTab === 3"
             class="tab-pane"
             :class="{ active: activeTab === 3, show: activeTab === 3 }"
           >

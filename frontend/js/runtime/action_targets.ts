@@ -1,5 +1,16 @@
-import { asTrimmedString } from './action_shared.ts';
+import { asTrimmedString } from '../shared/string_value.ts';
 import type { ActionItem, ProbeableSourceDescriptor } from './action_types.ts';
+
+type SameOriginTargetOptions = {
+    allowHash?: boolean;
+    normalizeRelative?: boolean;
+};
+
+type SameOriginTarget = {
+    href: string;
+    pathname: string;
+    rawTarget: string;
+};
 
 function getActionFallbackLabel(action: ActionItem | null | undefined): string {
     if (!action || typeof action !== 'object') {
@@ -15,40 +26,7 @@ function getActionFallbackLabel(action: ActionItem | null | undefined): string {
 }
 
 function normalizeInternalPagePath(target: unknown): string | null {
-    const rawTarget = asTrimmedString(target);
-    if (!rawTarget || typeof window === 'undefined' || !window.location) {
-        return null;
-    }
-
-    if (rawTarget.startsWith('//') || rawTarget.startsWith('#')) {
-        return null;
-    }
-
-    if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(rawTarget)) {
-        if (!/^https?:\/\//i.test(rawTarget)) {
-            return null;
-        }
-
-        try {
-            const resolvedUrl = new URL(rawTarget, window.location.origin);
-            if (resolvedUrl.origin !== window.location.origin) {
-                return null;
-            }
-            return resolvedUrl.pathname || '/';
-        } catch {
-            return null;
-        }
-    }
-
-    if (!rawTarget.startsWith('/')) {
-        return null;
-    }
-
-    try {
-        return new URL(rawTarget, window.location.origin).pathname || '/';
-    } catch {
-        return null;
-    }
+    return resolveSameOriginTarget(target)?.pathname || null;
 }
 
 function normalizeSourceHref(target: unknown): string {
@@ -65,12 +43,27 @@ function normalizeSourceHref(target: unknown): string {
 }
 
 function getProbeableSourceDescriptor(target: unknown): ProbeableSourceDescriptor | null {
+    const resolvedUrl = resolveSameOriginTarget(target, { normalizeRelative: true });
+    return resolvedUrl
+        ? {
+              href: resolvedUrl.href,
+              cacheKey: resolvedUrl.href,
+              pathname: resolvedUrl.pathname,
+              fallbackLabel: resolvedUrl.rawTarget
+          }
+        : null;
+}
+
+function resolveSameOriginTarget(
+    target: unknown,
+    options: SameOriginTargetOptions = {}
+): SameOriginTarget | null {
     const rawTarget = asTrimmedString(target);
     if (!rawTarget || typeof window === 'undefined' || !window.location) {
         return null;
     }
 
-    if (rawTarget.startsWith('//')) {
+    if (rawTarget.startsWith('//') || (!options.allowHash && rawTarget.startsWith('#'))) {
         return null;
     }
 
@@ -87,16 +80,15 @@ function getProbeableSourceDescriptor(target: unknown): ProbeableSourceDescripto
 
             return {
                 href: resolvedUrl.href,
-                cacheKey: resolvedUrl.href,
                 pathname: resolvedUrl.pathname || '/',
-                fallbackLabel: rawTarget
+                rawTarget
             };
         } catch {
             return null;
         }
     }
 
-    const normalizedHref = normalizeSourceHref(rawTarget);
+    const normalizedHref = options.normalizeRelative ? normalizeSourceHref(rawTarget) : rawTarget;
     if (!normalizedHref.startsWith('/')) {
         return null;
     }
@@ -105,9 +97,8 @@ function getProbeableSourceDescriptor(target: unknown): ProbeableSourceDescripto
         const resolvedUrl = new URL(normalizedHref, window.location.origin);
         return {
             href: resolvedUrl.href,
-            cacheKey: resolvedUrl.href,
             pathname: resolvedUrl.pathname || '/',
-            fallbackLabel: rawTarget
+            rawTarget
         };
     } catch {
         return null;

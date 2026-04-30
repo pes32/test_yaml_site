@@ -2,7 +2,7 @@
 
 /*
  * Cascade order intentionally preserves the former monolith behavior:
- * core -> editable -> header/sort -> context menu -> grouping/lazy.
+ * core -> editable -> header/sort -> column headers -> toolbar -> context menu -> grouping/lazy.
  * `.widget-table` remains a specialized layer above the generic `.table` from ui.css.
  *
  * Scroll ownership contract:
@@ -14,5 +14,7 @@
 @import "table-core.css";
 @import "table-editable.css";
 @import "table-header-sort.css";
+@import "table-column-headers.css";
+@import "table-toolbar.css";
 @import "table-context-menu.css";
 @import "table-grouping-lazy.css";

@@ -33,7 +33,8 @@ export const EXPECTED_ATTRS_BY_TYPE = {
     'demo_table_4',
     'demo_table_5',
     'demo_table_6',
-    'demo_table_7'
+    'demo_table_7',
+    'table_v2_markup'
   ],
   text: ['all_table_yaml', 'attrs_str', 'gui_yaml', 'modal_gui_str', 'modal_str', 'text_1', 'text_2', 'text_3', 'text_4'],
   time: ['table_time', 'time_widget'],

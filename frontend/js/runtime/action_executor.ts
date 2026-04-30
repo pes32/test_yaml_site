@@ -1,4 +1,4 @@
-import { asTrimmedString } from './action_shared.ts';
+import { asTrimmedString } from '../shared/string_value.ts';
 import {
     normalizeOutputAttrs,
     normalizeSourceHref,

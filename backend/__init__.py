@@ -13,6 +13,7 @@ from flask import Flask
 import werkzeug.serving
 
 from .config_service import ConfigService
+from .env_utils import parse_bool_env
 from .logging_setup import setup_logging
 
 
@@ -27,20 +28,8 @@ CONFIG: dict | None = None
 LOG_FILE_PATH: str | None = None
 
 
-def _parse_bool_env(name: str):
-    raw = os.getenv(name)
-    if raw is None:
-        return None
-    value = raw.strip().lower()
-    if value in {"1", "true", "yes", "on"}:
-        return True
-    if value in {"0", "false", "no", "off"}:
-        return False
-    return None
-
-
 def _debug_tooling_enabled() -> bool:
-    forced = _parse_bool_env("YAMLS_ENABLE_DEBUG_ROUTES")
+    forced = parse_bool_env("YAMLS_ENABLE_DEBUG_ROUTES")
     if forced is not None:
         return forced
 

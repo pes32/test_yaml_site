@@ -28,6 +28,7 @@ function patchCommandSyncOptions(options: RuntimePatchOptions): RuntimeCommandSy
         skipContextMenu: true,
         skipEditing: options.skipEditing !== false,
         skipGrouping: options.skipGrouping === true,
+        skipHistory: options.skipHistory === true,
         skipSelection: options.skipSelection === true,
         skipSort: true
     };

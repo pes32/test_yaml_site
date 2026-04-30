@@ -104,7 +104,7 @@ function useSplitButtonMenuPosition(
     }
 
     const availableWidth = Math.max(1, viewportWidth - viewportPadding * 2);
-    const menuWidth = Math.min(Math.max(toggleRect.width, 1), availableWidth);
+    const menuWidth = clamp(toggleRect.width, 1, availableWidth);
     const left = clamp(
       toggleRect.left,
       viewportPadding,

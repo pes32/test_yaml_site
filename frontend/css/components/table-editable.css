@@ -26,7 +26,15 @@
 }
 
 .widget-table--editable .cell-input.cell-input--view {
+    position: absolute;
+    inset: var(--table-cell-padding-y) var(--table-cell-padding-x);
+    width: calc(100% - (var(--table-cell-padding-x) * 2));
+    opacity: 0;
     pointer-events: none;
+}
+
+.widget-table--editable .cell-input:not(.cell-input--view) + .widget-table__cell-text-proxy {
+    display: none;
 }
 
 .widget-table--editable select.cell-input {
@@ -88,12 +96,12 @@
 .widget-table--editable [data-table-embedded-widget="true"] .list-combobox-input {
     width: 100%;
     max-width: 100%;
-    padding: 0 var(--dropdown-arrow-space) 0 var(--space-md);
+    padding: 0 var(--dropdown-arrow-space) 0 0;
 }
 
 .widget-table--editable [data-table-embedded-widget="true"] .widget-dt-input {
     width: auto;
-    padding: 0 var(--zero) 0 var(--space-md);
+    padding: 0 var(--zero);
 }
 
 .widget-table--editable [data-table-embedded-widget="true"] .widget-dt-input--date {
@@ -104,7 +112,7 @@
 .widget-table--editable [data-table-embedded-widget="true"] .widget-dt-input--time {
     min-width: var(--widget-dt-time-mask-w);
     width: var(--widget-dt-time-mask-w);
-    padding-left: var(--space-xs);
+    padding-left: 0;
     padding-right: 0;
 }
 

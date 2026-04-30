@@ -115,7 +115,24 @@ function selectionFromRuntime(
                       Math.max(0, Math.max(fullWidthRows.r0, fullWidthRows.r1)) + 1
                   )
                   .map((row) => String(row.id));
-    return { anchor, focus, fullWidthRowIds };
+    const fullHeightCols = selection?.fullHeightCols || null;
+    const fullHeightColumnKeys =
+        fullHeightCols == null
+            ? null
+            : Array.from(
+                  {
+                      length:
+                          Math.max(0, Math.max(fullHeightCols.c0, fullHeightCols.c1)) -
+                          Math.max(0, Math.min(fullHeightCols.c0, fullHeightCols.c1)) +
+                          1
+                  },
+                  (_item, offset) =>
+                      columnKeyAt(
+                          columns,
+                          Math.max(0, Math.min(fullHeightCols.c0, fullHeightCols.c1)) + offset
+                      )
+              ).filter((colKey): colKey is string => colKey != null);
+    return { anchor, focus, fullHeightColumnKeys, fullWidthRowIds };
 }
 
 function sortKeysFromRuntime(
@@ -200,12 +217,18 @@ function normalizeSelection(state: TableCoreState): TableCoreSelectionState {
     const anchor = cellExists(state, state.selection.anchor) ? state.selection.anchor : fallback;
     const focus = cellExists(state, state.selection.focus) ? state.selection.focus : anchor;
     const rowIds = new Set(state.rows.map((row) => String(row.id)));
+    const colKeys = new Set(state.columns.map((column) => column.columnKey));
     const fullWidthRowIds = state.selection.fullWidthRowIds
         ? state.selection.fullWidthRowIds.filter((rowId) => rowIds.has(rowId))
+        : null;
+    const fullHeightColumnKeys = state.selection.fullHeightColumnKeys
+        ? state.selection.fullHeightColumnKeys.filter((colKey) => colKeys.has(colKey))
         : null;
     return {
         anchor,
         focus,
+        fullHeightColumnKeys:
+            fullHeightColumnKeys && fullHeightColumnKeys.length ? fullHeightColumnKeys : null,
         fullWidthRowIds: fullWidthRowIds && fullWidthRowIds.length ? fullWidthRowIds : null
     };
 }
@@ -253,9 +276,15 @@ function contextSnapshotReferencesExistingState(state: TableCoreState): boolean 
         return false;
     }
     if (context.selectionSnapshot) {
-        const { anchor, focus, fullWidthRowIds } = context.selectionSnapshot;
+        const { anchor, focus, fullHeightColumnKeys, fullWidthRowIds } = context.selectionSnapshot;
         if (!rowIdExists(anchor?.rowId) || !columnKeyExists(anchor?.colKey)) return false;
         if (!rowIdExists(focus?.rowId) || !columnKeyExists(focus?.colKey)) return false;
+        if (
+            Array.isArray(fullHeightColumnKeys) &&
+            fullHeightColumnKeys.some((colKey) => !columnKeyExists(colKey))
+        ) {
+            return false;
+        }
         if (
             Array.isArray(fullWidthRowIds) &&
             fullWidthRowIds.some((rowId) => !rowIdExists(rowId))
@@ -307,7 +336,12 @@ function normalizeTableCoreState(state: TableCoreState): TableCoreState {
             )
         },
         rows,
-        selection: state.selection || { anchor: null, focus: null, fullWidthRowIds: null },
+        selection: state.selection || {
+            anchor: null,
+            focus: null,
+            fullHeightColumnKeys: null,
+            fullWidthRowIds: null
+        },
         sortKeys: state.sortKeys || []
     };
     next.selection = normalizeSelection(next);
@@ -476,6 +510,7 @@ function dispatchTableCommand(state: TableCoreState, command: TableCommand): Tab
                 selection: {
                     anchor: command.anchor,
                     focus: command.focus,
+                    fullHeightColumnKeys: command.fullHeightColumnKeys || null,
                     fullWidthRowIds: command.fullWidthRowIds || null
                 }
             });
@@ -603,6 +638,7 @@ export {
     columnKeyAt,
     createTableCoreStateFromRuntime,
     dispatchTableCommand,
+    groupingKeysFromRuntime,
     normalizeTableCoreState,
     rowIdAt,
     rowIndexById,

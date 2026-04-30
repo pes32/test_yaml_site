@@ -54,20 +54,24 @@ function usePageErrorRuntime(options: PageErrorRuntimeOptions) {
         return normalized;
     }
 
-    function reportFatalError(error: unknown, errorOptions: FrontendErrorOptions = {}): FrontendRuntimeError {
+    function reportWithPresentation(
+        error: unknown,
+        presentation: FrontendErrorOptions['presentation'],
+        errorOptions: FrontendErrorOptions = {}
+    ): FrontendRuntimeError {
         return reportError(error, {
-            presentation: FRONTEND_ERROR_PRESENTATIONS.fatal,
+            presentation,
             recoverable: false,
             ...errorOptions
         });
     }
 
+    function reportFatalError(error: unknown, errorOptions: FrontendErrorOptions = {}): FrontendRuntimeError {
+        return reportWithPresentation(error, FRONTEND_ERROR_PRESENTATIONS.fatal, errorOptions);
+    }
+
     function reportDiagnosticError(error: unknown, errorOptions: FrontendErrorOptions = {}): FrontendRuntimeError {
-        return reportError(error, {
-            presentation: FRONTEND_ERROR_PRESENTATIONS.diagnostic,
-            recoverable: false,
-            ...errorOptions
-        });
+        return reportWithPresentation(error, FRONTEND_ERROR_PRESENTATIONS.diagnostic, errorOptions);
     }
 
     function handleRecoverableError(error: unknown, errorOptions: FrontendErrorOptions = {}): FrontendRuntimeError {

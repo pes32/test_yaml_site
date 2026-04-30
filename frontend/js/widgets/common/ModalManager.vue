@@ -96,7 +96,7 @@ import { injectPageHostRuntimeServices } from '../../runtime/widget_runtime_brid
 import type { ParsedGuiSection, ParsedGuiTab } from '../../runtime/page_contract.ts';
 import ItemIcon from './ItemIcon.vue';
 import ModalButtons from './ModalButtons.vue';
-import { getModalWidgetAttrs, getModalWidgetValue } from './modal_widget_access.ts';
+import { createModalWidgetAccess } from './modal_widget_access.ts';
 import SectionCard from './SectionCard.vue';
 
 defineOptions({
@@ -109,6 +109,7 @@ const emit = defineEmits<{
 }>();
 
 const hostServices = injectPageHostRuntimeServices();
+const { getWidgetAttrs, getWidgetValue } = createModalWidgetAccess(hostServices);
 
 const modalScrollRoot = ref<HTMLElement | null>(null);
 
@@ -229,14 +230,6 @@ function toggleModalSectionCollapse(tabIndex: number, sectionIndex: number): voi
 
 function getSectionsForTab(tabIndex: number): ParsedGuiSection[] {
   return sectionsForTab(modalRuntimeState.value, tabIndex) as ParsedGuiSection[];
-}
-
-function getWidgetAttrs(widgetName: string) {
-  return getModalWidgetAttrs(hostServices, widgetName);
-}
-
-function getWidgetValue(widgetName: string) {
-  return getModalWidgetValue(hostServices, widgetName);
 }
 
 function onWidgetExecute(payload: unknown): void {

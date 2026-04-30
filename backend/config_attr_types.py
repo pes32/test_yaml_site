@@ -83,10 +83,11 @@ def _validate_attr_option_value(widget_type: str, option_name: str, value: Any) 
         "editable",
         "multiselect",
         "fon",
+        "abc",
         "line_numbers",
         "sort",
         "sticky_header",
-        "table_lazy",
+        "toolbar",
         "zebra",
     } and not _is_bool_attr_value(value):
         return "ожидается булево значение"

@@ -144,6 +144,10 @@ function dispatchClipboardClear(
         'clear cells',
         TABLE_RUNTIME_SYNC.ROWS_AND_SELECTION
     );
+    finalizeClipboardMutation(vm);
+}
+
+function finalizeClipboardMutation(vm: TableClipboardRuntimeSurface): void {
     if (vm.groupingActive && vm.isFullyLoaded) vm.refreshGroupingViewFromData();
     vm.onInput();
 }
@@ -205,8 +209,7 @@ function applyPasteMatrix(
         'paste cells',
         TABLE_RUNTIME_SYNC.ROWS_AND_SELECTION
     );
-    if (vm.groupingActive && vm.isFullyLoaded) vm.refreshGroupingViewFromData();
-    vm.onInput();
+    finalizeClipboardMutation(vm);
 }
 
 const ClipboardRuntimeMethods = {
@@ -221,7 +224,11 @@ const ClipboardRuntimeMethods = {
             this.tableData,
             resolvedSnapshot.rect,
             this.listMultiFn(),
-            (rowIndex: number) => displayDataRowAt(this, viewModel, rowIndex)
+            (rowIndex: number) => displayDataRowAt(this, viewModel, rowIndex),
+            {
+                includeColumn: (colIndex: number) =>
+                    !this.isLineNumberColumn(this.tableColumns[colIndex])
+            }
         );
     },
 

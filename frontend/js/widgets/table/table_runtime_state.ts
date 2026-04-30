@@ -23,11 +23,14 @@ import {
     columnIndexByKey,
     createTableCoreStateFromRuntime,
     dispatchTableCommand as dispatchCoreTableCommand,
-    normalizeTableCoreState
+    groupingKeysFromRuntime,
+    normalizeTableCoreState,
+    sortKeysFromRuntime
 } from './table_state_core.ts';
 import { buildTableViewModel } from './table_view_model.ts';
 
 type RuntimeStateSyncOptions = {
+    skipHistory?: boolean;
     skipContextMenu?: boolean;
     skipEditing?: boolean;
     skipGrouping?: boolean;
@@ -53,6 +56,7 @@ type TableRuntimeStoreMirrorSurface = Pick<
     | 'editingCell'
     | 'selAnchor'
     | 'selFocus'
+    | 'selFullHeightCols'
     | 'selFullWidthRows'
 > & {
     tableStore: TableStore;
@@ -82,6 +86,16 @@ const TABLE_RUNTIME_SYNC = Object.freeze({
     SORT_ONLY: skipRuntimeState('skipRows', 'skipGrouping', 'skipSelection', 'skipEditing', 'skipContextMenu')
 });
 
+const HISTORY_COMMAND_TYPES = new Set<TableCommand['type']>([
+    'PATCH_CELLS',
+    'REPLACE_ROWS',
+    'INSERT_ROWS',
+    'DELETE_ROWS',
+    'MOVE_ROW',
+    'SORT_COLUMNS',
+    'SET_GROUP_LEVELS'
+]);
+
 function isRecord(value: unknown): value is PublicTableCommandPayload {
     return !!value && typeof value === 'object' && !Array.isArray(value);
 }
@@ -99,6 +113,10 @@ function coreCellFromPayload(value: unknown): TableCoreCellAddress | null {
 
 function rowIdsFromPayload(value: unknown): string[] | null {
     return Array.isArray(value) ? value.map((rowId) => String(rowId)) : null;
+}
+
+function columnKeysFromPayload(value: unknown): string[] | null {
+    return Array.isArray(value) ? value.map((colKey) => String(colKey)) : null;
 }
 
 function matrixFromPayload(value: unknown): unknown[][] {
@@ -179,7 +197,16 @@ function runtimeTableViewModelSnapshot(
     vm: RuntimeTableStateBridgeSurface,
     coreState?: TableCoreState | null
 ): TableViewModel {
-    const core = coreState || vm.tableCoreStateSnapshot();
+    if (!coreState) {
+        return buildTableViewModel(vm.tableData, vm.tableColumns, {
+            expanded: vm.groupingState.expanded,
+            groupingLevelKeys: groupingKeysFromRuntime(vm.tableColumns, vm.groupingState),
+            listColumnIsMultiselect: (column: Record<string, unknown>) =>
+                vm.listColumnIsMultiselect(column as TableRuntimeColumn),
+            sortKeys: sortKeysFromRuntime(vm.tableColumns, vm.sortKeys)
+        });
+    }
+    const core = coreState;
     return buildTableViewModel(core.rows, core.columns, {
         expanded: core.grouping.expanded,
         groupingLevelKeys: core.grouping.levelKeys,
@@ -224,6 +251,7 @@ function syncRuntimeFromTableCoreState(
         );
         vm.selAnchor = selection.anchor;
         vm.selFocus = selection.focus;
+        vm.selFullHeightCols = selection.fullHeightCols || null;
         vm.selFullWidthRows = selection.fullWidthRows;
     }
     if (normalizedOptions.skipEditing !== true) {
@@ -265,9 +293,18 @@ function dispatchRuntimeTableCoreCommand(
     phase?: string,
     options: RuntimeStateSyncOptions = {}
 ): TableCoreState {
+    const shouldRecordHistory =
+        options.skipHistory !== true &&
+        HISTORY_COMMAND_TYPES.has(command.type) &&
+        typeof vm.captureHistorySnapshot === 'function' &&
+        typeof vm.recordHistoryEntry === 'function';
+    const before = shouldRecordHistory ? vm.captureHistorySnapshot() : null;
     const next = dispatchCoreTableCommand(vm.tableCoreStateSnapshot(), command);
     vm.syncRuntimeFromCoreState(next, options);
     vm.checkTableInvariants?.(phase || command.type);
+    if (before) {
+        vm.recordHistoryEntry(phase || command.type, before, vm.captureHistorySnapshot());
+    }
     return next;
 }
 
@@ -301,6 +338,9 @@ function checkRuntimeTableInvariants(
 function syncTableStoreMirrors(vm: TableRuntimeStoreMirrorSurface): void {
     vm.tableStore.selection.anchor = cloneRuntimeCellAddress(vm.selAnchor) || { r: 0, c: 0 };
     vm.tableStore.selection.focus = cloneRuntimeCellAddress(vm.selFocus) || { r: 0, c: 0 };
+    vm.tableStore.selection.fullHeightCols = vm.selFullHeightCols
+        ? { c0: vm.selFullHeightCols.c0, c1: vm.selFullHeightCols.c1 }
+        : null;
     vm.tableStore.selection.fullWidthRows = vm.selFullWidthRows
         ? { r0: vm.selFullWidthRows.r0, r1: vm.selFullWidthRows.r1 }
         : null;
@@ -335,6 +375,7 @@ function tableCommandFromPublicEntrypoint(
             return {
                 anchor,
                 focus,
+                fullHeightColumnKeys: columnKeysFromPayload(body.fullHeightColumnKeys),
                 fullWidthRowIds: rowIdsFromPayload(body.fullWidthRowIds),
                 type: 'SET_SELECTION_RECT'
             };

@@ -98,16 +98,9 @@ import {
   normalizeSingleVocValue
 } from './voc_value_core.ts';
 import {
-  closeDropdown as closeDropdownRuntime,
-  focusInput,
-  getInputElement as getInputElementRuntime,
-  listItemId as resolveListItemId,
-  moveDropdownHighlightedIndex,
-  openDropdown as openDropdownRuntime,
-  scheduleOutsideInteractionCommit,
-  setDropdownHighlightedIndex,
-  type DropdownRuntimeContext
+  scheduleOutsideInteractionCommit
 } from '../dropdown/dropdown_runtime.ts';
+import { createChoiceDropdownRuntime } from '../dropdown/choice_dropdown_runtime.ts';
 import {
   useVocModalSelection,
   type VocModalTableSurface
@@ -157,6 +150,18 @@ const columns = computed(() => normalizeVocColumns(props.widgetConfig.columns));
 const rows = computed(() => normalizeVocRows(columns.value, props.widgetConfig.source));
 const combinedFieldError = computed(() => state.vocError || fieldError.value || '');
 let openModalFromInlineDropdown = (): void => {};
+function listItemId(index: number): string {
+  return choiceDropdown.listItemId(index);
+}
+function setHighlightedIndex(index: number, options: { scroll?: boolean } = {}): void {
+  choiceDropdown.setHighlightedIndex(index, options);
+}
+function moveHighlightedIndex(delta: number): void {
+  choiceDropdown.moveHighlightedIndex(delta);
+}
+function getInputElement(): HTMLInputElement | null {
+  return choiceDropdown.getInputElement();
+}
 const inlineDropdown = useVocInlineDropdown({
   state,
   widgetConfig: props.widgetConfig,
@@ -170,7 +175,7 @@ const inlineDropdown = useVocInlineDropdown({
   closeDropdown,
   deactivateDraftController: field.deactivateDraftController,
   emitInput: field.emitInput,
-  focusInput: () => focusInput(dropdownRuntimeContext),
+  focusInput: () => choiceDropdown.focusInput(),
   moveHighlightedIndex,
   openDropdown,
   openModal: () => openModalFromInlineDropdown(),
@@ -205,50 +210,29 @@ const modalTitle = computed(() => {
   const label = String(props.widgetConfig.label || '').trim();
   return label || props.widgetName;
 });
-function getDropdownRefs() {
-  return resolveChoiceComboboxRefs(
-    combobox.value,
-    modalTable.value?.modalRoot || null
-  );
-}
-const dropdownRuntimeContext: DropdownRuntimeContext = {
+const choiceDropdown = createChoiceDropdownRuntime({
   $nextTick: nextTick,
-  get $refs() {
-    return getDropdownRefs();
-  },
-  get highlightedIndex() {
-    return state.highlightedIndex;
-  },
-  set highlightedIndex(value) {
+  getRefs: () => resolveChoiceComboboxRefs(combobox.value, modalTable.value?.modalRoot || null),
+  getHighlightedIndex: () => state.highlightedIndex,
+  setHighlightedIndex: (value) => {
     state.highlightedIndex = Number(value) || 0;
   },
-  get inlineRows() {
-    return inlineRows.value;
-  },
-  get isDropdownOpen() {
-    return state.isDropdownOpen;
-  },
-  set isDropdownOpen(value) {
+  getInlineRows: () => inlineRows.value,
+  getIsDropdownOpen: () => state.isDropdownOpen,
+  setIsDropdownOpen: (value) => {
     state.isDropdownOpen = Boolean(value);
   },
-  get listId() {
-    return state.listId;
-  },
-  get menuPosition() {
-    return state.menuPosition;
-  },
-  set menuPosition(value) {
+  getListId: () => state.listId,
+  getMenuPosition: () => state.menuPosition,
+  setMenuPosition: (value) => {
     state.menuPosition = value;
   },
   onOutsideInteractionCommit,
   resolveHighlightedIndex,
-  get shouldShowInlineDropdown() {
-    return shouldShowInlineDropdown.value;
-  },
-  get widgetConfig() {
-    return props.widgetConfig;
-  }
-};
+  getShouldShowInlineDropdown: () => shouldShowInlineDropdown.value,
+  getWidgetConfig: () => props.widgetConfig
+});
+const dropdownRuntimeContext = choiceDropdown.context;
 const {
   highlightedIndex,
   inputValue,
@@ -260,9 +244,6 @@ const {
   value,
   vocError
 } = toRefs(state);
-function listItemId(index: number): string {
-  return resolveListItemId(dropdownRuntimeContext, Number(index));
-}
 function formatRowLabel(row: VocRow | null | undefined): string {
   return formatVocRowLabel(row || null);
 }
@@ -323,24 +304,6 @@ function setVocError(message: string): void {
   state.vocError = errorMessage;
   field.handleTableCellCommitValidation(errorMessage);
 }
-function setHighlightedIndex(index: number, options: { scroll?: boolean } = {}): void {
-  setDropdownHighlightedIndex(
-    dropdownRuntimeContext,
-    index,
-    inlineRows.value.length,
-    options
-  );
-}
-function moveHighlightedIndex(delta: number): void {
-  moveDropdownHighlightedIndex(
-    dropdownRuntimeContext,
-    inlineRows.value.length,
-    delta
-  );
-}
-function getInputElement(): HTMLInputElement | null {
-  return getInputElementRuntime(dropdownRuntimeContext);
-}
 const modalSelection = useVocModalSelection({
   state,
   widgetConfig: props.widgetConfig,
@@ -376,16 +339,16 @@ const {
 } = modalSelection;
 openModalFromInlineDropdown = openModal;
 function openDropdown(options: { highlightFirst?: boolean } = {}): void {
-  openDropdownRuntime(dropdownRuntimeContext, options);
+  choiceDropdown.openDropdown(options);
 }
 function closeDropdown(): void {
-  closeDropdownRuntime(dropdownRuntimeContext);
+  choiceDropdown.closeDropdown();
 }
 function onArrowClick(): void {
   if (props.widgetConfig.readonly) {
     return;
   }
-  focusInput(dropdownRuntimeContext);
+  choiceDropdown.focusInput();
   openModal();
 }
 useWidgetConfigValueSync(props, field.syncCommittedValue, setValue);

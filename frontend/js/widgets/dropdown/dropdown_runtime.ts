@@ -1,3 +1,7 @@
+import numberUtils from '../../shared/number_utils.ts';
+
+const { clampNumber } = numberUtils;
+
 type DropdownRuntimeRefs = {
     dropdownMenu: HTMLElement | null;
     dropdownRoot: HTMLElement | null;
@@ -255,7 +259,7 @@ function resolveBoundedHighlightedIndex(index: number, itemCount: number): numbe
         return -1;
     }
     const requestedIndex = Number.isFinite(Number(index)) ? Number(index) : 0;
-    return Math.min(Math.max(requestedIndex, 0), maxIndex);
+    return clampNumber(requestedIndex, 0, maxIndex);
 }
 
 function setDropdownHighlightedIndex(

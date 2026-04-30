@@ -25,7 +25,7 @@ import {
   type ModalRuntimeState
 } from './modal_runtime_store.ts';
 import {
-  collectWidgetNamesFromSections,
+  collectWidgetNamesFromModalConfig,
   getModalMap,
   getParsedGuiState
 } from './page_selectors.ts';
@@ -116,26 +116,7 @@ function sectionsForTab(state: ModalRuntimeState | null | undefined, tabIndex: n
 }
 
 function collectModalWidgetNames(state: ModalRuntimeState | null | undefined): string[] {
-  const modalConfig = asModalConfig(state);
-  if (!modalConfig) {
-    return [];
-  }
-
-  const names = new Set<string>(collectWidgetNamesFromSections(modalConfig.content));
-  (Array.isArray(modalConfig.tabs) ? modalConfig.tabs : []).forEach((tab) => {
-    if (tab && typeof tab === 'object') {
-      collectWidgetNamesFromSections((tab as Record<string, unknown>).content)
-        .forEach((name) => names.add(name));
-    }
-  });
-  (Array.isArray(modalConfig.buttons) ? modalConfig.buttons : []).forEach((buttonName) => {
-    const token = String(buttonName || '').trim();
-    if (token && token !== 'CLOSE') {
-      names.add(token);
-    }
-  });
-
-  return Array.from(names);
+  return collectWidgetNamesFromModalConfig(asModalConfig(state));
 }
 
 async function prefetchModalWidgetTypes(

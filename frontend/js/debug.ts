@@ -200,37 +200,49 @@ function useDebugApp(): DebugAppBindings {
         });
     }
 
+    async function runScopedFetch<TData>(
+        scope: DebugErrorScope,
+        loading: Ref<boolean>,
+        message: string,
+        fetchData: () => Promise<TData>,
+        applyData: (data: TData) => void
+    ): Promise<void> {
+        await runScopedLoader(scope, loading, message, async () => {
+            applyData(await fetchData());
+        });
+    }
+
     async function loadApi(): Promise<void> {
-        await runScopedLoader(
+        await runScopedFetch(
             'api',
             apiLoading,
             'Не удалось загрузить структуру API',
-            async () => {
-                const data = await frontendApiClient.fetchDebugStructure();
+            frontendApiClient.fetchDebugStructure,
+            (data) => {
                 apiRoutes.value = data.routes;
             }
         );
     }
 
     async function loadLogs(): Promise<void> {
-        await runScopedLoader(
+        await runScopedFetch(
             'logs',
             logsLoading,
             'Не удалось загрузить debug-лог',
-            async () => {
-                const data = await frontendApiClient.fetchDebugLogs();
+            frontendApiClient.fetchDebugLogs,
+            (data) => {
                 logLines.value = data.lines;
             }
         );
     }
 
     async function loadPages(): Promise<void> {
-        await runScopedLoader(
+        await runScopedFetch(
             'pages',
             pagesLoading,
             'Не удалось загрузить YAML-страницы',
-            async () => {
-                const data = await frontendApiClient.fetchDebugPages();
+            frontendApiClient.fetchDebugPages,
+            (data) => {
                 pages.value = data.pages;
                 diagnostics.value = data.diagnostics;
                 if (data.lastError) {

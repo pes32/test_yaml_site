@@ -1,20 +1,9 @@
 <template>
   <div class="widget-table__sort-icons" :class="stateClass" aria-hidden="true">
     <svg
-      class="widget-table__sort-svg widget-table__sort-svg--up"
-      width="10"
-      height="10"
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        fill="currentColor"
-        d="M13.5845 17.7447L22.3941 8.93511C23.202 8.12722 23.202 6.80556 22.3941 5.99859L21.6588 5.26239C20.8528 4.45543 19.5302 4.45543 18.7232 5.26239L12 11.9856L5.27679 5.2624C4.46983 4.45543 3.14724 4.45543 2.34119 5.2624L1.60591 5.9986C0.798027 6.80556 0.798027 8.12723 1.60592 8.93511L10.4173 17.7447C10.8502 18.1785 11.4311 18.3715 12.0009 18.3393C12.568 18.3715 13.1498 18.1785 13.5845 17.7447Z"
-      ></path>
-    </svg>
-    <svg
-      class="widget-table__sort-svg widget-table__sort-svg--down"
+      v-for="direction in sortDirections"
+      :key="direction"
+      :class="['widget-table__sort-svg', `widget-table__sort-svg--${direction}`]"
       width="10"
       height="10"
       viewBox="0 0 24 24"
@@ -32,8 +21,10 @@
 <script setup lang="ts">
 type SortClass = string | Record<string, boolean> | Array<string | Record<string, boolean>>;
 
+const sortDirections = ['up', 'down'] as const;
+
 defineOptions({
-  name: 'TableSortIcons'
+  name: 'SortIcons'
 });
 
 defineProps<{

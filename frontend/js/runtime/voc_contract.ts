@@ -1,4 +1,4 @@
-import { normalizeScalarStringValue } from './widget_contract.ts';
+import { normalizeScalarStringValue } from '../shared/choice_value.ts';
 
 export type VocRow = {
   id: string;

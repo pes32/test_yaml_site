@@ -2,10 +2,12 @@
  * Методы выделения ячеек для TableWidget (подмешиваются в methods).
  */
 import type {
+    TableCellAddress,
     TableRuntimeMethodSubset,
     TableSelectionRuntimeSurface,
     TableSelectionState
 } from './table_contract.ts';
+import { firstUserColumnIndex } from './table_column_navigation.ts';
 import {
     buildCoreSelectionFromDisplay,
     displayCellToCore,
@@ -45,6 +47,7 @@ function dispatchDisplaySelection(
     nextSelection: {
         anchor: { c: number; r: number };
         focus: { c: number; r: number };
+        fullHeightCols?: { c0: number; c1: number } | null;
         fullWidthRows: { r0: number; r1: number } | null;
     },
     phase: string
@@ -113,9 +116,65 @@ const SelectionMethods = {
             const nextSelection = {
                 anchor: getSelectionAnchor(this),
                 focus: getSelectionFocus(this),
+                fullHeightCols: null,
                 fullWidthRows: { r0: lo, r1: hi }
             };
             dispatchDisplaySelection(this, nextSelection, 'set full row selection');
+        },
+        selectFullRow(row: number, focusCol?: number) {
+            const normalizedRow = this.normRow(row);
+            const normalizedCol = firstUserColumnIndex(this, focusCol);
+            const focus = { r: normalizedRow, c: normalizedCol };
+            dispatchDisplaySelection(
+                this,
+                {
+                    anchor: focus,
+                    focus,
+                    fullHeightCols: null,
+                    fullWidthRows: { r0: normalizedRow, r1: normalizedRow }
+                },
+                'select full row'
+            );
+            return focus;
+        },
+        setSelFullHeightColSpan(c0: number, c1: number) {
+            const anchorCol = this.normCol(c0);
+            const focusCol = this.normCol(c1);
+            const lo = Math.min(anchorCol, focusCol);
+            const hi = Math.max(anchorCol, focusCol);
+            const row = this.normRow(0);
+            const focus: TableCellAddress = { r: row, c: focusCol };
+            const anchor: TableCellAddress = { r: row, c: anchorCol };
+            dispatchDisplaySelection(
+                this,
+                {
+                    anchor,
+                    focus,
+                    fullHeightCols: { c0: lo, c1: hi },
+                    fullWidthRows: null
+                },
+                'set full column selection'
+            );
+            return focus;
+        },
+        selectAllTable() {
+            const rowCount = this.tbodyRowCount ? this.tbodyRowCount() : this.tableData.length;
+            const lastCol = this.tableColumns.length - 1;
+            if (rowCount <= 0 || lastCol < 0) return getSelectionFocus(this);
+            const firstUserCol = firstUserColumnIndex(this, 0);
+            const anchor: TableCellAddress = { r: this.normRow(0), c: firstUserCol };
+            const focus: TableCellAddress = anchor;
+            dispatchDisplaySelection(
+                this,
+                {
+                    anchor,
+                    focus,
+                    fullHeightCols: { c0: 0, c1: lastCol },
+                    fullWidthRows: null
+                },
+                'select all table'
+            );
+            return focus;
         },
         getSelRect() {
             return selectionRectFromDisplay(
@@ -134,8 +193,12 @@ const SelectionMethods = {
         selectionIsFullRowBlock() {
             const n = this.tableColumns.length;
             if (n === 0) return false;
+            if (this.selFullHeightCols) return false;
             const { c0, c1 } = this.getSelRect();
             return c0 === 0 && c1 === n - 1;
+        },
+        selectionIsFullColumnBlock() {
+            return !!this.selFullHeightCols;
         },
         /** Прямоугольник в один столбец (полоса по вертикали), в т.ч. одна ячейка. */
         selectionIsSingleColumnRect() {
@@ -192,6 +255,7 @@ const SelectionMethods = {
         },
         cellTdClass(row: number, col: number) {
             return {
+                'widget-table__cell--line-number': this.isLineNumberColumn(this.tableColumns[col]),
                 'widget-table__td-focusable': this.isEditable,
                 'widget-table__cell--error':
                     typeof this.cellHasCommitError === 'function' &&
@@ -205,7 +269,11 @@ const SelectionMethods = {
         },
         setSelectionSingle(r: number, c: number) {
             const cell = { r: this.normRow(r), c: this.normCol(c) };
-            dispatchDisplaySelection(this, { anchor: cell, focus: cell, fullWidthRows: null }, 'set selection');
+            dispatchDisplaySelection(
+                this,
+                { anchor: cell, focus: cell, fullHeightCols: null, fullWidthRows: null },
+                'set selection'
+            );
         },
         isExactFullRowR(r: number) {
             const n = this.tableColumns.length;
@@ -226,6 +294,7 @@ const SelectionMethods = {
             return '';
         },
         cellTabindex(row: number, col: number) {
+            if (this.isLineNumberColumn(this.tableColumns[col])) return -1;
             if (!this.isEditable) return -1;
             return getSelectionFocus(this).r === row && getSelectionFocus(this).c === col ? 0 : -1;
         },
@@ -234,11 +303,27 @@ const SelectionMethods = {
             const nr = this.normRow(focus.r + dr);
             const nc = this.normCol(focus.c + dc);
             if (nr === focus.r && nc === focus.c) return false;
+            if (this.selFullHeightCols && dr === 0 && dc !== 0) {
+                if (this.isLineNumberColumn(this.tableColumns[nc])) return false;
+                const anchor = getSelectionAnchor(this);
+                const nextSelection = {
+                    anchor,
+                    focus: { r: focus.r, c: nc },
+                    fullHeightCols: {
+                        c0: Math.min(anchor.c, nc),
+                        c1: Math.max(anchor.c, nc)
+                    },
+                    fullWidthRows: null
+                };
+                dispatchDisplaySelection(this, nextSelection, 'extend full column selection');
+                return true;
+            }
             if (this.selFullWidthRows && dr !== 0 && dc === 0) {
                 const anchor = getSelectionAnchor(this);
                 const nextSelection = {
                     anchor,
                     focus: { r: nr, c: focus.c },
+                    fullHeightCols: null,
                     fullWidthRows: {
                         r0: Math.min(anchor.r, nr),
                         r1: Math.max(anchor.r, nr)
@@ -250,10 +335,38 @@ const SelectionMethods = {
             const nextSelection = {
                 anchor: getSelectionAnchor(this),
                 focus: { r: nr, c: nc },
+                fullHeightCols: null,
                 fullWidthRows: null
             };
             dispatchDisplaySelection(this, nextSelection, 'extend selection');
             return true;
+        },
+        columnLetter(index: number) {
+            const labels = Array.isArray(this.columnLetterLabels) ? this.columnLetterLabels : [];
+            return labels[this.normCol(index)] || '';
+        },
+        onColumnLetterHeaderClick(event: MouseEvent, colIndex: number) {
+            if (!this.isEditable || this.tableUiLocked) return;
+            const normalizedCol = this.normCol(colIndex);
+            if (this.isLineNumberColumn(this.tableColumns[normalizedCol])) {
+                const focus = this.selectAllTable();
+                this.exitCellEdit();
+                this.$nextTick?.(() => this.focusSelectionCell(focus.r, focus.c));
+                return;
+            }
+            const previousAnchorCol =
+                event.shiftKey && this.selFullHeightCols
+                    ? this.selFullHeightCols.c0
+                    : normalizedCol;
+            const anchorCol =
+                this.isLineNumberColumn(this.tableColumns[this.normCol(previousAnchorCol)])
+                    ? normalizedCol
+                    : previousAnchorCol;
+            const focus = this.setSelFullHeightColSpan(anchorCol, normalizedCol);
+            this.exitCellEdit();
+            if (!this.isLineNumberColumn(this.tableColumns[focus.c])) {
+                this.$nextTick?.(() => this.focusSelectionCell(focus.r, focus.c));
+            }
         }
     } satisfies TableRuntimeMethodSubset<SelectionVm>;
 

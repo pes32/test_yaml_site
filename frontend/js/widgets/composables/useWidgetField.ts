@@ -1,4 +1,10 @@
 import { computed, getCurrentInstance, inject, onBeforeUnmount, ref } from 'vue';
+import {
+  createLifecycleBlockedResult,
+  createLifecycleCommitResult,
+  type LifecycleCommitContext,
+  type LifecycleCommitResult
+} from '../../shared/lifecycle_commit.ts';
 
 type WidgetConfig = Record<string, unknown> & {
   err_text?: string;
@@ -25,19 +31,8 @@ type WidgetFieldEmit = (event: 'input', payload: WidgetInputPayload) => void;
 type NotificationHandler = ((message: string, type?: string) => void) | null;
 type DraftLifecycleHandler = (() => void) | null;
 
-type DraftCommitContext = {
-  kind?: string;
-};
-
-type DraftCommitResult =
-  | {
-      status: 'noop' | 'committed';
-    }
-  | {
-      status: 'blocked';
-      severity: 'recoverable' | 'fatal';
-      error: unknown;
-    };
+type DraftCommitContext = LifecycleCommitContext;
+type DraftCommitResult = LifecycleCommitResult;
 
 type WidgetRoot = {
   showNotification?: (message: string, type?: string) => void;
@@ -227,15 +222,11 @@ export default function useWidgetField(
   }
 
   function createDraftCommitResult(status: 'noop' | 'committed'): DraftCommitResult {
-    return { status };
+    return createLifecycleCommitResult(status);
   }
 
   function createRecoverableBlockedResult(error: unknown): DraftCommitResult {
-    return {
-      status: 'blocked',
-      severity: 'recoverable',
-      error
-    };
+    return createLifecycleBlockedResult(error, 'recoverable');
   }
 
   function commitDraftValue(

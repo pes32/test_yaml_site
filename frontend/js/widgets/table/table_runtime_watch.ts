@@ -19,7 +19,7 @@ const tableRuntimeWatch: TableRuntimeWatchHandlers = {
     stickyHeaderEnabled(this: TableRuntimeVm, value: boolean) {
         this.$nextTick?.(() => {
             this._unbindStickyThead?.();
-            if (value) this._bindStickyThead?.();
+            if (value || this.toolbarEnabled) this._bindStickyThead?.();
         });
     }
 };

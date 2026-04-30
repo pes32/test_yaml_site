@@ -154,7 +154,8 @@ function ensureStickyClone(
         overlay = document.createElement('table');
         overlay.setAttribute('aria-label', 'sticky table header');
         overlay.className = `${table.className} widget-table__sticky-overlay`;
-        document.body.appendChild(overlay);
+        const host = vm._stickyScrollRoot instanceof Element ? vm._stickyScrollRoot : document.body;
+        host.appendChild(overlay);
         bindStickyCloneEvents(vm, overlay);
         vm._stickyCloneTableEl = overlay;
     }
@@ -211,9 +212,35 @@ function applyOverlayHorizontalClip(
     (overlay.style as CSSStyleDeclaration & { webkitClipPath?: string }).webkitClipPath = clipPath;
 }
 
+function stickyToolbarBottom(vm: StickyRuntimeVm, pinY: number): number {
+    const toolbar = vm.$refs?.tableToolbarHost as HTMLElement | null | undefined;
+    if (!toolbar) return pinY;
+    const rect = toolbar.getBoundingClientRect();
+    const height = rect.height;
+    if (!Number.isFinite(height) || height <= 0) return pinY;
+    return Math.max(pinY + height, rect.bottom);
+}
+
+function syncStickyToolbarHorizontalOffset(
+    vm: StickyRuntimeVm,
+    root: Element | null | undefined
+): void {
+    void root;
+    const toolbar = vm.$refs?.tableToolbarHost as HTMLElement | null | undefined;
+    if (!toolbar) return;
+    const rect = toolbar.getBoundingClientRect();
+    const storedAnchor = Number(toolbar.dataset.stickyToolbarAnchorLeft);
+    const anchorLeft = Number.isFinite(storedAnchor) ? storedAnchor : rect.left;
+    if (!Number.isFinite(storedAnchor)) {
+        toolbar.dataset.stickyToolbarAnchorLeft = String(anchorLeft);
+    }
+    toolbar.style.setProperty('--widget-table-toolbar-scroll-x', `${anchorLeft - rect.left}px`);
+}
+
 function updateStickyThead(vm: StickyRuntimeVm): void {
     if (!vm.stickyHeaderEnabled || !vm._stickyScrollRoot) return;
     const root = vm._stickyScrollRoot;
+    syncStickyToolbarHorizontalOffset(vm, root);
     const table = vm.$refs?.tableRoot as HTMLTableElement | null | undefined;
     const thead = vm.$refs?.tableThead as HTMLTableSectionElement | null | undefined;
     if (!table || !thead) return;
@@ -221,6 +248,8 @@ function updateStickyThead(vm: StickyRuntimeVm): void {
     const pinTop = readStickyTopPx(root, table);
     const rootRect = root.getBoundingClientRect();
     const pinY = rootRect.top + pinTop;
+    const toolbarBottom = stickyToolbarBottom(vm, pinY);
+    const headerPinY = toolbarBottom;
     const tableRect = table.getBoundingClientRect();
     const tableStyle = getComputedStyle(table);
     const borderTop = Number.parseFloat(tableStyle.borderTopWidth) || 0;
@@ -229,8 +258,8 @@ function updateStickyThead(vm: StickyRuntimeVm): void {
     const naturalTableBottom = tableRect.bottom - borderBottom;
     const theadHeight = thead.offsetHeight;
     const shouldPin =
-        naturalTableTop <= pinY + 0.5 &&
-        naturalTableBottom > pinY + theadHeight + 0.5;
+        naturalTableTop <= headerPinY + 0.5 &&
+        naturalTableBottom > headerPinY + theadHeight + 0.5;
 
     if (!shouldPin) {
         if (vm._stickyTheadPinned) {
@@ -272,7 +301,7 @@ function updateStickyThead(vm: StickyRuntimeVm): void {
     }
 
     overlay.style.position = 'fixed';
-    overlay.style.top = `${pinY}px`;
+    overlay.style.top = `${headerPinY}px`;
     overlay.style.left = `${tableRect.left}px`;
     overlay.style.width = `${tableRect.width}px`;
     overlay.style.zIndex = '9';
@@ -282,10 +311,17 @@ function updateStickyThead(vm: StickyRuntimeVm): void {
 }
 
 function bindStickyThead(vm: StickyRuntimeVm): void {
+    const previousToolbar = vm.$refs?.tableToolbarHost as HTMLElement | null | undefined;
+    const previousToolbarAnchor = previousToolbar?.dataset.stickyToolbarAnchorLeft || '';
     unbindStickyThead(vm);
-    if (!vm.stickyHeaderEnabled || typeof window === 'undefined') return;
+    if (typeof window === 'undefined') return;
     const table = vm.$refs?.tableRoot as HTMLTableElement | null | undefined;
     const thead = vm.$refs?.tableThead as HTMLTableSectionElement | null | undefined;
+    const toolbar = vm.$refs?.tableToolbarHost as HTMLElement | null | undefined;
+    if (toolbar && previousToolbarAnchor) {
+        toolbar.dataset.stickyToolbarAnchorLeft = previousToolbarAnchor;
+    }
+    if (!vm.stickyHeaderEnabled && !toolbar) return;
     if (!table || !thead) return;
 
     const root = findVerticalScrollRoot(table);
@@ -293,6 +329,7 @@ function bindStickyThead(vm: StickyRuntimeVm): void {
 
     vm._stickyScrollRoot = root;
     vm._stickyOnScroll = () => {
+        syncStickyToolbarHorizontalOffset(vm, root);
         scheduleUpdate(vm);
     };
 
@@ -304,11 +341,15 @@ function bindStickyThead(vm: StickyRuntimeVm): void {
         vm._stickyRo = new ResizeObserver(() => vm._stickyOnScroll?.());
         vm._stickyRo.observe(table);
         vm._stickyRo.observe(thead);
+        if (toolbar) {
+            vm._stickyRo.observe(toolbar);
+        }
         if (root.nodeType === 1) {
             vm._stickyRo.observe(root);
         }
     }
 
+    syncStickyToolbarHorizontalOffset(vm, root);
     scheduleUpdate(vm);
 }
 
@@ -331,6 +372,12 @@ function unbindStickyThead(vm: StickyRuntimeVm): void {
     if (vm._stickyRo) {
         vm._stickyRo.disconnect();
         vm._stickyRo = null;
+    }
+
+    const toolbar = vm.$refs?.tableToolbarHost as HTMLElement | null | undefined;
+    if (toolbar) {
+        toolbar.style.removeProperty('--widget-table-toolbar-scroll-x');
+        delete toolbar.dataset.stickyToolbarAnchorLeft;
     }
 
     vm._stickyScrollRoot = null;

@@ -22,6 +22,17 @@ type BuildTableViewModelOptions = {
     sortKeys?: TableCoreSortState[];
 };
 
+function emptyTableViewModel(): TableViewModel {
+    return {
+        displayIndexToRowId: [],
+        displayRows: [],
+        orderedRowIds: [],
+        rowIdToDisplayIndex: new Map<string, number>(),
+        rowIdToSourceIndex: new Map<string, number>(),
+        validPathKeys: new Set<string>()
+    };
+}
+
 function filterOrderedRowIds(
     rowIds: readonly string[],
     filterRowIds: BuildTableViewModelOptions['filterRowIds']
@@ -101,6 +112,7 @@ export {
     buildOrderedRowIds,
     buildTableViewModel,
     displayIndexForCell,
+    emptyTableViewModel,
     rowAtDisplayIndex,
     rowIdAtDisplayIndex,
     sourceIndexAtDisplayIndex

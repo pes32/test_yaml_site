@@ -36,6 +36,8 @@ import { tableRuntimeComputed } from './table_runtime_computed.ts';
 import { tableRuntimeMethods } from './table_runtime_registry.ts';
 import { tableRuntimeWatch } from './table_runtime_watch.ts';
 import { createTableStore } from './table_store.ts';
+import { createDefaultTableToolbarState } from './table_toolbar_model.ts';
+import { emptyTableViewModel } from './table_view_model.ts';
 
 type UseTableRuntimeOptions = {
     emit: TableWidgetEmit;
@@ -56,6 +58,7 @@ type RuntimeVmTarget = Partial<TableRuntimeVm> & Record<string, unknown>;
 type RuntimeComputedUnknownSetter = (this: TableRuntimeVm, value: unknown) => void;
 
 const TABLE_CONFIG_WATCH_KEYS = [
+    'abc',
     'data',
     'label',
     'lazy_chunk_size',
@@ -68,7 +71,7 @@ const TABLE_CONFIG_WATCH_KEYS = [
     'sticky_header',
     'sup_text',
     'table_attrs',
-    'table_lazy',
+    'toolbar',
     'value',
     'width',
     'zebra'
@@ -76,10 +79,14 @@ const TABLE_CONFIG_WATCH_KEYS = [
 
 const TABLE_RUNTIME_COMPUTED_FALLBACKS = {
     _lazyPendingRows: () => [],
+    canRedo: () => false,
+    canUndo: () => false,
+    columnLetterLabels: () => [],
     contextMenuItems: () => [],
     displayRows: () => [],
     groupingActive: () => false,
     groupingState: () => ({ levels: [], expanded: new Set<string>() }),
+    hasColumnLetters: () => false,
     hasColumnNumbers: () => false,
     hasExplicitTableWidth: () => false,
     headerSortEnabled: () => false,
@@ -89,16 +96,21 @@ const TABLE_RUNTIME_COMPUTED_FALLBACKS = {
     lazyEnabled: () => false,
     lazySessionId: () => 0,
     lineNumbersRuntimeEnabled: () => false,
+    runtimeColumnKeyList: () => [],
     sortColumnIndex: () => null,
     sortDirection: () => 'asc',
     sortKeys: () => [],
     stickyHeaderEnabled: () => false,
     stickyHeaderRuntimeEnabled: () => false,
+    tableRowIdToDataIndex: () => new Map<string, number>(),
+    tableViewModel: emptyTableViewModel,
     tableInlineStyle: () => ({}),
     tableLazyUiActive: () => false,
     tableMinRowCount: () => 0,
+    toolbarState: createDefaultTableToolbarState,
     tableUiLocked: () => false,
     tableZebra: () => false,
+    toolbarEnabled: () => false,
     wordWrapEnabled: () => false,
     wordWrapRuntimeEnabled: () => false
 } satisfies { [K in keyof TableRuntimeComputed]: () => TableRuntimeComputed[K] };
@@ -177,6 +189,7 @@ function createInitialTableRuntimeState(
         selectedRowIndex: -1,
         selAnchor: { r: 0, c: 0 },
         selFocus: { r: 0, c: 0 },
+        selFullHeightCols: null,
         selFullWidthRows: null,
         _tableProgrammaticFocus: false,
         _shiftSelectGesture: false,
@@ -185,7 +198,6 @@ function createInitialTableRuntimeState(
         _contextMenuKeydownHandler: null,
         editingCell: null,
         _tableFocusWithin: false,
-        _sortCycleRowOrder: null,
         cellValidationErrors: {},
         _lazyObserver: null,
         _lazyDebounceTimer: null,

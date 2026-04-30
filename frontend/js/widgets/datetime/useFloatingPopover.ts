@@ -1,5 +1,8 @@
 import { onBeforeUnmount, shallowRef, type Ref } from 'vue';
 import type { DateTimePopoverStyle } from './types.ts';
+import numberUtils from '../../shared/number_utils.ts';
+
+const { clampNumber } = numberUtils;
 
 type FloatingAlign = 'start' | 'end';
 type ElementGetter = () => Array<HTMLElement | null | undefined>;
@@ -30,7 +33,7 @@ function useFloatingPopover(getInsideElements: ElementGetter, onOutside: () => v
     const maxLeft = Math.max(margin, window.innerWidth - popoverRect.width - margin);
     const maxTop = Math.max(margin, window.innerHeight - popoverRect.height - margin);
 
-    left = Math.min(Math.max(margin, left), maxLeft);
+    left = clampNumber(left, margin, maxLeft);
     if (top > maxTop) {
       top = Math.max(margin, anchorRect.top - popoverRect.height - margin);
     }

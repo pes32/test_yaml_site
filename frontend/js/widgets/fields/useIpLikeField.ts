@@ -1,7 +1,12 @@
-import { computed, nextTick, ref, watch, type Ref } from 'vue';
+import { computed, nextTick, ref, type Ref } from 'vue';
 import useCommitFieldBase from '../composables/useCommitFieldBase.ts';
 import { validateRegexValue } from '../composables/field_validation.ts';
 import useWidgetField from '../composables/useWidgetField.ts';
+import { useWidgetConfigValueSync } from '../composables/useWidgetConfigValueSync.ts';
+import type {
+  LifecycleCommitContext,
+  LifecycleCommitResult
+} from '../../shared/lifecycle_commit.ts';
 
 type IpLikeWidgetConfig = Record<string, unknown> & {
   err_text?: string;
@@ -30,19 +35,8 @@ type IpLikeWidgetEmit = {
   (event: 'input', payload: IpLikeInputPayload): void;
 };
 
-type IpLikeCommitContext = {
-  kind?: string;
-};
-
-type IpLikeCommitResult =
-  | {
-      status: 'noop' | 'committed';
-    }
-  | {
-      error: unknown;
-      severity: 'recoverable' | 'fatal';
-      status: 'blocked';
-    };
+type IpLikeCommitContext = LifecycleCommitContext;
+type IpLikeCommitResult = LifecycleCommitResult;
 
 type IpLikeNormalizedValue = {
   activeOctet: string;
@@ -359,14 +353,7 @@ function useIpLikeField(
     return inputValue.value;
   }
 
-  watch(
-    () => props.widgetConfig.value,
-    (value) => {
-      if (value === undefined) return;
-      field.syncCommittedValue(value, setValue);
-    },
-    { immediate: true }
-  );
+  useWidgetConfigValueSync(props, field.syncCommittedValue, setValue);
 
   return {
     displayError,

@@ -15,14 +15,14 @@ import {
 } from './voc_value_core.ts';
 import { handleDropdownTableCellTab } from '../dropdown/dropdown_runtime.ts';
 import type { VocWidgetState } from './voc_shared.ts';
+import {
+  createLifecycleBlockedResult,
+  type LifecycleCommitContext,
+  type LifecycleCommitResult
+} from '../../shared/lifecycle_commit.ts';
 
-type VocCommitContext = {
-  kind?: string;
-};
-
-type VocCommitResult =
-  | { status: 'noop' | 'committed' }
-  | { error: unknown; severity: 'recoverable' | 'fatal'; status: 'blocked' };
+type VocCommitContext = LifecycleCommitContext;
+type VocCommitResult = LifecycleCommitResult;
 
 type VocInlineWidgetConfig = {
   readonly?: boolean;
@@ -354,11 +354,7 @@ function useVocInlineDropdown(options: UseVocInlineDropdownOptions) {
     }
     const message = String(options.combinedFieldError.value || '').trim();
     if (message && context.kind) {
-      return {
-        status: 'blocked',
-        severity: 'recoverable',
-        error: new Error(message)
-      };
+      return createLifecycleBlockedResult(new Error(message), 'recoverable');
     }
     return { status: 'committed' };
   }

@@ -11,7 +11,7 @@ import type {
     TableSchema,
     WidgetAttrsMap
 } from './table_contract.ts';
-import { WidgetMeasure } from './table_widget_helpers.ts';
+import { autoFitHeaderWidth, headerSortAffordancePx } from './table_width_model.ts';
 import { isBuiltinWidgetType } from '../../shared/widget_types.ts';
 
 type TableParseVm = TableRuntimeVm;
@@ -34,7 +34,7 @@ type HeaderNode = {
 
     const LINE_NUMBER_ATTR = '__line_numbers__';
     const LINE_NUMBER_LABEL = '№';
-    const LINE_NUMBER_WIDTH = '64px';
+    const LINE_NUMBER_WIDTH = '48px';
     const TABLE_CELL_ALLOWED_OPTIONS = {
         str: ['placeholder', 'regex', 'err_text', 'default'],
         int: ['placeholder', 'regex', 'err_text', 'default'],
@@ -51,14 +51,12 @@ type HeaderNode = {
     function computeAutoWidthLabel(vm: TableParseVm, label: unknown): string {
         const tableEl =
             typeof vm.getTableEl === 'function' ? vm.getTableEl() : null;
-        if (WidgetMeasure && typeof WidgetMeasure.computeAutoWidth === 'function') {
-            return WidgetMeasure.computeAutoWidth(
-                label,
-                WidgetMeasure.headerSortAffordancePx(vm.widgetConfig),
-                tableEl
-            );
-        }
-        return `${Math.min(500, String(label || '').length * 10 + 50)}px`;
+        return autoFitHeaderWidth({
+            headerText: label,
+            max: 500,
+            sortExtra: headerSortAffordancePx(vm.widgetConfig),
+            tableEl
+        });
     }
 
     function uniqPush(list: string[], value: unknown): void {

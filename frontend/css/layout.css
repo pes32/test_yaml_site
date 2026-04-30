@@ -342,6 +342,7 @@
 .page-tab-content--with-tabs {
     --widget-table-sticky-top: 0px;
     padding-top: var(--page-gap);
+    padding-left: 0;
 }
 
 .page-tab-content > .tab-pane {

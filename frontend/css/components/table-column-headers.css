@@ -1,0 +1,31 @@
+/* components/table-column-headers.css — Excel-like ABC row */
+
+.widget-table__column-letters-row th,
+.widget-table__column-letter {
+    padding: var(--space-2xs, 4px) var(--table-cell-padding-x);
+    text-align: center;
+    color: var(--color-text-muted);
+    font-weight: 600;
+    user-select: none;
+}
+
+.widget-table__column-letter {
+    cursor: pointer;
+}
+
+.widget-table__column-letter:not(.widget-table__column-letter--empty):hover {
+    background-color: var(--color-bg);
+}
+
+.widget-table__column-letter--empty {
+    cursor: default;
+}
+
+.widget-table__column-letter:focus {
+    outline: none;
+}
+
+.widget-table__column-letter:focus-visible {
+    outline: var(--table-focus-ring-width) solid var(--table-focus-ring-color);
+    outline-offset: var(--table-focus-ring-offset);
+}

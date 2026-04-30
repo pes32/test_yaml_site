@@ -1,8 +1,6 @@
-import type {
-  LifecycleCommitResult,
-  WidgetLifecycleCommitContext,
-  WidgetLifecycleHandle
-} from '../widgets/factory.ts';
+import { createLifecycleBlockedResult, createLifecycleCommitResult } from '../shared/lifecycle_commit.ts';
+import type { LifecycleCommitContext, LifecycleCommitResult } from '../shared/lifecycle_commit.ts';
+import type { WidgetLifecycleHandle } from '../widgets/factory.ts';
 
 type BoundaryActionKind = 'execute' | 'modal-close' | 'navigation';
 
@@ -58,21 +56,17 @@ function clearActiveWidgetLifecycle(
 
 async function commitActiveWidgetLifecycle(
   state: PageDraftRuntimeState,
-  context: WidgetLifecycleCommitContext = {}
+  context: LifecycleCommitContext = {}
 ): Promise<LifecycleCommitResult> {
   const handle = state.activeLifecycleHandle;
   if (!handle) {
-    return { status: 'noop' };
+    return createLifecycleCommitResult('noop');
   }
 
   try {
     return await handle.commitPendingState(context);
   } catch (error) {
-    return {
-      status: 'blocked',
-      severity: 'fatal',
-      error
-    };
+    return createLifecycleBlockedResult(error, 'fatal');
   }
 }
 

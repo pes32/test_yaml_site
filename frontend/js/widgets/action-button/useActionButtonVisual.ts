@@ -1,6 +1,6 @@
 import { computed, type CSSProperties } from 'vue';
 import { isFontIcon } from '../../shared/icon_helpers.ts';
-import { asTrimmedString } from '../../runtime/action_runtime.ts';
+import { asTrimmedString } from '../../shared/string_value.ts';
 import type { ActionButtonVisualOptions, ActionWidgetProps } from './types.ts';
 
 function resolveWidthValue(value: unknown): string {

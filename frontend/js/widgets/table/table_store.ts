@@ -21,6 +21,7 @@ function createTableStore(options: CreateTableStoreOptions = {}): TableStore {
         selection: {
             anchor: { r: 0, c: 0 },
             focus: { r: 0, c: 0 },
+            fullHeightCols: null,
             fullWidthRows: null
         },
         editing: {
@@ -48,12 +49,23 @@ function createTableStore(options: CreateTableStoreOptions = {}): TableStore {
             lazyPendingRows: [],
             tableUiLocked: false
         },
+        meta: {
+            cellMetaByKey: {}
+        },
+        history: {
+            future: [],
+            past: []
+        },
         validation: {
             cellErrors: {}
         },
         view: {
             lineNumbersRuntimeEnabled: !!options.lineNumbersEnabled,
             wordWrapRuntimeEnabled: false
+        },
+        widths: {
+            initialByColumnKey: {},
+            overrideByColumnKey: {}
         }
     };
 }

@@ -78,6 +78,33 @@ function normalizeLineNumberValue(value: unknown): number | '' {
     return Math.floor(num);
 }
 
+function normalizeIpOctetText(value: unknown): string {
+    return String(value ?? '')
+        .replace(/[,\s|\\/]+/g, '.')
+        .replace(/[^\d.]/g, '')
+        .split('.')
+        .slice(0, 4)
+        .map((part) => part.replace(/\D/g, '').slice(0, 3))
+        .join('.');
+}
+
+function normalizeIpMaskText(value: unknown): string {
+    const raw = String(value ?? '').trim().replace(/\s+/g, '');
+    if (!raw) return '';
+    const slashIndex = raw.indexOf('/');
+    if (slashIndex < 0) return normalizeIpOctetText(raw);
+    const ipPart = normalizeIpOctetText(raw.slice(0, slashIndex));
+    const maskPart = raw.slice(slashIndex + 1).replace(/\D/g, '').slice(0, 2);
+    return `${ipPart}/${maskPart}`;
+}
+
+function normalizeCellValueForColumn(value: unknown, column: Record<string, unknown> | null | undefined): unknown {
+    const type = String(column?.type || '').trim();
+    if (type === 'ip') return normalizeIpOctetText(value);
+    if (type === 'ip_mask') return normalizeIpMaskText(value);
+    return value;
+}
+
 function validateExternalTableRows(
     rows: unknown,
     tableColumns: Array<Record<string, unknown>>
@@ -117,13 +144,19 @@ function buildNormalizedCells(
         if (raw.length > externalCols) return null;
         const cells = new Array(cols).fill('');
         for (let i = 0; i < externalCols; i += 1) {
-            cells[i + 1] = raw[i] !== undefined ? raw[i] : '';
+            const column = tableColumns ? tableColumns[i + 1] : null;
+            cells[i + 1] = normalizeCellValueForColumn(raw[i] !== undefined ? raw[i] : '', column);
         }
         return cells;
     }
 
     while (raw.length < cols) raw.push('');
     if (raw.length > cols) raw.length = cols;
+    if (tableColumns) {
+        for (let index = 0; index < raw.length; index += 1) {
+            raw[index] = normalizeCellValueForColumn(raw[index], tableColumns[index]);
+        }
+    }
     if (lineNumberIndex >= 0) {
         raw[lineNumberIndex] = normalizeLineNumberValue(raw[lineNumberIndex]);
     }

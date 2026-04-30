@@ -5,24 +5,31 @@ import { parseTableAttrs } from './table_parse_attrs.ts';
 import { scheduleUpdate } from './table_scroll.ts';
 import { bindStickyThead, unbindStickyThead, updateStickyThead } from './table_sticky_header.ts';
 import { columnIndexByKey } from './table_state_core.ts';
-import { WidgetMeasure, WidgetUiCoords } from './table_widget_helpers.ts';
+import { WidgetUiCoords } from './table_widget_helpers.ts';
+import { autoFitHeaderWidth, headerSortAffordancePx } from './table_width_model.ts';
 import { safeCellValue } from './table_utils.ts';
 
 const ViewRuntimeMethods = {
     leafColStyle(column: TableRuntimeColumn | null | undefined) {
-        if (!column || !column.width) return {};
+        const index = this.tableColumns.indexOf(column as TableRuntimeColumn);
+        const width = index >= 0 ? this.runtimeColumnWidth(index) : column?.width;
+        if (!column || !width) return {};
         return {
-            width: column.width,
-            minWidth: column.width,
-            maxWidth: column.width
+            width,
+            minWidth: width,
+            maxWidth: width
         };
     },
 
     headerThStyle(cell: TableHeaderCell | null | undefined) {
-        if (!cell || !cell.width) return {};
+        const width =
+            cell && cell.runtimeColIndex != null && cell.colspan === 1
+                ? this.runtimeColumnWidth(cell.runtimeColIndex)
+                : cell?.width;
+        if (!cell || !width) return {};
         return {
-            width: cell.width,
-            minWidth: cell.width
+            width,
+            minWidth: width
         };
     },
 
@@ -86,26 +93,16 @@ const ViewRuntimeMethods = {
     },
 
     headerSortAffordancePx() {
-        return WidgetMeasure && WidgetMeasure.headerSortAffordancePx
-            ? WidgetMeasure.headerSortAffordancePx(this.widgetConfig)
-            : this.widgetConfig && this.widgetConfig.sort === false
-              ? 0
-              : 26;
+        return headerSortAffordancePx(this.widgetConfig);
     },
 
     computeAutoWidth(label: unknown) {
-        if (WidgetMeasure && WidgetMeasure.computeAutoWidth) {
-            return WidgetMeasure.computeAutoWidth(
-                label,
-                this.headerSortAffordancePx(),
-                this.getTableEl()
-            );
-        }
-        const sortExtra = this.headerSortAffordancePx();
-        return `${Math.min(
-            500,
-            String(label || '').length * 10 + 24 + sortExtra
-        )}px`;
+        return autoFitHeaderWidth({
+            headerText: label,
+            max: 500,
+            sortExtra: this.headerSortAffordancePx(),
+            tableEl: this.getTableEl()
+        });
     },
 
     safeCell(row: unknown, cellIndex: number) {
@@ -115,7 +112,8 @@ const ViewRuntimeMethods = {
     dataRowByIdentity(rowId: string) {
         const key = String(rowId || '');
         if (!key) return null;
-        return this.tableData.find((row) => row && String(row.id || '') === key) || null;
+        const index = this.tableRowIdToDataIndex.get(key);
+        return index == null ? null : this.tableData[index] || null;
     },
 
     cellValueByIdentity(rowId: string, colKey: string, fallbackCol: number) {
@@ -137,9 +135,13 @@ const ViewRuntimeMethods = {
         column: TableRuntimeColumn | null | undefined,
         fallbackCol: number
     ) {
+        const effectiveColumn =
+            typeof this.effectiveCellColumnByIdentity === 'function'
+                ? this.effectiveCellColumnByIdentity(rowId, colKey, fallbackCol, column)
+                : column;
         return this.formatCellValue(
             this.cellValueByIdentity(rowId, colKey, fallbackCol),
-            column
+            effectiveColumn
         );
     },
 

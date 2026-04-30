@@ -85,9 +85,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue';
+import { computed, nextTick, ref, type Ref } from 'vue';
 import Md3Field from '../common/Md3Field.vue';
 import { useWidgetConfigValueSync } from '../composables/useWidgetConfigValueSync.ts';
+import { blurEventTarget } from '../../shared/dom_events.ts';
 import CalendarPopover from './CalendarPopover.vue';
 import DateTimeSegment from './DateTimeSegment.vue';
 import TimePopover from './TimePopover.vue';
@@ -110,6 +111,12 @@ defineOptions({
 
 const CALENDAR_ICON_SRC = '/templates/icons/calendar.svg';
 const CLOCK_ICON_SRC = '/templates/icons/clock.svg';
+
+type SegmentCommitState = {
+  parsedDate?: unknown;
+  parsedTime?: unknown;
+  value: string;
+};
 
 const props = defineProps<DateTimeWidgetProps>();
 const emit = defineEmits<DateTimeWidgetEmit>();
@@ -243,34 +250,44 @@ function finalizeSegmentBlur(commitHandler: () => void): void {
   }
 }
 
-function commitDateInput(context?: DateTimeCommitContext) {
-  if (!dateValue.value) {
+function commitSegmentInput(
+  segmentValue: Ref<string>,
+  normalize: (rawValue: unknown) => SegmentCommitState,
+  isValid: (state: SegmentCommitState) => boolean,
+  validationMessage: string,
+  context?: DateTimeCommitContext
+) {
+  if (!segmentValue.value) {
     syncValue(false);
     return field.commitValue(value.value, '', context);
   }
 
-  const state = datePart.normalize(dateValue.value);
-  dateValue.value = state.value;
+  const state = normalize(segmentValue.value);
+  segmentValue.value = state.value;
   syncValue(false);
   return field.commitValue(
     value.value,
-    state.parsedDate ? '' : 'Неверный формат даты',
+    isValid(state) ? '' : validationMessage,
+    context
+  );
+}
+
+function commitDateInput(context?: DateTimeCommitContext) {
+  return commitSegmentInput(
+    dateValue,
+    datePart.normalize,
+    (state) => Boolean(state.parsedDate),
+    'Неверный формат даты',
     context
   );
 }
 
 function commitTimeInput(context?: DateTimeCommitContext) {
-  if (!timeValue.value) {
-    syncValue(false);
-    return field.commitValue(value.value, '', context);
-  }
-
-  const state = timePart.normalize(timeValue.value);
-  timeValue.value = state.value;
-  syncValue(false);
-  return field.commitValue(
-    value.value,
-    state.parsedTime ? '' : 'Неверный формат времени',
+  return commitSegmentInput(
+    timeValue,
+    timePart.normalize,
+    (state) => Boolean(state.parsedTime),
+    'Неверный формат времени',
     context
   );
 }
@@ -292,62 +309,52 @@ function commitPendingState(context?: DateTimeCommitContext) {
   return commitDraft(context);
 }
 
-function onDateInput(): void {
+function onSegmentInput(): void {
   syncValue(tableCellMode.value);
   if (!tableCellMode.value) {
     field.activateDraftController();
   }
+}
+
+function onDateInput(): void {
+  onSegmentInput();
 }
 
 function onTimeInput(): void {
-  syncValue(tableCellMode.value);
-  if (!tableCellMode.value) {
-    field.activateDraftController();
-  }
+  onSegmentInput();
+}
+
+function onSegmentBlur(commitHandler: () => void): void {
+  finalizeSegmentBlur(commitHandler);
 }
 
 function onDateBlur(): void {
-  finalizeSegmentBlur(() => {
-    commitDateInput();
-  });
+  onSegmentBlur(commitDateInput);
 }
 
 function onTimeBlur(): void {
-  finalizeSegmentBlur(() => {
-    commitTimeInput();
-  });
+  onSegmentBlur(commitTimeInput);
+}
+
+function onSegmentEnterCommit(event: KeyboardEvent, commitHandler: () => void): void {
+  if (tableCellMode.value) {
+    return;
+  }
+
+  event.preventDefault();
+  try {
+    commitHandler();
+  } finally {
+    blurEventTarget(event);
+  }
 }
 
 function onDateEnterCommit(event: KeyboardEvent): void {
-  if (tableCellMode.value) {
-    return;
-  }
-
-  event.preventDefault();
-  try {
-    commitDateInput();
-  } finally {
-    const target = event.target;
-    if (target instanceof HTMLElement) {
-      target.blur();
-    }
-  }
+  onSegmentEnterCommit(event, commitDateInput);
 }
 
 function onTimeEnterCommit(event: KeyboardEvent): void {
-  if (tableCellMode.value) {
-    return;
-  }
-
-  event.preventDefault();
-  try {
-    commitTimeInput();
-  } finally {
-    const target = event.target;
-    if (target instanceof HTMLElement) {
-      target.blur();
-    }
-  }
+  onSegmentEnterCommit(event, commitTimeInput);
 }
 
 function openDatePicker(): void {

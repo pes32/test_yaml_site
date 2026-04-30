@@ -5,8 +5,7 @@ import { asRecord, isRecord } from '../shared/object_record.ts';
 import { uniqueNames } from '../shared/string_list.ts';
 import type {
     AttrsResponse,
-    ModalResponse,
-    PageResponse
+    ModalResponse
 } from './api_contract.ts';
 import type {
     AttrConfigMap,
@@ -18,11 +17,6 @@ import type {
     ParsedGuiModal,
     UnknownRecord
 } from './page_contract.ts';
-
-type NormalizedPageState = Omit<PageResponse, 'attrs' | 'page'> & {
-    attrs: AttrConfigMap;
-    page: PageConfigRecord | null;
-};
 
 type NormalizedAttrsState = Omit<AttrsResponse, 'attrs'> & {
     attrs: AttrConfigMap;
@@ -49,58 +43,17 @@ function createEmptyStore(): PageConfigState {
     };
 }
 
-function normalizePageState(payload: PagePayload): NormalizedPageState {
+function bootstrap(store: PageConfigState, payload: PagePayload): PageConfigState {
     const page = asRecord<PageConfigRecord>(payload.page);
     const attrs = normalizeAttrsMap(payload.attrs);
 
-    return {
-        page: page && Object.keys(page).length ? page : null,
-        attrs,
-        diagnostics: normalizeDiagnostics(payload.diagnostics),
-        snapshotVersion: String(payload.snapshotVersion || '')
-    };
-}
-
-function normalizeAttrsState(payload: AttrsPayload): NormalizedAttrsState {
-    const attrs = normalizeAttrsMap(payload.attrs);
-    const resolvedNames = uniqueNames(payload.resolvedNames || Object.keys(attrs));
-
-    return {
-        attrs,
-        page: String(payload.page || ''),
-        resolvedNames,
-        missingNames: uniqueNames(payload.missingNames || []),
-        diagnostics: normalizeDiagnostics(payload.diagnostics),
-        snapshotVersion: String(payload.snapshotVersion || '')
-    };
-}
-
-function normalizeModalState(payload: ModalPayload): NormalizedModalState {
-    const modal = asRecord<ParsedGuiModal>(payload.modal);
-    const attrs = normalizeAttrsMap(payload.attrs);
-
-    return {
-        modal: modal && Object.keys(modal).length ? modal : null,
-        attrs,
-        page: String(payload.page || ''),
-        diagnostics: normalizeDiagnostics(payload.diagnostics),
-        resolvedNames: uniqueNames(payload.resolvedNames || Object.keys(attrs)),
-        missingNames: uniqueNames(payload.missingNames || []),
-        dependencies: asRecord(payload.dependencies),
-        snapshotVersion: String(payload.snapshotVersion || '')
-    };
-}
-
-function bootstrap(store: PageConfigState, payload: PagePayload): PageConfigState {
-    const normalized = normalizePageState(payload);
-
-    store.pageConfig = normalized.page;
-    store.pageName = normalized.page?.name
-        ? String(normalized.page.name)
+    store.pageConfig = page && Object.keys(page).length ? page : null;
+    store.pageName = store.pageConfig?.name
+        ? String(store.pageConfig.name)
         : '';
-    store.snapshotVersion = normalized.snapshotVersion;
-    store.diagnostics = normalized.diagnostics;
-    store.attrsByName = Object.assign({}, normalized.attrs);
+    store.snapshotVersion = String(payload.snapshotVersion || '');
+    store.diagnostics = normalizeDiagnostics(payload.diagnostics);
+    store.attrsByName = Object.assign({}, attrs);
 
     return store;
 }
@@ -110,7 +63,15 @@ function mergeAttrs(
     payload: AttrsPayload,
     _loadedNames?: unknown
 ): NormalizedAttrsState {
-    const normalized = normalizeAttrsState(payload);
+    const attrs = normalizeAttrsMap(payload.attrs);
+    const normalized: NormalizedAttrsState = {
+        attrs,
+        page: String(payload.page || ''),
+        resolvedNames: uniqueNames(payload.resolvedNames || Object.keys(attrs)),
+        missingNames: uniqueNames(payload.missingNames || []),
+        diagnostics: normalizeDiagnostics(payload.diagnostics),
+        snapshotVersion: String(payload.snapshotVersion || '')
+    };
 
     if (normalized.snapshotVersion) {
         store.snapshotVersion = normalized.snapshotVersion;
@@ -125,30 +86,30 @@ function mergeModalPayload(
     store: PageConfigState,
     payload: ModalPayload
 ): NormalizedModalState {
-    const normalized = normalizeModalState(payload);
+    const modal = asRecord<ParsedGuiModal>(payload.modal);
+    const attrs = normalizeAttrsMap(payload.attrs);
+    const normalized: NormalizedModalState = {
+        modal: modal && Object.keys(modal).length ? modal : null,
+        attrs,
+        page: String(payload.page || ''),
+        diagnostics: normalizeDiagnostics(payload.diagnostics),
+        resolvedNames: uniqueNames(payload.resolvedNames || Object.keys(attrs)),
+        missingNames: uniqueNames(payload.missingNames || []),
+        dependencies: asRecord(payload.dependencies),
+        snapshotVersion: String(payload.snapshotVersion || '')
+    };
 
     if (normalized.snapshotVersion) {
         store.snapshotVersion = normalized.snapshotVersion;
     }
     store.diagnostics = normalized.diagnostics.slice();
-
-    mergeAttrs(store, {
-        attrs: normalized.attrs,
-        page: normalized.page,
-        resolvedNames: normalized.resolvedNames,
-        missingNames: normalized.missingNames,
-        diagnostics: normalized.diagnostics,
-        snapshotVersion: normalized.snapshotVersion
-    });
+    Object.assign(store.attrsByName, normalized.attrs);
 
     return normalized;
 }
 
 const PageRuntimeStore = {
     createEmptyStore,
-    normalizePageState,
-    normalizeAttrsState,
-    normalizeModalState,
     bootstrap,
     mergeAttrs,
     mergeModalPayload
@@ -159,10 +120,7 @@ export {
     bootstrap,
     createEmptyStore,
     mergeAttrs,
-    mergeModalPayload,
-    normalizeAttrsState,
-    normalizeModalState,
-    normalizePageState
+    mergeModalPayload
 };
 
 export default PageRuntimeStore;

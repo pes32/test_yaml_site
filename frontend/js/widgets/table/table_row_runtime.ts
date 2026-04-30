@@ -3,6 +3,7 @@ import {
     cloneTableRowDeep,
     nextLineNumber
 } from './table_utils.ts';
+import { copyRowCellMeta } from './table_cell_meta.ts';
 import { isContextMenuSnapshotCurrent } from './table_context_menu_model.ts';
 import type {
     TableContextMenuSnapshot,
@@ -38,7 +39,8 @@ function snapshotSourceIndex(
 function insertRowsFromCommand(
     vm: TableRowRuntimeSurface,
     rows: Array<{ id: string; cells: unknown[] }>,
-    placement: { afterRowId?: string | null; beforeRowId?: string | null } = {}
+    placement: { afterRowId?: string | null; beforeRowId?: string | null } = {},
+    options: Record<string, unknown> = {}
 ): void {
     vm.dispatchTableCommand(
         {
@@ -48,7 +50,7 @@ function insertRowsFromCommand(
         },
         {},
         'insert row',
-        TABLE_RUNTIME_SYNC.ROWS_AND_SELECTION
+        { ...TABLE_RUNTIME_SYNC.ROWS_AND_SELECTION, ...options }
     );
     vm.refreshGroupingViewFromData();
     vm.onInput();
@@ -185,12 +187,24 @@ const RowRuntimeMethods = {
         Object.assign(copy, assignRowLineNumber(copy, this.tableColumns, nextLine));
         const copyRowId = copy.id != null ? String(copy.id) : '';
         const sourceRowId = rowIdAtSourceIndex(this, row);
+        const insertCopy = (placement: { afterRowId?: string | null; beforeRowId?: string | null }) => {
+            this.runWithHistory('duplicate row', () => {
+                insertRowsFromCommand(this, [copy], placement, { skipHistory: true });
+                if (!sourceRowId || !copyRowId) return;
+                this.tableStore.meta.cellMetaByKey = copyRowCellMeta(
+                    this.tableStore.meta.cellMetaByKey,
+                    sourceRowId,
+                    copyRowId,
+                    this.runtimeColumnKeys()
+                );
+            });
+        };
         if (where === 'above') {
-            insertRowsFromCommand(this, [copy], { beforeRowId: sourceRowId });
+            insertCopy({ beforeRowId: sourceRowId });
             if (copyRowId) this.restoreSelectionByRowIds(copyRowId, copyRowId, column, column, false);
             return;
         }
-        insertRowsFromCommand(this, [copy], { afterRowId: sourceRowId });
+        insertCopy({ afterRowId: sourceRowId });
         if (copyRowId) this.restoreSelectionByRowIds(copyRowId, copyRowId, column, column, false);
     },
 

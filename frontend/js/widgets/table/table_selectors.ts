@@ -6,6 +6,9 @@ import type {
     TableWidgetConfig,
     WidgetAttrsMap
 } from './table_contract.ts';
+import { isRecord } from '../../shared/object_record.ts';
+import { formatNowValueForWidgetType } from '../../shared/date_time_format.ts';
+import { normalizeChoiceValue } from '../../shared/choice_value.ts';
 
 type ClassMap = Record<string, boolean>;
 type CssStyleMap = Record<string, string>;
@@ -21,10 +24,6 @@ type SanitizeTableCellOptions = (
     type: unknown,
     widgetConfig: TableColumnAttrConfig | null | undefined
 ) => TableCellOptions;
-
-function isObjectRecord(value: unknown): value is Record<string, unknown> {
-    return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 function isChoiceColumnType(type: unknown): boolean {
     const key = String(type || '').trim();
@@ -101,27 +100,27 @@ function getCellDisplayTextStyle(column: TableRuntimeColumn | null | undefined):
     const kind = getCellDisplayKind(column);
     if (kind === 'list') {
         return {
-            paddingLeft: 'var(--space-md)',
+            paddingLeft: '0',
             paddingRight: 'var(--dropdown-arrow-space)'
         };
     }
     if (kind === 'date') {
         return {
-            paddingLeft: 'var(--space-md)',
+            paddingLeft: '0',
             paddingRight:
                 'calc(var(--widget-dt-gap) + var(--widget-dt-icon-slot-w))'
         };
     }
     if (kind === 'time') {
         return {
-            paddingLeft: 'var(--space-xs)',
+            paddingLeft: '0',
             paddingRight:
                 'calc(var(--widget-dt-gap) + var(--widget-dt-icon-slot-w))'
         };
     }
     if (kind === 'datetime') {
         return {
-            paddingLeft: 'var(--space-md)',
+            paddingLeft: '0',
             paddingRight:
                 'calc((var(--widget-dt-gap) * 2) + (var(--widget-dt-icon-slot-w) * 2) + var(--space-2xs, 4px))'
         };
@@ -144,21 +143,15 @@ function resolveTableLazyEnabled(
     rowCount: number,
     threshold = 100
 ): boolean {
-    const flag = widgetConfig && widgetConfig.table_lazy;
-    if (flag === true) return true;
-    if (flag === false) return false;
+    void widgetConfig;
     return rowCount > threshold;
-}
-
-function padDatePart(value: number | string): string {
-    return String(value).padStart(2, '0');
 }
 
 function getColumnAttrConfig(
     attrsByName: WidgetAttrsMap | null | undefined,
     column: TableRuntimeColumn | null | undefined
 ): TableColumnAttrConfig {
-    const attrs = isObjectRecord(attrsByName) ? attrsByName : {};
+    const attrs = isRecord(attrsByName) ? attrsByName : {};
     const keys = [column?.widgetRef, column?.source, column?.attr];
 
     for (const rawKey of keys) {
@@ -168,7 +161,7 @@ function getColumnAttrConfig(
         }
     }
 
-    return isObjectRecord(column?.widgetConfig)
+    return isRecord(column?.widgetConfig)
         ? column.widgetConfig
         : {};
 }
@@ -204,14 +197,7 @@ function normalizeCellWidgetValue(
 ): unknown {
     if (!column) return currentVal;
     if (isChoiceColumnType(column.type)) {
-        if (isMulti) {
-            return Array.isArray(currentVal)
-                ? currentVal.slice()
-                : currentVal
-                  ? [currentVal]
-                  : [];
-        }
-        return Array.isArray(currentVal) ? currentVal[0] || '' : currentVal;
+        return normalizeChoiceValue(currentVal, isMulti);
     }
     return currentVal == null ? '' : currentVal;
 }
@@ -238,7 +224,7 @@ function defaultCellValueFromColumn(
         return '';
     }
 
-    const tableCellOptions = options.tableCellOptions && isObjectRecord(options.tableCellOptions)
+    const tableCellOptions = options.tableCellOptions && isRecord(options.tableCellOptions)
         ? options.tableCellOptions
         : {};
 
@@ -247,13 +233,10 @@ function defaultCellValueFromColumn(
     }
 
     if (isChoiceColumnType(column.type)) {
-        if (options.isListColumnMultiselect === true) {
-            if (Array.isArray(tableCellOptions.default)) return tableCellOptions.default.slice();
-            return tableCellOptions.default ? [tableCellOptions.default] : [];
-        }
-        return Array.isArray(tableCellOptions.default)
-            ? tableCellOptions.default[0] || ''
-            : tableCellOptions.default;
+        return normalizeChoiceValue(
+            tableCellOptions.default,
+            options.isListColumnMultiselect === true
+        );
     }
 
     if (
@@ -263,11 +246,7 @@ function defaultCellValueFromColumn(
         tableCellOptions.default === 'now'
     ) {
         const now = options.now instanceof Date ? options.now : new Date();
-        const datePart = `${padDatePart(now.getDate())}.${padDatePart(now.getMonth() + 1)}.${now.getFullYear()}`;
-        const timePart = `${padDatePart(now.getHours())}:${padDatePart(now.getMinutes())}`;
-        if (column.type === 'date') return datePart;
-        if (column.type === 'time') return timePart;
-        return `${datePart} ${timePart}`;
+        return formatNowValueForWidgetType(String(column.type || ''), now);
     }
 
     return tableCellOptions.default;
@@ -306,7 +285,6 @@ export {
     getColumnTableCellOptions,
     isListColumnMultiselect,
     normalizeCellWidgetValue,
-    padDatePart,
     resolveTableLazyEnabled,
     tableCellConsumeKeys
 };

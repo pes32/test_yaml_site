@@ -1,3 +1,8 @@
+import { pad2 } from '../../shared/date_time_format.ts';
+import numberUtils from '../../shared/number_utils.ts';
+
+const { clampNumber } = numberUtils;
+
 const WEEKDAY_LABELS = Object.freeze(['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']);
 
 type ParsedTime = {
@@ -32,14 +37,6 @@ type TimePickerState = {
   pickerMinute: string;
   pickerSecond: string;
 };
-
-function pad(n: unknown): string {
-  return String(n).padStart(2, '0');
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
-}
 
 function getNow(): Date {
   return new Date();
@@ -162,11 +159,11 @@ function parseDate(str: unknown, now = getNow()): Date | null {
 }
 
 function formatDate(date: Date): string {
-  return `${pad(date.getDate())}.${pad(date.getMonth() + 1)}.${date.getFullYear()}`;
+  return `${pad2(date.getDate())}.${pad2(date.getMonth() + 1)}.${date.getFullYear()}`;
 }
 
 function formatDateISO(date: Date): string {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
 }
 
 function normalizeDateInputValue(rawValue: unknown, now = getNow()): DateInputState {
@@ -265,8 +262,8 @@ function parseTime(str: unknown): ParsedTime | null {
 
 function formatTime(timeValue: ParsedTime, options: { includeSeconds?: boolean } = {}): string {
   const includeSeconds = options.includeSeconds ?? Boolean(timeValue.hasSeconds);
-  const base = `${pad(timeValue.h)}:${pad(timeValue.m)}`;
-  return includeSeconds ? `${base}:${pad(timeValue.s ?? 0)}` : base;
+  const base = `${pad2(timeValue.h)}:${pad2(timeValue.m)}`;
+  return includeSeconds ? `${base}:${pad2(timeValue.s ?? 0)}` : base;
 }
 
 function normalizeTimeInputValue(rawValue: unknown): TimeInputState {
@@ -287,22 +284,22 @@ function normalizeTimePart(rawValue: unknown, max: number): string {
   if (!digits) {
     return '';
   }
-  return pad(clamp(Number(digits), 0, max));
+  return pad2(clampNumber(Number(digits), 0, max));
 }
 
 function pickerStateFromTime(parsedTime: ParsedTime | null | undefined, now = getNow()): TimePickerState {
   if (parsedTime) {
     return {
-      pickerHour: pad(parsedTime.h),
-      pickerMinute: pad(parsedTime.m),
-      pickerSecond: pad(parsedTime.s ?? 0),
+      pickerHour: pad2(parsedTime.h),
+      pickerMinute: pad2(parsedTime.m),
+      pickerSecond: pad2(parsedTime.s ?? 0),
       pickerHasSeconds: Boolean(parsedTime.hasSeconds)
     };
   }
 
   return {
-    pickerHour: pad(now.getHours()),
-    pickerMinute: pad(now.getMinutes()),
+    pickerHour: pad2(now.getHours()),
+    pickerMinute: pad2(now.getMinutes()),
     pickerSecond: '00',
     pickerHasSeconds: false
   };
@@ -339,19 +336,15 @@ export type {
 export {
   WEEKDAY_LABELS,
   formatDate,
-  formatDateISO,
   formatTime,
   getCalendarDays,
   getMonthLabel,
   getNow,
-  isSameDay,
   monthStart,
   normalizeDateInputValue,
   normalizeTimeInputValue,
   normalizeTimePart,
-  pad,
   parseDate,
-  parseTime,
   pickerStateFromTime,
   shiftMonth,
   splitDateTimeValue

@@ -52,6 +52,15 @@ export default defineConfig({
             return 'widget-field-core';
           }
 
+          if (
+            normalized.endsWith('/frontend/js/widgets/common/DropdownChevronIcon.vue') ||
+            normalized.endsWith('/frontend/js/widgets/common/SortIcons.vue') ||
+            normalized.endsWith('/frontend/js/shared/number_utils.ts') ||
+            normalized.endsWith('/frontend/js/shared/icon_helpers.ts')
+          ) {
+            return 'widget-shared';
+          }
+
           if (normalized.includes('/frontend/js/runtime/')) {
             return 'app-runtime';
           }

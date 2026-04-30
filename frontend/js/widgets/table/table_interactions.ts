@@ -75,12 +75,19 @@ const InteractionRuntimeMethods = {
 
         const normalizedRow = this.normRow(row);
         const normalizedCol = this.normCol(col);
+        if (this.isLineNumberColumn(this.tableColumns[normalizedCol])) {
+            const focus = this.selectFullRow(normalizedRow);
+            this.exitCellEdit();
+            this.$nextTick?.(() => this.focusSelectionCell(focus.r, focus.c));
+            return;
+        }
         this.setSelectionSingle(normalizedRow, normalizedCol);
         this.exitCellEdit();
         this.$nextTick?.(() => this.focusSelectionCell(normalizedRow, normalizedCol));
     },
 
     onTableCellDblClick(this: TableRuntimeVm, row: number, col: number) {
+        if (this.isLineNumberColumn(this.tableColumns[this.normCol(col)])) return;
         const cell = this.selectCellForEdit(row, col);
         if (!cell) return;
         this.enterCellEditAt(cell.r, cell.c, { caretEnd: true });
@@ -90,6 +97,9 @@ const InteractionRuntimeMethods = {
         if (!this.isEditable) return null;
         const normalizedRow = this.normRow(row);
         const normalizedCol = this.normCol(col);
+        if (this.isLineNumberColumn(this.tableColumns[normalizedCol])) {
+            return null;
+        }
         this.setSelectionSingle(normalizedRow, normalizedCol);
         if (!this.canMutateColumnIndex(normalizedCol)) {
             this.$nextTick?.(() => this.focusSelectionCell(normalizedRow, normalizedCol));
@@ -271,6 +281,7 @@ const InteractionRuntimeMethods = {
 
     onTableCellMouseDown(this: TableRuntimeVm, event: MouseEvent, row: number, col: number) {
         if (!this.isEditable || !event.shiftKey) return;
+        if (this.isLineNumberColumn(this.tableColumns[this.normCol(col)])) return;
         event.preventDefault();
         const normalizedRow = this.normRow(row);
         const normalizedCol = this.normCol(col);
@@ -304,6 +315,7 @@ const InteractionRuntimeMethods = {
         const address = readCellDisplayAddress(td);
         if (!address) return;
         const { row, col } = address;
+        if (this.isLineNumberColumn(this.tableColumns[this.normCol(col)])) return;
 
         if (target === td) {
             const keepForMenu = Boolean(

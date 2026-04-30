@@ -16,7 +16,6 @@ export {
     normalizeOutputAttrs,
     normalizeSourceHref
 } from './action_targets.ts';
-export { asTrimmedString } from './action_shared.ts';
 export type {
     ActionExecutionContext,
     ActionExecutionOptions,

@@ -274,6 +274,7 @@ test.describe('table pure core', () => {
     expect(selection).toEqual({
       anchor: { rowId: 'r3', colKey: 'team' },
       focus: { rowId: 'r1', colKey: 'name' },
+      fullHeightColumnKeys: null,
       fullWidthRowIds: ['r3', 'r1']
     });
 
@@ -286,6 +287,7 @@ test.describe('table pure core', () => {
     expect(restored).toEqual({
       anchor: { r: 0, c: 1 },
       focus: { r: 1, c: 0 },
+      fullHeightCols: null,
       fullWidthRows: { r0: 0, r1: 1 }
     });
   });

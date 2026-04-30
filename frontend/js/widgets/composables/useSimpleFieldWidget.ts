@@ -1,7 +1,13 @@
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import useCommitFieldBase from './useCommitFieldBase.ts';
 import { validateRegexValue } from './field_validation.ts';
 import useWidgetField from './useWidgetField.ts';
+import { useWidgetConfigValueSync } from './useWidgetConfigValueSync.ts';
+import { blurEventTarget } from '../../shared/dom_events.ts';
+import type {
+  LifecycleCommitContext,
+  LifecycleCommitResult
+} from '../../shared/lifecycle_commit.ts';
 
 type SimpleFieldWidgetConfig = Record<string, unknown> & {
   err_text?: string;
@@ -29,19 +35,8 @@ type SimpleFieldEmit = {
   (event: 'input', payload: SimpleFieldInputPayload): void;
 };
 
-type SimpleFieldCommitContext = {
-  kind?: string;
-};
-
-type SimpleFieldCommitResult =
-  | {
-      status: 'noop' | 'committed';
-    }
-  | {
-      error: unknown;
-      severity: 'recoverable' | 'fatal';
-      status: 'blocked';
-    };
+type SimpleFieldCommitContext = LifecycleCommitContext;
+type SimpleFieldCommitResult = LifecycleCommitResult;
 
 type SimpleFieldKind = 'float' | 'int' | 'string' | 'text';
 
@@ -201,10 +196,7 @@ function useSimpleFieldWidget(
     try {
       commitDraft();
     } finally {
-      const target = event.target;
-      if (target instanceof HTMLElement) {
-        target.blur();
-      }
+      blurEventTarget(event);
     }
   }
 
@@ -212,16 +204,7 @@ function useSimpleFieldWidget(
     commitDraft();
   }
 
-  watch(
-    () => props.widgetConfig.value,
-    (nextValue) => {
-      if (nextValue === undefined) {
-        return;
-      }
-      field.syncCommittedValue(nextValue, setValue);
-    },
-    { immediate: true }
-  );
+  useWidgetConfigValueSync(props, field.syncCommittedValue, setValue);
 
   return {
     fieldError,

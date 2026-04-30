@@ -15,7 +15,6 @@ import widgetFactory, {
   type WidgetDefinition,
   type WidgetLifecycleHandle
 } from '../factory.ts';
-import TableWidget from '../table/TableWidget.vue';
 import {
   assertRuntimeFeatureServices,
   injectPageHostRuntimeServices,
@@ -102,11 +101,7 @@ provideWidgetRuntimeBridge(widgetDefinition, hostServices, {
   }
 });
 
-const widgetComponent = computed(() =>
-  resolvedWidgetType.value === 'table'
-    ? TableWidget
-    : widgetDefinition.value.resolveComponent()
-);
+const widgetComponent = computed(() => widgetDefinition.value.resolveComponent());
 
 const widgetListeners = computed<Record<string, (payload: unknown) => void>>(() => {
   const listeners: Record<string, (payload: unknown) => void> = {};

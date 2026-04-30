@@ -1,4 +1,11 @@
 import { defineAsyncComponent, type Component } from 'vue';
+import {
+  createLifecycleBlockedResult,
+  createLifecycleCommitResult,
+  normalizeLifecycleCommitResult,
+  type LifecycleCommitContext,
+  type LifecycleCommitResult
+} from '../shared/lifecycle_commit.ts';
 import type { KnownWidgetType } from '../shared/widget_types.ts';
 import ImgWidget from './fields/ImgWidget.vue';
 import IpLikeWidget from './fields/IpLikeWidget.vue';
@@ -23,19 +30,7 @@ type WidgetCapabilities = {
   runtimeFeatures: ReadonlyArray<WidgetRuntimeFeature>;
 };
 
-type LifecycleCommitResult =
-  | {
-      status: 'noop' | 'committed';
-    }
-  | {
-      status: 'blocked';
-      severity: 'recoverable' | 'fatal';
-      error: unknown;
-    };
-
-type WidgetLifecycleCommitContext = {
-  kind?: string;
-};
+type WidgetLifecycleCommitContext = LifecycleCommitContext;
 
 type WidgetLifecycleInstance = {
   commitPendingState?: (context?: WidgetLifecycleCommitContext) => unknown;
@@ -75,9 +70,7 @@ const DEFAULT_WIDGET_CAPABILITIES: WidgetCapabilities = Object.freeze({
   runtimeFeatures: EMPTY_RUNTIME_FEATURES
 });
 
-const NOOP_COMMIT_RESULT: LifecycleCommitResult = Object.freeze({
-  status: 'noop'
-});
+const NOOP_COMMIT_RESULT: LifecycleCommitResult = Object.freeze(createLifecycleCommitResult('noop'));
 
 const NOOP_LIFECYCLE_HANDLE: WidgetLifecycleHandle = Object.freeze({
   bind() {
@@ -204,36 +197,8 @@ function normalizeCapabilities(
   };
 }
 
-function normalizeLifecycleCommitResult(result: unknown): LifecycleCommitResult {
-  if (result && typeof result === 'object') {
-    const candidate = result as Record<string, unknown>;
-    if (candidate.status === 'noop' || candidate.status === 'committed') {
-      return { status: candidate.status };
-    }
-
-    if (
-      candidate.status === 'blocked' &&
-      (candidate.severity === 'recoverable' || candidate.severity === 'fatal')
-    ) {
-      return {
-        status: 'blocked',
-        severity: candidate.severity,
-        error: candidate.error
-      };
-    }
-  }
-
-  return {
-    status: 'committed'
-  };
-}
-
 function createFatalBlockedResult(error: unknown): LifecycleCommitResult {
-  return {
-    status: 'blocked',
-    severity: 'fatal',
-    error
-  };
+  return createLifecycleBlockedResult(error, 'fatal');
 }
 
 function createWidgetLifecycleHandle(): WidgetLifecycleHandle {
@@ -465,18 +430,7 @@ export type {
 };
 
 export {
-  BUTTON_CAPABILITIES,
-  DEFAULT_WIDGET_CAPABILITIES,
-  DEFAULT_WIDGET_DEFINITIONS,
-  FIELD_WIDGET_CAPABILITIES,
-  NOOP_COMMIT_RESULT,
-  NOOP_LIFECYCLE_HANDLE,
-  TABLE_CAPABILITIES,
-  WidgetDefinitionRegistry,
-  createWidgetLifecycleHandle,
-  normalizeLifecycleCommitResult,
-  widgetFactory,
-  widgetRegistry
+  widgetFactory
 };
 
 export default widgetFactory;
