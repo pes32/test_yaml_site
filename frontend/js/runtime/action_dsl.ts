@@ -189,6 +189,16 @@ function parseButtonAction(attrs: ActionWidgetConfig | unknown): ActionItem | nu
         : {};
 
     for (const fieldName of BUTTON_ACTION_FIELD_PRIORITY) {
+        if (fieldName === 'command') {
+            const command = asTrimmedString(normalizedAttrs.command);
+            if (command) {
+                return {
+                    type: 'command',
+                    target: command
+                };
+            }
+            continue;
+        }
         const parsed = parseActionFieldLines(fieldName, normalizedAttrs[fieldName]);
         if (parsed.items.length) {
             return parsed.items[0];

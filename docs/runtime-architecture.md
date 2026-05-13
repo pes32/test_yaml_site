@@ -1,265 +1,170 @@
-# Runtime Architecture
+# Архитектура runtime
 
-## Overview
+## Обзор
 
 Frontend runtime разделён на несколько явных границ:
 
 1. backend собирает versioned snapshot из YAML;
-2. transport layer отдаёт только нормализованный envelope;
+2. transport layer отдаёт **нормализованный envelope** (детали и исключения — [api-contracts.md](api-contracts.md));
 3. page runtime раскладывает payload по stores и orchestration services;
 4. widget tree рендерится через `WidgetDefinitionRegistry` и не знает про raw backend shape.
 
-`frontend/js/page.ts` работает как thin export facade для `PageApp.vue`; page stores, lifecycle hooks, host services и flow wiring живут в `frontend/js/runtime/page_app_runtime.ts` и соседних runtime helpers.
+```mermaid
+flowchart TD
+  snap["Snapshot + bootstrap data"]
+  env["Normalized API envelope"]
+  stores["page_store + page_session + modal/notification stores"]
+  render["WidgetRenderer + runtime bridge"]
+  life["Widget lifecycle handle"]
+  boundary["Boundary commit pipeline"]
+  snap --> env
+  env --> stores
+  stores --> render
+  render --> life
+  life --> boundary
+```
 
-Frontend source под `frontend/js` — TypeScript/Vue source: widget layer, action/table/datetime/voc helpers, host/runtime glue (`page.ts`, API/attrs/modal bootstrap flows, diagnostics) и common Vue components проходят root `tsconfig.json`. Оставшийся strict-долг — постепенное сужение внешних DOM/event и compatibility-controller границ.
+`frontend/js/page.ts` — thin export facade для `PageApp.vue`; page stores, lifecycle hooks, host services и flow wiring — `frontend/js/runtime/page_app_runtime.ts` и соседние helpers.
 
-Type-hole policy автоматизирован отдельным gate: `npm --prefix tooling/vite run type-holes`.
-Новые `: any`, `as unknown as`, `ThisType<any>`, TS suppressions и Vue compat markers
-запрещены без документированной allowlist-записи.
+Исходники под `frontend/js` — TypeScript/Vue: widgets, action/table/datetime/voc helpers, host glue, root `tsconfig.json`. Оставшийся strict-долг — сужение внешних DOM/event и compatibility-controller границ.
 
-Для table feature companion docs вынесены отдельно:
+Type-hole gate: `npm --prefix tooling/vite run type-holes`. Новые `: any`, `as unknown as`, `ThisType<any>`, TS suppressions и Vue compat markers — только с allowlist.
 
-- [table-subsystem.md](table-subsystem.md)
-- [table-state-invariants.md](table-state-invariants.md)
-- [table-api-map.md](table-api-map.md)
-- [table-testing-matrix.md](table-testing-matrix.md)
+Companion docs для таблицы: [table-subsystem.md](table-subsystem.md), [table-state-invariants.md](table-state-invariants.md), [table-api-map.md](table-api-map.md), [table-testing-matrix.md](table-testing-matrix.md), [table-performance-notes.md](table-performance-notes.md), [table-runtime-notes.md](table-runtime-notes.md).
 
-## Ownership State
+## Transport envelope и YAML runtime API
+
+Страница и связанные данные грузятся через **один и тот же JSON envelope** (`ok`, `snapshot_version`, `snapshot_created_at`, `data`, `diagnostics`) — см. [api-contracts.md](api-contracts.md).
+
+К **YAML snapshot runtime** относятся, среди прочего: `GET /api/page`, `GET /api/attrs`, `GET /api/modal-gui`, `POST /api/execute`, `GET /api/config`, `POST /api/reload`, **`GET /api/pages`**. Последний — **read-model** (плоский индекс страниц для lazy-сценариев вроде подписей у `split_button.url`), а не «обход» envelope: те же snapshot-meta и snapshot-level `diagnostics`, тело `data` другого shape — это отражено в контракте как `PagesIndexState`.
+
+Отдельно от ядра страницы: **auth, user-settings, admin** — тот же envelope, но snapshot-meta часто `null`. Строгое исключение для потребителей ошибок: опциональные **плоские дубликаты** полей ошибки на корне ответа включаются только через `YAMLS_LEGACY_ERROR_ENVELOPE_DUPES` (канон — вложенный `error`); клиент уже читает `error.*` с fallback.
+
+## Инварианты runtime
+
+Сводные правила «кто единственный пишет/читает», чтобы не повторять их в каждом подразделе:
+
+| Область | Инвариант |
+| -------- | ---------- |
+| `page_store` | Писать snapshot-derived поля могут **только** bootstrap / attrs / modal merge flows. |
+| `page_session_store` | Committed widget values, загруженные attrs/modal ids, parsed GUI — меняются **только** через предусмотренные session/page flows, не из произвольного виджета. |
+| `page_draft_runtime` | Владеет single-flight boundary и активным lifecycle handle; **не** смешивает layout, modal cache и committed values. |
+| `modal_runtime_store` | Ephemeral modal UI; **только** orchestration с валидным `requestToken` пишет `status`, `modalConfig`, `error`, `restoreTargetViewId` (см. Modal Anti-Race). |
+| `page_notification_store` | Snackbar — **только** через actions этого store. |
+| `WidgetRenderer` | Единственная точка: `emitsInput` / `emitsExecute`, создание bind/unbind/dispose lifecycle handle. |
+| Lifecycle handle | `bind` / `unbind` вызывает **только** `WidgetRenderer`; `commitPendingState` после unbind/dispose — `noop`. |
+| Runtime bridge | Host services в subtree виджета попадают **только** через bridge от текущего `WidgetDefinition`; произвольный доступ к page stores из виджета — запрещён (см. Forbidden paths). |
+| Registry | Ветвление по `widget.type` вне `factory.ts` / contract-слоя не расширяется ad hoc. |
+
+## Запрещённые пути
+
+Явные анти-паттерны (нарушение — баг или технический долг):
+
+- **Виджеты не читают и не пишут `page_store` / `page_session_store` напрямую** — только через host bridge, события и предусмотренные API runtime.
+- **Modal UI-слой** (`ModalManager`, произвольные виджеты) **не мутирует session store** (в т.ч. `widgetValues`, `parsedGui`) обходом modal/page services.
+- **Чистые table-модули** (`table_*.ts` вне bridge) **не дергают fetch, window, глобальный page store и не запрашивают host services сами по себе** — интеграция через `table_page_bridge`, inject bridge, page-level loaders (см. [table-subsystem.md](table-subsystem.md)).
+- **Prefetch** не меняет активное меню / вкладку / модалку; поздние async после invalid modal token — отбрасываются.
+
+## Владение состоянием
+
+Ниже — **что где лежит**; правила записи см. в разделе «Инварианты runtime» выше.
 
 ### Snapshot-derived state
 
-`frontend/js/runtime/page_store.ts` владеет только snapshot-derived state:
-
-- `pageName`
-- `snapshotVersion`
-- `diagnostics`
-- `pageConfig`
-- `attrsByName`
-
-Менять этот store могут только bootstrap/attrs/modal merge flows.
+`frontend/js/runtime/page_store.ts`: `pageName`, `snapshotVersion`, `diagnostics`, `pageConfig`, `attrsByName`.
 
 ### Session/page state
 
-`frontend/js/runtime/page_session_store.ts` хранит только долгоживущий committed state страницы:
-
-- `widgetValues`
-- `loadedAttrNames`
-- `loadedModalIds`
-- `parsedGui`
-
-`widgetValues` остаётся единственным источником истины для committed значений page/modal widgets. Локальный draft живёт только внутри самого виджета и не переживает unmount/remount без коммита.
+`frontend/js/runtime/page_session_store.ts`: `widgetValues`, `loadedAttrNames`, `loadedModalIds`, `parsedGui`. `widgetValues` — единственный committed источник для page/modal widgets; draft только внутри виджета до commit.
 
 ### Draft boundary runtime
 
-`frontend/js/runtime/page_draft_runtime.ts` владеет:
-
-- `activeLifecycleHandle`
-- `boundaryToken`
-- `pendingBoundaryPromise`
-
-Этот runtime не знает ни про layout страницы, ни про modal cache, ни про committed widget values. Его задача одна: сериализовать boundary actions и вызвать `commitPendingState()` у активного lifecycle handle.
+`frontend/js/runtime/page_draft_runtime.ts`: `activeLifecycleHandle`, `boundaryToken`, `pendingBoundaryPromise`.
 
 ### Modal UI state
 
-`frontend/js/runtime/modal_runtime_store.ts` хранит только ephemeral modal UI state:
-
-- `activeModalId`
-- `modalConfig`
-- `status`
-- `activeTabIndex`
-- `collapsedSections`
-- `scrollTopByView`
-- `restoreTargetViewId`
-- `error`
-- `requestToken`
-
-Кэш modal definitions и список loaded modal ids живут в `page_session_store.ts`.
+`frontend/js/runtime/modal_runtime_store.ts`: `activeModalId`, `modalConfig`, `status`, `activeTabIndex`, `collapsedSections`, `scrollTopByView`, `restoreTargetViewId`, `error`, `requestToken`. Определения модалок и `loadedModalIds` — в `page_session_store.ts`.
 
 ### Notifications
 
-`frontend/js/runtime/page_notification_store.ts` владеет только snackbar state и timer bookkeeping:
+`frontend/js/runtime/page_notification_store.ts`: `snackbar`, `snackbarHideTimerId`, `snackbarSeq`.
 
-- `snackbar`
-- `snackbarHideTimerId`
-- `snackbarSeq`
+## Контракт реестра виджетов (сводка)
 
-Никто, кроме actions этого store, не пишет туда напрямую.
+Базовый contract: `frontend/js/widgets/factory.ts` — `WidgetDefinitionRegistry`. Полный текст правил: [widget-registry-contract.md](widget-registry-contract.md).
 
-## Widget Registry Contract
+Каждое definition задаёт: `type`, `resolveComponent()`, `prefetch()`, `capabilities`, `createLifecycleHandle()`. Capabilities: `stateful`, `draftCommit`, `emitsInput`, `emitsExecute`, `runtimeFeatures` (`confirmModal`, `modalControl`, `notifications`, `errorHandling`, `attrsAccess`).
 
-Базовый frontend render/runtime contract идёт через `frontend/js/widgets/factory.ts`, который является `WidgetDefinitionRegistry`.
+Инварианты доступа к registry/capabilities — в таблице раздела «Инварианты runtime».
 
-Каждое определение виджета фиксирует:
+## Жизненный цикл виджета
 
-- `type`
-- `resolveComponent()`
-- `prefetch()`
-- `capabilities`
-- `createLifecycleHandle()`
+Handle: `bind(instance)`, `unbind()`, `commitPendingState(context)`, `dispose()`. `commitPendingState` — async, результат `LifecycleCommitResult`: `noop` / `committed` / `blocked` с `severity` и `error`.
 
-`WidgetCapabilities` формализованы так:
+Unknown тип: render через `SimpleInputWidget`, пустые capabilities, no-op lifecycle, один warning на тип/сессию — см. [widget-registry-contract.md](widget-registry-contract.md).
 
-- `stateful`
-- `draftCommit`
-- `emitsInput`
-- `emitsExecute`
-- `runtimeFeatures`
+## Граница TypeScript у виджетов
 
-Поддерживаемые `runtimeFeatures`:
+**Источник истины по типам виджетов:** `frontend/js/shared/widget_types.ts` (`KNOWN_WIDGET_TYPE_NAMES` и производные), **регистрация и lazy-load компонентов:** `frontend/js/widgets/factory.ts`. Тип `table` — отдельный controller feature ([table-subsystem.md](table-subsystem.md)).
 
-- `confirmModal`
-- `modalControl`
-- `notifications`
-- `errorHandling`
-- `attrsAccess`
+Общие Vue-компоненты runtime (`Md3Field.vue`, `ConfirmModal.vue`, `ModalManager.vue`, …) — typed `<script setup lang="ts">`.
 
-Правила:
+Stateful виджеты сохраняют контракт: `getValue`, `setValue`, `commitPendingState` на границе registry; `commitDraft` — локально, boundary commit его не вызывает. Для ячеек таблицы см. методы pickers / `onArrowClick` в контракте table cell runtime.
 
-- только `WidgetRenderer` читает `emitsInput` и `emitsExecute`;
-- только draft runtime и `WidgetRenderer` работают с lifecycle handle;
-- только runtime bridge публикует host services в widget subtree;
-- branching по `widget.type` вне registry/contract layer больше не должен разрастаться по runtime call-sites.
+API contracts: `frontend/js/runtime/api_contract.ts`; transport: `api_client_core.ts`; фасад: `api_client.ts`.
 
-Полный contract описан в [docs/widget-registry-contract.md](widget-registry-contract.md).
+## Runtime bridge
 
-## Widget Lifecycle
+Host services только через bridge (шаги: host object → `WidgetRenderer` по `WidgetDefinition` → узкий набор injections). Стабильные имена injections:
 
-Lifecycle handle строгий и instance-scoped:
+- `getConfirmModal`, `openUiModal`, `closeUiModal`, `showAppNotification`, `reportAppError`, `handleRecoverableAppError`
+- `getWidgetAttrsByName`, `getWidgetRuntimeValueByName`, `getAllAttrsMap`, `getModalRuntimeState`, `getModalRuntimeController`
+- draft: `setActiveWidgetLifecycle`, `clearActiveWidgetLifecycle`
 
-- `bind(instance)`
-- `unbind()`
-- `commitPendingState(context)`
-- `dispose()`
+## Порядок boundary commit
 
-Семантика:
+Все boundary actions через `draftRuntime.runBoundaryAction(kind, action)`:
 
-- `bind()` вызывает только `WidgetRenderer` после mount/rebind;
-- `unbind()` вызывает только `WidgetRenderer` при unmount или смене child instance;
-- `dispose()` финализирует handle, вызывает `unbind()` и очищает ресурсы;
-- `commitPendingState()` всегда async и всегда возвращает `LifecycleCommitResult`.
-
-`LifecycleCommitResult` фиксирован:
-
-- `{ status: 'noop' | 'committed' }`
-- `{ status: 'blocked', severity: 'recoverable' | 'fatal', error }`
-
-Unknown widget fallback разрешён только как render-time unknown path: компонент рендерится через `SimpleInputWidget`, но definition остаётся с пустыми capabilities, no-op lifecycle и единообразным warning один раз на тип/сессию.
-
-## Widget TypeScript Boundary
-
-Widget layer и непосредственные runtime/helper modules находятся в TypeScript/Vue boundary:
-
-- TS/Composition API widgets: `str`, `text`, `int`, `float`, `button`, `date`, `time`, `datetime`, `ip`, `ip_mask`, `img`, `list`, `voc`, `split_button`;
-- `table` работает как typed Composition API controller feature через `useTableRuntime.ts`;
-- action runtime, datetime helpers, IP helpers, voc helpers и host/runtime glue живут в TypeScript modules;
-- common components вроде `Md3Field.vue`, `ConfirmModal.vue`, `ModalManager.vue`, `SectionCard.vue` и related shared components используют typed `<script setup lang="ts">`.
-
-Stateful widgets должны сохранять exposed lifecycle surface: `getValue`, `setValue` и `commitPendingState`. `commitDraft` может оставаться локальной helper-ручкой компонента, но registry-level boundary commit его не вызывает. Table-triggered widgets дополнительно сохраняют `openPicker`, `openDatePicker`, `openTimePicker` или `onArrowClick`, если эти методы использует table cell runtime.
-
-Normalized API response/request contracts живут в `frontend/js/runtime/api_contract.ts`.
-`api_client.ts` остаётся transport/envelope layer, а page/debug runtime работают с
-domain response structures.
-
-## Runtime Bridge
-
-Host services публикуются через definition-driven bridge, а не через произвольный доступ к page-owned state.
-
-Схема:
-
-1. page host runtime публикует один internal host-services object;
-2. `WidgetRenderer.vue` строит runtime bridge из текущего `WidgetDefinition`;
-3. bridge прокидывает вниз только допустимые для этого definition services;
-4. если definition требует service, которого host не дал, runtime пишет жёсткий warning.
-
-Стабильными injection names остаются:
-
-- `getConfirmModal`
-- `openUiModal`
-- `closeUiModal`
-- `showAppNotification`
-- `reportAppError`
-- `handleRecoverableAppError`
-- `getWidgetAttrsByName`
-- `getWidgetRuntimeValueByName`
-- `getAllAttrsMap`
-- `getModalRuntimeState`
-- `getModalRuntimeController`
-
-Для draft runtime используются:
-
-- `setActiveWidgetLifecycle`
-- `clearActiveWidgetLifecycle`
-
-## Boundary Commit Order
-
-Любой boundary action идёт через `draftRuntime.runBoundaryAction(kind, action)`.
-
-Порядок фиксирован:
-
-1. запрос boundary action;
+1. запрос action;
 2. single-flight lock;
-3. `commitPendingState()` активного lifecycle handle;
-4. если commit дал `noop` или `committed`, выполняется action;
-5. если commit дал `blocked/recoverable`, action отменяется и идёт recoverable UI path;
-6. если commit дал `blocked/fatal`, action отменяется и включается host-level fatal path.
+3. `commitPendingState()` активного handle;
+4. `noop` / `committed` → выполнить action;
+5. `blocked` + recoverable → отмена + recoverable UI;
+6. `blocked` + fatal → отмена + fatal host path.
 
-Пока pending commit или boundary action не завершён, повторный trigger не создаёт вторую операцию и получает текущий pending promise.
+Повторный trigger во время pending — тот же promise, вторая операция не создаётся.
 
-Сейчас через этот путь идут:
+Сценарии: навигация (`menu` / `tab` / `hash`), `execute`, закрытие модалки.
 
-- page navigation (`menu/tab/hash`)
-- `execute`
-- modal close
+## Модалки: защита от гонок
 
-## Modal Anti-Race Policy
+`requestToken`: **только** последний token пишет критичные поля modal store; `closeModal`, unmount страницы и сброс store инвалидируют token; prefetch не трогает active UI state.
 
-Modal open path использует `requestToken`.
+Оркестрация: `frontend/js/runtime/modal_runtime_service.ts`; `ModalManager.vue` — чтение state и вызов controller.
 
-Правила:
+## Поток страницы
 
-- только последний token имеет право писать `status`, `modalConfig`, `error` и `restoreTargetViewId`;
-- `closeModal`, page unmount и reset modal store инвалидируют текущий token;
-- поздние async results после invalidate игнорируются;
-- modal/page prefetch могут прогревать только loader/cache state и не меняют active UI state.
+1. Bootstrap: embed или `page_bootstrap_flow.loadPageConfig`;
+2. `page_store` ← snapshot-derived;
+3. `page_session_store` ← committed values и parsed GUI;
+4. `page_view_runtime` — menu/tab/hash/scroll;
+5. `attrs_loader` — догрузка attrs и зависимостей таблицы;
+6. `WidgetRenderer` — definition, bridge, lifecycle;
+7. `PageApp.vue` — view + feedback layers.
 
-`frontend/js/runtime/modal_runtime_service.ts` отвечает за orchestration open path, а `frontend/js/widgets/common/ModalManager.vue` только читает modal state и вызывает controller/actions.
+## Runtime таблицы
 
-## Page Flow
+1. `table_contract.ts` — границы типов/state;
+2. `table_store.ts` — table state;
+3. `table_runtime_registry.ts` + `useTableRuntime.ts` — orchestration;
+4. `TableWidget.vue` — thin root;
+5. прямые импорты между helpers, без import-order coupling.
 
-Нормальный startup выглядит так:
+## Модель ошибок и обратной связи
 
-1. page host runtime читает embed bootstrap или вызывает `page_bootstrap_flow.loadPageConfig`;
-2. `page_store.ts` принимает snapshot-derived state;
-3. `page_session_store.ts` инициализирует committed widget values и parsed GUI;
-4. `page_view_runtime.ts` настраивает active menu/tab/hash/scroll path;
-5. `attrs_loader.ts` догружает attrs только для нужных widgets и зависимостей таблицы;
-6. `WidgetRenderer.vue` резолвит `WidgetDefinition`, bridge и lifecycle handle;
-7. `PageApp.vue` рендерит только selectors-derived view + feedback layers.
+`frontend/js/runtime/error_model.ts` — единый контракт ошибок UI. Уровни: blocking page error (fatal host), recoverable (error model + snackbar), snapshot `diagnostics`, локальная validation виджета до commit.
 
-## Table Runtime
-
-Table feature использует explicit modules без engine namespace и side-effect registration.
-
-Схема:
-
-1. `table_contract.ts` фиксирует внутренние types/state boundaries;
-2. `table_store.ts` владеет table-specific runtime state;
-3. `createTableRuntime.ts` собирает computed/watch/method orchestration;
-4. `TableWidget.vue` остаётся thin UI-root и работает только через этот controller;
-5. table runtime helpers импортируют друг друга напрямую, без import-order coupling.
-
-## Error And Feedback Model
-
-`frontend/js/runtime/error_model.ts` остаётся единым frontend error contract.
-
-UI feedback разделён так:
-
-- blocking page error — host-level fatal path;
-- recoverable runtime errors — error model + snackbar;
-- diagnostics — snapshot/backend diagnostics;
-- widget-local validation — локальная ошибка виджета до boundary/local commit.
-
-## Related Documents
+## Связанные документы
 
 - [docs/widget-registry-contract.md](widget-registry-contract.md)
 - [docs/table-subsystem.md](table-subsystem.md)

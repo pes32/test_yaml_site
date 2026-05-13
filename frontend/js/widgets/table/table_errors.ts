@@ -1,4 +1,49 @@
-import type { TableRuntimeError, TableRuntimeErrorSeverity, UnknownRecord } from './table_contract.ts';
+import type {
+    TableCoreCellAddress,
+    TableRuntimeError,
+    TableRuntimeErrorSeverity,
+    UnknownRecord
+} from './table_contract.ts';
+
+export type TableUserFacingErrorOptions = {
+    cause?: unknown;
+    details?: unknown;
+};
+
+type TableRuntimeErrorSink = {
+    handleRecoverableAppErrorFromRuntime?: ((error: unknown, context?: UnknownRecord) => void) | null;
+    showAppNotificationFromRuntime?: ((message: string, type?: string) => void) | null;
+    /** Vue may type `$root` as nullable on component instances. */
+    $root?:
+        | { showNotification?: (message: string, type?: string) => void }
+        | null
+        | undefined;
+};
+
+function emitTableUserFacingError(
+    surface: TableRuntimeErrorSink,
+    message: unknown,
+    options: TableUserFacingErrorOptions = {}
+): void {
+    const normalizedMessage = String(message || 'Ошибка таблицы').trim() || 'Ошибка таблицы';
+    const sourceError = options.cause ? options.cause : new Error(normalizedMessage);
+    if (typeof surface.handleRecoverableAppErrorFromRuntime === 'function') {
+        surface.handleRecoverableAppErrorFromRuntime(sourceError, {
+            scope: 'table',
+            message: normalizedMessage,
+            details: options.details != null ? options.details : null
+        });
+        return;
+    }
+    if (typeof surface.showAppNotificationFromRuntime === 'function') {
+        surface.showAppNotificationFromRuntime(normalizedMessage, 'danger');
+        return;
+    }
+    const root = surface.$root;
+    if (root && typeof root.showNotification === 'function') {
+        root.showNotification(normalizedMessage, 'danger');
+    }
+}
 
 const TABLE_RUNTIME_ERROR_CODES = {
     clipboardReadUnavailable: 'clipboard_read_unavailable',
@@ -50,7 +95,28 @@ function normalizeTableRuntimeError(
     });
 }
 
+function tableValidationKey(cell: TableCoreCellAddress | null | undefined): string {
+    return cell ? `${cell.rowId}::${cell.colKey}` : '';
+}
+
+function setTableValidationError(
+    errors: Record<string, string>,
+    cell: TableCoreCellAddress | null | undefined,
+    message: unknown
+): Record<string, string> {
+    const key = tableValidationKey(cell);
+    if (!key) return { ...(errors || {}) };
+    const next = { ...(errors || {}) };
+    const errorMessage = String(message || '').trim();
+    if (errorMessage) next[key] = errorMessage;
+    else delete next[key];
+    return next;
+}
+
 export {
+    emitTableUserFacingError,
+    setTableValidationError,
+    tableValidationKey,
     TABLE_RUNTIME_ERROR_CODES,
     createTableRuntimeError,
     normalizeTableRuntimeError

@@ -18,7 +18,7 @@
 </template>
 
 <script setup lang="ts">
-import type { TableToolbarButton } from './table_toolbar_model.ts';
+import type { TableToolbarButton } from './table_internal.ts';
 
 defineOptions({
   name: 'TableToolbarIconButton'

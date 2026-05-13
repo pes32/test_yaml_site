@@ -104,7 +104,6 @@ def register_postgres_routes(app):
     def postgres_page():
         return render_template(
             "postgres.html",
-            debug_tooling_enabled=bool(app.config.get("DEBUG_TOOLING_ENABLED")),
             download_url=url_for("download_postgres_bundle"),
             documentation_url=url_for("download_postgres_documentation"),
             header_active="postgres",

@@ -351,10 +351,42 @@ start_waitress_process() {
 
     (
         cd "$ROOT_DIR"
-        nohup env PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" \
-            waitress-serve "${waitress_args[@]}" "$wsgi_app" \
-            >>"$WAITRESS_LOG" 2>&1 </dev/null &
-        echo "$!" >"$WAITRESS_PID_FILE"
+        env PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" \
+            python3 - "$WAITRESS_PID_FILE" "$WAITRESS_LOG" "${waitress_args[@]}" "$wsgi_app" <<'PY'
+import os
+import sys
+
+pid_file = sys.argv[1]
+log_file = sys.argv[2]
+waitress_args = sys.argv[3:]
+
+pid = os.fork()
+if pid:
+    with open(pid_file, "w", encoding="utf-8") as handle:
+        handle.write(f"{pid}\n")
+    raise SystemExit(0)
+
+os.setsid()
+
+stdin_fd = os.open(os.devnull, os.O_RDONLY)
+log_fd = os.open(log_file, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+try:
+    os.dup2(stdin_fd, 0)
+    os.dup2(log_fd, 1)
+    os.dup2(log_fd, 2)
+finally:
+    for fd in (stdin_fd, log_fd):
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+
+try:
+    os.execvpe("waitress-serve", ["waitress-serve", *waitress_args], os.environ.copy())
+except Exception as exc:
+    print(f"Не удалось запустить waitress-serve: {exc}", file=sys.stderr, flush=True)
+    os._exit(127)
+PY
     )
 }
 
@@ -434,6 +466,59 @@ wait_for_url() {
     done
 
     return 1
+}
+
+
+report_config_diagnostics() {
+    local config_status_file="$RUN_DIR/startup-config.json"
+    local config_url="https://$SERVER_NAME:$NGINX_PORT/api/config"
+
+    if ! curl -kfsS \
+        --resolve "$SERVER_NAME:$NGINX_PORT:$HEALTHCHECK_CONNECT_HOST" \
+        "$config_url" \
+        -o "$config_status_file" >/dev/null 2>&1; then
+        log "warning" "Не удалось прочитать startup diagnostics из /api/config"
+        return 0
+    fi
+
+    python3 - "$config_status_file" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+try:
+    with open(path, "r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+except Exception:
+    sys.exit(0)
+
+snapshot = payload.get("data") if isinstance(payload.get("data"), dict) else payload
+diagnostics = snapshot.get("diagnostics") if isinstance(snapshot, dict) else []
+if not isinstance(diagnostics, list):
+    diagnostics = []
+
+errors = [item for item in diagnostics if isinstance(item, dict) and item.get("level") == "error"]
+warnings = [item for item in diagnostics if isinstance(item, dict) and item.get("level") == "warning"]
+if not errors:
+    sys.exit(0)
+
+print(
+    f"[warning] YAML-конфигурация загружена с ошибками: "
+    f"{len(errors)} error, {len(warnings)} warning. "
+    "Страницы остаются доступными; проблемные attrs показаны error-виджетами."
+)
+for item in errors[:5]:
+    page = item.get("page") or "?"
+    file_name = item.get("file") or ""
+    line = item.get("line")
+    location = file_name
+    if line:
+        location = f"{location}:стр.{line}" if location else f"стр.{line}"
+    message = item.get("message") or item.get("code") or "diagnostic"
+    print(f"[warning] - {page}{(' | ' + location) if location else ''}: {message}")
+if len(errors) > 5:
+    print(f"[warning] - ... ещё {len(errors) - 5} error; подробности в run/waitress.log и logs/app.log")
+PY
 }
 
 
@@ -542,6 +627,8 @@ start_stack() {
 
     log "info" "waitress pid: $(cat "$WAITRESS_PID_FILE")"
     log "info" "nginx pid: $(cat "$NGINX_PID_FILE")"
+    log "info" "url: https://$SERVER_NAME:$NGINX_PORT"
+    report_config_diagnostics
     log "info" "vite build log: $VITE_BUILD_LOG"
     log "info" "waitress log: $WAITRESS_LOG"
     log "info" "nginx log: $NGINX_LOG"

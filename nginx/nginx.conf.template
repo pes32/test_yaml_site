@@ -30,6 +30,11 @@ http {
             expires 5m;
         }
 
+        location /templates/icons/ {
+            alias __PROJECT_ROOT__/templates/icons/;
+            add_header Cache-Control "public, max-age=31536000, immutable" always;
+        }
+
         location / {
             proxy_pass http://__WAITRESS_HOST__:__WAITRESS_PORT__;
             proxy_http_version 1.1;

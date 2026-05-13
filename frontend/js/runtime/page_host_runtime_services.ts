@@ -11,22 +11,27 @@ type ConfirmModalPublicSurface = {
     hide(): void;
 };
 
+/** Общие методы хоста для границ выполнения и уведомлений (см. PageAppRuntimeHost). */
+type PageRuntimeHostBoundarySurface = {
+    reportDiagnosticError(error: unknown, options?: UnknownRecord): FrontendRuntimeError;
+    runBoundaryAction<T>(kind: string, action: () => Promise<T> | T): Promise<BoundaryActionResult<T>>;
+    setActiveWidgetLifecycle(handle: WidgetLifecycleHandle | null | undefined): WidgetLifecycleHandle | null;
+    showNotification(message: string, type?: string): void;
+};
+
 type PageHostRuntimeServiceHost = {
     allAttrs: AttrConfigMap;
     clearActiveWidgetLifecycle(handle?: WidgetLifecycleHandle | null): WidgetLifecycleHandle | null;
     closeUiModal(): Promise<BoundaryActionResult<null>>;
     getCurrentPageName(): string;
+    getCurrentSnapshotVersion(): string;
     getWidgetAttrs(widgetName: string): PageAttrConfig;
     getWidgetRuntimeValue(widgetName: string): unknown;
     handleRecoverableError(error: unknown, options?: UnknownRecord): FrontendRuntimeError;
     modalRuntimeController: ModalRuntimeController | null;
     modalRuntimeState: ModalRuntimeState;
     openUiModal(modalName: string): Promise<unknown>;
-    reportDiagnosticError(error: unknown, options?: UnknownRecord): FrontendRuntimeError;
-    runBoundaryAction<T>(kind: string, action: () => Promise<T> | T): Promise<BoundaryActionResult<T>>;
-    setActiveWidgetLifecycle(handle: WidgetLifecycleHandle | null | undefined): WidgetLifecycleHandle | null;
-    showNotification(message: string, type?: string): void;
-};
+} & PageRuntimeHostBoundarySurface;
 
 function createPageHostRuntimeServices(
     host: PageHostRuntimeServiceHost,
@@ -40,6 +45,7 @@ function createPageHostRuntimeServices(
         getAllAttrsMap: () => host.allAttrs,
         getConfirmModal: () => confirmModal.value,
         getCurrentPageNameFromRuntime: () => host.getCurrentPageName(),
+        getCurrentSnapshotVersionFromRuntime: () => host.getCurrentSnapshotVersion(),
         getModalRuntimeController: () => host.modalRuntimeController,
         getModalRuntimeState: () => host.modalRuntimeState,
         getWidgetAttrsByName: (widgetName: string) => host.getWidgetAttrs(widgetName),
@@ -58,7 +64,8 @@ function createPageHostRuntimeServices(
 }
 
 export type {
-    ConfirmModalPublicSurface
+    ConfirmModalPublicSurface,
+    PageRuntimeHostBoundarySurface
 };
 
 export {

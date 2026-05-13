@@ -4,8 +4,8 @@
 .container-fluid.mt-3 {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - var(--app-navbar-height) - var(--space-md));
-    max-height: calc(100dvh - var(--app-navbar-height) - var(--space-md));
+    height: calc(100dvh - var(--app-navbar-height));
+    max-height: calc(100dvh - var(--app-navbar-height));
     overflow: hidden;
     box-sizing: border-box;
 }
@@ -98,6 +98,13 @@
     overflow: auto;
 }
 
+.page-lazy-sentinel {
+    min-height: var(--space-xl);
+    padding: var(--space-sm);
+    color: var(--color-text-muted);
+    text-align: center;
+}
+
 /* Цепочка min-width: 0 — широкие таблицы скроллятся внутри .page-tab-content */
 .page-content-column > .page-main-stack,
 .page-content-column > div,
@@ -107,7 +114,7 @@
 }
 
 /*
- * Табы страницы и debug: сверху колонки, без участия в вертикальном скролле контента.
+ * Табы страницы: сверху колонки, без участия в вертикальном скролле контента.
  * z-index: табы ниже области вкладки (0 < 1), иначе position:sticky у таблиц оказывается «под» полосой табов.
  * При фокусе в табах — page-tabs--focused поднимаем выше контента (кольца фокуса, выпадающие элементы).
  */
@@ -156,13 +163,15 @@
 
 .menu-card-label {
     display: block;
-    width: 100%;
+    width: 110%;
     color: inherit;
     font-size: var(--text-sm);
     font-weight: var(--fw-medium);
     line-height: var(--lh-sm);
     white-space: normal;
-    word-break: break-word;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
 }
 
 .page-item-icon {
@@ -183,6 +192,7 @@
 
 .menu-card .page-item-icon,
 .page-tabs .page-item-icon,
+.dropdown-item .page-item-icon,
 .page-section-header .page-item-icon,
 .modal-header .page-item-icon {
     width: var(--icon-size);
@@ -192,6 +202,7 @@
 
 .menu-card .page-item-icon img,
 .page-tabs .page-item-icon img,
+.dropdown-item .page-item-icon img,
 .page-section-header .page-item-icon img,
 .modal-header .page-item-icon img {
     width: var(--icon-size);
@@ -200,20 +211,24 @@
 
 /* Иконки в меню и табах: неактивный — тусклый, активный/ховер — насыщенный */
 .menu-card:not(.active) .page-item-icon img,
-.page-tabs .nav-link:not(.active) .page-item-icon img {
+.page-tabs .nav-link:not(.active) .page-item-icon img,
+.dropdown-item .page-item-icon img {
     opacity: 0.6;
     filter: grayscale(1);
 }
 .menu-card.active .page-item-icon img,
 .menu-card:hover .page-item-icon img,
 .page-tabs .nav-link.active .page-item-icon img,
-.page-tabs .nav-link:hover .page-item-icon img {
+.page-tabs .nav-link:hover .page-item-icon img,
+.dropdown-item:hover .page-item-icon img,
+.dropdown-item:focus .page-item-icon img {
     opacity: 1;
     filter: none;
 }
 
 .menu-card .page-item-icon i,
 .page-tabs .page-item-icon i,
+.dropdown-item .page-item-icon i,
 .page-section-header .page-item-icon i,
 .modal-header .page-item-icon i {
     font-size: var(--text-xl);
@@ -522,7 +537,7 @@ html {
     overflow-x: auto;
 }
 
-/* Debug: список страниц YAML — путь кликабельный */
+/* Список страниц YAML — путь кликабельный */
 .pages-list {
     margin: 0;
     font-family: var(--font-mono);

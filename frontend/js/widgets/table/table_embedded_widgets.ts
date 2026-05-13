@@ -1,12 +1,19 @@
 import type { Component } from 'vue';
 import DateTimeInputWidget from '../datetime/DateTimeInputWidget.vue';
+import SimpleFieldWidget from '../fields/SimpleFieldWidget.vue';
+import IpLikeWidget from '../fields/IpLikeWidget.vue';
 import ListWidget from '../ListWidget.vue';
 import VocWidget from '../voc/VocWidget.vue';
 
 const embeddedWidgetComponents: Record<string, Component> = {
     date: DateTimeInputWidget,
     datetime: DateTimeInputWidget,
+    float: SimpleFieldWidget,
+    int: SimpleFieldWidget,
+    ip: IpLikeWidget,
+    ip_mask: IpLikeWidget,
     list: ListWidget,
+    str: SimpleFieldWidget,
     time: DateTimeInputWidget,
     voc: VocWidget
 };

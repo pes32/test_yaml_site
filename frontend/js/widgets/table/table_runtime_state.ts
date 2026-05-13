@@ -10,15 +10,16 @@ import type {
     TableStore,
     TableViewModel
 } from './table_contract.ts';
-import { warnTableInvariants } from './table_invariants.ts';
+import { tableInvariantWarningsEnabled, warnTableInvariants } from './table_invariants.ts';
 import {
     buildCoreSelectionFromDisplay,
+    buildTableViewModel,
     coreCellToDisplay,
+    coreSortToRuntimeSort,
     displayCellToCore,
     restoreDisplaySelectionFromCore,
     runtimeDisplaySelection
-} from './table_selection_model.ts';
-import { coreSortToRuntimeSort } from './table_sort_model.ts';
+} from './table_internal.ts';
 import {
     columnIndexByKey,
     createTableCoreStateFromRuntime,
@@ -27,7 +28,6 @@ import {
     normalizeTableCoreState,
     sortKeysFromRuntime
 } from './table_state_core.ts';
-import { buildTableViewModel } from './table_view_model.ts';
 
 type RuntimeStateSyncOptions = {
     skipHistory?: boolean;
@@ -303,7 +303,9 @@ function dispatchRuntimeTableCoreCommand(
     vm.syncRuntimeFromCoreState(next, options);
     vm.checkTableInvariants?.(phase || command.type);
     if (before) {
-        vm.recordHistoryEntry(phase || command.type, before, vm.captureHistorySnapshot());
+        vm.recordHistoryEntry(phase || command.type, before, vm.captureHistorySnapshot(), {
+            snapshotsAlreadyOwned: true
+        });
     }
     return next;
 }
@@ -330,6 +332,7 @@ function checkRuntimeTableInvariants(
     vm: RuntimeTableStateBridgeSurface,
     phase?: string
 ): void {
+    if (!tableInvariantWarningsEnabled()) return;
     const core = vm.tableCoreStateSnapshot();
     const viewModel = vm.tableViewModelSnapshot(core);
     warnTableInvariants(core, viewModel, { phase: String(phase || 'table mutation') });

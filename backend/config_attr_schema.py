@@ -35,6 +35,7 @@ ATTR_WIDGET_SCHEMA: dict[str, dict[str, Any]] = {
                 "hint",
                 "icon",
                 "label",
+                "readonly",
                 "select_attrs",
                 "size",
                 "source",
@@ -54,6 +55,7 @@ ATTR_WIDGET_SCHEMA: dict[str, dict[str, Any]] = {
                 "hint",
                 "icon",
                 "label",
+                "readonly",
                 "select_attrs",
                 "size",
                 "source",
@@ -112,6 +114,7 @@ ATTR_WIDGET_SCHEMA: dict[str, dict[str, Any]] = {
         "allowed": frozenset(
             {
                 "widget",
+                "columns",
                 "default",
                 "editable",
                 "label",

@@ -7,12 +7,22 @@ import {
 import { findVerticalScrollRoot, scheduleUpdate } from './table_scroll.ts';
 
 type StickyRuntimeVm = TableStickyRuntimeSurface & {
+    _stickyBindRetryCount?: number;
     _stickyCloneClickHandler?: ((event: MouseEvent) => void) | null;
     _stickyCloneContextMenuHandler?: ((event: MouseEvent) => void) | null;
     _stickyCloneKeydownHandler?: ((event: KeyboardEvent) => void) | null;
     _stickyCloneSignature?: string;
     _stickyCloneTableEl?: HTMLTableElement | null;
+    _virtualScrollRoot?: Element | null;
 };
+
+function restoreSourceTheadVisibility(vm: StickyRuntimeVm): void {
+    const thead = vm.$refs?.tableThead as HTMLTableSectionElement | null | undefined;
+    if (!thead) return;
+    thead.classList.remove('widget-table__thead--js-source-hidden');
+    thead.style.visibility = '';
+    thead.style.pointerEvents = '';
+}
 
 function removeStickyClone(vm: StickyRuntimeVm | null | undefined): void {
     const overlay = vm?._stickyCloneTableEl;
@@ -37,13 +47,8 @@ function removeStickyClone(vm: StickyRuntimeVm | null | undefined): void {
 }
 
 function clearPinnedThead(vm: StickyRuntimeVm): void {
-    const thead = vm.$refs?.tableThead as HTMLTableSectionElement | null | undefined;
     removeStickyClone(vm);
-    if (thead) {
-        thead.classList.remove('widget-table__thead--js-source-hidden');
-        thead.style.visibility = '';
-        thead.style.pointerEvents = '';
-    }
+    restoreSourceTheadVisibility(vm);
     vm._stickyPinnedTableWidth = 0;
     vm._stickyPinnedWidthsByRow = null;
     vm._stickyPinnedRowCount = 0;
@@ -154,10 +159,11 @@ function ensureStickyClone(
         overlay = document.createElement('table');
         overlay.setAttribute('aria-label', 'sticky table header');
         overlay.className = `${table.className} widget-table__sticky-overlay`;
-        const host = vm._stickyScrollRoot instanceof Element ? vm._stickyScrollRoot : document.body;
-        host.appendChild(overlay);
+        document.body.appendChild(overlay);
         bindStickyCloneEvents(vm, overlay);
         vm._stickyCloneTableEl = overlay;
+    } else if (overlay.parentElement !== document.body) {
+        document.body.appendChild(overlay);
     }
 
     const nextSignature = buildStickyCloneSignature(table, thead);
@@ -210,6 +216,29 @@ function applyOverlayHorizontalClip(
     const clipPath = `inset(0px ${clipRight}px 0px ${clipLeft}px)`;
     overlay.style.clipPath = clipPath;
     (overlay.style as CSSStyleDeclaration & { webkitClipPath?: string }).webkitClipPath = clipPath;
+}
+
+function stickyCloneReady(
+    overlay: HTMLTableElement,
+    cloneThead: Element | null | undefined,
+    tableRect: DOMRect,
+    widthsByRow: number[][]
+): boolean {
+    if (!cloneThead) return false;
+    if (!(overlay.offsetHeight > 0) || !(overlay.offsetWidth > 0)) return false;
+    if (Math.abs(overlay.getBoundingClientRect().width - tableRect.width) > 1) return false;
+    const cloneRows = Array.from((cloneThead as HTMLTableSectionElement).rows || []);
+    for (let rowIndex = 0; rowIndex < widthsByRow.length; rowIndex += 1) {
+        const sourceWidths = widthsByRow[rowIndex] || [];
+        const cloneCells = Array.from(cloneRows[rowIndex]?.cells || []);
+        for (let cellIndex = 0; cellIndex < sourceWidths.length; cellIndex += 1) {
+            const width = sourceWidths[cellIndex];
+            if (!(width > 0.25)) continue;
+            const cloneWidth = cloneCells[cellIndex]?.getBoundingClientRect().width || 0;
+            if (!(cloneWidth > 0.25)) return false;
+        }
+    }
+    return true;
 }
 
 function stickyToolbarBottom(vm: StickyRuntimeVm, pinY: number): number {
@@ -278,20 +307,10 @@ function updateStickyThead(vm: StickyRuntimeVm): void {
             Math.abs((vm._stickyPinnedTableWidth || 0) - tableRect.width) < 0.5
     );
 
-    let widthsByRow = vm._stickyPinnedWidthsByRow;
-    if (!canReusePinnedWidths) {
-        clearPinnedThead(vm);
-        widthsByRow = buildHeaderCellWidthsFromLeafWidths(vm, leafWidths, thead);
-    }
-
-    vm._stickyTheadPinned = true;
-    vm._stickyPinnedTableWidth = tableRect.width;
-    vm._stickyPinnedWidthsByRow = widthsByRow;
-    vm._stickyPinnedRowCount = currentRowCount;
-
-    thead.classList.add('widget-table__thead--js-source-hidden');
-    thead.style.visibility = 'hidden';
-    thead.style.pointerEvents = 'none';
+    restoreSourceTheadVisibility(vm);
+    const widthsByRow = canReusePinnedWidths && vm._stickyPinnedWidthsByRow
+        ? vm._stickyPinnedWidthsByRow
+        : buildHeaderCellWidthsFromLeafWidths(vm, leafWidths, thead);
 
     const overlay = ensureStickyClone(vm, table, thead);
     const cloneThead = overlay.querySelector('thead');
@@ -308,12 +327,41 @@ function updateStickyThead(vm: StickyRuntimeVm): void {
     overlay.style.margin = '0';
     overlay.style.boxSizing = 'border-box';
     applyOverlayHorizontalClip(overlay, tableRect, rootRect);
+
+    if (!stickyCloneReady(overlay, cloneThead, tableRect, widthsByRow || [])) {
+        restoreSourceTheadVisibility(vm);
+        vm._stickyTheadPinned = false;
+        vm._stickyPinnedTableWidth = 0;
+        vm._stickyPinnedWidthsByRow = null;
+        vm._stickyPinnedRowCount = 0;
+        removeStickyClone(vm);
+        return;
+    }
+
+    vm._stickyTheadPinned = true;
+    vm._stickyPinnedTableWidth = tableRect.width;
+    vm._stickyPinnedWidthsByRow = widthsByRow;
+    vm._stickyPinnedRowCount = currentRowCount;
+    thead.classList.add('widget-table__thead--js-source-hidden');
+    thead.style.visibility = 'hidden';
+    thead.style.pointerEvents = 'none';
+}
+
+function scheduleStickyBindRetry(vm: StickyRuntimeVm): void {
+    const attempt = vm._stickyBindRetryCount || 0;
+    if (attempt >= 3) return;
+    vm._stickyBindRetryCount = attempt + 1;
+    vm.$nextTick?.(() => {
+        bindStickyThead(vm);
+    });
 }
 
 function bindStickyThead(vm: StickyRuntimeVm): void {
     const previousToolbar = vm.$refs?.tableToolbarHost as HTMLElement | null | undefined;
     const previousToolbarAnchor = previousToolbar?.dataset.stickyToolbarAnchorLeft || '';
+    const retryCount = vm._stickyBindRetryCount || 0;
     unbindStickyThead(vm);
+    vm._stickyBindRetryCount = retryCount;
     if (typeof window === 'undefined') return;
     const table = vm.$refs?.tableRoot as HTMLTableElement | null | undefined;
     const thead = vm.$refs?.tableThead as HTMLTableSectionElement | null | undefined;
@@ -322,11 +370,18 @@ function bindStickyThead(vm: StickyRuntimeVm): void {
         toolbar.dataset.stickyToolbarAnchorLeft = previousToolbarAnchor;
     }
     if (!vm.stickyHeaderEnabled && !toolbar) return;
-    if (!table || !thead) return;
+    if (!table || !thead) {
+        scheduleStickyBindRetry(vm);
+        return;
+    }
 
-    const root = findVerticalScrollRoot(table);
-    if (!root) return;
+    const root = vm._virtualScrollRoot || findVerticalScrollRoot(table);
+    if (!root) {
+        scheduleStickyBindRetry(vm);
+        return;
+    }
 
+    vm._stickyBindRetryCount = 0;
     vm._stickyScrollRoot = root;
     vm._stickyOnScroll = () => {
         syncStickyToolbarHorizontalOffset(vm, root);

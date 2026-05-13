@@ -1,6 +1,9 @@
 /* components/button.css — widget buttons and shared action affordances */
 
 .widget-button {
+    --widget-button-readonly-bg: var(--color-bg-soft);
+    --widget-button-readonly-border: transparent;
+    --widget-button-readonly-color: var(--color-text-muted);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -28,11 +31,11 @@
 }
 
 .widget-button:disabled {
-    opacity: 0.65;
-    background-color: var(--color-muted);
-    border-color: var(--color-muted);
+    opacity: 1;
+    background-color: var(--widget-button-readonly-bg);
+    border-color: var(--widget-button-readonly-border);
     cursor: not-allowed;
-    color: var(--color-bg);
+    color: var(--widget-button-readonly-color);
 }
 
 .button-icon {
@@ -56,4 +59,26 @@
 .widget-button.icon-only--ghost:hover:not(:disabled) {
     background-color: var(--color-icon-only-hover);
     border-color: transparent;
+}
+
+.widget-button.widget-button--readonly,
+.widget-button.widget-button--readonly:disabled {
+    color: var(--widget-button-readonly-color);
+    border-color: var(--widget-button-readonly-border);
+    background: var(--widget-button-readonly-bg);
+    opacity: 1;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.widget-button.widget-button--readonly .button-icon {
+    opacity: 1;
+    filter: none;
+}
+
+/* Иконка через mask + currentColor — тот же цвет, что и label (readonly/disabled) */
+.button-icon--text-color {
+    display: inline-block;
+    flex-shrink: 0;
+    background-color: currentColor;
 }

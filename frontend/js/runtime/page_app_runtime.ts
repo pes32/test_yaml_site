@@ -59,7 +59,8 @@ import type {
     PageViewHost,
     ParsedGuiMenu,
     ParsedGuiSection,
-    ParsedGuiTab
+    ParsedGuiTab,
+    UnknownRecord
 } from './page_contract.ts';
 import {
     getActiveMenu,
@@ -97,8 +98,13 @@ import {
 } from './widget_runtime_bridge.ts';
 import {
     createPageHostRuntimeServices,
-    type ConfirmModalPublicSurface
+    type ConfirmModalPublicSurface,
+    type PageRuntimeHostBoundarySurface
 } from './page_host_runtime_services.ts';
+import {
+    ensureWidgetSourceLoaded as ensureWidgetSourceLoadedFlow,
+    scheduleDbWidgetSourcePreload
+} from './widget_source_loader.ts';
 import { usePageErrorRuntime } from './page_error_runtime.ts';
 import { usePageNotifications } from './page_notifications.ts';
 import { usePageUiState, type PageUiState } from './page_ui_state.ts';
@@ -110,6 +116,7 @@ type PageAppPublicSurface = {
     closeUiModal(): Promise<BoundaryActionResult<null>>;
     executeCommand(commandData: unknown): Promise<void>;
     getCurrentPageName(): string;
+    getCurrentSnapshotVersion(): string;
     getWidgetAttrs(widgetName: string): PageAttrConfig;
     getWidgetRuntimeValue(widgetName: string): unknown;
     getWidgetValue(widgetName: string): unknown;
@@ -152,22 +159,23 @@ type WidgetInputPayload = {
     value?: unknown;
 };
 
-type PageAppRuntimeHost = PageViewHost & {
+type PageAppRuntimeHost = PageViewHost &
+    Omit<PageRuntimeHostBoundarySurface, 'reportDiagnosticError'> & {
     clearActiveWidgetLifecycle(handle?: WidgetLifecycleHandle | null): WidgetLifecycleHandle | null;
     closeUiModal(): Promise<BoundaryActionResult<null>>;
+    applyExecuteUpdates(updates: unknown): void;
+    getCurrentSnapshotVersion(): string;
     getWidgetAttrs(widgetName: string): PageAttrConfig;
     getWidgetRuntimeValue(widgetName: string): unknown;
     getWidgetValue(widgetName: string): unknown;
     handleRecoverableError(error: unknown, options?: FrontendErrorOptions): FrontendRuntimeError;
+    ensureWidgetSourceLoadedByName(widgetName: string, options?: UnknownRecord): Promise<void>;
     loadedAttrNames: string[];
     modalRuntimeController: ModalRuntimeController | null;
     modalRuntimeState: ModalRuntimeState;
     openUiModal(modalName: string): Promise<unknown>;
     prefetchWidgetsByNames(names: string[]): Promise<void>;
     reportDiagnosticError(error: unknown, options?: FrontendErrorOptions): FrontendRuntimeError;
-    runBoundaryAction<T>(kind: string, action: () => Promise<T> | T): Promise<BoundaryActionResult<T>>;
-    setActiveWidgetLifecycle(handle: WidgetLifecycleHandle | null | undefined): WidgetLifecycleHandle | null;
-    showNotification(message: string, type?: string): void;
 };
 
 function normalizeBoundaryActionKind(kind: string): BoundaryActionKind {
@@ -290,11 +298,14 @@ function usePageApp(): PageAppBindings {
     async function bootstrapPage(): Promise<void> {
         const bootstrapPayload = readPageBootstrap();
 
-        if (bootstrapPayload) {
+        try {
+            await loadPageConfig();
+        } catch (error) {
+            if (!bootstrapPayload) {
+                throw error;
+            }
             applyPagePayload(normalizePageResponse(bootstrapPayload));
             parseConfiguration();
-        } else {
-            await loadPageConfig();
         }
 
         await finishInitialViewActivation();
@@ -312,6 +323,10 @@ function usePageApp(): PageAppBindings {
 
     function getCurrentPageName(): string {
         return selectCurrentPageName(configState);
+    }
+
+    function getCurrentSnapshotVersion(): string {
+        return String(configState.snapshotVersion || '');
     }
 
     async function ensureAttrsLoaded(names: unknown): Promise<unknown> {
@@ -415,6 +430,36 @@ function usePageApp(): PageAppBindings {
         return selectWidgetValue(sessionState, allAttrs.value, widgetName);
     }
 
+    function applyExecuteUpdates(updates: unknown): void {
+        const values = asRecord(asRecord(updates).values);
+        Object.entries(values).forEach(([widgetName, value]) => {
+            const config = asRecord(allAttrs.value[widgetName]);
+            if (String(config.widget || '').trim() === 'table') {
+                PageRuntimeStore.patchAttrConfig(
+                    configState,
+                    widgetName,
+                    { value }
+                );
+                return;
+            }
+            PageSessionStore.setWidgetValue(
+                sessionState,
+                allAttrs.value,
+                widgetName,
+                value
+            );
+        });
+    }
+
+    function ensureWidgetSourceLoadedByName(
+        widgetName: string,
+        options: UnknownRecord = {}
+    ): Promise<void> {
+        return ensureWidgetSourceLoadedFlow(pageHost, widgetName, {
+            silent: options.silent === true
+        });
+    }
+
     const getActiveViewId = bindPageFlow(getActiveViewIdFlow);
 
     function getPageScrollRoot(): PageScrollRoot | null {
@@ -467,11 +512,14 @@ function usePageApp(): PageAppBindings {
             $nextTick(callback?: () => void) {
                 return callback ? nextTick(callback) : nextTick();
             },
+            applyExecuteUpdates,
             clearActiveWidgetLifecycle,
             closeUiModal,
             configState,
+            ensureWidgetSourceLoadedByName,
             fetchActiveViewAttrs,
             getCurrentPageName,
+            getCurrentSnapshotVersion,
             getPageScrollRoot,
             getWidgetAttrs,
             getWidgetConfig,
@@ -530,6 +578,7 @@ function usePageApp(): PageAppBindings {
 
     modalRuntimeController = createModalRuntimeController(pageHost, modalRuntimeState);
     provide(PAGE_HOST_RUNTIME_SERVICES_KEY, createPageHostRuntimeServices(pageHost, confirmModal));
+    provide('ensureWidgetSourceLoadedByName', ensureWidgetSourceLoadedByName);
 
     onMounted(async () => {
         if ('scrollRestoration' in history) {
@@ -538,6 +587,7 @@ function usePageApp(): PageAppBindings {
 
         try {
             await bootstrapPage();
+            scheduleDbWidgetSourcePreload(pageHost);
         } catch (error) {
             reportFatalError(error, {
                 scope: FRONTEND_ERROR_SCOPES.page,
@@ -561,6 +611,7 @@ function usePageApp(): PageAppBindings {
         closeUiModal,
         executeCommand,
         getCurrentPageName,
+        getCurrentSnapshotVersion,
         getWidgetAttrs,
         getWidgetRuntimeValue,
         getWidgetValue,

@@ -1,61 +1,79 @@
-# Table Verification Matrix
+# Матрица проверок таблицы
 
-## Required Project Checks
+Политика уровней gate согласована с [table-subsystem.md](table-subsystem.md) (раздел **Ворота качества**).
 
-Минимальный gate после table/runtime изменений:
+## Уровни gate
+
+### До merge (блокер PR)
+
+Обязательны без diagnostics:
 
 - `python3 -m backend.tools.validate_config --json`
 - `npm --prefix tooling/vite run type-holes`
 - `npm --prefix tooling/vite run typecheck:table`
 - `npm --prefix tooling/vite run typecheck`
 - `npm --prefix tooling/vite run build`
-- `tests/run.sh`
 
-`type-holes`, `typecheck` и `typecheck:table` являются обязательным gate для table runtime изменений. Ошибки в этих командах нельзя переводить в suppressions или weakening strictness.
+**При падении:** исправить в PR; ошибки `type-holes` / `typecheck` / `typecheck:table` **не** переводить в произвольные suppressions и без согласования не ослаблять strictness.
 
-## Expected Status Today
+### До релиза
 
-- YAML validator должен проходить без diagnostics.
-- Vite build должен проходить без circular chunk warning.
-- `type-holes`, `typecheck` и `typecheck:table` должны проходить без diagnostics.
-- Failures по удалённым файлам, отсутствующим scripts или stale docs считаются regression и должны исправляться сразу.
+- Полный приёмочный прогон тестового стека проекта: **`tests/run.sh`** (в том составе, который зафиксирован для релиза в CI/процессе; для table-relevant регрессии — как минимум `tests/run.sh specs/tables/table-widgets.spec.ts`, если отдельный срез допустим).
+- `tests/specs/tables/table-remote-gates.spec.ts` — API/DOM gate для remote/paged inline-giant: лимит `source` в `/api/page`, bounded `tbody tr`.
+- `tests/specs/tables/table-million-jump.spec.ts` — синтетический `total` 1M (патч `/api/page` + tail `table-query`): прыжок к строке 999999, bounded DOM; guard шаблона `visibleCellGrid`.
+- `python3 -m unittest tests.backend.test_table_runtime` — fingerprint Python/TS, `export_table_window`/prepare attrs, смена `view_id` при sort.
+- `tests/specs/tables/table-network.spec.ts` — сортировка remote-таблицы даёт `/api/table-query`; `scrollToDisplayRow` к хвосту даёт запрос с `offset` далеко от нуля.
+- Playwright suite `tests/specs/tables/table-widgets.spec.ts` покрывает в том числе: render flags, сортировку, virtual DOM cap, 10k formatted table samples, базовое редактирование, действия embedded-ячеек, Excel-like row selection/delete, range paste, часть context menu, переключение line numbers, grouping-row menu. Расширять автотесты предпочтительнее, чем раздувать ручной чеклист.
+- Для remote/paged таблиц hard gates: bounded attrs/page payload, `/api/table-query` window correctness, stale response guard, no frontend full-load for sort/group/search/format-column, DOM cap на 100k/1M fixture.
 
-## Manual Smoke Scope
+**При падении:** починить поведение **или** обновить spec и ожидания **явно** в том же PR (описание, зачем поменялся контракт); молча менять порог «чтобы прошло» нельзя.
 
-Baseline-страница для ручной проверки: [pages/2_widget_demo](../pages/2_widget_demo).
+### После крупных изменений в table (ручной smoke)
 
-Проверять в UI:
+Запускать **выборочно** при затрагивании sticky, embedded, меню, скролла или визуальных состояний. Не дублировать то, что уже стабильно ловит `table-widgets.spec.ts`.
 
-- header sort cycle and reset;
-- single-cell, range and row selection;
-- Excel-like row block selection: `Shift+Space`, row-range extension, `Ctrl+-`;
-- keyboard navigation and tab flow;
-- clipboard paste into selected ranges;
-- edit start/commit/cancel;
-- context menu on header, column-number header, grouping rows and body;
-- runtime toggles for sticky header, line numbering and word wrap;
-- sticky header mount/update/unmount;
-- lazy sentinel path;
-- embedded widget cells for `list`, `voc`, `date`, `time`, `datetime`, `ip`, `ip_mask`.
+**При падении:** открыть issue или краткую заметку в бэклоге; если дефект воспроизводимый — добавить строку в Playwright или в раздел «Бэклог: юнит-тесты» ниже.
 
-## Pure Logic Watchlist
+## Ожидаемое состояние сейчас
 
-Эти области должны оставаться детерминированными и пригодными для будущих unit tests:
+- YAML validator проходит без diagnostics.
+- Vite build без регрессии по circular chunk warning (если предупреждение появилось — разбирать как дефект сборки).
+- Failures из-за удалённых файлов, отсутствующих scripts или устаревших доков — regression, чинить сразу.
 
-- selection normalization and row-block behavior;
-- TSV serialization/deserialization;
-- stable sort fallback by row id;
-- grouping display rows and expanded state pruning;
-- initial runtime state slices;
-- explicit and generated row ids;
-- recoverable error normalization.
+## Ручной smoke
 
-## Browser/E2E Automation
+Страница для ручной проверки: [pages/2_widget_demo](../pages/2_widget_demo).
 
-Browser smoke живёт в `tests/specs/tables/table-widgets.spec.ts` и запускается через общий Playwright runner:
+Оставить **только то, что не заменено** `table-widgets.spec.ts` или даёт мало стабильности в headless:
+
+| Зона | Что проверить руками |
+|------|----------------------|
+| **Virtual + sticky** | Полный lifecycle: включение/выключение sticky в runtime, прокрутка контейнера на большие индексы, смена данных/колонок, размонтирование таблицы — thead и virtual window остаются согласованными с измерениями. |
+| **Сложные embedded** | Комбинации `list`/`voc` (поиск, мультивыбор если есть), `date`/`time`/`datetime`, обрыв редактирования по клику вне, последовательность open→commit→cancel на одной и той же ячейке. |
+| **Визуально / меню / dropdown** | Позиционирование и закрытие context menu при скролле и смене выделения; открытые dropdown в ячейке vs меню страницы; нет ли визуальных артефактов (overflow, z-index), которые E2E не фиксирует. |
+
+Остальное (базовая сортировка, выделение, paste, базовый context menu, virtual spacer behavior, line numbers и т.д.) — опираться на Playwright; при пробелах — дописывать spec.
+
+## Бэклог: юнит-тесты (чистая таблица)
+
+Кандидаты на **юнит-тесты** по чистым модулям (не абстрактное напоминание, а очередь работ). Переносить в код тестов по мере готовности инфраструктуры:
+
+- нормализация selection и row-block behavior;
+- TSV serialize/deserialize и граничные случаи paste matrix;
+- стабильный sort fallback по `rowId`;
+- grouping: `displayRows`, pruning expanded state;
+- virtual window + spacer math, measured-height cache, row mapping;
+- remote provider mode selection, loaded ranges, stale request guard and query-window merge;
+- indexed format rules and declarative selection expressions;
+- row-sharded metadata COW and history aliasing;
+- начальные срезы runtime state / store;
+- явные и сгенерированные `row id` при нормализации строк;
+- нормализация recoverable errors.
+
+## Браузерная и E2E-автоматизация
 
 ```bash
 tests/run.sh specs/tables/table-widgets.spec.ts
 ```
 
-Этот suite проверяет render flags, сортировку, lazy sentinel, базовое редактирование, embedded widget actions, Excel-like row selection/delete, range paste, column-number context menu, runtime line-number toggle и grouping-row context menu. Новые table interactions должны расширять этот runner, а не возвращать broken placeholder scripts.
+Новые стабильные table interactions расширяют этот runner; пустые скрипты-заглушки не использовать.

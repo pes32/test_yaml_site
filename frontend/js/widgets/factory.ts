@@ -12,6 +12,9 @@ import IpLikeWidget from './fields/IpLikeWidget.vue';
 import SimpleFieldWidget from './fields/SimpleFieldWidget.vue';
 import ButtonWidget from './fields/ButtonWidget.vue';
 
+/** См. docs/widget-registry-contract.md (Contract versioning). Major — ломающие изменения capabilities/bridge/lifecycle. */
+const REGISTRY_CONTRACT_VERSION = 1 as const;
+
 type WidgetComponent = Component;
 type WidgetLoaderModule = { default: WidgetComponent };
 type WidgetLoader = () => Promise<WidgetComponent | WidgetLoaderModule>;
@@ -48,6 +51,7 @@ type WidgetLifecycleHandle = {
 type WidgetDefinition = {
   type: string;
   capabilities: WidgetCapabilities;
+  isKnown: boolean;
   createLifecycleHandle: () => WidgetLifecycleHandle;
   prefetch: () => Promise<void>;
   resolveComponent: () => WidgetComponent;
@@ -338,6 +342,7 @@ class WidgetDefinitionRegistry {
     return {
       type,
       capabilities,
+      isKnown: true,
       createLifecycleHandle: capabilities.draftCommit
         ? () => createWidgetLifecycleHandle()
         : () => NOOP_LIFECYCLE_HANDLE,
@@ -365,6 +370,7 @@ class WidgetDefinitionRegistry {
         ...DEFAULT_WIDGET_CAPABILITIES,
         runtimeFeatures: []
       },
+      isKnown: false,
       createLifecycleHandle: () => NOOP_LIFECYCLE_HANDLE,
       prefetch: async () => {
         /* no-op */
@@ -430,6 +436,7 @@ export type {
 };
 
 export {
+  REGISTRY_CONTRACT_VERSION,
   widgetFactory
 };
 

@@ -16,7 +16,7 @@ from .contracts import Diagnostic, SourceFileMeta
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
 PAGES_DIR = os.path.join(ROOT_DIR, "pages")
 GUI_FILENAMES = {"gui.yaml", "gui.yml"}
-RESERVED_PAGE_PREFIXES = ("/api", "/debug", "/frontend", "/page/", "/templates")
+RESERVED_PAGE_PREFIXES = ("/api", "/frontend", "/page/", "/templates")
 RESERVED_PAGE_PATHS = {"/favicon.ico"}
 
 MODAL_GUI_ID_RE = re.compile(r"^modal_[a-zA-Z][a-zA-Z0-9_]*$")

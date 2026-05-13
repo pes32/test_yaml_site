@@ -14,8 +14,7 @@ import type {
     TableSelectionState,
     TableSortState
 } from './table_contract.ts';
-import { createEditingSession } from './table_editing_model.ts';
-import { appendRowsDedup } from './table_lazy_load_model.ts';
+import { appendRowsDedup, createEditingSession } from './table_internal.ts';
 import { getRowCells } from './table_utils.ts';
 
 const LINE_NUMBER_COLUMN_KEY = '__line_numbers__';

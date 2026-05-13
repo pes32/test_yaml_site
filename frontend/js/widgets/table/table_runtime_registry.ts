@@ -10,6 +10,7 @@ import { InteractionRuntimeMethods } from './table_interactions.ts';
 import { MenuRuntimeMethods } from './table_menu_runtime.ts';
 import { RowRuntimeMethods } from './table_row_runtime.ts';
 import { SelectionMethods } from './table_selection.ts';
+import { VirtualRuntimeMethods } from './table_virtual_runtime.ts';
 import { ViewRuntimeMethods } from './table_view_runtime.ts';
 import { WidthRuntimeMethods } from './table_width_runtime.ts';
 import { mountTableRuntime, unmountTableRuntime } from './table_runtime_lifecycle.ts';
@@ -18,6 +19,7 @@ import { tableRuntimeWatch } from './table_runtime_watch.ts';
 
 const tableRuntimeMethods = {
     ...SelectionMethods,
+    ...VirtualRuntimeMethods,
     ...ViewRuntimeMethods,
     ...DataRuntimeMethods,
     ...CellRuntimeMethods,

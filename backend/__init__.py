@@ -13,7 +13,6 @@ from flask import Flask
 import werkzeug.serving
 
 from .config_service import ConfigService
-from .env_utils import parse_bool_env
 from .logging_setup import setup_logging
 
 
@@ -26,24 +25,6 @@ VITE_MANIFEST_PATH = os.path.join(ROOT_DIR, "frontend", "dist", ".vite", "manife
 CONFIG_SERVICE: ConfigService | None = None
 CONFIG: dict | None = None
 LOG_FILE_PATH: str | None = None
-
-
-def _debug_tooling_enabled() -> bool:
-    forced = parse_bool_env("YAMLS_ENABLE_DEBUG_ROUTES")
-    if forced is not None:
-        return forced
-
-    env_name = (
-        os.getenv("YAMLS_ENV")
-        or os.getenv("APP_ENV")
-        or os.getenv("FLASK_ENV")
-        or ""
-    ).strip().lower()
-
-    if env_name in {"prod", "production"}:
-        return False
-
-    return True
 
 
 def _load_vite_manifest():
@@ -142,8 +123,6 @@ def create_app() -> Flask:
         static_folder=os.path.join(ROOT_DIR, "frontend"),
         static_url_path="/frontend",
     )
-    app.config["DEBUG_TOOLING_ENABLED"] = _debug_tooling_enabled()
-
     app.jinja_env.globals["ASSETS_VERSION"] = int(time.time())
     app.jinja_env.globals["vite_manifest"] = _load_vite_manifest
     app.jinja_env.globals["vite_entry_assets"] = _vite_entry_assets
@@ -155,17 +134,26 @@ def create_app() -> Flask:
         CONFIG_SERVICE = ConfigService(ROOT_DIR)
         CONFIG = CONFIG_SERVICE.get_snapshot()
 
+        from .error_handlers import register_error_handlers
         from .routes_api import register_api_routes
-        from .routes_debug import register_debug_routes
+        from .routes_admin_sql import register_admin_sql_routes
+        from .routes_auth import register_auth_routes
+        from .routes_client_diagnostic import register_client_diagnostic_routes
+        from .routes_db_schema import register_db_schema_routes
         from .routes_pages import register_page_routes
         from .routes_postgres import register_postgres_routes
         from .routes_static import register_static_routes
+        from .routes_user_settings import register_user_settings_routes
 
+        register_error_handlers(app)
         register_static_routes(app)
         register_postgres_routes(app)
         _register_optional_sudoku(app)
-        if app.config["DEBUG_TOOLING_ENABLED"]:
-            register_debug_routes(app, CONFIG_SERVICE, LOG_FILE_PATH)
+        register_auth_routes(app)
+        register_client_diagnostic_routes(app)
+        register_user_settings_routes(app)
+        register_db_schema_routes(app)
+        register_admin_sql_routes(app)
         register_page_routes(app, CONFIG_SERVICE)
         register_api_routes(app, CONFIG_SERVICE, LOG_FILE_PATH)
     except Exception:  # pragma: no cover

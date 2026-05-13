@@ -14,6 +14,7 @@ type PageHostRuntimeServices = {
   getAllAttrsMap?: () => AttrConfigMap;
   getConfirmModal?: () => unknown;
   getCurrentPageNameFromRuntime?: () => string;
+  getCurrentSnapshotVersionFromRuntime?: () => string;
   getModalRuntimeController?: () => unknown;
   getModalRuntimeState?: () => unknown;
   getWidgetAttrsByName?: (widgetName: string) => AttrConfigRecord;
@@ -38,7 +39,8 @@ const FEATURE_SERVICE_KEYS: Record<WidgetRuntimeFeature, string[]> = {
     'getWidgetAttrsByName',
     'getWidgetRuntimeValueByName',
     'getAllAttrsMap',
-    'getCurrentPageNameFromRuntime'
+    'getCurrentPageNameFromRuntime',
+    'getCurrentSnapshotVersionFromRuntime'
   ],
   confirmModal: ['getConfirmModal'],
   errorHandling: ['reportAppError', 'handleRecoverableAppError'],
@@ -144,6 +146,12 @@ function provideWidgetRuntimeBridge(
   provide('getCurrentPageNameFromRuntime', () =>
     withRuntimeFeature(definitionRef, 'attrsAccess', '', () =>
       hostServices?.getCurrentPageNameFromRuntime?.()
+    )
+  );
+
+  provide('getCurrentSnapshotVersionFromRuntime', () =>
+    withRuntimeFeature(definitionRef, 'attrsAccess', '', () =>
+      hostServices?.getCurrentSnapshotVersionFromRuntime?.()
     )
   );
 

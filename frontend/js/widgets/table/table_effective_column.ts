@@ -22,6 +22,8 @@ function columnTypeLockedByYaml(column: TableRuntimeColumn | null | undefined): 
     if (!column) return true;
     if (column.readonly === true || column.isLineNumber === true) return true;
     if (column.format != null && String(column.format).trim() !== '') return true;
+    const widgetRef = column.widgetRef != null ? String(column.widgetRef).trim() : '';
+    if (widgetRef) return true;
     return YAML_PROTECTED_TYPES.has(String(column.type || '').trim());
 }
 

@@ -3,7 +3,7 @@ import { rowMoveDuplicateOpsAllowed } from './table_menu_runtime.ts';
 import { tableLog } from './table_debug.ts';
 import { getCellByDisplayAddress, getCellFromEvent } from './table_dom.ts';
 import { buildJumpOpts, jumpTarget } from './table_jump.ts';
-import { resolveEditingBoundary } from './table_editing_model.ts';
+import { resolveEditingBoundary } from './table_internal.ts';
 import { buildClearCellPatchesForRuntime } from './table_selection.ts';
 import { dispatchRuntimeCellPatches } from './table_runtime_commands.ts';
 import { TABLE_RUNTIME_SYNC } from './table_runtime_state.ts';
@@ -28,6 +28,48 @@ function editFocus(vm: KeyboardVm) {
 
 function getFocusCell(vm: KeyboardVm) {
     return vm.selFocus || FALLBACK_FOCUS;
+}
+
+function resolveKeyboardCtx(vm: KeyboardVm, event: KeyboardEvent): KeyboardCtx | null {
+    const fromEvent = getCellFromEvent(vm, event);
+    if (fromEvent) {
+        const td = fromEvent.td;
+        const dropdownOpen = td.querySelector(
+            '.dropdown.show, [data-dropdown-open="true"]'
+        );
+        return {
+            row: fromEvent.row,
+            col: fromEvent.col,
+            td,
+            dropdownOpen
+        };
+    }
+    const key = event.key;
+    const navKeys = new Set(['PageDown', 'PageUp']);
+    const cmd = event.ctrlKey || event.metaKey;
+    const keyLower = String(key || '').toLowerCase();
+    const toolbarStyleShortcut =
+        cmd &&
+        !event.altKey &&
+        ((!event.shiftKey && ['b', 'i', 'u'].includes(keyLower)) ||
+            (event.shiftKey && keyLower === 'x'));
+    if (!navKeys.has(key) && !toolbarStyleShortcut) {
+        return null;
+    }
+    const focus = getFocusCell(vm);
+    const td = getCellByDisplayAddress(vm, focus.r, focus.c);
+    if (!td) {
+        return null;
+    }
+    const dropdownOpen = td.querySelector(
+        '.dropdown.show, [data-dropdown-open="true"]'
+    );
+    return {
+        row: focus.r,
+        col: focus.c,
+        td,
+        dropdownOpen
+    };
 }
 
 function getAnchorCell(vm: KeyboardVm) {
@@ -585,6 +627,37 @@ function handleClipboardShortcuts(vm: KeyboardVm, event: KeyboardEvent, ctx?: Ke
         return true;
     }
 
+    function handlePageNavigation(vm: KeyboardVm, event: KeyboardEvent, ctx: KeyboardCtx) {
+        if (event.key !== 'PageDown' && event.key !== 'PageUp') return false;
+        if (event.altKey || event.ctrlKey || event.metaKey) return false;
+        const rowCount = tbodyRowCount(vm);
+        if (rowCount <= 0) return false;
+        const estimated = Math.max(1, Number(vm.virtualState?.estimatedRowHeightPx) || 40);
+        const viewport = Math.max(estimated, Number(vm.virtualState?.viewportHeightPx) || estimated * 12);
+        const pageRows = Math.max(1, Math.floor(viewport / estimated) - 1);
+        const direction = event.key === 'PageDown' ? 1 : -1;
+        const nextRow = Math.max(0, Math.min(rowCount - 1, ctx.row + direction * pageRows));
+        const nextCol = vm.normCol(ctx.col);
+        event.preventDefault();
+        vm.exitCellEdit();
+        if (event.shiftKey) {
+            vm.setDisplaySelection(
+                {
+                    anchor: getAnchorCell(vm),
+                    focus: { r: nextRow, c: nextCol },
+                    fullHeightCols: vm.selFullHeightCols,
+                    fullWidthRows: vm.selFullWidthRows
+                },
+                'page extend selection'
+            );
+        } else {
+            vm.setSelectionSingle(nextRow, nextCol);
+        }
+        vm.ensureDisplayRowVisible?.(nextRow);
+        vm.$nextTick?.(() => vm.focusSelectionCell(nextRow, nextCol));
+        return true;
+    }
+
     const KEYBOARD_HANDLERS = [
         handleToolbarShortcuts,
         handleTabNavigation,
@@ -595,24 +668,23 @@ function handleClipboardShortcuts(vm: KeyboardVm, event: KeyboardEvent, ctx?: Ke
         handleRowInsertDeleteShortcuts,
         handleEnter,
         handlePrintableReplace,
+        handlePageNavigation,
         handleArrowNavigation
     ];
 
     function TableWidgetHandleKeydown(vm: KeyboardVm, event: KeyboardEvent) {
         if (!vm.isEditable) return;
-        const cell = getCellFromEvent(vm, event);
-        if (!cell) return;
         if (embeddedWidgetConsumesKey(event.target, event.key)) return;
         if (handleAltRowMoveDuplicate(vm, event)) return;
 
-        const dropdownOpen = cell.td.querySelector(
-            '.dropdown.show, [data-dropdown-open="true"]'
-        );
+        const cell = resolveKeyboardCtx(vm, event);
+        if (!cell?.td) return;
+
         const ctx = {
             row: cell.row,
             col: cell.col,
             td: cell.td,
-            dropdownOpen
+            dropdownOpen: cell.dropdownOpen
         };
 
         for (let i = 0; i < KEYBOARD_HANDLERS.length; i++) {

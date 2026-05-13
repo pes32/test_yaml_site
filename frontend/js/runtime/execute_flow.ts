@@ -12,6 +12,7 @@ type BoundaryResult<T> =
     | { status: string; value?: T };
 
 type ExecuteFlowHost = {
+    applyExecuteUpdates?(updates: unknown): void;
     getCurrentPageName(): string;
     getWidgetConfig(widgetName: string): PageAttrConfig;
     getWidgetValue(widgetName: string): unknown;
@@ -52,12 +53,18 @@ async function executeCommand(vm: ExecuteFlowHost, commandData: ExecuteCommandDa
             ? (result.data as UnknownRecord)
             : {};
 
-        vm.showNotification(
-            typeof data.message === 'string' && data.message
-                ? data.message
-                : 'Команда выполнена успешно',
-            'success'
-        );
+        if (typeof vm.applyExecuteUpdates === 'function') {
+            vm.applyExecuteUpdates(result.updates || {});
+        }
+
+        if (result.silentSuccess !== true) {
+            vm.showNotification(
+                typeof data.message === 'string' && data.message
+                    ? data.message
+                    : 'Команда выполнена успешно',
+                'success'
+            );
+        }
         return result;
     });
 

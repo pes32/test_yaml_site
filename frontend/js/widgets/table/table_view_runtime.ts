@@ -6,7 +6,7 @@ import { scheduleUpdate } from './table_scroll.ts';
 import { bindStickyThead, unbindStickyThead, updateStickyThead } from './table_sticky_header.ts';
 import { columnIndexByKey } from './table_state_core.ts';
 import { WidgetUiCoords } from './table_widget_helpers.ts';
-import { autoFitHeaderWidth, headerSortAffordancePx } from './table_width_model.ts';
+import { autoFitHeaderWidth, headerSortAffordancePx } from './table_internal.ts';
 import { safeCellValue } from './table_utils.ts';
 
 const ViewRuntimeMethods = {
@@ -112,6 +112,12 @@ const ViewRuntimeMethods = {
     dataRowByIdentity(rowId: string) {
         const key = String(rowId || '');
         if (!key) return null;
+        if (this.tableRemote?.mode === 'remote-paged') {
+            const item = this.tableRemote.rowItemsById[key];
+            if (item) {
+                return { id: item.rowId, cells: item.values.slice() };
+            }
+        }
         const index = this.tableRowIdToDataIndex.get(key);
         return index == null ? null : this.tableData[index] || null;
     },

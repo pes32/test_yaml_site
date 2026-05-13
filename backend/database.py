@@ -6,6 +6,7 @@ import logging
 import json
 import os
 import re
+import threading
 from contextlib import contextmanager
 from datetime import date, datetime, time
 from decimal import Decimal
@@ -17,14 +18,17 @@ import psycopg2
 import psycopg2.extras
 import yaml
 
+from .db_settings_service import (
+    connection_params_from_settings,
+    get_runtime_settings_mtime,
+    load_active_db_settings,
+    normalize_db_settings,
+)
+
 logger = logging.getLogger(__name__)
 
 # Корневая директория проекта
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-DB_SETTINGS_CANDIDATES = (
-    os.path.join(ROOT_DIR, "db_settings.yaml"),
-    os.path.join(ROOT_DIR, "database", "db_settings.yaml"),
-)
 READONLY_SQL_MAX_ROWS = 200
 READONLY_SQL_MAX_QUERY_LENGTH = 10000
 READONLY_SQL_STATEMENT_TIMEOUT_MS = 5000
@@ -57,8 +61,8 @@ READONLY_SQL_BLOCKED_PLAN_NODE_TYPES = frozenset({
 })
 
 
-class DebugSqlError(RuntimeError):
-    """Контролируемая ошибка debug SQL API."""
+class SqlError(RuntimeError):
+    """Контролируемая ошибка SQL API."""
 
     def __init__(self, message: str, *, code: str, status_code: int):
         super().__init__(message)
@@ -66,11 +70,11 @@ class DebugSqlError(RuntimeError):
         self.status_code = status_code
 
 
-class DebugSqlValidationError(DebugSqlError):
-    """Некорректный SQL-запрос для debug-only SELECT режима."""
+class SqlValidationError(SqlError):
+    """Некорректный SQL-запрос для read-only SELECT режима."""
 
     def __init__(self, message: str):
-        super().__init__(message, code="invalid_debug_sql_query", status_code=400)
+        super().__init__(message, code="invalid_sql_query", status_code=400)
 
 
 def _json_safe_value(value: Any) -> Any:
@@ -95,34 +99,34 @@ def _json_safe_value(value: Any) -> Any:
     return str(value)
 
 
-def _normalize_debug_select_query(query: str) -> str:
-    """Разрешает только один безопасный SELECT-запрос для debug UI."""
+def _normalize_readonly_select_query(query: str) -> str:
+    """Разрешает только один безопасный SELECT-запрос."""
 
     normalized = str(query or "").strip()
     if not normalized:
-        raise DebugSqlValidationError("Пустой SQL-запрос")
+        raise SqlValidationError("Пустой SQL-запрос")
 
     if len(normalized) > READONLY_SQL_MAX_QUERY_LENGTH:
-        raise DebugSqlValidationError(
+        raise SqlValidationError(
             f"SQL-запрос слишком длинный: максимум {READONLY_SQL_MAX_QUERY_LENGTH} символов"
         )
 
     if any(token in normalized for token in ("--", "/*", "*/")):
-        raise DebugSqlValidationError("SQL-комментарии в debug SQL запрещены")
+        raise SqlValidationError("SQL-комментарии запрещены")
 
     if ";" in normalized:
         if normalized.count(";") > 1 or not normalized.endswith(";"):
-            raise DebugSqlValidationError("Разрешён только один SELECT-запрос без дополнительных команд")
+            raise SqlValidationError("Разрешён только один SELECT-запрос без дополнительных команд")
         normalized = normalized[:-1].strip()
 
     if not re.match(r"^select\b", normalized, flags=re.IGNORECASE):
-        raise DebugSqlValidationError("Разрешён только SELECT-запрос")
+        raise SqlValidationError("Разрешён только SELECT-запрос")
 
     if READONLY_SQL_LOCKING_RE.search(normalized):
-        raise DebugSqlValidationError("SELECT ... FOR UPDATE/SHARE запрещён")
+        raise SqlValidationError("SELECT ... FOR UPDATE/SHARE запрещён")
 
     if READONLY_SQL_DISALLOWED_FUNCTIONS_RE.search(normalized):
-        raise DebugSqlValidationError("Запрещены потенциально опасные SQL-функции")
+        raise SqlValidationError("Запрещены потенциально опасные SQL-функции")
 
     return normalized
 
@@ -156,21 +160,21 @@ def _parse_explain_root(raw_plan: Any) -> dict[str, Any]:
         try:
             explain_data = json.loads(explain_data)
         except ValueError as exc:
-            raise DebugSqlValidationError("Не удалось разобрать SQL-план") from exc
+            raise SqlValidationError("Не удалось разобрать SQL-план") from exc
 
     if isinstance(explain_data, dict):
         explain_data = [explain_data]
 
     if not isinstance(explain_data, list) or not explain_data:
-        raise DebugSqlValidationError("Не удалось разобрать SQL-план")
+        raise SqlValidationError("Не удалось разобрать SQL-план")
 
     root = explain_data[0]
     if not isinstance(root, dict):
-        raise DebugSqlValidationError("Не удалось разобрать SQL-план")
+        raise SqlValidationError("Не удалось разобрать SQL-план")
 
     plan = root.get("Plan") or root
     if not isinstance(plan, dict):
-        raise DebugSqlValidationError("Не удалось разобрать SQL-план")
+        raise SqlValidationError("Не удалось разобрать SQL-план")
 
     return plan
 
@@ -181,7 +185,7 @@ def _validate_readonly_select_plan(cursor, query: str) -> None:
     cursor.execute(f"EXPLAIN (VERBOSE, FORMAT JSON) {query}")
     explain_row = cursor.fetchone()
     if not explain_row:
-        raise DebugSqlValidationError("Не удалось получить SQL-план")
+        raise SqlValidationError("Не удалось получить SQL-план")
 
     raw_plan = explain_row.get("QUERY PLAN") if hasattr(explain_row, "get") else explain_row[0]
     plan_root = _parse_explain_root(raw_plan)
@@ -207,65 +211,58 @@ def _validate_readonly_select_plan(cursor, query: str) -> None:
 
     if blocked_targets:
         blocked_targets.sort()
-        raise DebugSqlValidationError(
+        raise SqlValidationError(
             "Доступ к системным объектам PostgreSQL запрещён: "
             + ", ".join(dict.fromkeys(blocked_targets))
         )
 
     if blocked_node_types:
         blocked_node_types.sort()
-        raise DebugSqlValidationError(
+        raise SqlValidationError(
             "Разрешены только SELECT-запросы к пользовательским таблицам: "
             + ", ".join(dict.fromkeys(blocked_node_types))
         )
 
     if relation_count == 0:
-        raise DebugSqlValidationError("Разрешены только SELECT-запросы к пользовательским таблицам")
+        raise SqlValidationError("Разрешены только SELECT-запросы к пользовательским таблицам")
 
 
 def load_db_settings() -> Dict[str, Any]:
-    """Загружает настройки базы данных из db_settings.yaml."""
+    """Загружает активные настройки БД вместе с источником."""
 
-    try:
-        db_settings_path = next((path for path in DB_SETTINGS_CANDIDATES if os.path.isfile(path)), None)
-        if not db_settings_path:
-            candidates = ", ".join(DB_SETTINGS_CANDIDATES)
-            raise FileNotFoundError(f"Файл настроек БД не найден. Проверены пути: {candidates}")
-
-        with open(db_settings_path, "r", encoding="utf-8") as f:
-            settings = yaml.safe_load(f) or {}
-
-        # Валидация обязательных полей
-        required_fields = ["address", "port", "db_name", "user", "password"]
-        for field in required_fields:
-            if field not in settings:
-                raise ValueError(f"Отсутствует обязательное поле: {field}")
-
-        return settings
-    except FileNotFoundError:
-        logger.error("Файл настроек БД не найден")
-        raise
-    except yaml.YAMLError as e:
-        logger.error("Ошибка парсинга db_settings.yaml: %s", e)
-        raise
-    except Exception as e:
-        logger.exception("Ошибка загрузки настроек БД: %s", e)
-        raise
+    loaded = load_active_db_settings()
+    return {
+        "settings": dict(loaded["settings"]),
+        "source": loaded.get("source"),
+        "path": loaded.get("path"),
+        "runtime_mtime": loaded.get("runtime_mtime"),
+    }
 
 
 class DatabaseManager:
     """Менеджер для работы с PostgreSQL базой данных."""
 
-    def __init__(self):
+    def __init__(
+        self,
+        settings: dict[str, Any] | None = None,
+        *,
+        source: str | None = None,
+        settings_path: str | None = None,
+        runtime_mtime: int | None = None,
+    ):
         """Инициализация менеджера БД."""
-        self.settings = load_db_settings()
-        self._connection_params = {
-            "host": self.settings["address"],
-            "port": self.settings["port"],
-            "database": self.settings["db_name"],
-            "user": self.settings["user"],
-            "password": self.settings["password"],
-        }
+        if settings is None:
+            loaded = load_active_db_settings()
+            settings = loaded["settings"]
+            source = str(loaded.get("source") or "")
+            settings_path = str(loaded.get("path") or "")
+            runtime_mtime = loaded.get("runtime_mtime")
+
+        self.settings = normalize_db_settings(settings)
+        self.source = source or ""
+        self.settings_path = settings_path or ""
+        self.runtime_mtime = runtime_mtime
+        self._connection_params = connection_params_from_settings(self.settings)
 
     @contextmanager
     def get_connection(self):
@@ -389,6 +386,51 @@ class DatabaseManager:
                 "query": query
             }
 
+    def execute_admin_sql(
+        self,
+        query: str,
+        *,
+        statement_timeout_ms: int = 60000,
+    ) -> Dict[str, Any]:
+        """Выполняет произвольный admin SQL с timeout на уровне PostgreSQL."""
+
+        query = str(query or "").strip()
+        if not query:
+            return {"success": False, "error": "Пустой запрос", "query": query}
+
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+                    cursor.execute("SET LOCAL statement_timeout = %s", (statement_timeout_ms,))
+                    cursor.execute(query)
+                    columns = [desc[0] for desc in cursor.description] if cursor.description else []
+                    if cursor.description:
+                        rows = [_json_safe_value(dict(row)) for row in cursor.fetchall()]
+                        conn.commit()
+                        return {
+                            "success": True,
+                            "data": rows,
+                            "columns": columns,
+                            "row_count": len(rows),
+                            "query": query,
+                        }
+
+                    conn.commit()
+                    return {
+                        "success": True,
+                        "affected_rows": cursor.rowcount,
+                        "message": f"Запрос выполнен успешно. Затронуто строк: {cursor.rowcount}",
+                        "query": query,
+                    }
+        except psycopg2.Error as e:
+            error_msg = str(e).strip()
+            logger.error("Ошибка выполнения admin SQL: %s", error_msg)
+            return {"success": False, "error": error_msg, "query": query}
+        except Exception as e:
+            error_msg = str(e)
+            logger.exception("Неожиданная ошибка при выполнении admin SQL: %s", error_msg)
+            return {"success": False, "error": f"Неожиданная ошибка: {error_msg}", "query": query}
+
     def execute_readonly_select(
         self,
         query: str,
@@ -398,7 +440,7 @@ class DatabaseManager:
     ) -> Dict[str, Any]:
         """Выполняет только SELECT-запрос в read-only транзакции."""
 
-        normalized_query = _normalize_debug_select_query(query)
+        normalized_query = _normalize_readonly_select_query(query)
         conn = None
         started_at = perf_counter()
 
@@ -426,28 +468,28 @@ class DatabaseManager:
                         "max_rows": max_rows,
                         "duration_ms": int((perf_counter() - started_at) * 1000),
                     }
-        except DebugSqlError:
+        except SqlError:
             raise
         except psycopg2.OperationalError as exc:
-            logger.error("Ошибка подключения при выполнении debug SQL: %s", exc)
-            raise DebugSqlError(
+            logger.error("Ошибка подключения при выполнении read-only SQL: %s", exc)
+            raise SqlError(
                 "Не удалось подключиться к БД",
-                code="debug_sql_connection_failed",
+                code="sql_connection_failed",
                 status_code=503,
             ) from exc
         except psycopg2.Error as exc:
             error_msg = str(exc).strip() or "Ошибка выполнения SQL"
-            logger.error("Ошибка выполнения debug SQL: %s", error_msg)
-            raise DebugSqlError(
+            logger.error("Ошибка выполнения read-only SQL: %s", error_msg)
+            raise SqlError(
                 error_msg,
-                code="debug_sql_execution_failed",
+                code="sql_execution_failed",
                 status_code=400,
             ) from exc
         except Exception as exc:
-            logger.exception("Неожиданная ошибка при выполнении debug SQL")
-            raise DebugSqlError(
+            logger.exception("Неожиданная ошибка при выполнении read-only SQL")
+            raise SqlError(
                 f"Неожиданная ошибка: {exc}",
-                code="debug_sql_unexpected_error",
+                code="sql_unexpected_error",
                 status_code=500,
             ) from exc
         finally:
@@ -459,32 +501,62 @@ class DatabaseManager:
 
 
 _db_manager: DatabaseManager | None = None
+_db_manager_lock = threading.RLock()
+
+
+def replace_db_manager(manager: DatabaseManager) -> DatabaseManager:
+    """Потокобезопасно заменяет активный менеджер БД."""
+
+    global _db_manager
+    with _db_manager_lock:
+        _db_manager = manager
+        return _db_manager
+
+
+def reload_db_manager_from_active_settings() -> DatabaseManager:
+    loaded = load_active_db_settings()
+    return replace_db_manager(
+        DatabaseManager(
+            loaded["settings"],
+            source=str(loaded.get("source") or ""),
+            settings_path=str(loaded.get("path") or ""),
+            runtime_mtime=loaded.get("runtime_mtime"),
+        )
+    )
+
+
+def _manager_needs_runtime_reload(manager: DatabaseManager) -> bool:
+    current_mtime = get_runtime_settings_mtime()
+    return current_mtime != manager.runtime_mtime
 
 
 def get_db_manager() -> DatabaseManager:
-    """Ленивая инициализация менеджера БД для debug SQL и прочих utility use-cases."""
+    """Ленивая инициализация активного менеджера БД."""
 
     global _db_manager
-    if _db_manager is None:
+    with _db_manager_lock:
         try:
-            _db_manager = DatabaseManager()
+            if _db_manager is None:
+                _db_manager = DatabaseManager()
+            elif _manager_needs_runtime_reload(_db_manager):
+                _db_manager = reload_db_manager_from_active_settings()
         except FileNotFoundError as exc:
-            raise DebugSqlError(
-                "SQL debug недоступен: не найден конфиг БД",
-                code="debug_sql_not_configured",
+            raise SqlError(
+                "SQL недоступен: не найден конфиг БД",
+                code="sql_not_configured",
                 status_code=503,
             ) from exc
         except yaml.YAMLError as exc:
             logger.error("Ошибка чтения YAML-конфига БД: %s", exc)
-            raise DebugSqlError(
-                "SQL debug недоступен: ошибка чтения конфига БД",
-                code="debug_sql_not_configured",
+            raise SqlError(
+                "SQL недоступен: ошибка чтения конфига БД",
+                code="sql_not_configured",
                 status_code=503,
             ) from exc
         except ValueError as exc:
-            raise DebugSqlError(
-                f"SQL debug недоступен: {exc}",
-                code="debug_sql_not_configured",
+            raise SqlError(
+                f"SQL недоступен: {exc}",
+                code="sql_not_configured",
                 status_code=503,
             ) from exc
-    return _db_manager
+        return _db_manager

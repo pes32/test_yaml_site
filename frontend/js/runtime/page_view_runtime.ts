@@ -164,15 +164,31 @@ async function syncActiveView(vm: PageViewHost) {
     await vm.fetchActiveViewAttrs();
 }
 
+function scheduleTableWidgetChunkWarmup(): void {
+    if (typeof window === 'undefined') {
+        return;
+    }
+    const run = (): void => {
+        void widgetFactory.prefetchWidgetType('table');
+    };
+    if (typeof requestIdleCallback === 'function') {
+        requestIdleCallback(run, { timeout: 2500 });
+    } else {
+        setTimeout(run, 1);
+    }
+}
+
 async function finishInitialViewActivation(vm: PageViewHost) {
     setActiveViewFromHash(vm);
     void prefetchActiveViewWidgets(vm);
+    scheduleTableWidgetChunkWarmup();
     await syncActiveView(vm);
     registerHashListener(vm);
 }
 
 async function refreshActiveViewAfterNavigation(vm: PageViewHost) {
     void prefetchActiveViewWidgets(vm);
+    scheduleTableWidgetChunkWarmup();
     await syncActiveView(vm);
 }
 
@@ -181,6 +197,7 @@ async function handleHashChange(vm: PageViewHost) {
         rememberActiveViewScroll(vm);
         setActiveViewFromHash(vm);
         void prefetchActiveViewWidgets(vm);
+        scheduleTableWidgetChunkWarmup();
         await syncActiveView(vm);
         return null;
     });

@@ -1,10 +1,15 @@
 import {
     assignRowLineNumber,
     cloneTableRowDeep,
+    getRowCells,
     nextLineNumber
 } from './table_utils.ts';
-import { copyRowCellMeta } from './table_cell_meta.ts';
-import { isContextMenuSnapshotCurrent } from './table_context_menu_model.ts';
+import {
+    cloneCellMetaBucket,
+    copyRowCellMeta,
+    rawCellMetaBucket
+} from './table_cell_meta.ts';
+import { isContextMenuSnapshotCurrent, rowIdAtDisplayIndex } from './table_internal.ts';
 import type {
     TableContextMenuSnapshot,
     TableDataRow,
@@ -12,7 +17,6 @@ import type {
     TableRuntimeVm
 } from './table_contract.ts';
 import { TABLE_RUNTIME_SYNC } from './table_runtime_state.ts';
-import { rowIdAtDisplayIndex } from './table_view_model.ts';
 
 type TableRowRuntimeSurface = TableRuntimeVm;
 
@@ -188,24 +192,65 @@ const RowRuntimeMethods = {
         const copyRowId = copy.id != null ? String(copy.id) : '';
         const sourceRowId = rowIdAtSourceIndex(this, row);
         const insertCopy = (placement: { afterRowId?: string | null; beforeRowId?: string | null }) => {
-            this.runWithHistory('duplicate row', () => {
-                insertRowsFromCommand(this, [copy], placement, { skipHistory: true });
-                if (!sourceRowId || !copyRowId) return;
+            const beforeIndex = placement.beforeRowId ? this.tableData.findIndex((item) => String(item.id) === placement.beforeRowId) : -1;
+            const afterIndex = placement.afterRowId ? this.tableData.findIndex((item) => String(item.id) === placement.afterRowId) : -1;
+            const insertIndex = beforeIndex >= 0
+                ? beforeIndex
+                : afterIndex >= 0
+                  ? afterIndex + 1
+                  : this.tableData.length;
+            const columnKey = this.runtimeColumnKey(column);
+            const beforeSelection = {
+                anchor: sourceRowId && columnKey ? { colKey: columnKey, rowId: sourceRowId } : null,
+                focus: sourceRowId && columnKey ? { colKey: columnKey, rowId: sourceRowId } : null,
+                fullHeightColumnKeys: null,
+                fullWidthRowIds: null
+            };
+            const afterSelection = {
+                anchor: copyRowId && columnKey ? { colKey: columnKey, rowId: copyRowId } : null,
+                focus: copyRowId && columnKey ? { colKey: columnKey, rowId: copyRowId } : null,
+                fullHeightColumnKeys: null,
+                fullWidthRowIds: null
+            };
+            this.tableData.splice(insertIndex, 0, copy as TableDataRow);
+            if (sourceRowId && copyRowId) {
                 this.tableStore.meta.cellMetaByKey = copyRowCellMeta(
                     this.tableStore.meta.cellMetaByKey,
                     sourceRowId,
                     copyRowId,
                     this.runtimeColumnKeys()
                 );
+            }
+            const rowMeta = copyRowId
+                ? cloneCellMetaBucket(rawCellMetaBucket(this.tableStore.meta.cellMetaByKey[copyRowId]))
+                : {};
+            this.selFullWidthRows = null;
+            this.selAnchor = { r: insertIndex, c: column };
+            this.selFocus = { r: insertIndex, c: column };
+            this.tableStore.selection.anchor = { ...this.selAnchor };
+            this.tableStore.selection.focus = { ...this.selFocus };
+            this.tableStore.selection.fullHeightCols = null;
+            this.tableStore.selection.fullWidthRows = null;
+            this.recordOwnedHistoryEntry({
+                ...placement,
+                afterSelection,
+                beforeSelection,
+                kind: 'row-insert',
+                label: 'duplicate row',
+                row: { id: copyRowId, cells: getRowCells(copy).slice() },
+                rowMeta: Object.keys(rowMeta).length > 0 ? rowMeta : null
+            });
+            this.$nextTick(() => {
+                this.focusSelectionCell(insertIndex, column);
+                this.onInput();
+                this._scheduleStickyTheadUpdate?.();
             });
         };
         if (where === 'above') {
             insertCopy({ beforeRowId: sourceRowId });
-            if (copyRowId) this.restoreSelectionByRowIds(copyRowId, copyRowId, column, column, false);
             return;
         }
         insertCopy({ afterRowId: sourceRowId });
-        if (copyRowId) this.restoreSelectionByRowIds(copyRowId, copyRowId, column, column, false);
     },
 
     moveRowUpFromSnapshot(snapshot: TableContextMenuSnapshot) {

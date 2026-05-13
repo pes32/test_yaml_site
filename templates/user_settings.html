@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="ru">
+{% from "_html_head.html" import app_head %}
+{% set user_settings_bundle = vite_entry_assets('src/entry/user_settings.ts') %}
+{{ app_head('Настройки пользователя', user_settings_bundle) }}
+<body>
+    {% include "_app_header.html" %}
+    <script>
+    (function () {
+        var h = window.location.hash || '';
+        if (!h || h === '#') {
+            history.replaceState(null, '', '#menu-0');
+        }
+    })();
+    </script>
+    <div id="userSettingsApp"></div>
+    {% if user_settings_bundle %}
+    <script type="module" src="{{ url_for('static', filename='dist/' ~ user_settings_bundle['file']) }}"></script>
+    {% endif %}
+</body>
+</html>

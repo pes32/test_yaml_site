@@ -105,7 +105,7 @@ demo_table_4:
 demo_table_5:
   widget: table
   label: "Справочная, без сортировки:"
-  sup_text: "Статичная таблица без редактирования"
+  sup_text: "Ширина не задана"
   sort: false
   table_attrs: |
     name /Имя

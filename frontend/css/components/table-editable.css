@@ -9,9 +9,9 @@
     background: transparent;
     box-shadow: none;
     font: inherit;
-    line-height: var(--lh-lg);
-    height: var(--lh-lg);
-    min-height: var(--lh-lg);
+    line-height: var(--lh-md);
+    height: var(--lh-md);
+    min-height: var(--lh-md);
     color: inherit;
     box-sizing: border-box;
 }
@@ -29,8 +29,21 @@
     position: absolute;
     inset: var(--table-cell-padding-y) var(--table-cell-padding-x);
     width: calc(100% - (var(--table-cell-padding-x) * 2));
-    opacity: 0;
+    /*
+     * Firefox скрывает элементы с opacity:0 из дерева доступности — ломается
+     * getByRole('textbox') и часть ассистивных сценариев. Визуально значение
+     * всё равно показывает .widget-table__cell-text-proxy под этим слоем.
+     */
+    opacity: 1;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    caret-color: transparent;
     pointer-events: none;
+}
+
+/* В режиме просмотра инпут вынесен из потока — видимую строку и min-height даёт прокси (как span.cell-value в readonly). */
+.widget-table--editable .cell-input.cell-input--view + .widget-table__cell-text-proxy {
+    display: block;
 }
 
 .widget-table--editable .cell-input:not(.cell-input--view) + .widget-table__cell-text-proxy {
@@ -93,6 +106,12 @@
     padding-right: 0;
 }
 
+.widget-table--editable .cell-editor-wrap > input[data-table-embedded-widget="true"].form-control {
+    min-height: var(--lh-md);
+    height: var(--lh-md);
+    line-height: var(--lh-md);
+}
+
 .widget-table--editable [data-table-embedded-widget="true"] .list-combobox-input {
     width: 100%;
     max-width: 100%;
@@ -136,14 +155,7 @@
     background: transparent;
 }
 
-.widget-table--editable tbody td:not(.widget-table__group-row) > span {
-    display: block;
-    min-height: var(--lh-lg);
-    line-height: var(--lh-lg);
-}
-
 .widget-table--word-wrap.widget-table--editable tbody td:not(.widget-table__group-row) > span.widget-table__cell-value {
-    min-height: 0;
     line-height: var(--table-word-wrap-line-height);
 }
 

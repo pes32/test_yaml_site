@@ -33,6 +33,8 @@ run/
 
 # Database
 *.db
+database/db_settings.runtime.yaml
+database/.db_settings.runtime.key
 
 # Config
 .env
@@ -53,6 +55,7 @@ node_modules/
 tooling/vite/node_modules/
 frontend/dist/
 npm-debug.log*
+report-jscpd/
 
 # Local TLS
 ssl/

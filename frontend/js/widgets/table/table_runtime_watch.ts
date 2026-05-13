@@ -2,13 +2,21 @@ import type {
     TableRuntimeVm,
     TableRuntimeWatchHandlers
 } from './table_contract.ts';
+import { computeTableInitSignature } from './table_runtime_init_signature.ts';
+
+function initializeWhenSignatureChanged(vm: TableRuntimeVm): void {
+    const next = computeTableInitSignature(vm);
+    if (next === vm.lastInitSignature) return;
+    vm.lastInitSignature = next;
+    vm.initializeTable?.();
+}
 
 const tableRuntimeWatch: TableRuntimeWatchHandlers = {
     widgetName(this: TableRuntimeVm) {
-        this.initializeTable?.();
+        initializeWhenSignatureChanged(this);
     },
     widgetConfig(this: TableRuntimeVm) {
-        this.initializeTable?.();
+        initializeWhenSignatureChanged(this);
     },
     tableLazyUiActive(this: TableRuntimeVm, value: boolean) {
         this.$nextTick?.(() => {

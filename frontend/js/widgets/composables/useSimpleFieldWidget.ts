@@ -12,6 +12,7 @@ import type {
 type SimpleFieldWidgetConfig = Record<string, unknown> & {
   err_text?: string;
   placeholder?: string;
+  no_copy?: boolean;
   readonly?: boolean;
   regex?: RegExp | string;
   rows?: number;
@@ -33,12 +34,14 @@ type SimpleFieldInputPayload = {
 
 type SimpleFieldEmit = {
   (event: 'input', payload: SimpleFieldInputPayload): void;
+  (event: 'live-input', payload: SimpleFieldInputPayload): void;
+  (event: 'blur', payload: SimpleFieldInputPayload): void;
 };
 
 type SimpleFieldCommitContext = LifecycleCommitContext;
 type SimpleFieldCommitResult = LifecycleCommitResult;
 
-type SimpleFieldKind = 'float' | 'int' | 'string' | 'text';
+type SimpleFieldKind = 'float' | 'int' | 'password' | 'string' | 'text';
 
 type UseSimpleFieldWidgetOptions = {
   kind: SimpleFieldKind;
@@ -166,6 +169,7 @@ function useSimpleFieldWidget(
   function onInput(event?: Event): void {
     const nextValue = eventValue(event);
     syncLiveValue(nextValue == null ? value.value : nextValue);
+    emit('live-input', { config: props.widgetConfig, name: props.widgetName, value: value.value });
 
     if (field.tableCellMode.value) {
       field.emitInput(value.value);
@@ -185,6 +189,7 @@ function useSimpleFieldWidget(
 
   function onBlur(): void {
     fieldBase.commitOnBlur(commitDraft);
+    emit('blur', { config: props.widgetConfig, name: props.widgetName, value: value.value });
   }
 
   function onEnterCommit(event: KeyboardEvent): void {

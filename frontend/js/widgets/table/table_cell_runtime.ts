@@ -3,9 +3,12 @@ import { EMBEDDED_TABLE_WIDGET_TYPES } from '../../shared/widget_types.ts';
 import * as tableSelectors from './table_selectors.ts';
 import { tableLog } from './table_debug.ts';
 import { sanitizeTableCellOptions } from './table_parse_attrs.ts';
-import { displayCellToCore } from './table_selection_model.ts';
+import {
+    displayCellToCore,
+    setTableValidationError,
+    tableValidationKey
+} from './table_internal.ts';
 import { dispatchRuntimeCellPatches } from './table_runtime_commands.ts';
-import { setTableValidationError, tableValidationKey } from './table_validation_model.ts';
 import { tableEmbeddedWidgetComponent } from './table_embedded_widgets.ts';
 import type {
     TableCellDisplayAction,
@@ -19,6 +22,24 @@ import type {
 function resolveEmbeddedWidgetType(type: unknown): string {
     const key = String(type || '').trim();
     return EMBEDDED_TABLE_WIDGET_TYPES.has(key) ? key : '';
+}
+
+function columnHasEmbeddedFieldOptions(vm: TableRuntimeVm, column: TableRuntimeColumn): boolean {
+    const ref = column.widgetRef != null && String(column.widgetRef).trim();
+    if (ref) return true;
+    const opts = vm.getColumnTableCellOptions(column);
+    return !!(opts && (opts.regex || opts.placeholder || opts.err_text));
+}
+
+function columnUsesEmbeddedFieldWidget(vm: TableRuntimeVm, column: TableRuntimeColumn): boolean {
+    const t = String(column.type || '').trim();
+    if (t === 'int' || t === 'float' || t === 'str') {
+        return columnHasEmbeddedFieldOptions(vm, column);
+    }
+    if (t === 'ip' || t === 'ip_mask') {
+        return true;
+    }
+    return false;
 }
 
 function cellRefKey(rowId: string, colKey: string): string {
@@ -49,7 +70,6 @@ function buildCellWidgetConfig(
         ...options,
         widget: column.type,
         value,
-        default: undefined,
         label:
             attrConfig && attrConfig.label !== undefined
                 ? attrConfig.label
@@ -122,16 +142,19 @@ const CellRuntimeMethods = {
     },
 
     columnWidgetComponentByType(type: unknown) {
-        const widgetType = resolveEmbeddedWidgetType(type);
-        return widgetType ? tableEmbeddedWidgetComponent(widgetType) : null;
+        const key = String(type || '').trim();
+        return tableEmbeddedWidgetComponent(key);
     },
 
     cellWidgetComponent(column: TableRuntimeColumn | null | undefined) {
-        return this.columnWidgetComponentByType(column && column.type);
+        if (!column || !this.cellUsesEmbeddedWidget(column)) return null;
+        return tableEmbeddedWidgetComponent(String(column.type || '').trim());
     },
 
     cellUsesEmbeddedWidget(column: TableRuntimeColumn | null | undefined) {
-        return !!(column && resolveEmbeddedWidgetType(column.type));
+        if (!column) return false;
+        if (resolveEmbeddedWidgetType(column.type)) return true;
+        return columnUsesEmbeddedFieldWidget(this, column);
     },
 
     cellDisplayActions: tableSelectors.getCellDisplayActions,
@@ -248,6 +271,14 @@ const CellRuntimeMethods = {
         const col = this.normCol(colIndex);
         const colKey = this.runtimeColumnKey(col);
         if (!colKey) return null;
+        if (this.tableRemote?.mode === 'remote-paged') {
+            const item = this.tableRemote.itemsByDisplayIndex[row];
+            if (item?.kind === 'row') {
+                return { colKey, rowId: item.rowId };
+            }
+            if (item) return null;
+            return { colKey, rowId: `remote_missing_${row}` };
+        }
         const displayRow = this.displayRows[row];
         if (displayRow && displayRow.kind === 'data') {
             return { colKey, rowId: displayRow.rowId };

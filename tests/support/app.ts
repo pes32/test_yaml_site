@@ -6,6 +6,12 @@ export const DEMO_PAGE = {
   title: 'Виджеты'
 } as const;
 
+export const BACKEND_DEMO_PAGE = {
+  name: '3_backend_demo',
+  url: '/backend_demo',
+  title: 'Backend demo'
+} as const;
+
 function attrValue(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
@@ -34,6 +40,10 @@ export function tableCell(page: Page, name: string, row: number, col: number): L
   return table(page, name).locator(`tbody td[data-row="${row}"][data-col="${col}"]`).first();
 }
 
+export function tableCellText(page: Page, name: string, row: number, col: number): Locator {
+  return tableCell(page, name, row, col).locator('.widget-table__cell-value').first();
+}
+
 export async function waitForPageReady(page: Page): Promise<void> {
   await expect(page.locator('.page-shell')).toBeVisible();
   await expect(page.locator('.page-empty-placeholder')).toHaveCount(0);
@@ -50,6 +60,13 @@ export async function gotoWidgetDemo(page: Page): Promise<void> {
   await waitForPageReady(page);
   await expect(page.locator('body')).toHaveAttribute('data-page-name', DEMO_PAGE.name);
   await expect(page).toHaveURL(new RegExp(`${DEMO_PAGE.url}(#.*)?$`));
+}
+
+export async function gotoBackendDemo(page: Page): Promise<void> {
+  await page.goto(BACKEND_DEMO_PAGE.url);
+  await waitForPageReady(page);
+  await expect(page.locator('body')).toHaveAttribute('data-page-name', BACKEND_DEMO_PAGE.name);
+  await expect(page).toHaveURL(new RegExp(`${BACKEND_DEMO_PAGE.url}(#.*)?$`));
 }
 
 export async function selectMenu(page: Page, menuName: string): Promise<void> {

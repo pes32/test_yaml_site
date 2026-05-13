@@ -15,6 +15,7 @@ export type ApiEnvelope = UnknownRecord & {
     data?: unknown;
     diagnostics?: unknown;
     error?: unknown;
+    error_code?: unknown;
     message?: unknown;
     ok?: boolean;
     snapshot_version?: unknown;
@@ -26,6 +27,13 @@ export type PageSummary = {
     url: string;
 };
 
+/** Нормализованный ответ `GET /api/pages` (read-model / navigation index). */
+export type PagesIndexState = {
+    diagnostics: ApiDiagnostic[];
+    pages: PageSummary[];
+    snapshotVersion: string | null;
+};
+
 export type ExecuteRequestPayload = {
     command: string;
     output_attrs?: string[];
@@ -34,11 +42,18 @@ export type ExecuteRequestPayload = {
     widget?: string;
 };
 
+export type WidgetSourceRequestPayload = {
+    page: string;
+    snapshot_version?: string | null;
+    widget: string;
+};
+
 export type PageResponse = {
     attrs: UnknownRecord;
     diagnostics: ApiDiagnostic[];
     page: UnknownRecord | null;
-    snapshotVersion: string;
+    snapshotVersion: string | null;
+    tableRuntime: UnknownRecord;
 };
 
 export type AttrsResponse = {
@@ -47,12 +62,56 @@ export type AttrsResponse = {
     missingNames: string[];
     page: string;
     resolvedNames: string[];
-    snapshotVersion: string;
+    snapshotVersion: string | null;
+    tableRuntime: UnknownRecord;
 };
 
 export type ModalResponse = AttrsResponse & {
     dependencies: UnknownRecord;
     modal: UnknownRecord | null;
+};
+
+export type TableQueryRequestPayload = {
+    attr: string;
+    export_chunk?: { limit?: number; offset: number };
+    page: string;
+    snapshot_version?: string | null;
+    view: UnknownRecord;
+};
+
+export type TableCommandRequestPayload = TableQueryRequestPayload & {
+    commands: UnknownRecord[];
+};
+
+export type TableQueryResponse = {
+    attr: string;
+    diagnostics: ApiDiagnostic[];
+    hasMore: boolean;
+    items: unknown[];
+    limit: number;
+    offset: number;
+    page: string;
+    snapshotVersion: string | null;
+    total: number;
+    viewFingerprint: string;
+    viewId: string;
+};
+
+export type TableCommandResponse = TableQueryResponse & {
+    commandsApplied: UnknownRecord[];
+};
+
+export type TableExportResponse = {
+    attr: string;
+    diagnostics: ApiDiagnostic[];
+    exportChunked: boolean;
+    exportHasMore: boolean;
+    exportLimit: number;
+    exportOffset: number;
+    page: string;
+    rows: unknown[][];
+    snapshotVersion: string | null;
+    total: number;
 };
 
 export type ExecuteResponse = {
@@ -62,51 +121,39 @@ export type ExecuteResponse = {
     message: string;
     page: string | null;
     params: UnknownRecord;
-    snapshotVersion: string;
+    snapshotVersion: string | null;
+    silentSuccess: boolean;
+    updates: UnknownRecord;
     widget: string | null;
 };
 
-export type DebugApiRoute = {
-    endpoint: string;
-    methods: string[];
-    rule: string;
-};
-
-export type DebugSqlRow = UnknownRecord;
-
-export type DebugStructureResponse = {
-    routes: DebugApiRoute[];
-    snapshot: UnknownRecord;
-};
-
-export type DebugLogsResponse = {
-    lines: string[];
-    total: number;
-};
-
-export type DebugPagesResponse = {
+export type WidgetSourceResponse = {
     diagnostics: ApiDiagnostic[];
-    lastError: string | null;
-    pages: PageSummary[];
-    snapshot: UnknownRecord;
+    page: string;
+    patch: UnknownRecord;
+    snapshotVersion: string | null;
+    widget: string;
 };
 
-export type DebugSnapshotResponse = {
-    diagnostics: ApiDiagnostic[];
-    lastError: string | null;
-    meta: UnknownRecord;
-    pageCount: number;
-    pagesByUrl: UnknownRecord;
+export type UserRecord = UnknownRecord & {
+    role_name?: string;
+    user_id?: number;
+    user_login?: string;
+    user_email?: string;
+    user_name?: string;
+    user_patronymic?: string;
+    user_status?: string;
+    user_surname?: string;
 };
 
-export type DebugSqlResponse = {
-    columns: string[];
-    diagnostics: ApiDiagnostic[];
-    durationMs: number;
-    maxRows: number;
-    query: string;
-    rowCount: number;
-    rows: DebugSqlRow[];
-    snapshotVersion: string;
-    truncated: boolean;
+export type RoleRecord = {
+    role_name: string;
+};
+
+export type DbSettingsPublicResponse = {
+    path?: string;
+    settings: UnknownRecord & {
+        password_set?: boolean;
+    };
+    source?: string;
 };

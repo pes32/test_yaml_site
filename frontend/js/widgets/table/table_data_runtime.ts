@@ -25,18 +25,17 @@ import {
 } from './table_grouping.ts';
 import {
     appendRowsDedup,
-    normalizeLazyChunkSize,
-    splitLazyInitialRows,
-    takeLazyChunk
-} from './table_lazy_load_model.ts';
-import {
     buildCoreSelectionFromDisplay,
     captureSelectionIdentity as captureCoreSelectionIdentity,
     coreCellToDisplay,
-    runtimeDisplaySelection,
+    coreSortToRuntimeSort,
+    normalizeLazyChunkSize,
     restoreSelectionIdentity as restoreCoreSelectionIdentity,
-    setSelectionCommandFromCore
-} from './table_selection_model.ts';
+    runtimeDisplaySelection,
+    setSelectionCommandFromCore,
+    splitLazyInitialRows,
+    takeLazyChunk
+} from './table_internal.ts';
 import {
     TABLE_RUNTIME_SYNC,
     checkRuntimeTableInvariants,
@@ -53,7 +52,6 @@ import {
     sortKeysFromRuntime,
     withUniqueColumnKeys
 } from './table_state_core.ts';
-import { coreSortToRuntimeSort } from './table_sort_model.ts';
 import {
     assignRowLineNumber,
     cloneTableData,
@@ -68,11 +66,18 @@ import {
     stripTableDataForEmit,
     validateExternalTableRows
 } from './table_utils.ts';
-
-type TableRuntimeErrorOptions = {
-    cause?: unknown;
-    details?: unknown;
-};
+import { emitTableUserFacingError, type TableUserFacingErrorOptions } from './table_errors.ts';
+import frontendApiClient, { FrontendApiError } from '../../runtime/api_client.ts';
+import {
+    DEFAULT_REMOTE_LIMIT,
+    createInitialRemoteProviderState,
+    createRemoteProviderState,
+    mergeRemoteWindow,
+    normalizeRuntimeProviderConfig,
+    resolveRemoteProviderSourceKey,
+    rowsFromRemoteProviderState
+} from './table_row_provider.ts';
+import { computeTableQueryViewFingerprint } from './table_query_fingerprint.ts';
 
 type TableSelectionIdentitySnapshot = {
     anchorCol: number;
@@ -214,6 +219,15 @@ const DataRuntimeMethods = {
         this._tableFocusWithin = false;
         this.sortKeys = [];
         this._tableContextMenuMouseDown = false;
+        this.tableRemote.activeAbortController?.abort();
+        this.tableRemote = createInitialRemoteProviderState();
+        this._remotePendingRange = null;
+        this._remoteRangeRequestRaf = 0;
+        this._pendingFocusSelectionCell = null;
+        if (this._focusSelectionScheduledRaf && typeof cancelAnimationFrame === 'function') {
+            cancelAnimationFrame(this._focusSelectionScheduledRaf);
+        }
+        this._focusSelectionScheduledRaf = 0;
         this.exitCellEdit();
         this._teardownLazyObserver();
         this.lazySessionId = (this.lazySessionId || 0) + 1;
@@ -232,7 +246,20 @@ const DataRuntimeMethods = {
         this.groupingState = { levels: [], expanded: new Set() };
         this.parseTableAttrs(this.widgetConfig.table_attrs);
         this.captureInitialTableWidths?.();
-        const incomingSource = Array.isArray(this.widgetConfig.value)
+        const runtimeSidecar = normalizeRuntimeProviderConfig(
+            this.widgetConfig && this.widgetConfig.__tableRuntime
+        );
+        const remoteState = createRemoteProviderState({
+            ...runtimeSidecar,
+            sourceKey: resolveRemoteProviderSourceKey(runtimeSidecar, this.widgetConfig)
+        });
+        const remoteRows =
+            remoteState.mode === 'remote-paged'
+                ? rowsFromRemoteProviderState(remoteState)
+                : [];
+        const incomingSource = remoteState.mode === 'remote-paged'
+            ? remoteRows
+            : Array.isArray(this.widgetConfig.value)
             ? this.widgetConfig.value
             : Array.isArray(this.widgetConfig.source)
               ? this.widgetConfig.source
@@ -248,16 +275,27 @@ const DataRuntimeMethods = {
             } else {
                 this.tableData = normalized;
             }
+            this.tableRemote = remoteState.mode === 'remote-paged'
+                ? remoteState
+                : createInitialRemoteProviderState();
         } else {
             this.tableData = [];
             this._lazyPendingRows = [];
             this.isFullyLoaded = true;
+            this.tableRemote = createInitialRemoteProviderState();
         }
         this.ensureMinTableRows();
         this.normalizeTableRuntimeState?.('initialize table');
-        this.onInput();
+        this.applyReadonlySelectedRowFromConfig?.();
+        if (this.tableRemote.mode !== 'remote-paged') {
+            this.onInput();
+        }
         this.$nextTick(() => {
-            this._setupLazyObserver();
+            if (this.widgetConfig && this.widgetConfig.auto_width === true) {
+                this.applyTableAutoWidthToAll?.();
+            }
+            this._resetVirtualMeasurements?.();
+            this._bindVirtualRows?.();
             this._unbindStickyThead();
             if (this.stickyHeaderEnabled || this.toolbarEnabled) this._bindStickyThead();
         });
@@ -284,36 +322,23 @@ const DataRuntimeMethods = {
         }
     },
     prepareRowsForLazyDisplay(rows: TableDataRow[], lazyThreshold: number) {
-        this.lazyEnabled = this.resolveTableLazyEnabled(rows.length);
-        const lazyRows = splitLazyInitialRows(rows, {
-            enabled: this.lazyEnabled,
-            threshold: lazyThreshold
-        });
-        this._lazyPendingRows = lazyRows.pendingRows;
-        this.isFullyLoaded = lazyRows.isFullyLoaded;
-        return lazyRows.visibleRows;
+        void lazyThreshold;
+        this.lazyEnabled = false;
+        this._lazyPendingRows = [];
+        this.isFullyLoaded = true;
+        return rows.slice();
     },
-    showTableError(message: unknown, options: TableRuntimeErrorOptions = {}) {
-        const normalizedMessage = String(message || 'Ошибка таблицы').trim() || 'Ошибка таблицы';
-        const sourceError = options && options.cause ? options.cause : new Error(normalizedMessage);
-        if (typeof this.handleRecoverableAppErrorFromRuntime === 'function') {
-            this.handleRecoverableAppErrorFromRuntime(sourceError, {
-                scope: 'table',
-                message: normalizedMessage,
-                details: options && options.details ? options.details : null
-            });
-            return;
-        }
-        if (typeof this.showAppNotificationFromRuntime === 'function') {
-            this.showAppNotificationFromRuntime(normalizedMessage, 'danger');
-            return;
-        }
-        const root = this.$root;
-        if (root && typeof root.showNotification === 'function') {
-            root.showNotification(normalizedMessage, 'danger');
-        }
+    showTableError(message: unknown, options: TableUserFacingErrorOptions = {}) {
+        emitTableUserFacingError(this, message, options);
     },
     onInput() {
+        if (this.tableRemote.mode === 'remote-paged') {
+            this.tablePageBridge?.notify?.(
+                'Remote-paged таблица сохраняет изменения командами; sync value emit отключён.',
+                'warning'
+            );
+            return;
+        }
         this.$emit('input', {
             name: this.widgetName,
             value: stripTableDataForEmit(this.tableData, this.tableColumns),
@@ -347,9 +372,90 @@ const DataRuntimeMethods = {
         this.ensureMinTableRows();
         this.normalizeTableRuntimeState?.('set value');
         this.onInput();
+        this.$nextTick(() => {
+            this._resetVirtualMeasurements?.();
+            this._scheduleVirtualWindowUpdate?.();
+        });
     },
     getValue() {
+        if (this.tableRemote.mode === 'remote-paged') {
+            throw new Error('sync getValue() запрещён для remote-paged таблиц; используйте async export/commands');
+        }
         return stripTableDataForEmit(this.tableData, this.tableColumns);
+    },
+    async exportValueAsync(options?: { onProgress?: (loaded: number, total: number) => void }) {
+        if (this.tableRemote.mode !== 'remote-paged') {
+            return this.getValue();
+        }
+        const page = this.tableRemote.page || String(this.tableRemote.tableId || '').split(':')[0] || '';
+        const attr =
+            this.tableRemote.attr ||
+            this.widgetName ||
+            String(this.tableRemote.tableId || '').split(':').slice(1).join(':');
+        const basePayload = {
+            attr,
+            page,
+            snapshot_version:
+                this.tablePageBridge?.getSnapshotVersion?.() || this.tableRemote.snapshotVersion || null,
+            view: this.tableRemote.view
+        };
+        const chunkLimit = 50000;
+        try {
+            const response = await frontendApiClient.exportTable(basePayload);
+            return response.rows;
+        } catch (error) {
+            if (!(error instanceof FrontendApiError) || error.code !== 'table_export_too_large') {
+                throw error;
+            }
+            let offset = 0;
+            const allRows: unknown[][] = [];
+            let total = Infinity;
+            while (offset < total) {
+                const chunk = await frontendApiClient.exportTable({
+                    ...basePayload,
+                    export_chunk: { offset, limit: chunkLimit }
+                });
+                total = chunk.total;
+                allRows.push(...chunk.rows);
+                options?.onProgress?.(allRows.length, total);
+                if (!chunk.exportHasMore) {
+                    break;
+                }
+                offset += chunk.rows.length;
+                if (chunk.rows.length === 0) {
+                    break;
+                }
+            }
+            return allRows;
+        }
+    },
+    async getValueAsync() {
+        return this.exportValueAsync();
+    },
+    async submitTableCommands(commands: Record<string, unknown>[]) {
+        if (this.tableRemote.mode !== 'remote-paged') {
+            return null;
+        }
+        const page = this.tableRemote.page || String(this.tableRemote.tableId || '').split(':')[0] || '';
+        const attr = this.tableRemote.attr || this.widgetName || String(this.tableRemote.tableId || '').split(':').slice(1).join(':');
+        const response = await frontendApiClient.submitTableCommands({
+            attr,
+            commands: Array.isArray(commands) ? commands : [],
+            page,
+            snapshot_version: this.tablePageBridge?.getSnapshotVersion?.() || this.tableRemote.snapshotVersion || null,
+            view: this.tableRemote.view
+        });
+        this.tableRemote = mergeRemoteWindow(this.tableRemote, response);
+        const rows = rowsFromRemoteProviderState(this.tableRemote);
+        this.tableData = this.normalizeExternalRowsOrWarn(rows) || [];
+        this.normalizeTableRuntimeState?.('remote table command', {
+            ...TABLE_RUNTIME_SYNC.ROWS_ONLY
+        });
+        this.$nextTick(() => {
+            this._scheduleVirtualWindowUpdate?.();
+            this._scheduleStickyTheadUpdate?.();
+        });
+        return response;
     },
     toggleLineNumbersFromSnapshot(snapshot: TableContextMenuSnapshot) {
         if (snapshot && snapshot.sessionId !== this.contextMenuSessionId) {
@@ -478,6 +584,181 @@ const DataRuntimeMethods = {
         }
         this.normalizeTableRuntimeState?.('sort');
     },
+    async queryRemoteTableWindow(viewPatch: Record<string, unknown> = {}) {
+        if (this.tableRemote.mode !== 'remote-paged') return false;
+        const page = this.tableRemote.page || String(this.tableRemote.tableId || '').split(':')[0] || '';
+        const attr = this.tableRemote.attr || this.widgetName || String(this.tableRemote.tableId || '').split(':').slice(1).join(':');
+        if (!page || !attr) return false;
+        const view = {
+            ...this.tableRemote.view,
+            ...viewPatch
+        };
+        const sourceKeyResolved = resolveRemoteProviderSourceKey(this.tableRemote, this.widgetConfig);
+        const snapshotVersion = this.tablePageBridge?.getSnapshotVersion?.() || this.tableRemote.snapshotVersion || '';
+        const requestId = (this.tableRemote.activeRequestId || 0) + 1;
+        if (this.tableRemote.activeAbortController) {
+            this.tableRemote.activeAbortController.abort();
+        }
+        const abortController = typeof AbortController !== 'undefined'
+            ? new AbortController()
+            : null;
+        this.tableRemote = {
+            ...this.tableRemote,
+            activeAbortController: abortController,
+            activeRequestId: requestId,
+            snapshotVersion,
+            sourceKey: sourceKeyResolved,
+            view
+        };
+        this.isLoadingChunk = true;
+        try {
+            const expectedFingerprint = await computeTableQueryViewFingerprint({
+                attr,
+                page,
+                provider: String(this.tableRemote.provider || 'inline'),
+                sourceKey: sourceKeyResolved,
+                view: view as unknown as Record<string, unknown>
+            });
+            if (this.tableRemote.activeRequestId !== requestId) {
+                return false;
+            }
+            if (expectedFingerprint !== this.tableRemote.activeViewFingerprint) {
+                this.tableRemote = {
+                    ...this.tableRemote,
+                    activeViewFingerprint: expectedFingerprint,
+                    itemsByDisplayIndex: {},
+                    loadedRanges: [],
+                    rowItemsById: {}
+                };
+                this.tableData = [];
+                this.normalizeTableRuntimeState?.('remote table view reset', {
+                    ...TABLE_RUNTIME_SYNC.ROWS_ONLY
+                });
+            }
+            const dispatchFingerprint = expectedFingerprint;
+            const response = await frontendApiClient.queryTable({
+                attr,
+                page,
+                snapshot_version: snapshotVersion || null,
+                view
+            }, {
+                signal: abortController?.signal
+            });
+            if (this.tableRemote.activeRequestId !== requestId) {
+                return false;
+            }
+            if (this.tableRemote.activeViewFingerprint !== dispatchFingerprint) {
+                return false;
+            }
+            if (
+                response.viewFingerprint
+                && response.viewFingerprint !== expectedFingerprint
+            ) {
+                console.warn('[TableWidget]', 'remote table-query fingerprint mismatch — stale response discarded', {
+                    attr,
+                    expected: expectedFingerprint,
+                    got: response.viewFingerprint,
+                    page
+                });
+                return false;
+            }
+            this.tableRemote = mergeRemoteWindow(this.tableRemote, response);
+            const rows = rowsFromRemoteProviderState(this.tableRemote);
+            this.tableData = this.normalizeExternalRowsOrWarn(rows) || [];
+            this.normalizeTableRuntimeState?.('remote table query', {
+                ...TABLE_RUNTIME_SYNC.ROWS_ONLY
+            });
+            this.$nextTick(() => {
+                this._scheduleVirtualWindowUpdate?.();
+                this._scheduleStickyTheadUpdate?.();
+            });
+            return true;
+        } catch (error) {
+            if (
+                error instanceof DOMException &&
+                error.name === 'AbortError'
+            ) {
+                return false;
+            }
+            this.tablePageBridge?.handleRecoverableError?.({
+                cause: error,
+                code: 'table_query_failed',
+                message: 'Не удалось загрузить окно таблицы',
+                severity: 'recoverable'
+            });
+            return false;
+        } finally {
+            if (this.tableRemote.activeRequestId === requestId) {
+                this.tableRemote = {
+                    ...this.tableRemote,
+                    activeAbortController: null
+                };
+                this.isLoadingChunk = false;
+            }
+            const pendingRange = this._remotePendingRange;
+            if (
+                pendingRange
+                && !this._remoteRangeRequestRaf
+                && !this.tableRemote.activeAbortController
+            ) {
+                this.requestRemoteRangeForWindow(pendingRange.start, pendingRange.end);
+            }
+        }
+    },
+    remoteRangeLoaded(start: number, end: number) {
+        if (this.tableRemote.mode !== 'remote-paged') return true;
+        return this.tableRemote.loadedRanges.some((range) =>
+            range.start <= start && range.end >= end
+        );
+    },
+    remoteDisplayIndexLoaded(index: number) {
+        if (this.tableRemote.mode !== 'remote-paged') return true;
+        const safeIndex = Math.max(0, Math.floor(Number(index) || 0));
+        return this.tableRemote.loadedRanges.some((range) =>
+            range.start <= safeIndex && range.end > safeIndex
+        );
+    },
+    requestRemoteRangeForWindow(start: number, end: number) {
+        if (this.tableRemote.mode !== 'remote-paged') return false;
+        const safeStart = Math.max(0, Math.floor(Number(start) || 0));
+        const safeEnd = Math.max(safeStart, Math.floor(Number(end) || safeStart));
+        if (safeEnd <= safeStart) return false;
+        if (this.remoteRangeLoaded(safeStart, safeEnd)) return false;
+        let missingStart = safeStart;
+        while (missingStart < safeEnd && this.remoteDisplayIndexLoaded(missingStart)) {
+            missingStart += 1;
+        }
+        if (missingStart >= safeEnd) return false;
+        const cappedEnd = Math.min(safeEnd, missingStart + DEFAULT_REMOTE_LIMIT);
+        const pending = this._remotePendingRange;
+        this._remotePendingRange = pending
+            ? {
+                start: Math.min(pending.start, missingStart),
+                end: Math.min(
+                    Math.max(pending.end, cappedEnd),
+                    Math.min(safeEnd, Math.min(pending.start, missingStart) + DEFAULT_REMOTE_LIMIT)
+                )
+            }
+            : { start: missingStart, end: cappedEnd };
+        if (this._remoteRangeRequestRaf) return true;
+        const schedule = typeof requestAnimationFrame === 'function'
+            ? requestAnimationFrame
+            : (callback: FrameRequestCallback) => window.setTimeout(callback, 16);
+        this._remoteRangeRequestRaf = schedule(() => {
+            this._remoteRangeRequestRaf = 0;
+            const range = this._remotePendingRange;
+            if (!range || this.remoteRangeLoaded(range.start, range.end)) return;
+            if (this.tableRemote.activeAbortController) {
+                return;
+            }
+            this._remotePendingRange = null;
+            void this.queryRemoteTableWindow({
+                limit: Math.max(1, range.end - range.start),
+                offset: range.start
+            });
+        });
+        return true;
+    },
     applyColumnSort(colIdx: number, direction: 'asc' | 'desc') {
         this.applySortKeysFromRuntime(
             [{ col: colIdx, dir: direction === 'desc' ? 'desc' : 'asc' }],
@@ -491,6 +772,33 @@ const DataRuntimeMethods = {
         );
     },
     applySortKeysFromCore(nextSortKeys: TableCoreSortState[] | null | undefined, phase?: string) {
+        if (this.tableRemote.mode === 'remote-paged') {
+            const before = this.captureRemoteHistorySnapshot();
+            const normalizedCoreSort = nextSortKeys || [];
+            this.sortKeys = coreSortToRuntimeSort(this.tableColumns, normalizedCoreSort);
+            this.tableRemote = {
+                ...this.tableRemote,
+                view: {
+                    ...this.tableRemote.view,
+                    offset: 0,
+                    sort: normalizedCoreSort.map((item) => ({
+                        columnKey: item.colKey,
+                        direction: item.dir === 'desc' ? 'desc' : 'asc'
+                    }))
+                }
+            };
+            const after = this.captureRemoteHistorySnapshot();
+            this.recordRemoteHistoryEntry(phase || 'remote sort', before, after, {
+                kind: 'sort',
+                sort: after.view.sort || []
+            });
+            void this.queryRemoteTableWindow({
+                offset: 0,
+                sort: after.view.sort || []
+            });
+            void phase;
+            return;
+        }
         const selectionIdentity = this.captureSelectionIdentity();
         this.sortKeys = coreSortToRuntimeSort(this.tableColumns, nextSortKeys || []);
         this.restoreSelectionIdentity(selectionIdentity, { focus: false });
@@ -502,11 +810,16 @@ const DataRuntimeMethods = {
         void phase;
     },
     normRow(rowIndex: number) {
-        const length = this.displayRows.length || this.tableData.length;
+        const length = this.tableRemote.mode === 'remote-paged'
+            ? this.tableRemote.totalRows
+            : this.displayRows.length || this.tableData.length;
         const max = Math.max(0, length - 1);
         return clamp(rowIndex, 0, max);
     },
     tbodyRowCount() {
+        if (this.tableRemote.mode === 'remote-paged') {
+            return this.tableRemote.totalRows;
+        }
         return this.displayRows.length || this.tableData.length;
     },
     resolveDataRowIndex(viewRow: number) {
@@ -540,9 +853,35 @@ const DataRuntimeMethods = {
         };
     },
     groupExpanded(pathKey: string) {
+        if (this.tableRemote.mode === 'remote-paged') {
+            const expanded = Array.isArray(this.tableRemote.view.expandedGroups)
+                ? this.tableRemote.view.expandedGroups.map((item) => String(item))
+                : [];
+            return expanded.includes(String(pathKey || ''));
+        }
         return this.groupingState.expanded.has(pathKey);
     },
     toggleGroupExpand(pathKey: string) {
+        if (this.tableRemote.mode === 'remote-paged') {
+            const groupId = String(pathKey || '');
+            if (!groupId) return;
+            const current = Array.isArray(this.tableRemote.view.expandedGroups)
+                ? this.tableRemote.view.expandedGroups.map((item) => String(item))
+                : [];
+            const next = current.includes(groupId)
+                ? current.filter((item) => item !== groupId)
+                : current.concat(groupId);
+            this.dispatchTableCoreCommand(
+                { expandedPathKeys: next, type: 'SET_GROUP_EXPANDED' },
+                'remote toggle group',
+                { ...TABLE_RUNTIME_SYNC.GROUPING_ONLY, skipHistory: true }
+            );
+            void this.queryRemoteTableWindow({
+                expandedGroups: next,
+                offset: 0
+            });
+            return;
+        }
         const next = new Set(this.groupingState.expanded);
         if (next.has(pathKey)) next.delete(pathKey);
         else next.add(pathKey);
@@ -555,6 +894,10 @@ const DataRuntimeMethods = {
     },
     refreshGroupingViewFromData() {
         this.normalizeTableRuntimeState?.('rebuild grouping');
+        if (this.tableRemote.mode === 'remote-paged') {
+            this.$nextTick(() => this._scheduleStickyTheadUpdate());
+            return;
+        }
         if (!this.groupingActive || !this.isFullyLoaded) {
             this.$nextTick(() => this._scheduleStickyTheadUpdate());
             return;
@@ -653,14 +996,6 @@ const DataRuntimeMethods = {
         this.$nextTick(() => this._setupLazyObserver());
     },
     flushLazyFullLoadInternal() {
-        if (this.isFullyLoaded) return true;
-        if (this.widgetConfig && this.widgetConfig.lazy_fail_full_load === true) {
-            return false;
-        }
-        const rest = this._lazyPendingRows.slice();
-        this._lazyPendingRows = [];
-        this._appendRowsDedup(rest);
-        this.normalizeTableRuntimeState?.('lazy full load');
         this.isFullyLoaded = true;
         this._teardownLazyObserver();
         return true;

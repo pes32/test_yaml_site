@@ -139,6 +139,7 @@ class ApiError(StrictModel):
 
     code: str
     message: str
+    details: Optional[str] = None
 
 
 class PagePublicConfigResponse(AliasedStrictModel):
@@ -158,6 +159,7 @@ class PageDataResponse(StrictModel):
 
     page: PagePublicConfigResponse
     attrs: JsonDict = Field(default_factory=dict)
+    table_runtime: JsonDict = Field(default_factory=dict)
 
 
 class AttrsDataResponse(AliasedStrictModel):
@@ -165,6 +167,7 @@ class AttrsDataResponse(AliasedStrictModel):
 
     page: str
     attrs: JsonDict = Field(default_factory=dict)
+    table_runtime: JsonDict = Field(default_factory=dict)
     resolved_names: List[str] = Field(default_factory=list, alias="resolved_names")
     missing_names: List[str] = Field(default_factory=list, alias="missing_names")
 
@@ -190,70 +193,6 @@ class PagesDataResponse(StrictModel):
     pages: List[PageSummaryResponse] = Field(default_factory=list)
 
 
-class DebugRouteResponse(StrictModel):
-    """One route row for debug structure."""
-
-    endpoint: str
-    methods: List[str] = Field(default_factory=list)
-    rule: str
-
-
-class DebugStructureDataResponse(StrictModel):
-    """`data` contract for GET /api/debug/structure."""
-
-    routes: List[DebugRouteResponse] = Field(default_factory=list)
-    snapshot: JsonDict = Field(default_factory=dict)
-
-
-class DebugLogsDataResponse(StrictModel):
-    """`data` contract for GET /api/debug/logs."""
-
-    lines: List[str] = Field(default_factory=list)
-    total: int = 0
-
-
-class DebugPageSummaryResponse(AliasedStrictModel):
-    """One page row for GET /api/debug/pages."""
-
-    name: str
-    title: str
-    url: str
-    modal_ids: List[str] = Field(default_factory=list, alias="modal_ids")
-    source_files: List[JsonDict] = Field(default_factory=list, alias="source_files")
-    diagnostics: List[JsonDict] = Field(default_factory=list)
-
-
-class DebugPagesDataResponse(AliasedStrictModel):
-    """`data` contract for GET /api/debug/pages."""
-
-    pages: List[DebugPageSummaryResponse] = Field(default_factory=list)
-    snapshot: JsonDict = Field(default_factory=dict)
-    diagnostics: List[JsonDict] = Field(default_factory=list)
-    last_error: Optional[str] = Field(default=None, alias="last_error")
-
-
-class DebugSnapshotDataResponse(AliasedStrictModel):
-    """`data` contract for GET /api/debug/snapshot."""
-
-    meta: JsonDict = Field(default_factory=dict)
-    page_count: int = Field(default=0, alias="page_count")
-    pages_by_url: Dict[str, str] = Field(default_factory=dict, alias="pages_by_url")
-    diagnostics: List[JsonDict] = Field(default_factory=list)
-    last_error: Optional[str] = Field(default=None, alias="last_error")
-
-
-class DebugSqlDataResponse(AliasedStrictModel):
-    """`data` contract for POST /api/debug/sql."""
-
-    query: str
-    columns: List[str] = Field(default_factory=list)
-    rows: List[JsonDict] = Field(default_factory=list)
-    row_count: int = Field(default=0, alias="row_count")
-    truncated: bool = False
-    max_rows: int = Field(default=0, alias="max_rows")
-    duration_ms: int = Field(default=0, alias="duration_ms")
-
-
 class ExecuteRequest(AliasedIgnoreModel):
     """Контракт тела POST /api/execute."""
 
@@ -272,20 +211,6 @@ class ExecuteRequest(AliasedIgnoreModel):
         return stripped
 
 
-class DebugSqlRequest(IgnoreModel):
-    """Контракт тела POST /api/debug/sql."""
-
-    query: str
-
-    @field_validator("query")
-    @classmethod
-    def _validate_query(cls, value: str) -> str:
-        stripped = str(value or "").strip()
-        if not stripped:
-            raise ValueError("query is required")
-        return stripped
-
-
 class ExecuteResponse(StrictModel):
     """Формальный ответ execute API."""
 
@@ -295,3 +220,51 @@ class ExecuteResponse(StrictModel):
     widget: Optional[str] = None
     message: str
     data: Any = None
+    updates: JsonDict = Field(default_factory=dict)
+    silent_success: bool = False
+
+
+class UserPublicResponse(AliasedStrictModel):
+    """Публичная модель пользователя для auth/user-settings/admin API."""
+
+    user_id: int
+    user_login: str
+    user_surname: Optional[str] = None
+    user_name: Optional[str] = None
+    user_patronymic: Optional[str] = None
+    user_email: Optional[str] = None
+    user_status: str
+    role_name: str
+
+
+class RolePublicResponse(StrictModel):
+    role_id: Optional[int] = None
+    role_name: str
+
+
+class AuthLoginRequest(AliasedIgnoreModel):
+    login: str
+    password: str
+
+
+class UserSettingsBootstrapData(StrictModel):
+    user: UserPublicResponse
+    is_admin: bool
+
+
+class AdminUsersData(StrictModel):
+    users: List[UserPublicResponse] = Field(default_factory=list)
+
+
+class AdminRolesData(StrictModel):
+    roles: List[RolePublicResponse] = Field(default_factory=list)
+
+
+class DbSettingsPublicData(StrictModel):
+    settings: JsonDict
+    source: Optional[str] = None
+    path: Optional[str] = None
+
+
+class AdminSqlRequest(AliasedIgnoreModel):
+    query: str

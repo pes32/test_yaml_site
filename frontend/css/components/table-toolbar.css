@@ -5,9 +5,9 @@
     top: var(--widget-table-sticky-top);
     left: 0;
     z-index: 1200;
-    width: max-content;
-    max-width: none;
-    padding: var(--space-xs) 0 0;
+    width: 100%;
+    max-width: 100%;
+    padding: var(--space-xs) 0 var(--space-xs);
     background: var(--color-bg);
     background-clip: padding-box;
     box-sizing: border-box;
@@ -24,11 +24,15 @@
     align-items: stretch;
     gap: var(--space-2xs, 4px);
     width: max-content;
-    max-width: 100%;
+    max-width: none;
     margin: 0;
     overflow: visible;
     padding-bottom: 0;
     transform: translateX(var(--widget-table-toolbar-scroll-x, 0px));
+}
+
+.widget-table-toolbar-host + .widget-table-container .widget-table {
+    margin-top: var(--space-xs);
 }
 
 .widget-table-toolbar__column {

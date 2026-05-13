@@ -7,6 +7,7 @@ export const EXPECTED_ATTRS_BY_TYPE = {
     'button_4',
     'button_5',
     'button_backend_demo',
+    'button_readonly',
     'func_1',
     'func_2',
     'func_3',

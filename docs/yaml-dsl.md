@@ -1,4 +1,4 @@
-# YAML DSL
+# DSL YAML (страницы и attrs)
 
 `pages/<page>/` описывает страницу как набор YAML-документов, из которых backend собирает нормализованный snapshot.
 
@@ -73,7 +73,7 @@ Attrs-фрагменты мержатся на backend.
 Нормализованный attrs map потом используется:
 
 - для page bootstrap;
-- для lazy `/api/attrs`;
+- для отложенной загрузки attrs через `/api/attrs`;
 - для modal attrs loading;
 - для table dependency resolution.
 
@@ -111,12 +111,40 @@ DOM-heavy поля `date`, `time`, `datetime`, `ip` и `ip_mask` сохраня�
 
 ### `table`
 
-Table v2 добавляет два YAML-флага:
+Таблица в **v3** (см. [CHANGELOG.md](../CHANGELOG.md)): виртуальный скролл, для режима с БД — последовательная подгрузка окон данных; в YAML сохраняются те же основные переключатели, что обобщены ниже.
+
+В **v2** добавлены два YAML-флага:
 
 - `toolbar: true` показывает панель форматирования над таблицей;
 - `abc: true` показывает буквенную строку колонок.
 
-Флаг `table_lazy` не используется: lazy-режим включается автоматически для больших таблиц.
+Публичный режим данных таблицы — `auto`. YAML не обязан выбирать `local-full` или `remote-paged`: runtime сам выбирает provider.
+
+- inline `value`/`source`/`data` до `LOCAL_FULL_MAX_ROWS` (`1000`) работает как `local-full`;
+- большие inline tables получают diagnostic: для Excel-like производительности строки нужно вынести в file/db source;
+- file/db/unknown row source обслуживается как `remote-paged`, где sort/group/search и окна строк идут через backend view/query;
+- виртуализация — внутренний runtime слой, а не YAML-флаг и не legacy `table_lazy`.
+
+File source задаётся объектом в `source`/`value`/`data`:
+
+```yaml
+source:
+  kind: file
+  path: data/big_table.jsonl
+  format: jsonl   # csv | json | jsonl
+```
+
+`path` должен оставаться внутри project root. `csv` может указать `header: true`; `jsonl` читает одну JSON-строку на ряд; `json` принимает массив рядов или `{ rows: [...] }`.
+
+DB source также остаётся внутренним remote provider:
+
+```yaml
+source:
+  kind: db
+  query: "select id, code, status from public.big_table"
+```
+
+Backend оборачивает query как read-only subquery и применяет `LIMIT/OFFSET`, sort/filter/search/group view state до возврата окна. Для простых таблиц можно указать `table: schema.table` вместо `query`.
 
 ### `button` и `split_button`
 
@@ -191,6 +219,62 @@ Runtime behavior:
 - `button` сохраняет существующий button-compatible execution contract;
 - `split_button` использует тот же TypeScript action-runtime, но добавляет dropdown UI.
 
+### DB-команды и заполнение виджетов
+
+`button.command` может быть обычной зарегистрированной backend-командой, UI-командой `<modal> -ui` или SQL-командой из YAML. Для SQL публичные page/attrs/execute API отдают только служебный маркер; backend берёт реальный SQL из внутреннего snapshot по `page + widget`, поэтому произвольный SQL из тела запроса не выполняется и YAML-запрос не раскрывается в browser-visible payload.
+
+Форматы SQL-команд:
+
+- `command: test_select_1 -pg` выполняет `SELECT * FROM test_select_1();`;
+- `command: |` выполняет raw SQL из block scalar в одной транзакции: при ошибке `rollback`, при успехе `commit`.
+
+`select_attrs` задаёт, куда положить результат SQL:
+
+```yaml
+load_fields:
+  widget: button
+  command: test_select_1 -pg
+  select_attrs:
+    target_widget: db_column
+
+load_same_names:
+  widget: button
+  command: |
+    SELECT col_1, col_2 FROM test_table LIMIT 1;
+  select_attrs: col_1, col_2
+```
+
+Для обычных виджетов SQL должен вернуть ровно одну строку. Для `table` результат полностью заменяет строки таблицы; порядок колонок берётся из `table_attrs`. Если в результате SQL нет колонки из `select_attrs` или `table_attrs`, backend возвращает явную ошибку на фронт.
+
+### DB-source для `list` и `voc`
+
+`list` может загрузить варианты из PostgreSQL после первичного рендера страницы или немедленно при фокусе:
+
+```yaml
+status_list:
+  widget: list
+  columns: code
+  source: test_voc_1 -pg
+```
+
+`columns` у `list` — один DB-столбец, значения которого станут options.
+
+`voc` для DB-source использует block scalar `columns`, где слева DB-поле, справа заголовок в модальном окне:
+
+```yaml
+operation_voc:
+  widget: voc
+  columns: |
+    code /Код
+    description /Значение
+  source: |
+    SELECT code, description
+    FROM voc_1
+    ORDER BY code;
+```
+
+Frontend грузит DB-source через `POST /api/widget-source` с dedupe/cache по `snapshot_version + page + widget`. Старый inline `voc` с `columns: ["Код", "Наименование"]` и block-scalar `source` остаётся валидным. Если DB-source не вернул нужный столбец, ошибка показывается пользователю как SQL/runtime ошибка.
+
 ### `voc` widget
 
 `voc` — lookup-виджет справочника.
@@ -230,8 +314,7 @@ operation_code:
 
 Важно:
 
-- `select_attrs` — допустимый YAML-ключ `button` и `split_button`, который резервирует список имён виджетов для будущего механизма заполнения;
-- `select_attrs` пока не реализует само заполнение, но его синтаксис считается корректным;
+- `select_attrs` — допустимый YAML-ключ `button` и `split_button`; он заполняет выбранные виджеты результатом SQL-команды;
 - `output_attrs` не является YAML-ключом attrs-конфига и относится только к transport request `POST /api/execute`.
 
 ## UI-команды

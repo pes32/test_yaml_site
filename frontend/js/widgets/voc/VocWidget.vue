@@ -68,6 +68,7 @@
 <script setup lang="ts">
 import {
   computed,
+  inject,
   nextTick,
   onBeforeUnmount,
   reactive,
@@ -132,10 +133,21 @@ defineOptions({
 });
 const props = defineProps<VocWidgetProps>();
 const emit = defineEmits<VocWidgetEmit>();
+const ensureWidgetSourceLoadedByName = inject<
+  ((widgetName: string, options?: Record<string, unknown>) => Promise<void>) | null
+>('ensureWidgetSourceLoadedByName', null);
 const combobox = ref<ChoiceComboboxSurface | null>(null);
 const modalTable = ref<VocModalTableSurface | null>(null);
 const state = reactive(createVocWidgetState()) as VocWidgetState;
 const field = useWidgetField(props, emit);
+const liveWidgetConfig = new Proxy({} as VocWidgetConfig, {
+  get(_target, key: string | symbol) {
+    return (props.widgetConfig as Record<PropertyKey, unknown>)[key];
+  },
+  has(_target, key: string | symbol) {
+    return key in (props.widgetConfig as Record<PropertyKey, unknown>);
+  }
+});
 const tableCellRootAttrs = field.tableCellRootAttrs;
 const fieldError = field.fieldError;
 const isDraftEditing = field.isDraftEditing;
@@ -150,6 +162,11 @@ const columns = computed(() => normalizeVocColumns(props.widgetConfig.columns));
 const rows = computed(() => normalizeVocRows(columns.value, props.widgetConfig.source));
 const combinedFieldError = computed(() => state.vocError || fieldError.value || '');
 let openModalFromInlineDropdown = (): void => {};
+function ensureSourceLoaded(): void {
+  if (typeof ensureWidgetSourceLoadedByName === 'function') {
+    void ensureWidgetSourceLoadedByName(props.widgetName, { silent: false });
+  }
+}
 function listItemId(index: number): string {
   return choiceDropdown.listItemId(index);
 }
@@ -164,7 +181,7 @@ function getInputElement(): HTMLInputElement | null {
 }
 const inlineDropdown = useVocInlineDropdown({
   state,
-  widgetConfig: props.widgetConfig,
+  widgetConfig: liveWidgetConfig,
   isMultiselect,
   isDraftEditing,
   tableCellMode,
@@ -178,7 +195,10 @@ const inlineDropdown = useVocInlineDropdown({
   focusInput: () => choiceDropdown.focusInput(),
   moveHighlightedIndex,
   openDropdown,
-  openModal: () => openModalFromInlineDropdown(),
+  openModal: () => {
+    ensureSourceLoaded();
+    openModalFromInlineDropdown();
+  },
   scheduleOutsideCommit: (options) => scheduleOutsideInteractionCommit(dropdownRuntimeContext, options),
   setHighlightedIndex,
   setSingleValue,
@@ -192,13 +212,13 @@ const {
   commitPendingState,
   onInputBlur,
   onInputChange,
-  onInputFocus,
   onInputKeydown,
   onMenuKeydown,
   onOutsideInteractionCommit,
   onWidgetFocusOut,
   resolveHighlightedIndex,
-  selectInlineRow
+  selectInlineRow,
+  onInputFocus: onInlineInputFocus
 } = inlineDropdown;
 const listMenuId = computed(() => `voc-menu-${state.listId}`);
 const highlightedId = computed(() =>
@@ -269,6 +289,10 @@ function setHighlightedFromPointer(index: number): void {
 function selectInlineItem(item: unknown): void {
   selectInlineRow(asVocRow(item));
 }
+function onInputFocus(): void {
+  ensureSourceLoaded();
+  onInlineInputFocus();
+}
 function setSingleValue(value: unknown, options: { forceSyncInput?: boolean } = {}): void {
   state.value = normalizeSingleVocValue(value);
   state.singleDraftDirty = false;
@@ -306,7 +330,7 @@ function setVocError(message: string): void {
 }
 const modalSelection = useVocModalSelection({
   state,
-  widgetConfig: props.widgetConfig,
+  widgetConfig: liveWidgetConfig,
   isMultiselect,
   rows,
   clearVocError,
@@ -339,6 +363,7 @@ const {
 } = modalSelection;
 openModalFromInlineDropdown = openModal;
 function openDropdown(options: { highlightFirst?: boolean } = {}): void {
+  ensureSourceLoaded();
   choiceDropdown.openDropdown(options);
 }
 function closeDropdown(): void {
@@ -348,6 +373,7 @@ function onArrowClick(): void {
   if (props.widgetConfig.readonly) {
     return;
   }
+  ensureSourceLoaded();
   choiceDropdown.focusInput();
   openModal();
 }

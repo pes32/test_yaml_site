@@ -85,6 +85,8 @@ def setup_logging(app: "Flask") -> str:
 
     # Убираем поток GET /frontend/... и подобных строк из app.log.
     logging.getLogger("werkzeug").setLevel(logging.ERROR)
+    # Waitress слушает внутренний порт за nginx; INFO "Serving on ..." путает с публичным URL.
+    logging.getLogger("waitress").setLevel(logging.WARNING)
 
     # Не добавляем хендлеров к app.logger — пусть сообщения всплывают к root.
     if default_handler in app.logger.handlers:

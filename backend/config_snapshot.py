@@ -7,13 +7,17 @@ from typing import Any
 
 from .config_files import (
     PAGES_DIR,
-    collect_page_scope_files,
     is_reserved_page_url,
     list_page_directories,
-    normalize_page_url,
     page_name_from_path,
 )
-from .config_modals import _collect_embedded_modals, _collect_file_modals
+from .config_pipeline_stages import (
+    stage_collect_and_merge_modals,
+    stage_load_page_raw,
+    stage_merge_and_validate_attrs,
+    stage_normalize_gui,
+    stage_validate_page,
+)
 from .config_shared import (
     ConfigLoadError,
     SnapshotValidationError,
@@ -28,19 +32,88 @@ from .config_attr_validation import _validate_attr_config
 from .config_gui_validation import (
     _build_duplicate_attr_diagnostics,
     _build_unused_attr_diagnostics,
-    _validate_page_documents,
 )
 from .contracts import (
     AppSnapshot,
     Diagnostic,
     PageSnapshot,
     RawAttrsFragment,
-    RawGuiDocument,
     SnapshotMeta,
     SourceFileMeta,
     utc_now_iso,
 )
-from .gui_dsl import gui_root_keys, normalize_page_gui
+
+
+WIDGET_ERROR_DIAGNOSTIC_CODES = frozenset(
+    {
+        "invalid_attr_option_value",
+        "invalid_voc_column_label",
+        "invalid_voc_source_row_width",
+        "missing_attr_reference",
+        "unknown_attr_widget",
+        "unsupported_attr_option",
+        "voc_columns_required",
+    }
+)
+
+
+def _diagnostic_attr_name(item: Diagnostic) -> str:
+    node_path = str(item.node_path or "").strip()
+    if not node_path:
+        return ""
+    return node_path.split(".", 1)[0].split("[", 1)[0].strip()
+
+
+def _should_render_attr_as_error(item: Diagnostic) -> bool:
+    if item.level != "error" or item.code not in WIDGET_ERROR_DIAGNOSTIC_CODES:
+        return False
+    return bool(_diagnostic_attr_name(item))
+
+
+def _error_attr_config(
+    attr_name: str,
+    original_config: Any,
+    diagnostics: list[Diagnostic],
+) -> dict[str, Any]:
+    original = original_config if isinstance(original_config, dict) else {}
+    label = str(original.get("label") or attr_name or "error").strip()
+    config: dict[str, Any] = {
+        "widget": "str",
+        "label": label,
+        "default": attr_name or "error",
+        "regex": "(?!)",
+        "err_text": "error!",
+        "sup_text": "error!",
+        "x_config_error": True,
+        "x_config_error_codes": sorted({item.code for item in diagnostics}),
+        "x_config_error_messages": [item.message for item in diagnostics],
+    }
+
+    width = original.get("width")
+    if isinstance(width, (int, float, str)) and not isinstance(width, bool):
+        config["width"] = width
+
+    return config
+
+
+def _with_error_widgets(page_config: dict[str, Any], diagnostics: list[Diagnostic]) -> dict[str, Any]:
+    grouped: dict[str, list[Diagnostic]] = {}
+    for item in diagnostics:
+        if not _should_render_attr_as_error(item):
+            continue
+        attr_name = _diagnostic_attr_name(item)
+        grouped.setdefault(attr_name, []).append(item)
+
+    if not grouped:
+        return page_config
+
+    attrs = dict(page_config.get("attrs") or {})
+    for attr_name, items in grouped.items():
+        attrs[attr_name] = _error_attr_config(attr_name, attrs.get(attr_name), items)
+
+    page_config = dict(page_config)
+    page_config["attrs"] = attrs
+    return page_config
 
 
 def _merge_attrs_files(
@@ -86,47 +159,32 @@ def load_page_config(
     *,
     pages_dir: str = PAGES_DIR,
 ) -> dict[str, Any]:
-    gui_file, attr_files, modal_files = collect_page_scope_files(
-        page_path,
-        page_name,
-        pages_dir,
+    raw = stage_load_page_raw(page_path, page_name, pages_dir=pages_dir)
+    attrs, attr_sources, diagnostics = stage_merge_and_validate_attrs(
+        raw["attr_files"],
+        raw["page_name"],
+        raw["page_url"],
     )
-    gui = RawGuiDocument.model_validate(load_yaml_dict(gui_file)).root
-    page_url = normalize_page_url(gui.get("url"), page_name)
-
-    attrs, attr_sources, diagnostics = _merge_attrs_files(attr_files, page_name, page_url)
-    file_modals, modal_sources, modal_diagnostics = _collect_file_modals(modal_files, page_name)
-    embedded_modals, embedded_diagnostics = _collect_embedded_modals(gui, page_name, gui_file)
+    merged_modals, modal_sources, modal_diagnostics = stage_collect_and_merge_modals(
+        raw["gui"],
+        raw["gui_file"],
+        raw["modal_files"],
+        raw["page_name"],
+    )
     diagnostics.extend(modal_diagnostics)
-    diagnostics.extend(embedded_diagnostics)
-
-    merged_modals = dict(file_modals)
-    for modal_id, modal in embedded_modals.items():
-        if modal_id in merged_modals:
-            diagnostics.append(
-                make_diagnostic(
-                    "info",
-                    "embedded_modal_overrides_file",
-                    f"Встроенная модалка '{modal_id}' имеет приоритет над modal_<id>.yaml",
-                    page=page_name,
-                    file=_relpath(gui_file),
-                    node_path=modal_id,
-                )
-            )
-        merged_modals[modal_id] = modal
-
-    page_gui_root_keys = gui_root_keys(gui)
+    norm = stage_normalize_gui(raw["gui"])
+    gui = norm["gui"]
     page_snapshot = PageSnapshot(
-        name=page_name,
-        url=page_url,
-        title=str(gui.get("title", page_name)),
+        name=raw["page_name"],
+        url=raw["page_url"],
+        title=str(gui.get("title", raw["page_name"])),
         gui=gui,
-        parsedGui=normalize_page_gui(gui, page_gui_root_keys),
+        parsedGui=norm["parsedGui"],
         attrs=attrs,
         modals=merged_modals,
-        guiMenuKeys=page_gui_root_keys,
+        guiMenuKeys=norm["guiMenuKeys"],
         modalGuiIds=sorted(merged_modals.keys()),
-        sourceFiles=[_source_file_meta(gui_file, "gui"), *attr_sources, *modal_sources],
+        sourceFiles=[_source_file_meta(raw["gui_file"], "gui"), *attr_sources, *modal_sources],
         diagnostics=diagnostics,
     )
 
@@ -144,7 +202,7 @@ def _snapshot_version(source_files: list[SourceFileMeta], pages_by_url: dict[str
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
-def build_config_snapshot(
+def stage_build_snapshot(
     pages_dir: str = PAGES_DIR,
     *,
     strict: bool = True,
@@ -169,7 +227,7 @@ def build_config_snapshot(
             Diagnostic.model_validate(item)
             for item in page_config.get("diagnostics") or []
         ]
-        page_attr_definitions, page_refs, page_validation_diagnostics = _validate_page_documents(
+        page_attr_definitions, page_refs, page_validation_diagnostics = stage_validate_page(
             page_path,
             page_name,
             page_config["url"],
@@ -178,21 +236,8 @@ def build_config_snapshot(
         )
         page_all_diagnostics = [*page_diagnostics, *page_validation_diagnostics]
         diagnostics.extend(page_all_diagnostics)
-
-        if _has_error_level_diagnostics(page_all_diagnostics):
-            diagnostics.append(
-                make_diagnostic(
-                    "warning",
-                    "page_skipped_due_to_errors",
-                    f"Страница '{page_name}' не опубликована из-за ошибок в конфигурации",
-                    page=page_name,
-                    file=(page_config.get("sourceFiles") or [{}])[0].get("path")
-                    if page_config.get("sourceFiles")
-                    else _relpath(page_path),
-                    url=page_config.get("url"),
-                )
-            )
-            continue
+        page_config = _with_error_widgets(page_config, page_all_diagnostics)
+        page_config["diagnostics"] = [item.model_dump() for item in page_all_diagnostics]
 
         pages[page_name] = page_config
         page_attrs[page_name] = page_config.get("attrs", {})
@@ -251,6 +296,14 @@ def build_config_snapshot(
     if strict and _has_error_level_diagnostics(diagnostics):
         raise SnapshotValidationError(diagnostics)
     return snapshot.model_dump(by_alias=True)
+
+
+def build_config_snapshot(
+    pages_dir: str = PAGES_DIR,
+    *,
+    strict: bool = True,
+) -> dict[str, Any]:
+    return stage_build_snapshot(pages_dir=pages_dir, strict=strict)
 
 
 def load_config() -> dict[str, Any]:

@@ -215,6 +215,7 @@ export {
     assertTableInvariants,
     collectTableInvariantIssues,
     formatTableInvariantIssues,
+    tableInvariantWarningsEnabled,
     warnTableInvariants
 };
 export type { TableInvariantIssue, TableInvariantCheckOptions };

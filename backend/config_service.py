@@ -200,6 +200,29 @@ class ConfigService:
             self._log_snapshot_diagnostics(diagnostics)
         logger.error("Не удалось обновить snapshot конфигурации: %s", last_error)
 
+    def _abort_reload_with_build_failure(
+        self,
+        fingerprint: Dict[str, int],
+        *,
+        last_error: str,
+        status_diagnostics: list[dict[str, Any]],
+        log_last_error: str,
+        log_diagnostics: list[dict[str, Any]] | None = None,
+    ) -> None:
+        self._failed_fingerprint = fingerprint
+        self._last_error = last_error
+        self._snapshot = self._set_build_status(
+            self._snapshot,
+            last_error=self._last_error,
+            diagnostics=status_diagnostics,
+        )
+        self._schedule_next_scan()
+        self._log_failure_once(
+            fingerprint,
+            last_error=log_last_error,
+            diagnostics=log_diagnostics,
+        )
+
     def _reload_if_needed(self, force: bool = False) -> bool:
         if not force and not self._live_reload_enabled:
             return False
@@ -223,59 +246,53 @@ class ConfigService:
         try:
             snapshot = build_config_snapshot(self.pages_dir, strict=False)
         except SnapshotValidationError as exc:
-            self._failed_fingerprint = fingerprint
-            self._last_error = str(exc)
-            self._snapshot = self._set_build_status(
-                self._snapshot,
-                last_error=self._last_error,
-                diagnostics=[
+            last_error = str(exc)
+            self._abort_reload_with_build_failure(
+                fingerprint,
+                last_error=last_error,
+                status_diagnostics=[
                     make_diagnostic(
                         "error",
                         "snapshot_build_failed",
-                        self._last_error,
+                        last_error,
                     ).model_dump()
                 ],
-            )
-            self._schedule_next_scan()
-            self._log_failure_once(
-                fingerprint,
-                last_error="Новый snapshot отклонён из-за validation errors; сохранён предыдущий валидный snapshot",
-                diagnostics=[item.model_dump() for item in exc.diagnostics],
+                log_last_error=(
+                    "Новый snapshot отклонён из-за validation errors; "
+                    "сохранён предыдущий валидный snapshot"
+                ),
+                log_diagnostics=[item.model_dump() for item in exc.diagnostics],
             )
             return False
         except ConfigLoadError as exc:
-            self._failed_fingerprint = fingerprint
-            self._last_error = str(exc)
-            self._snapshot = self._set_build_status(
-                self._snapshot,
-                last_error=self._last_error,
-                diagnostics=[
+            last_error = str(exc)
+            self._abort_reload_with_build_failure(
+                fingerprint,
+                last_error=last_error,
+                status_diagnostics=[
                     make_diagnostic(
                         "error",
                         "snapshot_build_failed",
-                        self._last_error,
+                        last_error,
                     ).model_dump()
                 ],
+                log_last_error=str(exc),
             )
-            self._schedule_next_scan()
-            self._log_failure_once(fingerprint, last_error=str(exc))
             return False
         except Exception as exc:  # pragma: no cover
-            self._failed_fingerprint = fingerprint
-            self._last_error = str(exc)
-            self._snapshot = self._set_build_status(
-                self._snapshot,
-                last_error=self._last_error,
-                diagnostics=[
+            last_error = str(exc)
+            self._abort_reload_with_build_failure(
+                fingerprint,
+                last_error=last_error,
+                status_diagnostics=[
                     make_diagnostic(
                         "error",
                         "snapshot_build_failed_unexpected",
-                        self._last_error,
+                        last_error,
                     ).model_dump()
                 ],
+                log_last_error=str(exc),
             )
-            self._schedule_next_scan()
-            self._log_failure_once(fingerprint, last_error=str(exc))
             logger.exception("Неожиданная ошибка при обновлении snapshot конфигурации: %s", exc)
             return False
 

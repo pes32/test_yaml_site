@@ -11,7 +11,7 @@ import type {
     TableSchema,
     WidgetAttrsMap
 } from './table_contract.ts';
-import { autoFitHeaderWidth, headerSortAffordancePx } from './table_width_model.ts';
+import { autoFitHeaderWidth, headerSortAffordancePx } from './table_internal.ts';
 import { isBuiltinWidgetType } from '../../shared/widget_types.ts';
 
 type TableParseVm = TableRuntimeVm;

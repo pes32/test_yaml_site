@@ -11,7 +11,6 @@ import {
     watch,
     type ComputedRef
 } from 'vue';
-import { resolveTableDependencies } from '../../shared/table_attr_dependencies.ts';
 import type {
     TableRuntimeComputed,
     TableRuntimeComputedRefs,
@@ -26,6 +25,7 @@ import type {
     TableWidgetSetupBindings,
     TableWidgetSetupMethods
 } from './table_contract.ts';
+import { DEFAULT_REMOTE_LIMIT } from './table_row_provider.ts';
 import { createTablePageBridge } from './table_page_bridge.ts';
 import { TABLE_WIDGET_SETUP_METHOD_KEYS } from './table_setup_keys.ts';
 import {
@@ -36,8 +36,12 @@ import { tableRuntimeComputed } from './table_runtime_computed.ts';
 import { tableRuntimeMethods } from './table_runtime_registry.ts';
 import { tableRuntimeWatch } from './table_runtime_watch.ts';
 import { createTableStore } from './table_store.ts';
-import { createDefaultTableToolbarState } from './table_toolbar_model.ts';
-import { emptyTableViewModel } from './table_view_model.ts';
+import { createDefaultTableToolbarState, emptyTableViewModel } from './table_internal.ts';
+import { createInitialVirtualState } from './table_virtual_model.ts';
+import {
+    computeTableInitSignature,
+    tableDependencySignature
+} from './table_runtime_init_signature.ts';
 
 type UseTableRuntimeOptions = {
     emit: TableWidgetEmit;
@@ -59,7 +63,10 @@ type RuntimeComputedUnknownSetter = (this: TableRuntimeVm, value: unknown) => vo
 
 const TABLE_CONFIG_WATCH_KEYS = [
     'abc',
+    'auto_width',
     'data',
+    'readonly_row_selection',
+    'readonly_selected_row_id',
     'label',
     'lazy_chunk_size',
     'lazy_fail_full_load',
@@ -97,6 +104,17 @@ const TABLE_RUNTIME_COMPUTED_FALLBACKS = {
     lazySessionId: () => 0,
     lineNumbersRuntimeEnabled: () => false,
     runtimeColumnKeyList: () => [],
+    selectionRenderState: () => ({
+        anchorCol: 0,
+        anchorRow: 0,
+        focus: { r: 0, c: 0 },
+        isFullColumnBlock: false,
+        isFullRowBlock: false,
+        isMulti: false,
+        readonly: false,
+        rect: { c0: 0, c1: 0, r0: 0, r1: 0 },
+        showSelection: false
+    }),
     sortColumnIndex: () => null,
     sortDirection: () => 'asc',
     sortKeys: () => [],
@@ -105,8 +123,14 @@ const TABLE_RUNTIME_COMPUTED_FALLBACKS = {
     tableRowIdToDataIndex: () => new Map<string, number>(),
     tableViewModel: emptyTableViewModel,
     tableInlineStyle: () => ({}),
+    tableDataMode: () => 'local-full',
     tableLazyUiActive: () => false,
     tableMinRowCount: () => 0,
+    visibleCellGridStableRows: () => [],
+    visibleCellGrid: () => [],
+    visibleDisplayRows: () => [],
+    virtualBottomSpacerStyle: () => ({}),
+    virtualTopSpacerStyle: () => ({}),
     toolbarState: createDefaultTableToolbarState,
     tableUiLocked: () => false,
     tableZebra: () => false,
@@ -132,38 +156,6 @@ function readWidgetConfigValue(
     return config && typeof config === 'object' ? config[key] : undefined;
 }
 
-function tableDependencySignature(
-    config: TableWidgetConfig | null | undefined,
-    getAllAttrsMap: (() => WidgetAttrsMap) | null
-): string {
-    const deps = resolveTableDependencies(config || {});
-    if (!deps.length || typeof getAllAttrsMap !== 'function') {
-        return '';
-    }
-
-    const attrs = getAllAttrsMap() || {};
-    return deps
-        .map((name) => {
-            const attrConfig = attrs && typeof attrs === 'object' ? attrs[name] : null;
-            if (!attrConfig || typeof attrConfig !== 'object') {
-                return `${name}:missing`;
-            }
-
-            const columns = Array.isArray(attrConfig.columns)
-                ? attrConfig.columns.map((item) => String(item ?? '')).join(',')
-                : '';
-            return [
-                name,
-                String(attrConfig.widget || ''),
-                attrConfig.readonly === true ? 'readonly' : '',
-                attrConfig.editable === false ? 'not-editable' : '',
-                attrConfig.multiselect === true ? 'multi' : '',
-                columns
-            ].join(':');
-        })
-        .join('|');
-}
-
 function createInitialTableRuntimeState(
     props: TableRuntimePropsSurface,
     tablePageBridge: ReturnType<typeof createTablePageBridge>
@@ -174,6 +166,39 @@ function createInitialTableRuntimeState(
         headerRows: [],
         tableColumns: [],
         tableData: [],
+        tableRemote: {
+            activeAbortController: null,
+            activeRequestId: 0,
+            activeViewFingerprint: '',
+            cellRangeRules: [],
+            columnRulesByKey: {},
+            directCellOverrides: {},
+            formatRules: [],
+            globalRules: [],
+            itemsByDisplayIndex: {},
+            loadedRanges: [],
+            mode: 'local-full',
+            attr: '',
+            page: '',
+            provider: 'inline',
+            rowItemsById: {},
+            rowRangeRules: [],
+            selectionExpression: null,
+            snapshotVersion: '',
+            sourceKey: '',
+            tableId: '',
+            totalRows: 0,
+            view: {
+                expandedGroups: [],
+                filters: [],
+                group: [],
+                limit: DEFAULT_REMOTE_LIMIT,
+                offset: 0,
+                search: null,
+                sort: []
+            },
+            viewId: ''
+        },
         tableStore: reactive(
             createTableStore({
                 lineNumbersEnabled: !!(props.widgetConfig && props.widgetConfig.line_numbers === true),
@@ -186,7 +211,12 @@ function createInitialTableRuntimeState(
         contextMenuContext: null,
         contextMenuSessionId: 0,
         _pasteInProgress: false,
+        _focusSelectionScheduledRaf: 0,
+        _pendingFocusSelectionCell: null,
+        _remotePendingRange: null,
+        _remoteRangeRequestRaf: 0,
         selectedRowIndex: -1,
+        lastInitSignature: '',
         selAnchor: { r: 0, c: 0 },
         selFocus: { r: 0, c: 0 },
         selFullHeightCols: null,
@@ -210,6 +240,13 @@ function createInitialTableRuntimeState(
         _stickyRaf: 0,
         _stickyOnScroll: null,
         _stickyRo: null,
+        _virtualScrollRoot: null,
+        _virtualRaf: 0,
+        _virtualMeasureRaf: 0,
+        _virtualOnScroll: null,
+        _virtualOnResize: null,
+        _virtualRo: null,
+        virtualState: createInitialVirtualState(),
         tablePageBridge,
         getAllAttrsMapFromRuntime: tablePageBridge.getAllAttrsMap,
         handleRecoverableAppErrorFromRuntime: (error: unknown, context?: Record<string, unknown>) => {
@@ -368,6 +405,10 @@ function useTableRuntime(options: UseTableRuntimeOptions): TableWidgetSetupBindi
     const instance = getCurrentInstance();
 
     const getAllAttrsMapFromRuntime = inject<(() => WidgetAttrsMap) | null>('getAllAttrsMap', null);
+    const getSnapshotVersionFromRuntime = inject<(() => string) | null>(
+        'getCurrentSnapshotVersionFromRuntime',
+        null
+    );
     const handleRecoverableAppErrorFromRuntime = inject<
         ((error: unknown, context?: Record<string, unknown>) => void) | null
     >('handleRecoverableAppError', null);
@@ -377,6 +418,7 @@ function useTableRuntime(options: UseTableRuntimeOptions): TableWidgetSetupBindi
     );
     const tablePageBridge = createTablePageBridge({
         getAllAttrsMap: getAllAttrsMapFromRuntime,
+        getSnapshotVersion: getSnapshotVersionFromRuntime,
         handleRecoverableAppError: handleRecoverableAppErrorFromRuntime,
         showAppNotification: showAppNotificationFromRuntime
     });
@@ -398,6 +440,16 @@ function useTableRuntime(options: UseTableRuntimeOptions): TableWidgetSetupBindi
     const runtimeComputedRefs = createRuntimeComputedRefs(vm);
     Object.assign(computedRefs, runtimeComputedRefs);
 
+    let virtualWindowWatchFlushPending = false;
+    const queueVirtualWindowUpdateFromWatchers = () => {
+        if (virtualWindowWatchFlushPending) return;
+        virtualWindowWatchFlushPending = true;
+        vm.$nextTick?.(() => {
+            virtualWindowWatchFlushPending = false;
+            vm._scheduleVirtualWindowUpdate?.();
+        });
+    };
+
     watch(
         TABLE_CONFIG_WATCH_KEYS.map((key) => () =>
             readWidgetConfigValue(props.widgetConfig, key)
@@ -415,9 +467,34 @@ function useTableRuntime(options: UseTableRuntimeOptions): TableWidgetSetupBindi
     watch(runtimeComputedRefs.stickyHeaderEnabled, (value) =>
         tableRuntimeWatch.stickyHeaderEnabled.call(vm, value)
     );
+    watch(
+        () => runtimeComputedRefs.displayRows.value.length,
+        () => queueVirtualWindowUpdateFromWatchers()
+    );
+    watch(runtimeComputedRefs.displayRows, () => {
+        vm._resetVirtualMeasurements?.();
+        queueVirtualWindowUpdateFromWatchers();
+    });
+    watch(runtimeComputedRefs.wordWrapEnabled, () => {
+        vm._resetVirtualMeasurements?.();
+        queueVirtualWindowUpdateFromWatchers();
+    });
+    watch(
+        () => [
+            state.tableColumns.length,
+            Object.entries(state.tableStore.widths.overrideByColumnKey)
+                .map(([key, value]) => `${key}:${value ?? ''}`)
+                .join('|')
+        ].join(':'),
+        () => {
+            vm._resetVirtualMeasurements?.();
+            queueVirtualWindowUpdateFromWatchers();
+        }
+    );
 
     onMounted(() => {
         mountTableRuntime(vm);
+        vm.lastInitSignature = computeTableInitSignature(vm);
     });
 
     onBeforeUnmount(() => {

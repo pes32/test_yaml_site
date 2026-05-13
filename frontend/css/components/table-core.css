@@ -42,6 +42,10 @@
     position: relative;
 }
 
+.widget-table tbody td {
+    line-height: var(--lh-md);
+}
+
 /* collapse + sticky на th/td в таблицах не поддерживается — отдельная сетка границ только для sticky. */
 .widget-table--sticky-header {
     border-collapse: separate;
@@ -82,6 +86,10 @@
 .widget-table__sticky-overlay {
     position: fixed;
     margin-top: 0;
+    pointer-events: none;
+}
+
+.widget-table__sticky-overlay th {
     pointer-events: auto;
 }
 
@@ -96,7 +104,7 @@
     position: relative;
     width: 100%;
     min-width: 0;
-    min-height: var(--lh-lg);
+    min-height: var(--lh-md);
     box-sizing: border-box;
 }
 
@@ -114,6 +122,19 @@
     box-sizing: border-box;
 }
 
+/*
+ * Единая высота «тела» ячейки: пустая и с текстом занимают одну и ту же строку (line-box).
+ * word-wrap и многострочный режим — отдельные исключения ниже.
+ */
+.widget-table tbody .widget-table__cell-value {
+    min-height: var(--lh-md);
+    line-height: var(--lh-md);
+}
+
+.widget-table__cell-value--danger {
+    color: var(--color-danger);
+}
+
 .widget-table__cell-text-proxy {
     display: none;
 }
@@ -126,7 +147,8 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    line-height: var(--lh-lg);
+    line-height: var(--lh-md);
+    min-height: var(--lh-md);
     box-sizing: border-box;
 }
 
@@ -214,7 +236,7 @@
 
 .widget-table__cell-action--list {
     width: var(--dropdown-arrow-space);
-    height: var(--lh-lg);
+    height: var(--lh-md);
     color: var(--color-text-main);
 }
 
@@ -279,20 +301,48 @@
     line-height: var(--table-word-wrap-line-height);
 }
 
-.widget-table tbody tr:nth-of-type(odd) {
+.widget-table tbody tr[data-display-row].widget-table__row--odd {
     background-color: var(--color-bg-stripe);
 }
 
-.widget-table tbody tr:nth-of-type(even) {
+.widget-table tbody tr[data-display-row].widget-table__row--even {
     background-color: var(--color-bg);
 }
 
 /* zebra: false — без чередования фона строк */
-.widget-table--no-zebra tbody tr:nth-of-type(odd),
-.widget-table--no-zebra tbody tr:nth-of-type(even) {
+.widget-table--no-zebra tbody tr[data-display-row].widget-table__row--odd,
+.widget-table--no-zebra tbody tr[data-display-row].widget-table__row--even {
     background-color: var(--color-bg);
 }
 
-.widget-table tbody tr:hover {
+.widget-table tbody tr[data-display-row]:hover {
     background-color: var(--color-table-hover);
+}
+
+.widget-table__virtual-spacer,
+.widget-table__virtual-spacer:hover,
+.widget-table__virtual-padding,
+.widget-table__virtual-padding:hover {
+    background: transparent;
+}
+
+.widget-table__virtual-spacer {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.widget-table td.widget-table__virtual-spacer-proxy-cell {
+    padding: 0;
+    border: 0;
+    height: 0;
+    line-height: 0;
+}
+
+.widget-table td.widget-table__virtual-spacer-cell {
+    padding: 0;
+    border: 0;
+    height: 0;
+    line-height: 0;
+    pointer-events: none;
 }

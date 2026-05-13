@@ -1,58 +1,52 @@
-# Server Runtime
+# Серверный runtime
 
-## Current Runtime Entry Points
+## Точки входа runtime
 
-Основной локальный production-like запуск:
+Основной локально production-like запуск:
 
 - `./start.sh`
 - `./stop.sh`
 
-Debug-запуск:
+Общий shell-код: `scripts/runtime_common.sh`. Backend entrypoint: `settings/wsgi.py` (Waitress через `./start.sh`).
 
-- `./start_debug.sh`
+## Файлы окружения
 
-Общий shell-код запуска живёт в `scripts/runtime_common.sh`. Flask/Waitress entrypoints лежат в `settings/wsgi.py` и `settings/app.py`.
+**Каноничное расположение** (одно «правильное» место для настроек окружения):
 
-## Environment Files
+| Файл | Роль |
+|------|------|
+| `settings/production.defaults.env` | базовые значения по умолчанию |
+| `settings/production.env` | локальные переопределения (не в git по смыслу продукта) |
 
-Базовые значения:
+**Deprecated.** Fallback на **корень репозитория** (`production.defaults.env`, `production.env`) по-прежнему обрабатывается в `start.sh` / `stop.sh` для обратной совместимости, но **не используйте это в новых сетапах** — иначе появятся два равноправных места конфигурации и путаница при поддержке. Новые клоны и CI держите только на `settings/*.env`.
 
-- `settings/production.defaults.env`
-- `settings/debug.defaults.env`
+Явный override путей возможен через переменные `YAMLS_DEFAULT_ENV_FILE` / `YAMLS_ENV_FILE` (см. `start.sh`).
 
-Локальные override-файлы, если нужны:
+## Nginx, TLS и логи
 
-- `settings/production.env`
-- `settings/debug.env`
+- `nginx/nginx.conf.template` — шаблон nginx.
+- `run/nginx.conf` — сгенерированный конфиг текущего запуска.
+- `ssl/dev.crt`, `ssl/dev.key` — локальный self-signed TLS.
+- `run/*.log`, `logs/app.log` — логи.
+- `frontend/dist` — собранный Vite bundle для nginx/backend.
 
-Корневые env-пути поддерживаются как fallback, но основные настройки лучше хранить в `settings/`.
+## Backend и статические ресурсы
 
-Для debug режима итоговый `YAMLS_NGINX_BIND_HOST` остаётся `0.0.0.0`. Такой режим удобен для текущего окружения, хотя для более закрытого локального запуска безопаснее `127.0.0.1`.
+| Asset | Назначение | Статус |
+|-------|------------|--------|
+| `database/db_settings.yaml` | fallback подключения к PostgreSQL | активный fallback |
+| `templates/sql_inspect.app` | материал PG helper / download | авторский |
+| `templates/Документация` | документация в шаблонах | авторский |
+| `templates/files` | статические / downloadable файлы | активный |
+| `templates/mems` | демо-ассеты | демо |
+| `sudoku` | демо/авторская фича | демо |
 
-## Nginx, TLS And Logs
+## Безопасность в production
 
-- `nginx/nginx.conf.template` — шаблон nginx config.
-- `run/nginx.conf` — generated config для текущего запуска.
-- `ssl/dev.crt` и `ssl/dev.key` — локальный self-signed TLS материал.
-- `run/*.log` и `logs/app.log` — runtime logs.
-- `frontend/dist` — собранный Vite bundle, который отдаёт nginx/backend flow.
+- **YAML-страницы сейчас публичны:** маршруты вида `/page/...` и контент из snapshot **не закрыты** моделью сессии/auth так же, как системные экраны и admin API. Это **архитектурный риск**: любой, кто знает URL, может открыть страницу и дергать связанные snapshot API (`/api/page`, `/api/attrs`, `/api/execute`, …) без проверки пользователя. Для любого развёртывания с чувствительными данными нужно явно решать: сетевой периметр, отдельный ingress без публикации YAML-маршрутов, middleware с auth, или доведение защиты YAML-дерева до паритета с остальным приложением. Пока это не сделано, treat YAML surface как **открытый read/execute к миру**, если приложение доступно извне.
 
-## Backend And Static Runtime Assets
+- Основной YAML flow **не** позиционируется как production-ready persistence схемы БД под всё приложение.
 
-Используемые server/runtime assets, которые не считаются мусором:
+- Auth и роли **покрывают** новые системные страницы и admin/user-settings API; **не** полагаются на них для изоляции YAML-контента.
 
-- `database/db_settings.yaml` — настройки read-only SQL debug tooling.
-- `templates/sql_inspect.app` — авторский PostgreSQL helper/download material.
-- `templates/Документация` — авторские/документационные материалы.
-- `templates/files` — downloadable/static materials.
-- `templates/mems` — авторские demo assets.
-- `sudoku` — demo/author feature.
-
-`deploy_yamls.sh` не входит в tracked product workflow и выглядит как локальный deploy helper с реальными host/user данными. Решение по этому файлу принимает владелец проекта.
-
-## Production Safety
-
-- Debug routes в production по умолчанию выключены.
-- Основной YAML flow пока не предоставляет production-ready DB persistence.
-- Полной auth/permission модели пока нет.
-- Для публичного сервера целевая схема остаётся `public nginx -> waitress on 127.0.0.1`, но конкретную deployment-инструкцию нужно оформлять отдельно под фактическую инфраструктуру.
+- Целевая схема для публичного сервера: `public nginx → Waitress на 127.0.0.1`; конкретный playbook деплоя — отдельно под вашу инфраструктуру.

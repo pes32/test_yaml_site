@@ -2,15 +2,17 @@
   <div class="widget-container u-wide">
     <button
       class="widget-button inline-flex-center"
-      :class="buttonClasses"
+      :class="[buttonClasses, { 'widget-button--readonly': isReadonly }]"
       :style="standaloneButtonStyle"
       :title="buttonTitle"
+      :disabled="isReadonly"
       @click="onButtonClick"
     >
       <action-button-content
         :icon-name="iconName"
         :icon-style="iconStyle"
         :label="buttonLabel"
+        :tint-icon-with-text-color="isReadonly"
       ></action-button-content>
     </button>
 
@@ -34,6 +36,7 @@ defineOptions({
 const props = defineProps<ActionWidgetProps>();
 const emit = defineEmits<ActionWidgetEmit>();
 const buttonAction = computed(() => parseButtonAction(props.widgetConfig));
+const isReadonly = computed(() => !!props.widgetConfig.readonly);
 
 const {
   buttonClasses,
@@ -50,7 +53,7 @@ const {
 } = useActionWidgetBase(props, emit, { fallbackTitle: 'Кнопка' });
 
 function onButtonClick(): void {
-  if (!buttonAction.value) {
+  if (isReadonly.value || !buttonAction.value) {
     return;
   }
   void executeAction(buttonAction.value);

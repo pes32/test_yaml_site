@@ -1,9 +1,5 @@
 import { tableDebugState, tableLog } from './table_debug.ts';
-import {
-    commitEditorHandle,
-    createDomTableEditorHandle,
-    isTableEditorHandle
-} from './table_editing_model.ts';
+import { commitEditorHandle, createDomTableEditorHandle, isTableEditorHandle } from './table_internal.ts';
 import {
     dispatchRuntimeCellPatches,
     type RuntimePatchOptions
@@ -34,6 +30,23 @@ function readEventValue(event: Event | { target?: { value?: unknown } } | unknow
     return event;
 }
 
+function writeEventTargetValue(event: Event | { target?: { value?: unknown } } | unknown, value: unknown): void {
+    const nextValue = value == null ? '' : String(value);
+    if (event instanceof Event) {
+        const target = event.target;
+        if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+            if (target.value !== nextValue) target.value = nextValue;
+        }
+        return;
+    }
+    if (event && typeof event === 'object' && 'target' in event) {
+        const target = (event as { target?: unknown }).target;
+        if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+            if (target.value !== nextValue) target.value = nextValue;
+        }
+    }
+}
+
 function normalizeIpInputValue(value: unknown): string {
     const filtered = String(value || '')
         .replace(/[,\s|\\/]+/g, '.')
@@ -43,6 +56,50 @@ function normalizeIpInputValue(value: unknown): string {
         .slice(0, 4)
         .map((part: string) => part.replace(/\D/g, '').slice(0, 3))
         .join('.');
+}
+
+function normalizeIntInputValue(value: unknown): string {
+    const compact = String(value ?? '').replace(/\s+/g, '');
+    const sign = compact.startsWith('-') ? '-' : '';
+    return sign + compact.replace(/\D+/g, '');
+}
+
+function normalizeFloatInputValue(value: unknown): string {
+    const compact = String(value ?? '').replace(/,/g, '.').replace(/\s+/g, '');
+    const sign = compact.startsWith('-') ? '-' : '';
+    const unsigned = compact.replace(/-/g, '');
+    let hasDot = false;
+    let output = '';
+    for (const char of unsigned) {
+        if (char >= '0' && char <= '9') {
+            output += char;
+            continue;
+        }
+        if (char === '.' && !hasDot) {
+            output += char;
+            hasDot = true;
+        }
+    }
+    return sign + output;
+}
+
+function normalizeCellTextInputValue(
+    runtime: CellIdentityRuntime,
+    rowId: string,
+    colKey: string,
+    fallbackCol: number,
+    value: unknown
+): unknown {
+    const colIndex = columnIndexFromIdentityFallback(runtime, colKey, fallbackCol);
+    const column = runtime.tableColumns[colIndex];
+    const type =
+        typeof runtime.effectiveCellTypeByIdentity === 'function' && column
+            ? runtime.effectiveCellTypeByIdentity(rowId, colKey, colIndex, column)
+            : column?.type;
+    if (type === 'int') return normalizeIntInputValue(value);
+    if (type === 'float') return normalizeFloatInputValue(value);
+    if (type === 'ip') return normalizeIpInputValue(value);
+    return value;
 }
 
 function isTableCellWidgetInstance(value: unknown): value is TableCellWidgetInstance {
@@ -136,8 +193,12 @@ function patchCellByIdentity(
 
 const EditingRuntimeMethods = {
     onCellInput(rowIndex: number, cellIndex: number, event: Event | { target?: { value?: unknown } } | unknown) {
-        const newValue = readEventValue(event);
-        patchCellByDisplayAddress(this, rowIndex, cellIndex, newValue, {
+        const cell = this.coreCellFromDisplay(this.normRow(rowIndex), this.normCol(cellIndex));
+        const newValue = cell
+            ? normalizeCellTextInputValue(this, cell.rowId, cell.colKey, cellIndex, readEventValue(event))
+            : readEventValue(event);
+        writeEventTargetValue(event, newValue);
+        patchCellByCoreAddress(this, cell, newValue, {
             skipGroupingViewRefresh: true
         });
         tableLog('cell input', rowIndex, cellIndex);
@@ -148,7 +209,9 @@ const EditingRuntimeMethods = {
         colKey: string,
         event: Event | { target?: { value?: unknown } } | unknown
     ) {
-        const newValue = readEventValue(event);
+        const colIndex = columnIndexFromIdentityFallback(this, colKey, 0);
+        const newValue = normalizeCellTextInputValue(this, rowId, colKey, colIndex, readEventValue(event));
+        writeEventTargetValue(event, newValue);
         patchCellByIdentity(this, rowId, colKey, newValue, {
             skipGroupingViewRefresh: true
         });
@@ -157,6 +220,7 @@ const EditingRuntimeMethods = {
 
     onIpInput(rowIndex: number, cellIndex: number, event: Event | { target?: { value?: unknown } } | unknown) {
         const filtered = normalizeIpInputValue(readEventValue(event));
+        writeEventTargetValue(event, filtered);
         patchCellByDisplayAddress(this, rowIndex, cellIndex, filtered, {
             skipGroupingViewRefresh: true
         });
@@ -169,6 +233,7 @@ const EditingRuntimeMethods = {
         event: Event | { target?: { value?: unknown } } | unknown
     ) {
         const filtered = normalizeIpInputValue(readEventValue(event));
+        writeEventTargetValue(event, filtered);
         patchCellByIdentity(this, rowId, colKey, filtered, {
             skipGroupingViewRefresh: true
         });
@@ -254,6 +319,7 @@ const EditingRuntimeMethods = {
             'close editor',
             TABLE_RUNTIME_SYNC.EDITING_ONLY
         );
+        this.$nextTick(() => this._scheduleVirtualMeasurement?.());
     },
 
     applyTrimToEditedTextCell(row: number, col: number) {
@@ -349,26 +415,65 @@ const EditingRuntimeMethods = {
         return trigger instanceof HTMLElement ? trigger : null;
     },
 
+    _flushFocusSelectionCellNow(normalizedRow: number, normalizedCol: number) {
+        this.ensureDisplayRowVisible?.(normalizedRow);
+        const td = getCellByDisplayAddress(this, normalizedRow, normalizedCol);
+        if (!td) {
+            this.$nextTick(() => {
+                const nextTd = getCellByDisplayAddress(this, normalizedRow, normalizedCol);
+                if (!nextTd) return;
+                this._tableProgrammaticFocus = true;
+                nextTd.focus({ preventScroll: true });
+                this.endProgrammaticFocusSoon();
+            });
+            return;
+        }
+        this._tableProgrammaticFocus = true;
+        td.focus({ preventScroll: true });
+        this.endProgrammaticFocusSoon();
+    },
+
     focusSelectionCell(row: number, col: number) {
-        this.exitCellEdit();
         const normalizedCol = this.normCol(col);
         const normalizedRow = this.normRow(row);
-        const td = getCellByDisplayAddress(this, normalizedRow, normalizedCol);
-        if (!td) return;
-        this._tableProgrammaticFocus = true;
-        td.focus();
-        this.endProgrammaticFocusSoon();
+        this._pendingFocusSelectionCell = { c: normalizedCol, r: normalizedRow };
+        if (this._focusSelectionScheduledRaf) return;
+        const schedule =
+            typeof requestAnimationFrame === 'function'
+                ? requestAnimationFrame.bind(globalThis)
+                : (callback: FrameRequestCallback) => {
+                      return typeof globalThis === 'undefined'
+                          ? setTimeout(callback, 16)
+                          : setTimeout(callback, 16);
+                  };
+        const token = schedule(() => {
+            this._focusSelectionScheduledRaf = 0;
+            const queued = this._pendingFocusSelectionCell;
+            this._pendingFocusSelectionCell = null;
+            if (!queued) return;
+            if (
+                this.editingCell &&
+                this.editingCell.r === queued.r &&
+                this.editingCell.c === queued.c
+            ) {
+                return;
+            }
+            this.exitCellEdit();
+            this._flushFocusSelectionCellNow(queued.r, queued.c);
+        });
+        this._focusSelectionScheduledRaf = typeof token === 'number' ? token : 0;
     },
 
     focusSelectionCellWithRetry(row: number, col: number) {
         const normalizedRow = this.normRow(row);
         const normalizedCol = this.normCol(col);
+        this.ensureDisplayRowVisible?.(normalizedRow);
         const attempt = () => {
             this.exitCellEdit();
             const td = getCellByDisplayAddress(this, normalizedRow, normalizedCol);
             if (!td) return false;
             this._tableProgrammaticFocus = true;
-            td.focus();
+            td.focus({ preventScroll: true });
             this.endProgrammaticFocusSoon();
             return true;
         };
@@ -395,6 +500,7 @@ const EditingRuntimeMethods = {
             this.editingCell = null;
             return;
         }
+        this.ensureDisplayRowVisible?.(normalizedRow);
         const coreCell = this.coreCellFromDisplay(normalizedRow, normalizedCol);
         if (!coreCell) return;
         const sourceRow = this.dataRowByIdentity(coreCell.rowId);
@@ -404,6 +510,7 @@ const EditingRuntimeMethods = {
             'open editor',
             TABLE_RUNTIME_SYNC.EDITING_ONLY
         );
+        this.$nextTick(() => this._scheduleVirtualMeasurement?.());
         this._tableProgrammaticFocus = true;
         this.$nextTick(() => {
             const editor = this.getCellEditorElement(normalizedRow, normalizedCol);

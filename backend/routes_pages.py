@@ -22,7 +22,6 @@ def register_page_routes(app, config_service):
         public_page = public_page_config(page_config)
         return render_template(
             "page.html",
-            debug_tooling_enabled=bool(app.config.get("DEBUG_TOOLING_ENABLED")),
             page_config=public_page,
             page_bootstrap=_page_bootstrap(snapshot, page_config),
         )

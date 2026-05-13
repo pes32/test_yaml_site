@@ -1,71 +1,105 @@
 <template>
-  <div v-if="show" class="modal-overlay confirm-modal-overlay flex-center" @click.self="cancel">
-    <div class="modal-content confirm-modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" v-text="config?.title || 'Подтверждение'"></h5>
-        <button type="button" class="ui-close-button" aria-label="Закрыть" @click="cancel"></button>
-      </div>
-      <div class="modal-body" v-text="config?.text || 'Вы уверены?'"></div>
-      <div class="modal-footer">
-        <button
-          type="button"
-          class="widget-button confirm-modal-action confirm-modal-action--secondary"
-          @click="cancel"
-          v-text="config?.cancel || 'Отмена'"
-        ></button>
-        <button
-          type="button"
-          class="widget-button confirm-modal-action"
-          @click="accept"
-          v-text="config?.accept || 'Подтвердить'"
-        ></button>
-      </div>
-    </div>
-  </div>
+  <modal-frame
+    :show="show"
+    :title="config?.title || 'Подтверждение'"
+    content-class="confirm-modal-content"
+    body-class="confirm-modal-body--multiline"
+    @close="cancel"
+  >
+    <div>{{ config?.text || 'Вы уверены?' }}</div>
+    <div v-if="errorText" class="confirm-modal-error" role="alert">{{ errorText }}</div>
+    <template #footer>
+      <button
+        type="button"
+        class="widget-button confirm-modal-action confirm-modal-action--secondary"
+        @click="cancel"
+        v-text="config?.cancel || 'Отмена'"
+      ></button>
+      <button
+        type="button"
+        class="widget-button confirm-modal-action"
+        :disabled="busy"
+        @click="accept"
+        v-text="config?.accept || 'Подтвердить'"
+      ></button>
+    </template>
+  </modal-frame>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue';
-
-type ConfirmModalConfig = {
-  accept?: string;
-  cancel?: string;
-  text?: string;
-  title?: string;
-};
+import ModalFrame from './ModalFrame.vue';
+import type { ConfirmModalConfig } from './confirm_modal_contract.ts';
 
 defineOptions({
-  name: 'ConfirmModal'
+  name: 'ConfirmModal',
 });
 
 const show = ref(false);
 const config = ref<ConfirmModalConfig | null>(null);
-const _acceptHandler = ref<(() => void) | null>(null);
+const acceptHandler = ref<(() => void | Promise<void>) | null>(null);
+const cancelHandler = ref<(() => void) | null>(null);
+const busy = ref(false);
+const errorText = ref('');
 
 function open(nextConfig?: ConfirmModalConfig | null): void {
-  config.value = nextConfig || {};
+  const cfg = nextConfig || {};
+  config.value = cfg;
+  acceptHandler.value = typeof cfg.onAccept === 'function' ? cfg.onAccept : null;
+  cancelHandler.value = typeof cfg.onCancel === 'function' ? cfg.onCancel : null;
+  busy.value = false;
+  errorText.value = '';
   show.value = true;
 }
 
-function hide(): void {
+function close(): void {
   show.value = false;
-  _acceptHandler.value = null;
+  acceptHandler.value = null;
+  cancelHandler.value = null;
+  config.value = null;
+  busy.value = false;
+  errorText.value = '';
 }
 
-function accept(): void {
-  _acceptHandler.value?.();
-  hide();
+async function accept(): Promise<void> {
+  const handler = acceptHandler.value;
+  if (!handler) {
+    close();
+    return;
+  }
+  busy.value = true;
+  errorText.value = '';
+  try {
+    await handler();
+    close();
+  } catch (err) {
+    errorText.value = err instanceof Error ? err.message : String(err);
+    busy.value = false;
+  }
 }
 
 function cancel(): void {
-  hide();
+  const handler = cancelHandler.value;
+  close();
+  if (handler) handler();
 }
 
 defineExpose({
-  _acceptHandler,
   accept,
   cancel,
-  hide,
-  open
+  close,
+  open,
 });
 </script>
+
+<style scoped>
+:deep(.confirm-modal-body--multiline) {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.confirm-modal-error {
+  margin-top: var(--space-md, 12px);
+  color: var(--color-danger, #c00);
+  font-size: var(--text-sm, 13px);
+}
+</style>

@@ -15,11 +15,7 @@ cd "$TESTS_DIR"
 resolve_start_script() {
   local configured="${YAMLS_TEST_START_SCRIPT:-}"
   if [ -z "$configured" ]; then
-    if [ "${YAMLS_TEST_MODE:-debug}" = "prod" ] || [ "${YAMLS_TEST_MODE:-debug}" = "production" ]; then
-      configured="./start.sh"
-    else
-      configured="./start_debug.sh"
-    fi
+    configured="./start.sh"
   fi
 
   if [[ "$configured" = /* ]]; then
@@ -31,33 +27,17 @@ resolve_start_script() {
 }
 
 load_stack_env_for_base_url() {
-  local start_script="$1"
-  local mode="production"
+  local start_script="$1" # kept for caller compatibility
   local default_env_file=""
   local env_file=""
 
-  if [[ "$(basename "$start_script")" == *debug* ]]; then
-    mode="debug"
+  default_env_file="${YAMLS_DEFAULT_ENV_FILE:-$ROOT_DIR/settings/production.defaults.env}"
+  if [ "$default_env_file" = "$ROOT_DIR/settings/production.defaults.env" ] && [ ! -f "$default_env_file" ]; then
+    default_env_file="$ROOT_DIR/production.defaults.env"
   fi
-
-  if [ "$mode" = "debug" ]; then
-    default_env_file="${YAMLS_DEFAULT_ENV_FILE:-$ROOT_DIR/settings/debug.defaults.env}"
-    if [ "$default_env_file" = "$ROOT_DIR/settings/debug.defaults.env" ] && [ ! -f "$default_env_file" ]; then
-      default_env_file="$ROOT_DIR/debug.defaults.env"
-    fi
-    env_file="${YAMLS_ENV_FILE:-$ROOT_DIR/settings/debug.env}"
-    if [ "$env_file" = "$ROOT_DIR/settings/debug.env" ] && [ ! -f "$env_file" ] && [ -f "$ROOT_DIR/debug.env" ]; then
-      env_file="$ROOT_DIR/debug.env"
-    fi
-  else
-    default_env_file="${YAMLS_DEFAULT_ENV_FILE:-$ROOT_DIR/settings/production.defaults.env}"
-    if [ "$default_env_file" = "$ROOT_DIR/settings/production.defaults.env" ] && [ ! -f "$default_env_file" ]; then
-      default_env_file="$ROOT_DIR/production.defaults.env"
-    fi
-    env_file="${YAMLS_ENV_FILE:-$ROOT_DIR/settings/production.env}"
-    if [ "$env_file" = "$ROOT_DIR/settings/production.env" ] && [ ! -f "$env_file" ] && [ -f "$ROOT_DIR/production.env" ]; then
-      env_file="$ROOT_DIR/production.env"
-    fi
+  env_file="${YAMLS_ENV_FILE:-$ROOT_DIR/settings/production.env}"
+  if [ "$env_file" = "$ROOT_DIR/settings/production.env" ] && [ ! -f "$env_file" ] && [ -f "$ROOT_DIR/production.env" ]; then
+    env_file="$ROOT_DIR/production.env"
   fi
 
   if [ -f "$default_env_file" ]; then
@@ -109,7 +89,7 @@ cleanup() {
 trap cleanup EXIT
 
 if [ "${YAMLS_TEST_SKIP_STACK:-0}" != "1" ]; then
-  echo "[tests] stopping existing Yamls stack from start.sh/start_debug.sh, if any"
+  echo "[tests] stopping existing Yamls stack from start.sh, if any"
   (cd "$ROOT_DIR" && ./stop.sh)
 
   echo "[tests] starting Yamls stack: $START_SCRIPT"

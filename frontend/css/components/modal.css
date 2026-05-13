@@ -38,6 +38,13 @@
     max-height: min(var(--gui-modal-max-h), calc(100dvh - 2 * var(--space-md)));
 }
 
+.gui-modal .modal-title {
+    font-size: var(--text-lg);
+    font-weight: var(--fw-medium);
+    color: var(--color-text-main);
+    text-align: left;
+}
+
 .gui-modal.voc-modal-content {
     --gui-modal-max-w: 1100px;
     --gui-modal-max-h: 720px;
@@ -268,4 +275,14 @@
 .confirm-modal-content .modal-footer .confirm-modal-action--secondary:hover:not(:disabled) {
     background-color: var(--color-border-light);
     border-color: var(--color-border);
+}
+
+.confirm-modal-content .modal-footer .confirm-modal-action:disabled,
+.confirm-modal-content .modal-footer .confirm-modal-action--secondary:disabled {
+    opacity: 1;
+    color: var(--widget-button-readonly-color);
+    background-color: var(--widget-button-readonly-bg);
+    border-color: var(--widget-button-readonly-border);
+    cursor: not-allowed;
+    box-shadow: none;
 }

@@ -186,7 +186,7 @@ import {
   type TableToolbarButton,
   type TableToolbarButtonState,
   type TableToolbarTypeOption
-} from './table_toolbar_model.ts';
+} from './table_internal.ts';
 
 type ToolbarColumnMode = 'buttons' | 'colors' | 'tools';
 type ToolbarButtonRowModel = {

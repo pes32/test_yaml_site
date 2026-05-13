@@ -18,13 +18,25 @@ def _is_scalar_sequence(value: Any) -> bool:
 
 
 def _is_widget_name_list_value(value: Any) -> bool:
-    return _is_string_attr_value(value) or (
-        isinstance(value, list) and all(_is_string_attr_value(item) for item in value)
-    )
+    if _is_string_attr_value(value):
+        return True
+    if isinstance(value, list):
+        return all(_is_string_attr_value(item) for item in value)
+    if isinstance(value, dict):
+        return all(_is_string_attr_value(key) and _is_string_attr_value(item) for key, item in value.items())
+    return False
 
 
 def _is_string_list_value(value: Any) -> bool:
     return isinstance(value, list) and all(_is_string_attr_value(item) for item in value)
+
+
+def _is_columns_value_valid(widget_type: str, value: Any) -> bool:
+    if widget_type == "list":
+        return _is_string_attr_value(value)
+    if widget_type == "voc":
+        return _is_string_attr_value(value) or _is_string_list_value(value)
+    return _is_string_list_value(value)
 
 
 def _is_bool_attr_value(value: Any) -> bool:
@@ -70,10 +82,14 @@ def _is_source_value_valid(widget_type: str, value: Any) -> bool:
 
 def _validate_attr_option_value(widget_type: str, option_name: str, value: Any) -> str | None:
     if option_name == "select_attrs" and not _is_widget_name_list_value(value):
-        return "ожидается строка или список строк"
+        return "ожидается строка, список строк или словарь строк"
     if option_name == "dialog" and not _is_dialog_value(value):
         return "ожидается словарь"
-    if option_name == "columns" and not _is_string_list_value(value):
+    if option_name == "columns" and not _is_columns_value_valid(widget_type, value):
+        if widget_type == "list":
+            return "ожидается строка с именем столбца"
+        if widget_type == "voc":
+            return "ожидается список строк или block-scalar строка"
         return "ожидается список строк"
     if option_name == "rows" and not _is_int_attr_value(value):
         return "ожидается целое число"

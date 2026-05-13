@@ -79,6 +79,12 @@ button_6:
     fake_visual_action_2 | Второй пункт
     fake_visual_action_3 | Третий пункт
 
+button_readonly:
+  widget: button
+  label: Нажми меня!
+  icon: test.svg
+  readonly: true
+
 # === Функциональное описание кнопок ===
 
 func_1:

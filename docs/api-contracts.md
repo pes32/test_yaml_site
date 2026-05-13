@@ -1,8 +1,12 @@
-# API Contracts
+# Контракты API
+
+Документы: DDL подробно — [api-contracts-ddl.md](api-contracts-ddl.md).
 
 ## Envelope
 
-Все HTTP API проекта используют единый transport envelope:
+Большинство JSON API используют единый transport envelope (`backend/api_response.py`: `success_payload` / `error_payload`).
+
+**Успех** (пример):
 
 ```json
 {
@@ -14,7 +18,7 @@
 }
 ```
 
-Ошибка:
+**Ошибка** (канонический ответ): код и текст только во вложенном **`error`** (`code`, `message`, `details`). Плоские дубликаты `error_code` / `message` / `details` на корне могут быть временно включены переменной окружения **`YAMLS_LEGACY_ERROR_ENVELOPE_DUPES=1`** (см. `error_payload`).
 
 ```json
 {
@@ -23,218 +27,91 @@
   "snapshot_created_at": "2026-03-27T12:34:56+00:00",
   "error": {
     "code": "page_not_found",
-    "message": "Страница не найдена"
+    "message": "Страница не найдена",
+    "details": null
   },
   "diagnostics": []
 }
 ```
 
-Transport shape знает только `frontend/js/runtime/api_client.ts`. UI-слой работает с нормализованными domain-структурами.
+Клиент: `frontend/js/runtime/api_client_core.ts` — разбор **сначала** из `error.*`, затем fallback на плоские поля (`readApiErrorCode`, `normalizeEnvelopeErrorMessage`). Фасад: `api_client.ts` + сегменты `api_client_*.ts`.
 
-## HTML bootstrap
+- Snapshot-маршруты (`snapshot_success` / `snapshot_error`): `snapshot_version` и `snapshot_created_at` из `snapshot.meta` (могут быть `null`, если meta пустая).
+- Маршруты без snapshot (`/api/auth/*`, часть admin): те же ключи, часто `null`.
 
-`templates/page.html` встраивает bootstrap в:
+## Runtime API
 
-```html
-<script id="page-data" type="application/json">...</script>
-```
+HTML-bootstrap: `templates/page.html`, блок `<script id="page-data" type="application/json">` — тот же envelope, что и `GET /api/page/<name>`.
 
-Внутри лежит тот же envelope-формат, что и у `GET /api/page/<name>`.
+| Метод | Назначение |
+|--------|------------|
+| `GET /api/page/<name>` | Полная нормализованная страница: `data.page` (`PagePublicConfigResponse`: `gui`, `parsedGui`, `guiMenuKeys`, `modalGuiIds`, …), `data.attrs`, `data.table_runtime` для remote таблиц. Нормализация на фронте → `PageResponse` / page store (`page`, `attrs`, `tableRuntime`, `diagnostics`, `snapshotVersion`). |
+| `GET /api/attrs?page=&names=` | Частичные attrs: `page`, `attrs`, `table_runtime`, `resolved_names`, `missing_names` → `AttrsResponse` (`resolvedNames`, `missingNames`, camelCase + meta). |
+| `GET /api/modal-gui?page=&id=` | Модалка + attrs по виджетам модалки: поля как в типичном attrs-ответе плюс `modal`, `dependencies` → `ModalResponse`. |
+| `POST /api/table-query` | Remote/paged table view query: тело `{ page, attr, snapshot_version, view }`, где `view` содержит `offset`, `limit`, `sort`, `filters`, `group`, `search`, `expandedGroups`. Ответ: `view_id`, `view_fingerprint`, `total`, `offset`, `limit`, mixed `items`, `has_more`; при ошибках guard (например, группировка на огромном файле) коды `file_view_group_too_large` / ограничения export. |
+| `POST /api/table-command` | Command path для remote таблиц: тело `{ page, attr, snapshot_version, view, commands }`. View-команды (`sort`, `filters`, `search`, `group`, `toggle-group`) обновляют backend view и возвращают новое окно; мутации в `commands_applied` помечаются `status: client_only` до подключения персиста. |
+| `POST /api/table-export` | Materializing export: тело `{ page, attr, snapshot_version, view }` и опционально **`export_chunk`** `{ offset, limit }` (лимит сервера до 50k строк). Монолит: `{ rows, total }`. Чанк: добавляются `export_chunked`, `export_has_more`, `export_offset`, `export_limit`. Слишком большой монолитный файловый экспорт → `413` / `table_export_too_large`; `exportValueAsync` затем запрашивает чанки. Не используется в click/scroll/sort/render-path. |
+| `POST /api/execute` | Тело: `command`, `params`, `page`, `widget`, опционально `output_attrs` (только transport). Для SQL-кнопок browser-visible `command` является служебным маркером; backend берёт реальный SQL из внутреннего snapshot по `page + widget`, возвращает только `updates.values` и `silent_success`. Старые зарегистрированные команды возвращают поля команды + `message`, вложенный `data` → `ExecuteResponse`. |
+| `POST /api/widget-source` | Ленивая загрузка DB-source для `list/voc`: тело `{ page, widget, snapshot_version }`; ответ `{ page, widget, patch }`, где patch обновляет `source`, а для `voc` также нормализованные `columns`. |
+| `GET /api/config` | `data` — полный snapshot конфигурации (как у config service). |
+| `POST /api/reload` | Пересборка snapshot; в `data` сводка (`updated`, `page_count`, `last_error`, `message`, `meta`). |
 
-## `GET /api/page/<name>`
+### `GET /api/pages` — read-model / navigation index
 
-`data`:
+**Статус:** не отдельный источник истины; **проекция** `snapshot.pages` в плоский список `{ name, title, url }` из **того же** snapshot, что и остальные snapshot-маршруты.
 
-```json
-{
-  "page": {
-    "name": "main",
-    "url": "/",
-    "title": "Main",
-    "gui": {},
-    "guiMenuKeys": [],
-    "modalGuiIds": []
-  },
-  "attrs": {}
-}
-```
+- Тот же envelope: **`snapshot_version` / `snapshot_created_at`** совпадают с текущим snapshot.
+- **`diagnostics`** в envelope — snapshot-level диагностики сборки (как при дефолтном `snapshot_success`), не принудительно пустой массив.
+- `data.pages` — массив кратких записей; фронт нормализует в **`PagesIndexState`** (`frontend/js/runtime/api_contract.ts`): `pages`, `diagnostics`, `snapshotVersion` (`string | null`).
+- Типичное использование: lazy **label-resolution** для `split_button.url` (см. `action_labels.ts` → `fetchPages`).
 
-Frontend normalizes это в `PageState`:
+## Auth и user settings
 
-- `page`
-- `attrs`
-- `diagnostics`
-- `snapshotVersion`
+Тот же envelope; без привязанного snapshot поля `snapshot_version` / `snapshot_created_at` часто `null`.
 
-## `GET /api/attrs?page=<name>&names=a,b`
+**Auth**
 
-`data`:
+- `GET /api/auth/me`
+- `POST /api/auth/login` — тело: `login`, `password`
+- `POST /api/auth/logout`
 
-```json
-{
-  "page": "main",
-  "attrs": {},
-  "resolved_names": ["a"],
-  "missing_names": ["b"]
-}
-```
+**Пользователь (сессия)**
 
-Frontend normalizes это в `AttrsState`:
+- `GET /api/user-settings/bootstrap`
+- `PUT /api/user-settings/account`
+- `POST /api/user-settings/password`
 
-- `page`
-- `attrs`
-- `resolvedNames`
-- `missingNames`
-- `diagnostics`
-- `snapshotVersion`
+## Admin DB API
 
-## `GET /api/pages`
+Все под `require_admin`, кроме отдельно оговоренных.
 
-`data`:
+**Пользователи и роли:** `GET/POST /api/admin/users`, `GET /api/admin/roles`, `PUT /api/admin/users/<id>`, `POST .../password`, `POST .../toggle-block`.
 
-```json
-{
-  "pages": [
-    {
-      "name": "main",
-      "title": "Main",
-      "url": "/"
-    }
-  ]
-}
-```
+**Настройки БД:** `GET /api/admin/db-settings`, `GET /api/admin/db-settings/fallback`, `POST .../test`, `POST .../save`, `GET /api/admin/db-backup/schema_only`, `GET /api/admin/db-backup/full`.
 
-Этот endpoint не участвует в backend normalization и не меняет snapshot shape.
-Сейчас frontend использует его как lazy runtime-input для label-resolution у
-`split_button.url`, когда нужно заменить внутренний URL на title опубликованной страницы.
+**Схема и DDL:** read-only эндпоинты `GET /api/admin/db-schema/tables|columns|constraints`; **`POST .../ddl/preview`** и **`POST .../ddl/execute`** — полное описание тел запросов, таблица `operation`, примеры и транзакция — в [api-contracts-ddl.md](api-contracts-ddl.md).
 
-## `GET /api/modal-gui?page=<name>&id=<modal_id>`
+**Произвольный SQL:** `POST /api/admin/sql`, тело `{ "query": "..." }`, timeout 60s.
 
-`data`:
+## Diagnostics
 
-```json
-{
-  "page": "main",
-  "modal": {
-    "id": "save",
-    "name": "save",
-    "title": "Сохранение",
-    "icon": "save",
-    "tabs": [],
-    "content": [],
-    "buttons": ["CLOSE"],
-    "widgetNames": ["field_1"],
-    "source": "file",
-    "sourceFile": "pages/main/modal_save.yaml"
-  },
-  "attrs": {},
-  "resolved_names": ["field_1"],
-  "missing_names": [],
-  "dependencies": {
-    "widget_names": ["field_1"]
-  }
-}
-```
+- **`POST /api/client-diagnostic`** — приём клиентской диагностики; ответ `data: { "ok": true }` (без авторизации).
+- В snapshot-envelope поле **`diagnostics`** — структурированные сообщения уровня snapshot/страницы (см. `Diagnostic` в `backend/contracts.py`).
 
-Frontend normalizes это в `ModalState`.
+Системные маршруты обрабатываются тем же клиентским слоем; доменные типы — `frontend/js/runtime/api_contract.ts`.
 
-## `POST /api/execute`
+## Contract files
 
-Request:
+- `backend/contracts.py` — Pydantic: страницы, attrs, modals, diagnostics, snapshot.
+- `frontend/js/runtime/api_contract.ts` — нормализованные ответы/запросы transport layer (`PagesIndexState`, `PageResponse`, …).
+- `frontend/js/runtime/page_contract.ts` — домен страницы / stores.
+- `frontend/js/runtime/widget_contract.ts` — stateful widgets.
+- `frontend/js/runtime/action_types.ts`, `action_runtime.ts` — button / split_button.
+- `frontend/js/widgets/table/table_contract.ts` — таблица.
+- `frontend/js/runtime/voc_contract.ts` — voc.
 
-```json
-{
-  "command": "save",
-  "params": {},
-  "page": "main",
-  "widget": "save_button",
-  "output_attrs": ["name"]
-}
-```
-
-`output_attrs` здесь относится только к transport/API-запросу и не является YAML-ключом в attrs-конфиге.
-
-Success `data`:
-
-```json
-{
-  "command": "save",
-  "params": {},
-  "page": "main",
-  "widget": "save_button",
-  "message": "Команда 'save' выполнена",
-  "data": null
-}
-```
-
-Frontend normalizes это в `ExecuteResult`.
-
-Важно:
-
-- `output_attrs` остаётся transport-only полем execute request;
-- `split_button` не вводит отдельный transport format и для command-items использует тот же execute pipeline, что и обычный `button`.
-- frontend action runtime расположен в TypeScript modules (`action_runtime.ts` и соседние `action_*.ts` files), transport shape `POST /api/execute` общий для `button` и `split_button`.
-
-## Debug API
-
-Debug routes используют тот же envelope:
-
-- `GET /api/debug/structure`
-- `GET /api/debug/logs`
-- `GET /api/debug/pages`
-- `GET /api/debug/snapshot`
-- `POST /api/debug/sql`
-
-`POST /api/debug/sql` принимает JSON вида:
-
-```json
-{
-  "query": "SELECT * FROM some_table LIMIT 20"
-}
-```
-
-Ограничения debug SQL:
-
-- разрешён только один `SELECT`;
-- запрос должен читать пользовательские таблицы;
-- SQL-комментарии и дополнительные команды запрещены;
-- системные схемы `pg_catalog`, `information_schema` и relation names `pg_*` запрещены;
-- запрос выполняется в read-only транзакции;
-- результат ограничивается серверным `max_rows`.
-
-Их raw transport тоже проходит через `frontend/js/runtime/api_client.ts`.
-Нормализованные frontend response shapes экспортируются из
-`frontend/js/runtime/api_contract.ts`, поэтому `page.ts` и `debug.ts` не держат
-локальные ad hoc transport-типы рядом с runtime-кодом.
-
-## Contract Files
-
-Актуальные contract files находятся рядом с владельцами runtime:
-
-- `backend/contracts.py` — backend-side Pydantic contracts for pages, attrs, modals, debug payloads, diagnostics and API envelope data.
-- `frontend/js/runtime/api_contract.ts` — normalized frontend response/request contracts для page/debug/API transport.
-- `frontend/js/runtime/page_contract.ts` — frontend page/runtime domain boundary.
-- `frontend/js/runtime/widget_contract.ts` — stateful widget value/list normalization helpers.
-- `frontend/js/runtime/action_types.ts` и `frontend/js/runtime/action_runtime.ts` — internal action item/execution contracts для `button` и `split_button`.
-- `frontend/js/widgets/table/table_contract.ts` — internal table runtime/schema/state/service contracts.
-- `frontend/js/runtime/voc_contract.ts` — voc widget source/value contract.
-
-Это не публичный SDK. Сейчас contracts служат для согласования backend transport, frontend stores и feature modules внутри проекта.
+Это внутренние контракты репозитория, не публичный SDK.
 
 ## Frontend error normalization
 
-В UI ошибка не ходит как raw `fetch`/HTTP object.
-
-Единый runtime contract живёт в `frontend/js/runtime/error_model.ts` и нормализует ошибки в:
-
-- `kind`
-- `scope`
-- `recoverable`
-- `message`
-- `code`
-- `status`
-- `diagnostics`
-- `snapshotVersion`
-- `details`
-
-`api_client.ts` знает только envelope и transport status, а page/debug runtime работают через этот frontend error shape.
+`frontend/js/runtime/error_model.ts`: единый объект ошибки для UI (`presentation`, `kind`, `scope`, `recoverable`, `message`, `code`, `status`, `diagnostics`, `snapshotVersion`, `details`, `cause`). `FrontendApiError` из `api_client_core.ts` поднимается из transport/envelope и дальше нормализуется через `normalizeFrontendError` / `presentFrontendError`.

@@ -43,7 +43,6 @@ def register_sudoku(app) -> None:
             template_source = template_path.read_text(encoding="utf-8")
             return render_template_string(
                 template_source,
-                debug_tooling_enabled=bool(app.config.get("DEBUG_TOOLING_ENABLED")),
                 header_active="sudoku",
             )
         except Exception:

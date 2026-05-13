@@ -6,6 +6,7 @@ import {
     type FrontendErrorOptions,
     type FrontendRuntimeError
 } from './error_model.ts';
+import { remoteLogClientDiagnostic } from './client_diagnostic_remote_log.ts';
 
 type PageAsyncState = {
     loading: boolean;
@@ -71,6 +72,7 @@ function usePageErrorRuntime(options: PageErrorRuntimeOptions) {
     }
 
     function reportDiagnosticError(error: unknown, errorOptions: FrontendErrorOptions = {}): FrontendRuntimeError {
+        remoteLogClientDiagnostic(error, errorOptions as Record<string, unknown>);
         return reportWithPresentation(error, FRONTEND_ERROR_PRESENTATIONS.diagnostic, errorOptions);
     }
 

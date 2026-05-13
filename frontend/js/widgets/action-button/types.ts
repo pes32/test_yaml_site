@@ -15,6 +15,7 @@ type VisualActionWidgetConfig = ActionWidgetConfig & {
   hint?: string;
   icon?: string;
   label?: string;
+  readonly?: boolean;
   size?: number | string;
   sup_text?: unknown;
   width?: number | string;
@@ -49,6 +50,8 @@ type ActionButtonContentProps = {
   iconStyle: CSSProperties;
   label: string;
   labelClass?: string;
+  /** Когда текст кнопки задаётся через `color` (readonly/disabled), перекрасить растровую иконку под тот же оттенок */
+  tintIconWithTextColor?: boolean;
 };
 
 export type {

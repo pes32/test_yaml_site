@@ -26,6 +26,7 @@ type FrontendErrorOptions = {
   asPageError?: boolean;
   cause?: unknown;
   code?: unknown;
+  context?: string;
   details?: unknown;
   diagnostic?: boolean;
   diagnostics?: unknown;
@@ -35,7 +36,11 @@ type FrontendErrorOptions = {
   recoverable?: boolean;
   scope?: FrontendErrorScope | string;
   snapshotVersion?: unknown;
+  source?: string;
   status?: unknown;
+  vueInfo?: string;
+  widgetName?: string;
+  widgetType?: string;
 };
 
 type FrontendErrorLike = {

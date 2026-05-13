@@ -104,15 +104,14 @@ function openConfirmDialog(
         ? options.dialog as ConfirmDialogConfig
         : {};
 
-    modal._acceptHandler = () => {
-        Promise.resolve(runAction(context, action, options)).catch(() => {});
-    };
-
     modal.open({
         title: dialogConfig.title || 'Подтверждение',
         text: dialogConfig.text || 'Вы уверены?',
         accept: dialogConfig.accept || 'Подтвердить',
-        cancel: dialogConfig.cancel || 'Отмена'
+        cancel: dialogConfig.cancel || 'Отмена',
+        onAccept: () => {
+            Promise.resolve(runAction(context, action, options)).catch(() => {});
+        }
     });
 
     return null;

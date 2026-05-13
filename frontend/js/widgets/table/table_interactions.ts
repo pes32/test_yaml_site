@@ -3,7 +3,7 @@ import { readCellDisplayAddress } from './table_dom.ts';
 import { TableWidgetHandleKeydown } from './table_keyboard.ts';
 import { dispatchRuntimeCellPatches } from './table_runtime_commands.ts';
 import { TABLE_RUNTIME_SYNC } from './table_runtime_state.ts';
-import { displayCellToCore } from './table_selection_model.ts';
+import { displayCellToCore } from './table_internal.ts';
 
 type CellEditorActionKind = string;
 type CellIdentityArgs = [
@@ -61,7 +61,15 @@ function patchDisplayCellForTyping(
 
 const InteractionRuntimeMethods = {
     onTableCellClick(this: TableRuntimeVm, event: MouseEvent, row: number, col: number) {
-        if (!this.isEditable) return;
+        const readonlySel = !!(this.widgetConfig && this.widgetConfig.readonly_row_selection);
+        if (!this.isEditable && !readonlySel) return;
+        if (readonlySel && !this.isEditable) {
+            this._shiftAnchorLocked = false;
+            if (event.shiftKey || event.button !== 0) return;
+            const normalizedRow = this.normRow(row);
+            this.selectFullRow(normalizedRow);
+            return;
+        }
         this._shiftAnchorLocked = false;
         if (event.shiftKey) {
             this._shiftSelectGesture = false;
@@ -361,6 +369,9 @@ const InteractionRuntimeMethods = {
         const related = getElement(event.relatedTarget);
         if (related && this.$el?.contains(related)) return;
         this._tableFocusWithin = false;
+        if (this.editingCell) {
+            this.exitCellEdit();
+        }
     },
 
     onTableEditableKeydown(this: TableRuntimeVm, event: KeyboardEvent) {

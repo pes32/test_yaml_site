@@ -1,28 +1,52 @@
 # Changelog
 
-[Русская версия](CHANGELOG.md)
+[Russian version](CHANGELOG.md)
+
+## v.0.5 л.
+
+Date: `05.2026`
+
+- **Table v3:**
+  - Virtual scrolling and sequential window loading for database-backed tables
+  - Minor table-editor improvements
+- **Auth and roles:**
+  - `admin` — database and system administration
+  - `user` — no access to `/user_settings`
+- **Database integration:**
+  - Default connection from `database/db_settings.yaml`
+  - Connection settings in the UI
+  - DB bootstrap script: `database/init_db.sql`
+  - Create tables and columns from the UI
+  - Column configuration from the UI
+
+## v.0.375 л.
+
+Date: `05.2026`
+
+- **Table v2.** Editor support for tables.
 
 ## v.0.25 л.
 
-- Moved key frontend areas to Vue SFC and TypeScript modules.
-- Refactored the table runtime: removed legacy table `.js` modules, import-order registration, and temporary wrappers.
-- Removed confirmed orphan assets and a broken frontend script.
-- Updated runtime, contracts, server startup, and table subsystem documentation.
-- Known remaining item: strict `typecheck`/`typecheck:table` for the table runtime still needs a dedicated pass.
+Date: `04.2026`
+
+- Migrated key frontend areas to Vue SFCs and TypeScript modules.
+- Extensive refactoring.
 
 ## v.0.2 л.
 
-- Clickable mockup without DB-backed persistence.
-- MD3-inspired visual style.
+Date: `03.2026`
+
+- Clickable mockup without integrated DB persistence in the main YAML flow.
+- MD3-inspired visual language.
 - Added `voc`, `img`, `split_button`, and `table` widgets.
-- Improved the rest of the widget/runtime layers.
-- Exposed part of the YAML materials directly in the UI for review.
-- Added author materials.
+- Improved the remaining widgets and runtime layers.
+- Surfaced part of the YAML materials in the UI for review.
+- Added author-specific demo content.
 - Introduced explicit versioning.
 
 ## v.0.1
 
-Date: `05.2025`
+Date: `08.2025`
 
-- Initial implementation of the idea.
-- Built the first YAML sketches and the initial assembly layer from earlier projects.
+- First implementation of the idea.
+- Initial YAML sketches and assembly layer from earlier projects.

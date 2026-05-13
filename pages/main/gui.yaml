@@ -11,4 +11,4 @@ box "Шалом, землянин!":
   - "Бэк: Python 3.8+, Flask, PyYAML, Pydantic, Waitress"
   - "Фронт: Vue 3, JavaScript/TypeScript, ES modules"
   - "Сборка и типизация фронта: Vite, TypeScript, vue-tsc"
-  - "Основа проекта: YAML-driven UI runtime"
+  - "Основа проекта: YAML-файлы. Весь GUI и виджеты описаны через yaml-файлы"

@@ -1,0 +1,13 @@
+{
+  "name": "yaml-site-root-scripts",
+  "private": true,
+  "description": "Прокси-скрипты к tooling/vite; зависимости Vite/Vue только в tooling/vite/package.json.",
+  "scripts": {
+    "vite:type-holes": "npm --prefix tooling/vite run type-holes",
+    "vite:typecheck": "npm --prefix tooling/vite run typecheck",
+    "vite:typecheck:table": "npm --prefix tooling/vite run typecheck:table",
+    "vite:build": "npm --prefix tooling/vite run build",
+    "vite:preflight": "npm --prefix tooling/vite run preflight",
+    "vite:dev": "npm --prefix tooling/vite run dev"
+  }
+}

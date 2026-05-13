@@ -1,5 +1,25 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { openDemoTab, widget } from '../../support/app';
+
+async function fulfillExecuteOk(page: Page, data: { command: string; widget: string }) {
+  await page.route('**/api/execute', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        data: {
+          command: data.command,
+          data: null,
+          message: 'Команда выполнена',
+          page: '2_widget_demo',
+          params: {},
+          widget: data.widget
+        }
+      })
+    });
+  });
+}
 
 test.describe('behavior: buttons, split buttons and modals', () => {
   test.beforeEach(async ({ page }) => {
@@ -14,24 +34,17 @@ test.describe('behavior: buttons, split buttons and modals', () => {
     await expect(widget(page, 'button_5').getByRole('button')).toHaveAttribute('title', 'ОГРОМНАЯ КНОПКА');
   });
 
+  test('readonly button uses the shared disabled visual style without a dark frame', async ({ page }) => {
+    const readonlyButton = widget(page, 'button_readonly').getByRole('button', { name: 'Нажми меня!' });
+    await expect(readonlyButton).toBeDisabled();
+    await expect(readonlyButton).toHaveCSS('background-color', 'rgb(242, 246, 254)');
+    await expect(readonlyButton).toHaveCSS('color', 'rgb(112, 117, 121)');
+    await expect(readonlyButton).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+    await expect(readonlyButton).toHaveCSS('box-shadow', 'none');
+  });
+
   test('button command uses the shared execute pipeline', async ({ page }) => {
-    await page.route('**/api/execute', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          ok: true,
-          data: {
-            command: 'test_command',
-            data: null,
-            message: 'Команда выполнена',
-            page: '2_widget_demo',
-            params: {},
-            widget: 'func_1'
-          }
-        })
-      });
-    });
+    await fulfillExecuteOk(page, { command: 'test_command', widget: 'func_1' });
 
     const executeRequest = page.waitForRequest((request) =>
       request.method() === 'POST' && request.url().endsWith('/api/execute')
@@ -100,23 +113,7 @@ test.describe('behavior: buttons, split buttons and modals', () => {
   });
 
   test('split button command item uses the shared execute pipeline', async ({ page }) => {
-    await page.route('**/api/execute', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          ok: true,
-          data: {
-            command: 'fake_visual_action_2',
-            data: null,
-            message: 'Команда выполнена',
-            page: '2_widget_demo',
-            params: {},
-            widget: 'button_6'
-          }
-        })
-      });
-    });
+    await fulfillExecuteOk(page, { command: 'fake_visual_action_2', widget: 'button_6' });
 
     const executeRequest = page.waitForRequest((request) =>
       request.method() === 'POST' && request.url().endsWith('/api/execute')
@@ -177,23 +174,7 @@ test.describe('behavior: buttons, split buttons and modals', () => {
     await page.getByRole('button', { name: 'Отмена' }).click();
     await expect(page.locator('.confirm-modal-content')).toHaveCount(0);
 
-    await page.route('**/api/execute', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          ok: true,
-          data: {
-            command: 'test_command',
-            data: null,
-            message: 'Команда выполнена',
-            page: '2_widget_demo',
-            params: {},
-            widget: 'func_4'
-          }
-        })
-      });
-    });
+    await fulfillExecuteOk(page, { command: 'test_command', widget: 'func_4' });
 
     await widget(page, 'func_4').getByRole('button', { name: 'Диалог (command)' }).click();
     const executeRequest = page.waitForRequest((request) =>

@@ -2,14 +2,18 @@ import type { Component } from 'vue';
 import type {
     TableCellDataType,
     TableCellDisplayAction,
+    TableCellMeta,
     TableCellStyleMeta,
     TableCellTypeMeta,
     TableContextMenuSnapshot,
     TableCoreCellAddress,
+    TableFormatRule,
+    TableSelectionExpression,
     TableToolbarState,
     TableRuntimeColumn,
     TableRuntimeMethodSubset,
-    TableRuntimeVm
+    TableRuntimeVm,
+    TableSelectionRenderState
 } from './table_contract.ts';
 import { coerceCellValueForDataType } from './table_cell_type_coercion.ts';
 import {
@@ -17,7 +21,9 @@ import {
     normalizeColor,
     normalizeFontSize,
     patchCellMeta,
+    patchCellMetaForRowsAndColumns,
     peekCellMeta,
+    rawCellMetaMap,
     type TableCellMetaPatch
 } from './table_cell_meta.ts';
 import {
@@ -25,20 +31,27 @@ import {
     columnTypeToTableCellDataType,
     resolveEffectiveCellColumn
 } from './table_effective_column.ts';
-import { dispatchRuntimeCellPatches } from './table_runtime_commands.ts';
-import { displayCellToCore } from './table_selection_model.ts';
 import {
     createDefaultTableToolbarState,
+    displayCellToCore,
+    setTableValidationError,
     TABLE_TOOLBAR_DEFAULT_FILL_COLOR,
     TABLE_TOOLBAR_DEFAULT_FONT_SIZE,
     TABLE_TOOLBAR_DEFAULT_TEXT_COLOR
-} from './table_toolbar_model.ts';
-import { setTableValidationError } from './table_validation_model.ts';
+} from './table_internal.ts';
+import { getCachedRemoteFormatRuleBuckets } from './table_format_rule_index.ts';
+import { dispatchRuntimeCellPatches } from './table_runtime_commands.ts';
 
 const EMPTY_STYLE = Object.freeze({}) as Record<string, string>;
 const CELL_CURSOR_STYLE = Object.freeze({ cursor: 'pointer' }) as Record<string, string>;
 const TOOLBAR_STYLE_ACTIONS = ['bold', 'italic', 'underline', 'strike'] as const;
 const TOOLBAR_DEFAULT_STATE: TableToolbarState = Object.freeze(createDefaultTableToolbarState());
+const TD_STYLE_CACHE = new WeakMap<TableCellStyleMeta, Record<string, string>>();
+let remoteFormatRuleSeq = 0;
+
+function hasStyle(style: Record<string, string>): boolean {
+    return style !== EMPTY_STYLE && Object.keys(style).length > 0;
+}
 
 function selectedMutableCoreCells(vm: TableRuntimeVm): TableCoreCellAddress[] {
     const rect = vm.getSelRect();
@@ -56,6 +69,24 @@ function selectedMutableCoreCells(vm: TableRuntimeVm): TableCoreCellAddress[] {
     return cells;
 }
 
+function selectedMutableCoreGrid(vm: TableRuntimeVm): { columnKeys: string[]; rowIds: string[] } {
+    const rect = vm.getSelRect();
+    const columnKeys = vm.runtimeColumnKeys();
+    const selectedColumnKeys: string[] = [];
+    for (let col = rect.c0; col <= rect.c1; col += 1) {
+        if (!vm.canMutateColumnIndex(col)) continue;
+        const colKey = columnKeys[col];
+        if (colKey) selectedColumnKeys.push(colKey);
+    }
+    if (!selectedColumnKeys.length) return { columnKeys: [], rowIds: [] };
+    const rowIds: string[] = [];
+    for (let row = rect.r0; row <= rect.r1; row += 1) {
+        const displayRow = vm.displayRows[row];
+        if (displayRow && displayRow.kind === 'data') rowIds.push(displayRow.rowId);
+    }
+    return { columnKeys: selectedColumnKeys, rowIds };
+}
+
 function styleFromMeta(meta: TableCellStyleMeta | null | undefined): Record<string, string> {
     if (!meta) return EMPTY_STYLE;
     const style: Record<string, string> = {};
@@ -66,21 +97,26 @@ function styleFromMeta(meta: TableCellStyleMeta | null | undefined): Record<stri
             meta.underline ? 'underline' : '',
             meta.strike ? 'line-through' : ''
         ].filter(Boolean).join(' ');
+        if (meta.strike) style.textDecorationThickness = '2px';
     }
     if (meta.textColor) style.color = meta.textColor;
     if (meta.fontSize) style.fontSize = `${meta.fontSize}px`;
     if (meta.horizontalAlign) style.textAlign = meta.horizontalAlign;
-    return style;
+    return Object.keys(style).length ? (Object.freeze(style) as Record<string, string>) : EMPTY_STYLE;
 }
 
 function tdStyleFromMeta(meta: TableCellStyleMeta | null | undefined): Record<string, string> {
     if (!meta) return CELL_CURSOR_STYLE;
+    const cached = TD_STYLE_CACHE.get(meta);
+    if (cached) return cached;
     const style: Record<string, string> = { cursor: 'pointer' };
     if (meta.fillColor) style.backgroundColor = meta.fillColor;
     if (meta.verticalAlign) {
         style.verticalAlign = meta.verticalAlign === 'middle' ? 'middle' : meta.verticalAlign;
     }
-    return style;
+    const result = Object.freeze(style) as Record<string, string>;
+    TD_STYLE_CACHE.set(meta, result);
+    return result;
 }
 
 function effectiveColumnForIdentity(
@@ -147,6 +183,178 @@ function toolbarStateFromFocusedCell(vm: TableRuntimeVm): TableToolbarState {
     };
 }
 
+function mergeStyleMeta(
+    base: TableCellMeta | null | undefined,
+    stylePatch: TableCellStyleMeta | null | undefined
+): TableCellMeta | null {
+    if (!stylePatch || !Object.keys(stylePatch).length) return base || null;
+    return {
+        ...(base || {}),
+        style: {
+            ...((base && base.style) || {}),
+            ...stylePatch
+        }
+    };
+}
+
+function remoteRuleMetaForCell(
+    vm: TableRuntimeVm,
+    rowId: string,
+    colKey: string,
+    base: TableCellMeta | null
+): TableCellMeta | null {
+    if (vm.tableRemote?.mode !== 'remote-paged') return base;
+    let merged = base;
+    const applyRule = (rule: TableFormatRule) => {
+        merged = mergeStyleMeta(merged, rule.stylePatch);
+    };
+    (vm.tableRemote.globalRules || []).forEach(applyRule);
+    (vm.tableRemote.columnRulesByKey[colKey] || []).forEach(applyRule);
+    const direct = vm.tableRemote.directCellOverrides[`${rowId}::${colKey}`];
+    if (direct?.style) {
+        merged = mergeStyleMeta(merged, direct.style);
+    }
+    const item = vm.tableRemote.rowItemsById[rowId];
+    if (!item) return merged;
+    const colIndex = vm.runtimeColumnKeys().indexOf(colKey);
+    const buckets = getCachedRemoteFormatRuleBuckets(vm.tableRemote);
+    const rowRules = buckets.bySourceIndex.get(item.sourceIndex);
+    if (rowRules) {
+        for (const rule of rowRules) {
+            if (rule.target.kind === 'row-range') {
+                applyRule(rule);
+            } else if (rule.target.kind === 'cell-range') {
+                const t = rule.target;
+                if (colIndex >= t.c0 && colIndex <= t.c1) applyRule(rule);
+            }
+        }
+    }
+    for (const rule of buckets.wideRules) {
+        if (rule.target.kind === 'row-range') {
+            const t = rule.target;
+            if (item.sourceIndex >= t.r0 && item.sourceIndex <= t.r1) applyRule(rule);
+        } else if (rule.target.kind === 'cell-range') {
+            const t = rule.target;
+            if (
+                item.sourceIndex >= t.r0 &&
+                item.sourceIndex <= t.r1 &&
+                colIndex >= t.c0 &&
+                colIndex <= t.c1
+            ) {
+                applyRule(rule);
+            }
+        }
+    }
+    return merged;
+}
+
+function selectionExpressionToRuleTarget(
+    expression: TableSelectionExpression | null | undefined,
+    state: TableSelectionRenderState,
+    columnKeys: string[],
+    totalRows: number
+): TableFormatRule['target'] {
+    if (expression?.kind === 'full-column') {
+        return { kind: 'column', columnKey: expression.columnKey };
+    }
+    if (expression?.kind === 'all-rows') {
+        return {
+            kind: 'cell-range',
+            r0: 0,
+            r1: Math.max(0, totalRows - 1),
+            c0: 0,
+            c1: Math.max(0, columnKeys.length - 1)
+        };
+    }
+    if (expression?.kind === 'cell-range') {
+        return {
+            kind: 'cell-range',
+            r0: expression.r0,
+            r1: expression.r1,
+            c0: expression.c0,
+            c1: expression.c1
+        };
+    }
+    if (state.isFullColumnBlock && state.rect.c0 === state.rect.c1) {
+        const columnKey = columnKeys[state.rect.c0] || '';
+        if (columnKey) return { kind: 'column', columnKey };
+    }
+    if (state.isFullRowBlock) {
+        return { kind: 'row-range', r0: state.rect.r0, r1: state.rect.r1 };
+    }
+    return {
+        kind: 'cell-range',
+        r0: state.rect.r0,
+        r1: state.rect.r1,
+        c0: state.rect.c0,
+        c1: state.rect.c1
+    };
+}
+
+function addRemoteFormatRule(vm: TableRuntimeVm, patch: TableCellStyleMeta): void {
+    const state = vm.selectionRenderState;
+    const columnKeys = vm.runtimeColumnKeys();
+    const normalizedPatch = { ...patch };
+    const before = vm.captureRemoteHistorySnapshot();
+    const rules = vm.tableRemote.formatRules.slice();
+    const target = selectionExpressionToRuleTarget(
+        vm.tableRemote.selectionExpression,
+        state,
+        columnKeys,
+        vm.tableRemote.totalRows
+    );
+    const rule = {
+        id: `remote_format_${++remoteFormatRuleSeq}`,
+        scope: vm.tableRemote.selectionExpression &&
+            vm.tableRemote.selectionExpression.kind !== 'cell-range'
+            ? vm.tableRemote.selectionExpression.scope
+            : 'currentView' as const,
+        stylePatch: normalizedPatch,
+        target
+    } satisfies TableFormatRule;
+    rules.push(rule);
+    const columnRulesByKey = { ...vm.tableRemote.columnRulesByKey };
+    const rowRangeRules = vm.tableRemote.rowRangeRules.slice();
+    const cellRangeRules = vm.tableRemote.cellRangeRules.slice();
+    const globalRules = vm.tableRemote.globalRules.slice();
+    if (rule.target.kind === 'column') {
+        columnRulesByKey[rule.target.columnKey] = (columnRulesByKey[rule.target.columnKey] || [])
+            .concat(rule);
+    } else if (
+        rule.target.kind === 'cell-range' &&
+        rule.target.r0 === 0 &&
+        rule.target.r1 >= Math.max(0, vm.tableRemote.totalRows - 1) &&
+        rule.target.c0 === 0 &&
+        rule.target.c1 >= Math.max(0, columnKeys.length - 1)
+    ) {
+        globalRules.push(rule);
+    } else if (rule.target.kind === 'row-range') {
+        rowRangeRules.push(rule);
+    } else {
+        cellRangeRules.push(rule);
+    }
+    vm.tableRemote = {
+        ...vm.tableRemote,
+        cellRangeRules,
+        columnRulesByKey,
+        formatRules: rules,
+        globalRules,
+        rowRangeRules
+    };
+    vm.recordRemoteHistoryEntry('remote format', before, vm.captureRemoteHistorySnapshot(), {
+        kind: 'format',
+        patch: normalizedPatch,
+        target: rule.target
+    });
+    void vm.submitTableCommands([
+        {
+            kind: 'format',
+            patch: normalizedPatch,
+            target: rule.target
+        }
+    ]);
+}
+
 function styleBooleanPatchForAction(action: string, toolbarState: TableToolbarState): TableCellStyleMeta | null {
     if (!TOOLBAR_STYLE_ACTIONS.includes(action as (typeof TOOLBAR_STYLE_ACTIONS)[number])) {
         return null;
@@ -182,6 +390,15 @@ function toolbarContextSnapshot(vm: TableRuntimeVm): TableContextMenuSnapshot {
     };
 }
 
+function replaceCellMetaMapIfChanged(vm: TableRuntimeVm, nextMap: ReturnType<typeof patchCellMeta>): void {
+    if (nextMap === rawCellMetaMap(vm.tableStore.meta.cellMetaByKey)) return;
+    vm.tableStore.meta.cellMetaByKey = nextMap;
+    vm.$nextTick(() => {
+        vm._scheduleVirtualMeasurement?.();
+        vm._scheduleVirtualWindowUpdate?.();
+    });
+}
+
 function numericMetaPatchesForSelection(
     vm: TableRuntimeVm,
     transform: (meta: TableCellTypeMeta) => TableCellTypeMeta
@@ -208,8 +425,8 @@ function numericMetaPatchesForSelection(
 const FormattingRuntimeMethods = {
     cellMetaByIdentity(rowId: string, colKey: string) {
         const metaMap = this.tableStore.meta.cellMetaByKey;
-        if (!hasCellMetaEntries(metaMap)) return null;
-        return peekCellMeta(metaMap, { rowId, colKey });
+        const base = hasCellMetaEntries(metaMap) ? peekCellMeta(metaMap, { rowId, colKey }) : null;
+        return remoteRuleMetaForCell(this, rowId, colKey, base);
     },
 
     effectiveCellColumnByIdentity(
@@ -223,13 +440,10 @@ const FormattingRuntimeMethods = {
     },
 
     cellTdStyleByIdentity(rowId: string, colKey: string, fallbackRow: number, fallbackCol: number) {
+        void fallbackRow;
+        void fallbackCol;
         const meta = this.cellMetaByIdentity(rowId, colKey);
-        const outlineStyle = this.cellSelectionOutlineStyle(fallbackRow, fallbackCol);
-        if (!meta && !Object.keys(outlineStyle).length) return CELL_CURSOR_STYLE;
-        return {
-            ...tdStyleFromMeta(meta?.style),
-            ...outlineStyle
-        };
+        return meta ? tdStyleFromMeta(meta.style) : CELL_CURSOR_STYLE;
     },
 
     cellVisualTextStyleByIdentity(
@@ -243,7 +457,8 @@ const FormattingRuntimeMethods = {
         const effectiveColumn = meta ? resolveEffectiveCellColumn(column, meta) : column;
         const baseStyle = this.cellDisplayTextStyle(effectiveColumn);
         const metaStyle = styleFromMeta(meta?.style);
-        if (!Object.keys(baseStyle).length && !Object.keys(metaStyle).length) return EMPTY_STYLE;
+        if (!hasStyle(baseStyle)) return metaStyle;
+        if (!hasStyle(metaStyle)) return baseStyle;
         return {
             ...baseStyle,
             ...metaStyle
@@ -278,7 +493,7 @@ const FormattingRuntimeMethods = {
     },
 
     applyCellStylePatchToSelection(patch: TableCellStyleMeta) {
-        this.runWithHistory('format cells', () => {
+        if (this.tableRemote.mode === 'remote-paged') {
             const normalized: TableCellStyleMeta = { ...patch };
             if (Object.prototype.hasOwnProperty.call(normalized, 'fillColor')) {
                 normalized.fillColor = normalizeColor(normalized.fillColor) || null;
@@ -289,12 +504,30 @@ const FormattingRuntimeMethods = {
             if (Object.prototype.hasOwnProperty.call(normalized, 'fontSize')) {
                 normalized.fontSize = normalizeFontSize(normalized.fontSize);
             }
-            this.tableStore.meta.cellMetaByKey = patchCellMeta(
-                this.tableStore.meta.cellMetaByKey,
-                this.selectedMutableCoreCells().map((cell: TableCoreCellAddress) => ({
-                    cell,
-                    meta: { style: normalized }
-                }))
+            addRemoteFormatRule(this, normalized);
+            this.$nextTick(() => this._scheduleStickyTheadUpdate());
+            return;
+        }
+        this.runWithCellMetaHistory('format cells', () => {
+            const normalized: TableCellStyleMeta = { ...patch };
+            if (Object.prototype.hasOwnProperty.call(normalized, 'fillColor')) {
+                normalized.fillColor = normalizeColor(normalized.fillColor) || null;
+            }
+            if (Object.prototype.hasOwnProperty.call(normalized, 'textColor')) {
+                normalized.textColor = normalizeColor(normalized.textColor) || null;
+            }
+            if (Object.prototype.hasOwnProperty.call(normalized, 'fontSize')) {
+                normalized.fontSize = normalizeFontSize(normalized.fontSize);
+            }
+            const grid = selectedMutableCoreGrid(this);
+            replaceCellMetaMapIfChanged(
+                this,
+                patchCellMetaForRowsAndColumns(
+                    this.tableStore.meta.cellMetaByKey,
+                    grid.rowIds,
+                    grid.columnKeys,
+                    { style: normalized }
+                )
             );
             this.$nextTick(() => this._scheduleStickyTheadUpdate());
         });
@@ -317,7 +550,10 @@ const FormattingRuntimeMethods = {
                 errors = setTableValidationError(errors, cell, result.valid ? '' : result.message);
             }
             if (metaPatches.length) {
-                this.tableStore.meta.cellMetaByKey = patchCellMeta(this.tableStore.meta.cellMetaByKey, metaPatches);
+                replaceCellMetaMapIfChanged(
+                    this,
+                    patchCellMeta(this.tableStore.meta.cellMetaByKey, metaPatches)
+                );
             }
             this.cellValidationErrors = errors;
             this.tableStore.validation.cellErrors = { ...errors };
@@ -331,16 +567,27 @@ const FormattingRuntimeMethods = {
 
     canApplyNumericFormatToSelection() {
         const columnKeys = this.runtimeColumnKeys();
-        return this.selectedMutableCoreCells().some((cell: TableCoreCellAddress) => {
-            const col = columnKeys.indexOf(cell.colKey);
-            const meta = this.cellMetaByIdentity(cell.rowId, cell.colKey);
-            const type = meta?.dataType?.type || columnTypeToToolbarType(this.tableColumns[col]);
-            return !columnTypeLockedByYaml(this.tableColumns[col]) && (type === 'float' || type === 'exponent');
-        });
+        const rect = this.getSelRect();
+        for (let col = rect.c0; col <= rect.c1; col += 1) {
+            if (!this.canMutateColumnIndex(col)) continue;
+            const column = this.tableColumns[col];
+            if (columnTypeLockedByYaml(column)) continue;
+            const baseType = columnTypeToToolbarType(column);
+            if (baseType === 'float' || baseType === 'exponent') return true;
+            const colKey = columnKeys[col];
+            if (!colKey) continue;
+            for (let row = rect.r0; row <= rect.r1; row += 1) {
+                const displayRow = this.displayRows[row];
+                if (!displayRow || displayRow.kind !== 'data') continue;
+                const type = this.cellMetaByIdentity(displayRow.rowId, colKey)?.dataType?.type;
+                if (type === 'float' || type === 'exponent') return true;
+            }
+        }
+        return false;
     },
 
     applyPrecisionDeltaToSelection(delta: number) {
-        this.runWithHistory('precision', () => {
+        this.runWithCellMetaHistory('precision', () => {
             const patches = numericMetaPatchesForSelection(this, (meta) => {
                 const current = Number(meta.precision ?? 2);
                 return {
@@ -348,17 +595,23 @@ const FormattingRuntimeMethods = {
                     precision: Math.max(0, Math.min(12, current + delta))
                 };
             });
-            this.tableStore.meta.cellMetaByKey = patchCellMeta(this.tableStore.meta.cellMetaByKey, patches);
+            replaceCellMetaMapIfChanged(
+                this,
+                patchCellMeta(this.tableStore.meta.cellMetaByKey, patches)
+            );
         });
     },
 
     toggleThousandsForSelection() {
-        this.runWithHistory('thousands', () => {
+        this.runWithCellMetaHistory('thousands', () => {
             const patches = numericMetaPatchesForSelection(this, (meta) => ({
                 ...meta,
                 thousands: meta.thousands !== true
             }));
-            this.tableStore.meta.cellMetaByKey = patchCellMeta(this.tableStore.meta.cellMetaByKey, patches);
+            replaceCellMetaMapIfChanged(
+                this,
+                patchCellMeta(this.tableStore.meta.cellMetaByKey, patches)
+            );
         });
     },
 

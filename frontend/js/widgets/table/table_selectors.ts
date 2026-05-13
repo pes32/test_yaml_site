@@ -13,6 +13,21 @@ import { normalizeChoiceValue } from '../../shared/choice_value.ts';
 type ClassMap = Record<string, boolean>;
 type CssStyleMap = Record<string, string>;
 
+const EMPTY_STYLE = Object.freeze({}) as CssStyleMap;
+const LIST_TEXT_STYLE = Object.freeze({
+    paddingLeft: '0',
+    paddingRight: 'var(--dropdown-arrow-space)'
+}) as CssStyleMap;
+const SINGLE_DATE_TIME_TEXT_STYLE = Object.freeze({
+    paddingLeft: '0',
+    paddingRight: 'calc(var(--widget-dt-gap) + var(--widget-dt-icon-slot-w))'
+}) as CssStyleMap;
+const DATETIME_TEXT_STYLE = Object.freeze({
+    paddingLeft: '0',
+    paddingRight:
+        'calc((var(--widget-dt-gap) * 2) + (var(--widget-dt-icon-slot-w) * 2) + var(--space-2xs, 4px))'
+}) as CssStyleMap;
+
 type DefaultCellValueOptions = {
     isLineNumberColumn?: (column: TableRuntimeColumn) => boolean;
     isListColumnMultiselect?: boolean;
@@ -99,33 +114,18 @@ function getCellDisplayTextClass(column: TableRuntimeColumn | null | undefined):
 function getCellDisplayTextStyle(column: TableRuntimeColumn | null | undefined): CssStyleMap {
     const kind = getCellDisplayKind(column);
     if (kind === 'list') {
-        return {
-            paddingLeft: '0',
-            paddingRight: 'var(--dropdown-arrow-space)'
-        };
+        return LIST_TEXT_STYLE;
     }
     if (kind === 'date') {
-        return {
-            paddingLeft: '0',
-            paddingRight:
-                'calc(var(--widget-dt-gap) + var(--widget-dt-icon-slot-w))'
-        };
+        return SINGLE_DATE_TIME_TEXT_STYLE;
     }
     if (kind === 'time') {
-        return {
-            paddingLeft: '0',
-            paddingRight:
-                'calc(var(--widget-dt-gap) + var(--widget-dt-icon-slot-w))'
-        };
+        return SINGLE_DATE_TIME_TEXT_STYLE;
     }
     if (kind === 'datetime') {
-        return {
-            paddingLeft: '0',
-            paddingRight:
-                'calc((var(--widget-dt-gap) * 2) + (var(--widget-dt-icon-slot-w) * 2) + var(--space-2xs, 4px))'
-        };
+        return DATETIME_TEXT_STYLE;
     }
-    return {};
+    return EMPTY_STYLE;
 }
 
 function getCellDisplayActionsClass(column: TableRuntimeColumn | null | undefined): string[] {

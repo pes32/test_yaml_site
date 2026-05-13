@@ -6,11 +6,12 @@ import {
 import {
     coreCellToDisplay,
     displayCellFromCoreIdentity,
+    rowAtDisplayIndex,
+    rowIdAtDisplayIndex,
     selectionRectFromSnapshot
-} from './table_selection_model.ts';
+} from './table_internal.ts';
 import { buildClearCellPatchesForRuntime } from './table_selection.ts';
 import { TABLE_RUNTIME_SYNC } from './table_runtime_state.ts';
-import { rowAtDisplayIndex, rowIdAtDisplayIndex } from './table_view_model.ts';
 import type {
     TableColumnKey,
     TableContextMenuSnapshot,
@@ -132,6 +133,23 @@ function mutablePasteColumnKeys(
     return keys;
 }
 
+function reportClipboardAccessFailure(
+    vm: TableClipboardRuntimeSurface,
+    kind: 'read' | 'write',
+    error: unknown
+): void {
+    const message =
+        kind === 'write'
+            ? 'Не удалось скопировать данные в буфер обмена.'
+            : 'Не удалось прочитать данные из буфера обмена.';
+    vm.showTableError(message, {
+        cause: error,
+        details: {
+            action: kind === 'write' ? 'clipboard_write' : 'clipboard_read'
+        }
+    });
+}
+
 function dispatchClipboardClear(
     vm: TableClipboardRuntimeSurface,
     rect: TableSelectionRect
@@ -238,12 +256,7 @@ const ClipboardRuntimeMethods = {
                 await navigator.clipboard.writeText(text);
             }
         } catch (error) {
-            this.showTableError('Не удалось скопировать данные в буфер обмена.', {
-                cause: error,
-                details: {
-                    action: 'clipboard_write'
-                }
-            });
+            reportClipboardAccessFailure(this, 'write', error);
         }
     },
 
@@ -281,12 +294,7 @@ const ClipboardRuntimeMethods = {
                     text = await navigator.clipboard.readText();
                 }
             } catch (error) {
-                this.showTableError('Не удалось прочитать данные из буфера обмена.', {
-                    cause: error,
-                    details: {
-                        action: 'clipboard_read'
-                    }
-                });
+                reportClipboardAccessFailure(this, 'read', error);
                 return;
             }
             if (text == null || text === '') return;

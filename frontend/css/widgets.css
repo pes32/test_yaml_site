@@ -136,3 +136,52 @@
 .card-body .row .widget-container {
     margin-bottom: var(--zero);
 }
+
+/* Fallback при ошибке монтирования/рендера одного виджета */
+.widget-render-fallback {
+    padding: var(--space-md);
+    border-radius: var(--radius-xs);
+    border: 1px solid var(--md3-outline-error);
+    background: color-mix(in srgb, var(--md3-outline-error) 10%, var(--color-bg));
+}
+
+.widget-render-fallback__title {
+    font-weight: var(--fw-bold);
+    color: var(--md3-outline-error);
+    margin-bottom: var(--space-sm);
+}
+
+.widget-render-fallback__meta {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--space-2xs) var(--space-md);
+    margin: 0 0 var(--space-sm);
+    font-size: var(--text-sm);
+}
+
+.widget-render-fallback__dt {
+    margin: 0;
+    color: var(--color-text-muted);
+}
+
+.widget-render-fallback__dd {
+    margin: 0;
+}
+
+.widget-render-fallback__code {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--color-text-main);
+}
+
+.widget-render-fallback__message {
+    margin: 0 0 var(--space-xs);
+    font-size: var(--text-base);
+    color: var(--color-text-main);
+}
+
+.widget-render-fallback__detail {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+}

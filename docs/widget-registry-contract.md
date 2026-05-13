@@ -1,6 +1,6 @@
-# Widget Registry Contract
+# Контракт реестра виджетов
 
-## Purpose
+## Назначение
 
 `frontend/js/widgets/factory.ts` является `WidgetDefinitionRegistry`.
 
@@ -9,7 +9,19 @@
 - дать единый contract для render path;
 - зафиксировать capabilities виджета;
 - формализовать lifecycle draft-commit;
-- держать ad hoc branching по `widget.type` вне runtime call-sites.
+- держать ad hoc branching по `widget.type` вне runtime call-sites;
+
+## Версионирование контракта
+
+Изменения в lifecycle, capabilities или наборе bridge-инъекций совместимы не всегда. Чтобы старые виджеты/host не ломались **молча**, контракт версионируется.
+
+- **Поле в коде:** `REGISTRY_CONTRACT_VERSION` экспортируется из [`frontend/js/widgets/factory.ts`](../frontend/js/widgets/factory.ts). Host/page runtime может при старте сверять ожидаемую версию с фактической и логировать/фейлить при несовпадении major.
+- **Когда bump:**
+  - **major:** снятие/переименование capability, `runtimeFeatures`, метода handle, семантики `commitPendingState`, обязательной инъекции;
+  - **minor:** новые опциональные feature, новые provide-ключи за флагом feature, расширение `LifecycleCommitResult` обратно совместимо;
+  - **patch:** уточнение доков/типов без смены поведения.
+
+Текущее значение в репозитории должно совпадать с описанием в этом документе.
 
 ## WidgetDefinition
 
@@ -33,7 +45,24 @@
 - `emitsExecute`
 - `runtimeFeatures`
 
-Поддерживаемые `runtimeFeatures`:
+### Обязательные флаги (ядро)
+
+Они есть у **каждого** нормализованного definition (unknown — осознанно «все false / пусто»):
+
+| Поле | Назначение | Кто читает |
+|------|------------|------------|
+| `stateful` | участие в runtime value contract, committed value из `page_session_store` | host / data path |
+| `draftCommit` | виджет может держать локальный draft и получает lifecycle handle | `WidgetRenderer`, bridge lifecycle |
+| `emitsInput` | подписка на `input` | `WidgetRenderer` |
+| `emitsExecute` | подписка на `execute` | `WidgetRenderer` |
+
+Семантика этих полей **стабильная**: менять смысл только с bump **major** версии контракта.
+
+### Optional surface: `runtimeFeatures`
+
+`runtimeFeatures` — **не** общий DI-контейнер: только заранее оговорённые ключи из union `WidgetRuntimeFeature`, каждый ключ включает **фиксированный** набор host-функций (см. `FEATURE_SERVICE_KEYS` в `frontend/js/runtime/widget_runtime_bridge.ts`).
+
+**Стабильные feature** (продакшен-каталог, изменения только через review + версия контракта):
 
 - `confirmModal`
 - `modalControl`
@@ -41,14 +70,14 @@
 - `errorHandling`
 - `attrsAccess`
 
-Семантика:
+**Экспериментальные** feature появляются только с явной пометкой в PR и здесь, до «промоушена» в стабильные; без этого запрещено плодить новые строки в `runtimeFeatures` «на будущее».
 
-- `stateful` означает, что widget участвует в runtime value contract и получает committed value из `page_session_store`;
-- `draftCommit` означает, что widget может держать локальный draft и получает lifecycle handle;
-- `emitsInput` и `emitsExecute` читает только `WidgetRenderer`;
-- `runtimeFeatures` читает только widget runtime bridge.
+Семантика разделения:
 
-## WidgetRenderer Rules
+- `emitsInput` / `emitsExecute` — только `WidgetRenderer`;
+- `runtimeFeatures` — только widget runtime bridge и `assertRuntimeFeatureServices`.
+
+## Правила WidgetRenderer
 
 `frontend/js/widgets/common/WidgetRenderer.vue` является единственной точкой, где:
 
@@ -60,7 +89,7 @@
 
 Только widgets с `capabilities.draftCommit === true` получают активный lifecycle handle и могут участвовать в boundary commit.
 
-## Lifecycle Handle
+## Lifecycle handle
 
 `WidgetLifecycleHandle` фиксирован так:
 
@@ -71,8 +100,7 @@
 
 Правила:
 
-- `bind()` вызывает только `WidgetRenderer`;
-- повторный bind на тот же handle допустим только как controlled rebind;
+- `bind()` и связка `unbind()`→`bind()` вызывает **только** `WidgetRenderer` (см. [Controlled rebind](#controlled-rebind));
 - `unbind()` и `dispose()` обязаны быть идемпотентными;
 - вызов `commitPendingState()` после `unbind()` или `dispose()` должен возвращать `noop`;
 - silent swallow ошибок запрещён.
@@ -82,7 +110,24 @@
 - `{ status: 'noop' | 'committed' }`
 - `{ status: 'blocked', severity: 'recoverable' | 'fatal', error }`
 
-## Direct Lifecycle
+## Контролируемый rebind
+
+**Инициатор:** только `WidgetRenderer` (`syncLifecycleBinding`, watchers на ref экземпляра и на смену definition).
+
+**Когда разрешён повторный bind «того же» handle:**
+
+- после обновления Vue-ref виджета при **том же** `WidgetDefinition` — выполняется **`unbind()` затем `bind(instance)`** на существующем handle;
+- внешний код **не** вызывает `bind` на handle напрямую.
+
+**Смена `WidgetDefinition` (тип виджета):** это **не** rebind: создаётся **новый** handle, предыдущий проходит `unbind` + `dispose`. Старый handle больше не валиден.
+
+**Что с pending draft:**
+
+- после `unbind` / `dispose` boundary commit через этот handle **не обязан** доставить draft в store;
+- `WidgetRenderer` при смене типа виджета **не** вызывает `commitPendingState` автоматически;
+- если продуктово нужно сохранить ввод — host/navigation слой обязан инициировать commit **до** смены binding или принять явную потерю черновика. Виджет после `unbind` не должен рассчитывать на отложенный flush через старый handle.
+
+## Прямой lifecycle
 
 Registry использует только прямой instance-scoped lifecycle:
 
@@ -93,7 +138,7 @@ Registry использует только прямой instance-scoped lifecycl
 
 `commitDraft(...)`, `isDraftEditing` и field-error probing больше не являются registry-level fallback contract. Виджет может держать такие методы локально, но boundary commit идёт только через `commitPendingState`.
 
-## Runtime Bridge
+## Runtime bridge
 
 Host services публикуются в widget subtree только через runtime bridge.
 
@@ -104,26 +149,38 @@ Host services публикуются в widget subtree только через r
 3. bridge публикует вниз только соответствующие injections;
 4. если definition требует отсутствующий service, runtime пишет warning.
 
-Стабильные injections:
+### Группы injections
 
-- `getConfirmModal`
-- `openUiModal`
-- `closeUiModal`
-- `showAppNotification`
-- `reportAppError`
-- `handleRecoverableAppError`
-- `getWidgetAttrsByName`
-- `getWidgetRuntimeValueByName`
-- `getAllAttrsMap`
-- `getModalRuntimeState`
-- `getModalRuntimeController`
+Связка «feature → ключи» — в коде `FEATURE_SERVICE_KEYS`; ниже — сгруппировано для чтения.
 
-Draft-lifecycle injections:
+**Modal**
 
-- `setActiveWidgetLifecycle`
-- `clearActiveWidgetLifecycle`
+- `getConfirmModal` — feature `confirmModal`
+- `openUiModal`, `closeUiModal` — `modalControl`
 
-## Unknown Widget Policy
+**Modal / runtime state (стек модалок)**
+
+- `getModalRuntimeState`, `getModalRuntimeController` — `modalControl`
+
+**Notifications**
+
+- `showAppNotification` — `notifications`
+
+**Errors**
+
+- `reportAppError`, `handleRecoverableAppError` — `errorHandling`
+
+**Attrs и контекст страницы**
+
+- `getWidgetAttrsByName`, `getWidgetRuntimeValueByName`, `getAllAttrsMap`, `getCurrentPageNameFromRuntime` — `attrsAccess`
+
+**Lifecycle (draft boundary)**
+
+- `setActiveWidgetLifecycle`, `clearActiveWidgetLifecycle` — не `runtimeFeatures`; пробрасываются только если `capabilities.draftCommit === true` (обёртки вызывают host из `WidgetRenderer`).
+
+Дополнительные поля в типе host (например `runBoundaryAction`) не входят в таблицу feature→ключ, пока не станут частью официального bridge-контракта и не будут задокументированы здесь.
+
+## Политика для неизвестных виджетов
 
 Unknown widget fallback допускается только в render-time unknown path.
 
@@ -137,7 +194,7 @@ Unknown widget fallback допускается только в render-time unkno
 
 Неизвестный тип не должен наследовать draft/runtime policy от `str` “по смыслу”.
 
-## Restricted Surface
+## Ограниченная поверхность
 
 Запрещены:
 
@@ -147,7 +204,7 @@ Unknown widget fallback допускается только в render-time unkno
 
 Новые runtime-интеграции должны опираться только на `WidgetDefinitionRegistry`, capabilities и lifecycle handle contract.
 
-## Current Status Matrix
+## Матрица текущего статуса
 
 - TS/Composition API widgets: `str`, `text`, `int`, `float`, `button`, `date`, `time`, `datetime`, `ip`, `ip_mask`, `img`, `list`, `voc`, `split_button`;
 - `table` работает как typed controller feature;

@@ -42,6 +42,7 @@ export type PageConfigState = {
     diagnostics: FrontendDiagnostic[];
     pageConfig: PageConfigRecord | null;
     attrsByName: AttrConfigMap;
+    tableRuntimeByName: Record<string, UnknownRecord>;
 };
 
 export type PageSessionState = {
@@ -51,7 +52,13 @@ export type PageSessionState = {
     parsedGui: ParsedGuiState | null;
 };
 
-export type PagePayload = { page?: unknown; attrs?: unknown; diagnostics?: unknown; snapshotVersion?: unknown };
+export type PagePayload = {
+    page?: unknown;
+    attrs?: unknown;
+    diagnostics?: unknown;
+    snapshotVersion?: unknown;
+    tableRuntime?: unknown;
+};
 
 export type AttrsPayload = {
     attrs?: unknown;
@@ -60,6 +67,7 @@ export type AttrsPayload = {
     page?: unknown;
     resolvedNames?: unknown;
     snapshotVersion?: unknown;
+    tableRuntime?: unknown;
 };
 
 export type ModalPayload = AttrsPayload & {
@@ -70,6 +78,7 @@ export type ModalPayload = AttrsPayload & {
 export type PageRuntimeServices = {
     getAllAttrsMap(): AttrConfigMap;
     getCurrentPageNameFromRuntime(): string;
+    getCurrentSnapshotVersionFromRuntime(): string;
     getModalRuntimeController(): unknown;
     getModalRuntimeState(): unknown;
     getWidgetAttrsByName(widgetName: string): PageAttrConfig;

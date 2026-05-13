@@ -4,8 +4,8 @@
     :has-value="hasValue"
     :label-floats="labelFloats"
     :is-focused="isFocused"
-    :wrap-extra="{ error: !!fieldError }"
-    :has-supporting="!!(widgetConfig.sup_text || fieldError)"
+    :wrap-extra="{ error: !!(fieldError || supportingErrorText) }"
+    :has-supporting="!!(widgetConfig.sup_text || supportingErrorText)"
     :wrap-variant="isTextArea ? 'textarea' : undefined"
     :container-modifier="isTextArea ? 'textarea' : undefined"
   >
@@ -28,7 +28,7 @@
     <input
       v-else
       v-model="value"
-      type="text"
+      :type="inputType"
       class="form-control"
       data-table-editor-target="true"
       v-bind="tableCellRootAttrs"
@@ -36,13 +36,16 @@
       :disabled="widgetConfig.readonly"
       :tabindex="widgetConfig.readonly ? -1 : null"
       :title="simpleFieldKind === 'string' ? value : undefined"
+      :autocomplete="simpleFieldKind === 'password' ? 'new-password' : undefined"
+      @copy="onCopyProtected"
+      @cut="onCopyProtected"
       @input="onInput"
       @focus="onFocus"
       @blur="onBlur"
       @keydown.enter="onEnterCommit"
     >
     <template #supporting>
-      <span v-if="fieldError" class="md3-error" v-text="fieldError"></span>
+      <span v-if="supportingErrorText" class="md3-error" v-text="supportingErrorText"></span>
       <span v-else v-text="widgetConfig.sup_text"></span>
     </template>
   </md3-field>
@@ -66,7 +69,7 @@ const emit = defineEmits<SimpleFieldEmit>();
 
 function resolveSimpleFieldKind(widgetType: unknown): SimpleFieldKind {
   const key = String(widgetType || '').trim();
-  if (key === 'int' || key === 'float' || key === 'text') {
+  if (key === 'int' || key === 'float' || key === 'text' || key === 'password') {
     return key;
   }
   return 'string';
@@ -74,6 +77,7 @@ function resolveSimpleFieldKind(widgetType: unknown): SimpleFieldKind {
 
 const simpleFieldKind = resolveSimpleFieldKind(props.widgetConfig.widget);
 const isTextArea = simpleFieldKind === 'text';
+const inputType = computed(() => simpleFieldKind === 'password' ? 'password' : 'text');
 const textareaRows = computed(() => {
   const rows = Number(props.widgetConfig.rows);
   return Number.isInteger(rows) && rows > 0 ? rows : 3;
@@ -98,6 +102,14 @@ const {
   tableCellRootAttrs,
   value
 } = useSimpleFieldWidget(props, emit, { kind: simpleFieldKind });
+
+const supportingErrorText = computed(() => fieldError.value || '');
+
+function onCopyProtected(event: ClipboardEvent): void {
+  if (simpleFieldKind === 'password' || props.widgetConfig.no_copy) {
+    event.preventDefault();
+  }
+}
 
 defineExpose({
   commitDraft,

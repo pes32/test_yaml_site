@@ -44,7 +44,7 @@
   </md3-field>
 </template>
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch, type CSSProperties } from 'vue';
+import { computed, inject, nextTick, onBeforeUnmount, ref, shallowRef, watch, type CSSProperties } from 'vue';
 import ChoiceCombobox from './common/ChoiceCombobox.vue';
 import Md3Field from './common/Md3Field.vue';
 import {
@@ -90,6 +90,9 @@ defineOptions({
 const props = defineProps<ListWidgetProps>();
 const emit = defineEmits<ListWidgetEmit>();
 const field = useWidgetField(props, emit);
+const ensureWidgetSourceLoadedByName = inject<
+  ((widgetName: string, options?: Record<string, unknown>) => Promise<void>) | null
+>('ensureWidgetSourceLoadedByName', null);
 const combobox = ref<ChoiceComboboxSurface | null>(null);
 const isDropdownOpen = ref(false);
 const isFocused = ref(false);
@@ -228,6 +231,11 @@ function resetHighlightToFirstFilteredOption(): void {
 function getCurrentHighlightedOption() {
   return getHighlightedOptionFromValueModel(highlightedIndex.value);
 }
+function ensureSourceLoaded(): void {
+  if (typeof ensureWidgetSourceLoadedByName === 'function') {
+    void ensureWidgetSourceLoadedByName(props.widgetName, { silent: false });
+  }
+}
 function onInputChange(event: Event): void {
   if (!isSearchable.value) {
     return;
@@ -242,6 +250,7 @@ function onInputChange(event: Event): void {
   resetHighlightToFirstFilteredOption();
 }
 function onInputFocus(): void {
+  ensureSourceLoaded();
   isFocused.value = true;
   if (!isMultiselect.value && isEditable.value && !isDraftEditing.value) {
     inputValue.value = getOptionLabelByValue(value.value);
@@ -373,6 +382,7 @@ function onArrowClick(): void {
   if (props.widgetConfig.readonly) {
     return;
   }
+  ensureSourceLoaded();
   choiceDropdown.focusInput();
   if (isDropdownOpen.value) {
     closeDropdown();
@@ -393,6 +403,7 @@ function selectOption(
   }
 }
 function openDropdown(options: { highlightFirstFiltered?: boolean } = {}): void {
+  ensureSourceLoaded();
   choiceDropdown.openDropdown({
     highlightFirst: options.highlightFirstFiltered === true
   });

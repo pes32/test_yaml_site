@@ -76,6 +76,10 @@
     color: var(--color-text-muted);
 }
 
+.md3-dropdown-wrap.is-readonly .list-combobox-input {
+    color: var(--color-text-muted);
+}
+
 .widget-dropdown {
     width: var(--widget-dropdown-w);
     min-width: var(--widget-dropdown-w);

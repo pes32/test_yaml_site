@@ -2,7 +2,7 @@
     <div class="page-header-brand-wrap">
         <a class="page-header-brand" href="/">YAML System</a>
         <span class="page-header-version"
-              title="Кликабельный макет. Без БД.">v.0.375 л.</span>
+              title="Почти рабочая система. База не связана с ямлами.">v0.5 л.</span>
     </div>
     <nav class="page-header-actions" aria-label="Основная навигация">
         <a class="page-header-icon-link{% if header_active == 'postgres' %} is-active{% endif %}"
@@ -20,13 +20,267 @@
            title="GitHub-репозиторий">
             <img src="{{ url_for('serve_icon', filename='github.svg') }}" alt="">
         </a>
-        {% if debug_tooling_enabled %}
-        <a class="page-header-link" href="/debug" target="_blank" rel="noopener noreferrer">Debug</a>
-        {% endif %}
         {% if sudoku_is_available() %}
         <a class="page-header-link{% if header_active == 'sudoku' %} is-active{% endif %}"
            href="/sudoku"
            {% if header_active == 'sudoku' %}aria-current="page"{% endif %}>Судоку</a>
         {% endif %}
+        <div id="headerAuthRoot" class="page-header-auth-root">
+            <button
+                id="headerAuthButton"
+                type="button"
+                class="page-header-link page-header-auth-button{% if header_active == 'user_settings' %} is-active{% endif %}"
+                aria-haspopup="dialog"
+                aria-expanded="false">
+                <span id="headerAuthIconWrap" class="page-header-auth-icon-wrap inline-flex-center">
+                    <img id="headerAuthIcon" class="page-header-auth-icon" src="{{ url_for('serve_icon', filename='login.svg') }}" alt="">
+                </span>
+                <span id="headerAuthText" class="page-header-auth-text">Вход</span>
+            </button>
+            <div
+                id="headerUserMenu"
+                class="page-header-user-menu"
+                role="menu"
+                aria-hidden="true">
+                <a class="page-header-user-menu-item" href="/user_settings" role="menuitem">
+                    <span class="page-header-user-menu-icon inline-flex-center">
+                        <img src="{{ url_for('serve_icon', filename='settings.svg') }}" alt="">
+                    </span>
+                    <span class="page-header-user-menu-label">Настройка</span>
+                </a>
+                <button id="headerLogoutButton" type="button" class="page-header-user-menu-item page-header-user-menu-button" role="menuitem">
+                    <span class="page-header-user-menu-icon inline-flex-center">
+                        <img src="{{ url_for('serve_icon', filename='logout.svg') }}" alt="">
+                    </span>
+                    <span class="page-header-user-menu-label">Выход</span>
+                </button>
+            </div>
+        </div>
     </nav>
 </header>
+
+<div id="headerLoginModal" class="header-login-modal" role="dialog" aria-modal="true" aria-labelledby="headerLoginTitle" aria-hidden="true">
+    <form id="headerLoginForm" class="header-login-form" autocomplete="on">
+        <div class="header-login-form__header">
+            <h5 id="headerLoginTitle" class="header-login-form__title">Вход</h5>
+            <button id="headerLoginCloseButton" type="button" class="ui-close-button" aria-label="Закрыть"></button>
+        </div>
+        <div class="header-login-form__body">
+            <label class="header-login-field">
+                <span class="header-login-field__label">Логин</span>
+                <input id="headerLoginInput" class="header-login-field__input" name="login" autocomplete="username" type="text" autocapitalize="off" autocorrect="off" spellcheck="false">
+            </label>
+            <label class="header-login-field">
+                <span class="header-login-field__label">Пароль</span>
+                <input id="headerPasswordInput" class="header-login-field__input" name="password" autocomplete="current-password" type="password">
+            </label>
+            <div id="headerLoginError" class="header-login-error" role="alert" aria-live="polite"></div>
+        </div>
+        <div class="header-login-form__footer">
+            <button id="headerLoginCancelButton" type="button" class="widget-button confirm-modal-action confirm-modal-action--secondary">Отмена</button>
+            <button type="submit" class="widget-button confirm-modal-action">Войти</button>
+        </div>
+    </form>
+</div>
+
+<script>
+(function () {
+    const authButton = document.getElementById('headerAuthButton');
+    const authText = document.getElementById('headerAuthText');
+    const authIcon = document.getElementById('headerAuthIcon');
+    const authIconWrap = document.getElementById('headerAuthIconWrap');
+    const authRoot = document.getElementById('headerAuthRoot');
+    const userMenu = document.getElementById('headerUserMenu');
+    const logoutButton = document.getElementById('headerLogoutButton');
+    const modal = document.getElementById('headerLoginModal');
+    const form = document.getElementById('headerLoginForm');
+    const loginInput = document.getElementById('headerLoginInput');
+    const passwordInput = document.getElementById('headerPasswordInput');
+    const errorNode = document.getElementById('headerLoginError');
+    const closeButton = document.getElementById('headerLoginCloseButton');
+    const cancelButton = document.getElementById('headerLoginCancelButton');
+    const loginIconUrl = "{{ url_for('serve_icon', filename='login.svg') }}";
+    let currentUser = null;
+
+    function userLabel(user) {
+        const surname = String((user && user.user_surname) || '').trim();
+        const name = String((user && user.user_name) || '').trim();
+        const patronymic = String((user && user.user_patronymic) || '').trim();
+        if (surname && name && patronymic) {
+            return surname + ' ' + name.charAt(0) + '.' + patronymic.charAt(0) + '.';
+        }
+        return String((user && user.user_login) || '');
+    }
+
+    function emitAuthState() {
+        window.dispatchEvent(new CustomEvent('yamls-auth-state-changed', { detail: { user: currentUser } }));
+    }
+
+    function setError(message) {
+        if (!errorNode) return;
+        const text = message ? String(message) : '';
+        errorNode.textContent = text;
+        errorNode.classList.toggle('header-login-error--visible', Boolean(text));
+    }
+
+    function hideMenu() {
+        if (userMenu) {
+            userMenu.classList.remove('is-open');
+            userMenu.setAttribute('aria-hidden', 'true');
+        }
+        if (authButton) authButton.setAttribute('aria-expanded', 'false');
+    }
+
+    function showMenu() {
+        if (userMenu) {
+            userMenu.classList.add('is-open');
+            userMenu.setAttribute('aria-hidden', 'false');
+        }
+        if (authButton) authButton.setAttribute('aria-expanded', 'true');
+    }
+
+    function isMenuOpen() {
+        return Boolean(userMenu && userMenu.classList.contains('is-open'));
+    }
+
+    function openLoginModal() {
+        hideMenu();
+        setError('');
+        if (!modal) return;
+        modal.classList.add('header-login-modal--open');
+        modal.setAttribute('aria-hidden', 'false');
+        if (loginInput) {
+            loginInput.value = '';
+            loginInput.focus();
+        }
+        if (passwordInput) passwordInput.value = '';
+    }
+
+    function closeLoginModal() {
+        if (!modal) return;
+        modal.classList.remove('header-login-modal--open');
+        modal.setAttribute('aria-hidden', 'true');
+        if (form) form.reset();
+        setError('');
+    }
+
+    function renderAuth(user) {
+        currentUser = user || null;
+        hideMenu();
+        if (!authText || !authButton || !authIcon || !authIconWrap) return;
+        if (!currentUser) {
+            authIcon.src = loginIconUrl;
+            authIconWrap.classList.remove('is-hidden');
+            authText.textContent = 'Вход';
+            authButton.setAttribute('aria-haspopup', 'dialog');
+            return;
+        }
+        authIconWrap.classList.add('is-hidden');
+        authText.textContent = userLabel(currentUser);
+        authButton.setAttribute('aria-haspopup', 'menu');
+    }
+
+    function readApiErrorMessage(payload) {
+        if (!payload || typeof payload !== 'object') return '';
+        var envelope = payload;
+        var err = envelope.error && typeof envelope.error === 'object' ? envelope.error : {};
+        var base = '';
+        if (typeof err.message === 'string' && err.message.trim()) {
+            base = err.message.trim();
+        } else if (typeof envelope.message === 'string' && envelope.message.trim()) {
+            base = envelope.message.trim();
+        } else if (typeof envelope.error === 'string' && envelope.error.trim()) {
+            base = envelope.error.trim();
+        }
+        var topDetails = typeof envelope.details === 'string' ? envelope.details.trim() : '';
+        var nestedDetails = typeof err.details === 'string' ? err.details.trim() : '';
+        var details = topDetails || nestedDetails;
+        return details ? base + ': ' + details : base;
+    }
+
+    async function requestJson(url, options) {
+        const response = await fetch(url, options || {});
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || (payload && payload.ok === false)) {
+            var msg = readApiErrorMessage(payload);
+            throw new Error(msg || ('HTTP ' + response.status));
+        }
+        return (payload && payload.data) || {};
+    }
+
+    if (authButton) {
+        authButton.addEventListener('click', function () {
+            if (currentUser) {
+                if (isMenuOpen()) hideMenu();
+                else showMenu();
+                return;
+            }
+            openLoginModal();
+        });
+    }
+
+    if (form) {
+        form.addEventListener('submit', async function (event) {
+            event.preventDefault();
+            setError('');
+            try {
+                const data = await requestJson('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        login: loginInput ? loginInput.value : '',
+                        password: passwordInput ? passwordInput.value : ''
+                    })
+                });
+                closeLoginModal();
+                renderAuth(data.user || null);
+                emitAuthState();
+            } catch (error) {
+                setError(error instanceof Error ? error.message : String(error));
+            }
+        });
+    }
+
+    if (logoutButton) {
+        logoutButton.addEventListener('click', async function () {
+            try {
+                await requestJson('/api/auth/logout', { method: 'POST' });
+            } finally {
+                renderAuth(null);
+                emitAuthState();
+                window.location.href = '/';
+            }
+        });
+    }
+
+    [closeButton, cancelButton].forEach(function (button) {
+        if (button) button.addEventListener('click', closeLoginModal);
+    });
+    if (modal) {
+        modal.addEventListener('click', function (event) {
+            if (event.target === modal) closeLoginModal();
+        });
+    }
+    document.addEventListener('keydown', function (event) {
+        if (event.key !== 'Escape') return;
+        if (modal && modal.classList.contains('header-login-modal--open')) {
+            closeLoginModal();
+            return;
+        }
+        if (isMenuOpen()) hideMenu();
+    });
+    document.addEventListener('click', function (event) {
+        if (authRoot && !authRoot.contains(event.target)) hideMenu();
+    });
+
+    requestJson('/api/auth/me')
+        .then(function (data) {
+            renderAuth(data.user || null);
+            emitAuthState();
+        })
+        .catch(function () {
+            renderAuth(null);
+            emitAuthState();
+        });
+})();
+</script>

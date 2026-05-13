@@ -4,6 +4,7 @@ import { createTableRuntimeError, normalizeTableRuntimeError } from './table_err
 
 type CreateTablePageBridgeOptions = {
     getAllAttrsMap?: (() => WidgetAttrsMap) | null;
+    getSnapshotVersion?: (() => string) | null;
     handleRecoverableAppError?: ((error: unknown, context?: Record<string, unknown>) => void) | null;
     showAppNotification?: ((message: string, type?: string) => void) | null;
 };
@@ -19,6 +20,7 @@ function createTablePageBridge(
 
     return {
         getAllAttrsMap: options.getAllAttrsMap || (() => ({})),
+        getSnapshotVersion: options.getSnapshotVersion || (() => ''),
         getListOptions: () => [],
         notify: (message, type) => {
             options.showAppNotification?.(message, type);

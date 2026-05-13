@@ -9,7 +9,8 @@ async function editNativeTableCell(name: string, page: Page, row: number, col: n
   await expect(input).toBeVisible();
   await input.fill(value);
   await input.blur();
-  await expect(input).toHaveValue(value);
+  // Embedded int/float/ip cells unmount the editor after blur; displayed text lives under `.widget-table__cell-value`.
+  await expect(tableCellText(page, name, row, col)).toHaveText(value);
 }
 
 async function addRowBelowFromCell(name: string, page: Page, row: number, col: number) {
@@ -71,15 +72,79 @@ async function leafHeaderWrapStates(page: Page, name: string) {
   });
 }
 
+function percentile(values: number[], p: number): number {
+  const sorted = values.slice().sort((a, b) => a - b);
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * p) - 1));
+  return sorted[index] || 0;
+}
+
+async function measureSyntheticTableClicks(markupTable: Locator) {
+  const result = await markupTable.evaluate(async (tableElement) => {
+    async function flushVueMicrotasks(): Promise<void> {
+      await Promise.resolve();
+      await Promise.resolve();
+    }
+
+    async function clickCell(index: number): Promise<{ duration: number; phase: { down: number; up: number; click: number; flush: number } }> {
+      const row = index % 12;
+      const col = 1 + (index % 8);
+      const cell = tableElement.querySelector(`tbody td[data-row="${row}"][data-col="${col}"]`) as HTMLElement | null;
+      if (!cell) throw new Error(`Missing perf cell ${row}:${col}`);
+      const started = performance.now();
+      cell.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 }));
+      const afterDown = performance.now();
+      cell.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, button: 0 }));
+      const afterUp = performance.now();
+      cell.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+      const afterClick = performance.now();
+      await flushVueMicrotasks();
+      const finished = performance.now();
+      return {
+        duration: finished - started,
+        phase: {
+          down: afterDown - started,
+          up: afterUp - afterDown,
+          click: afterClick - afterUp,
+          flush: finished - afterClick
+        }
+      };
+    }
+
+    for (let index = 0; index < 8; index += 1) {
+      await clickCell(index);
+    }
+
+    const samples: number[] = [];
+    const phases: Array<{ down: number; up: number; click: number; flush: number }> = [];
+    for (let index = 0; index < 32; index += 1) {
+      const measured = await clickCell(index);
+      samples.push(measured.duration);
+      phases.push(measured.phase);
+    }
+    return { phases, samples };
+  });
+
+  return {
+    ...result,
+    median: percentile(result.samples, 0.5),
+    p95: percentile(result.samples, 0.95),
+    slowest: Math.max(...result.samples)
+  };
+}
+
 type TableWidgetRuntimeInspection = {
   registeredType: string;
   contextMenuOpenValue: boolean;
   exposed: {
     contextMenuOpenBoolean: boolean;
     dispatchTableCommand: boolean;
+    ensureDisplayRowVisible: boolean;
+    focusSelectionCell: boolean;
     getValue: boolean;
     initializeTable: boolean;
     onTableEditableKeydown: boolean;
+    scrollToDisplayRow: boolean;
+    selectAllTable: boolean;
     setValue: boolean;
     stickyHeaderEnabledBoolean: boolean;
     tableDataArray: boolean;
@@ -90,6 +155,7 @@ type TableWidgetRuntimeInspection = {
     tableRootFromRuntime: boolean;
     tableRootFromRuntimeMatchesElement: boolean;
     tableThead: boolean;
+    virtualSpacerRows: number;
   };
 };
 
@@ -128,6 +194,21 @@ async function installWidgetInstanceDebugRegistry(page: Page): Promise<void> {
 }
 
 async function ensureTableV2MarkupRows(page: Page, targetCount: number): Promise<void> {
+  await page.waitForFunction(() => {
+    type TableDebugEntry = {
+      instance?: {
+        dispatchTableCommand?: (command: string, payload?: Record<string, unknown>) => unknown;
+        tableData?: Array<{ id?: string; cells?: unknown[] }>;
+      };
+    };
+    type TableDebugWindow = Window & {
+      __YAMLS_WIDGET_INSTANCE_DEBUG__?: {
+        entries?: Record<string, TableDebugEntry>;
+      };
+    };
+    const entry = (window as TableDebugWindow).__YAMLS_WIDGET_INSTANCE_DEBUG__?.entries?.table_v2_markup;
+    return typeof entry?.instance?.dispatchTableCommand === 'function' && Array.isArray(entry.instance.tableData);
+  });
   await page.evaluate((count) => {
     type TableDebugEntry = {
       instance?: {
@@ -157,17 +238,18 @@ async function ensureTableV2MarkupRows(page: Page, targetCount: number): Promise
       return {
         id: `toolbar-test-row-${rowNumber}`,
         cells: [
+          rowNumber,
           `Проверка строки ${rowNumber}`,
-          source[1] || 'Вера',
-          source[2] || 'bad-number',
-          source[3] || 'x',
-          source[4] || '31.12.2026',
-          source[5] || '25:99',
-          source[6] || '222/222/222222',
-          source[7] || '10.10.10.10/33',
-          source[8] || 'Риск',
-          source[9] || 'C3',
-          source[10] || 'Строка для проверки скролла'
+          source[2] || 'Вера',
+          source[3] || 'bad-number',
+          source[4] || 'x',
+          source[5] || '31.12.2026',
+          source[6] || '25:99',
+          source[7] || '222/222/222222',
+          source[8] || '10.10.10.10/33',
+          source[9] || 'Риск',
+          source[10] || 'C3',
+          source[11] || 'Строка для проверки скролла'
         ]
       };
     });
@@ -178,7 +260,67 @@ async function ensureTableV2MarkupRows(page: Page, targetCount: number): Promise
     });
   }, targetCount);
 
-  await expect(table(page, 'table_v2_markup').locator('tbody tr')).toHaveCount(targetCount);
+  await page.waitForFunction((count) => {
+    type TableDebugEntry = {
+      instance?: {
+        tableData?: Array<{ id?: string; cells?: unknown[] }>;
+      };
+    };
+    type TableDebugWindow = Window & {
+      __YAMLS_WIDGET_INSTANCE_DEBUG__?: {
+        entries?: Record<string, TableDebugEntry>;
+      };
+    };
+    const entry = (window as TableDebugWindow).__YAMLS_WIDGET_INSTANCE_DEBUG__?.entries?.table_v2_markup;
+    const rows = entry?.instance?.tableData;
+    return Array.isArray(rows) && rows.length >= count;
+  }, targetCount);
+  await expect(table(page, 'table_v2_markup').locator('tbody tr[data-display-row]').first()).toBeVisible();
+}
+
+async function scrollTableToDisplayRow(
+  page: Page,
+  name: string,
+  rowIndex: number,
+  align: 'start' | 'center' | 'end' = 'start'
+): Promise<void> {
+  await page.evaluate(({ align: requestedAlign, row, widgetName }) => {
+    type TableDebugEntry = {
+      instance?: {
+        scrollToDisplayRow?: (rowIndex: number, align?: 'start' | 'center' | 'end') => void;
+      };
+    };
+    type TableDebugWindow = Window & {
+      __YAMLS_WIDGET_INSTANCE_DEBUG__?: {
+        entries?: Record<string, TableDebugEntry>;
+      };
+    };
+    const entry = (window as TableDebugWindow).__YAMLS_WIDGET_INSTANCE_DEBUG__?.entries?.[widgetName];
+    if (typeof entry?.instance?.scrollToDisplayRow !== 'function') {
+      throw new Error(`${widgetName} scrollToDisplayRow is not registered`);
+    }
+    entry.instance.scrollToDisplayRow(row, requestedAlign);
+  }, { align, row: rowIndex, widgetName: name });
+}
+
+async function selectAllTableViaRuntime(page: Page, name: string): Promise<void> {
+  await page.evaluate((widgetName) => {
+    type TableDebugEntry = {
+      instance?: {
+        selectAllTable?: () => unknown;
+      };
+    };
+    type TableDebugWindow = Window & {
+      __YAMLS_WIDGET_INSTANCE_DEBUG__?: {
+        entries?: Record<string, TableDebugEntry>;
+      };
+    };
+    const entry = (window as TableDebugWindow).__YAMLS_WIDGET_INSTANCE_DEBUG__?.entries?.[widgetName];
+    if (typeof entry?.instance?.selectAllTable !== 'function') {
+      throw new Error(`${widgetName} selectAllTable is not registered`);
+    }
+    entry.instance.selectAllTable();
+  }, name);
 }
 
 async function inspectTableWidgetRuntime(page: Page, name: string): Promise<TableWidgetRuntimeInspection> {
@@ -206,9 +348,13 @@ async function inspectTableWidgetRuntime(page: Page, name: string): Promise<Tabl
       exposed: {
         contextMenuOpenBoolean: typeof publicInstance.contextMenuOpen === 'boolean',
         dispatchTableCommand: typeof publicInstance.dispatchTableCommand === 'function',
+        ensureDisplayRowVisible: typeof publicInstance.ensureDisplayRowVisible === 'function',
+        focusSelectionCell: typeof publicInstance.focusSelectionCell === 'function',
         getValue: typeof publicInstance.getValue === 'function',
         initializeTable: typeof publicInstance.initializeTable === 'function',
         onTableEditableKeydown: typeof publicInstance.onTableEditableKeydown === 'function',
+        scrollToDisplayRow: typeof publicInstance.scrollToDisplayRow === 'function',
+        selectAllTable: typeof publicInstance.selectAllTable === 'function',
         setValue: typeof publicInstance.setValue === 'function',
         stickyHeaderEnabledBoolean: typeof publicInstance.stickyHeaderEnabled === 'boolean',
         tableDataArray: Array.isArray(publicInstance.tableData)
@@ -218,7 +364,8 @@ async function inspectTableWidgetRuntime(page: Page, name: string): Promise<Tabl
         lazySentinelRow: element.querySelector('.widget-table__lazy-sentinel') instanceof HTMLTableRowElement,
         tableRootFromRuntime: tableRoot instanceof HTMLTableElement,
         tableRootFromRuntimeMatchesElement: tableRoot === element,
-        tableThead: element.querySelector('thead') instanceof HTMLTableSectionElement
+        tableThead: element.querySelector('thead') instanceof HTMLTableSectionElement,
+        virtualSpacerRows: element.querySelectorAll('.widget-table__virtual-spacer').length
       }
     };
   }, name);
@@ -286,17 +433,51 @@ test.describe('behavior: demo table widgets', () => {
     await expect(table(page, 'demo_table_6').locator('tbody tr')).toHaveCount(3);
   });
 
-  test('large lazy table renders the first chunk and keeps lazy sentinel instead of 1000 DOM rows', async ({ page }) => {
-    const lazyTable = table(page, 'demo_table_7');
-    await expect(lazyTable.locator('tbody tr').first()).toContainText('REC-0001');
-    await expect(lazyTable.locator('tbody tr').nth(99)).toContainText('REC-0100');
-    await expect(lazyTable.locator('tbody tr')).toHaveCount(101);
-    await expect(lazyTable.locator('.widget-table__lazy-sentinel')).toHaveCount(1);
+  test('large table uses the virtual renderer instead of rendering every row', async ({ page }) => {
+    const virtualTable = table(page, 'demo_table_7');
+    const dataRows = virtualTable.locator('tbody tr[data-display-row]');
+    await expect(dataRows.first()).toContainText('REC-0001');
+    await expect.poll(async () => dataRows.count()).toBeLessThanOrEqual(160);
+    await expect(virtualTable.locator('.widget-table__lazy-sentinel')).toHaveCount(0);
+    await expect(virtualTable.locator('.widget-table__virtual-spacer')).toHaveCount(1);
+  });
+
+  test('virtual spacer row ignores context menu and stays aria-hidden', async ({ page }) => {
+    const virtualTable = table(page, 'demo_table_7');
+    await scrollTableToDisplayRow(page, 'demo_table_7', 400, 'start');
+    const spacer = virtualTable.locator('.widget-table__virtual-spacer').first();
+    await expect(spacer).toHaveCount(1);
+    await expect(spacer).toHaveAttribute('aria-hidden', 'true');
+    await spacer.dispatchEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      button: 2
+    });
+    await expect(page.locator('.context-menu')).toHaveCount(0);
+  });
+
+  test('PageDown moves selection down without rendering full row model', async ({ page }) => {
+    await openDemoTab(page, 'Таблицы', 'Таблица с разметкой');
+    await ensureTableV2MarkupRows(page, 120);
+    const markup = table(page, 'table_v2_markup');
+    await tableCell(page, 'table_v2_markup', 2, 1).click();
+    await page.keyboard.press('PageDown');
+    await page.keyboard.press('PageDown');
+    const focusRow = await page.evaluate(() => {
+      type W = Window & {
+        __YAMLS_WIDGET_INSTANCE_DEBUG__?: {
+          entries?: Record<string, { instance?: { selFocus?: { r: number } } }>;
+        };
+      };
+      return (window as W).__YAMLS_WIDGET_INSTANCE_DEBUG__?.entries?.table_v2_markup?.instance?.selFocus?.r;
+    });
+    expect(focusRow).toBeGreaterThan(5);
+    await expect.poll(async () => markup.locator('tbody tr[data-display-row]').count()).toBeLessThan(200);
   });
 
   test('table public surface stays limited while runtime refs work', async ({ page }) => {
-    const lazyTable = table(page, 'demo_table_7');
-    await expect(lazyTable.locator('.widget-table__lazy-sentinel')).toHaveCount(1);
+    const virtualTable = table(page, 'demo_table_7');
+    await expect(virtualTable.locator('.widget-table__lazy-sentinel')).toHaveCount(0);
 
     const mountedRuntime = await inspectTableWidgetRuntime(page, 'demo_table_7');
     expect(mountedRuntime).toMatchObject({
@@ -305,16 +486,20 @@ test.describe('behavior: demo table widgets', () => {
       exposed: {
         contextMenuOpenBoolean: true,
         dispatchTableCommand: true,
+        ensureDisplayRowVisible: true,
+        focusSelectionCell: true,
         getValue: true,
         initializeTable: true,
         onTableEditableKeydown: true,
+        scrollToDisplayRow: true,
+        selectAllTable: true,
         setValue: true,
         stickyHeaderEnabledBoolean: true,
         tableDataArray: true
       },
       refs: {
         contextMenuEl: false,
-        lazySentinelRow: true,
+        lazySentinelRow: false,
         tableRootFromRuntime: true,
         tableRootFromRuntimeMatchesElement: true,
         tableThead: true
@@ -370,6 +555,7 @@ test.describe('behavior: complex table widget', () => {
   test('complex table cells support native text editing and embedded list actions', async ({ page }) => {
     await editNativeTableCell('big_table', page, 0, 1, 'строка');
     await editNativeTableCell('big_table', page, 0, 3, '42');
+    await editNativeTableCell('big_table', page, 0, 1, 'abc123x');
 
     const dateCell = tableCell(page, 'big_table', 0, 9);
     await expect(dateCell.getByRole('button', { name: 'Выбрать дату' })).toBeVisible();
@@ -410,6 +596,29 @@ test.describe('behavior: complex table widget', () => {
     const plainTextInset = await cellTextLeftInset(page, 'big_table', 0, 1);
     expect(Math.abs(dateTextInset - plainTextInset)).toBeLessThanOrEqual(1);
     expect(Math.abs(timeTextInset - plainTextInset)).toBeLessThanOrEqual(1);
+  });
+
+  test('numeric table fields normalize text and custom field errors do not resize rows', async ({ page }) => {
+    const complexTable = table(page, 'big_table');
+    const intCell = tableCell(page, 'big_table', 0, 3);
+    await intCell.dblclick();
+    const nativeIntEditor = intCell.getByRole('textbox').first();
+    await nativeIntEditor.fill('abc-12x3');
+    await expect(nativeIntEditor).toHaveValue('123');
+    await nativeIntEditor.blur();
+
+    const row = complexTable.locator('tbody tr').first();
+    const beforeHeight = await row.evaluate((element) => element.getBoundingClientRect().height);
+    const customIntCell = tableCell(page, 'big_table', 0, 8);
+    await customIntCell.dblclick();
+    const customIntEditor = customIntCell.getByRole('textbox').first();
+    await customIntEditor.fill('12abc');
+    await expect(customIntEditor).toHaveValue('12');
+    const editingHeight = await row.evaluate((element) => element.getBoundingClientRect().height);
+    expect(editingHeight).toBeLessThanOrEqual(beforeHeight + 1);
+    await customIntEditor.blur();
+    const afterHeight = await row.evaluate((element) => element.getBoundingClientRect().height);
+    expect(afterHeight).toBeLessThanOrEqual(beforeHeight + 1);
   });
 
   test('full-row keyboard selection keeps focus and Ctrl+Minus deletes the selected row block', async ({ page }) => {
@@ -546,9 +755,85 @@ test.describe('behavior: table v2 toolbar', () => {
 
     const contentBox = await rect(content);
     const stickyToolbarBox = await rect(toolbarHost);
+    const stickyToolbarInnerBox = await rect(toolbar);
     const stickyHeaderBox = await rect(page.locator('.widget-table__sticky-overlay').first());
     expect(Math.abs(stickyToolbarBox.top - contentBox.top)).toBeLessThanOrEqual(1);
     expect(Math.abs(stickyHeaderBox.top - stickyToolbarBox.bottom)).toBeLessThanOrEqual(1);
+    expect(stickyHeaderBox.top - stickyToolbarInnerBox.bottom).toBeGreaterThanOrEqual(3);
+  });
+
+  test('keeps selection clicks responsive on formatted 40-row tables', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 520 });
+    await openDemoTab(page, 'Таблицы', 'Таблица с разметкой');
+    await ensureTableV2MarkupRows(page, 40);
+
+    const markupTable = table(page, 'table_v2_markup');
+    const toolbar = page.locator('.widget-table-toolbar').first();
+    const baseline = await measureSyntheticTableClicks(markupTable);
+
+    await selectAllTableViaRuntime(page, 'table_v2_markup');
+    await toolbar.getByTitle('Зачеркнутый').click();
+    await expect(tableCellText(page, 'table_v2_markup', 0, 1)).toHaveCSS('text-decoration-thickness', '2px');
+    await expect(tableCellText(page, 'table_v2_markup', 39, 11)).toHaveCSS('text-decoration-thickness', '2px');
+
+    const formatted = await measureSyntheticTableClicks(markupTable);
+    const perfSummary = JSON.stringify({
+      baseline: {
+        median: baseline.median,
+        p95: baseline.p95,
+        sample: baseline.samples.slice(0, 6),
+        slowest: baseline.slowest
+      },
+      formatted: {
+        median: formatted.median,
+        p95: formatted.p95,
+        phases: formatted.phases.slice(0, 3),
+        sample: formatted.samples.slice(0, 6),
+        slowest: formatted.slowest
+      }
+    });
+    expect(formatted.median, perfSummary).toBeLessThanOrEqual(baseline.median + 100);
+    expect(formatted.p95, perfSummary).toBeLessThanOrEqual(baseline.p95 + 200);
+  });
+
+  test('virtual 10k table keeps DOM bounded and preserves formatting offscreen', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 560 });
+    await openDemoTab(page, 'Таблицы', 'Таблица с разметкой');
+    await ensureTableV2MarkupRows(page, 10000);
+
+    const markupTable = table(page, 'table_v2_markup');
+    const toolbar = page.locator('.widget-table-toolbar').first();
+    const dataRows = markupTable.locator('tbody tr[data-display-row]');
+    await expect.poll(async () => dataRows.count()).toBeLessThanOrEqual(180);
+    await expect(markupTable.locator('.widget-table__lazy-sentinel')).toHaveCount(0);
+
+    await selectAllTableViaRuntime(page, 'table_v2_markup');
+    await toolbar.getByTitle('Зачеркнутый').click();
+    await toolbar.getByTitle('Цвет заливки', { exact: true }).click();
+    await toolbar.getByTitle('Цвет текста', { exact: true }).click();
+
+    await expect(tableCellText(page, 'table_v2_markup', 0, 1)).toHaveCSS('text-decoration-thickness', '2px');
+    await expect(tableCell(page, 'table_v2_markup', 0, 1)).toHaveCSS('background-color', 'rgb(255, 242, 204)');
+    await expect(tableCellText(page, 'table_v2_markup', 0, 1)).toHaveCSS('color', 'rgb(192, 0, 0)');
+
+    await scrollTableToDisplayRow(page, 'table_v2_markup', 5000, 'center');
+    await expect(tableCellText(page, 'table_v2_markup', 5000, 1)).toBeVisible();
+    await expect.poll(async () => dataRows.count()).toBeLessThanOrEqual(180);
+    await expect(tableCellText(page, 'table_v2_markup', 5000, 1)).toHaveCSS('text-decoration-thickness', '2px');
+    await expect(tableCell(page, 'table_v2_markup', 5000, 1)).toHaveCSS('background-color', 'rgb(255, 242, 204)');
+    await expect(tableCellText(page, 'table_v2_markup', 5000, 1)).toHaveCSS('color', 'rgb(192, 0, 0)');
+
+    await scrollTableToDisplayRow(page, 'table_v2_markup', 9999, 'end');
+    await expect(tableCellText(page, 'table_v2_markup', 9999, 1)).toBeVisible();
+    await expect.poll(async () => dataRows.count()).toBeLessThanOrEqual(180);
+    await expect(tableCellText(page, 'table_v2_markup', 9999, 1)).toHaveCSS('text-decoration-thickness', '2px');
+    await expect(tableCell(page, 'table_v2_markup', 9999, 1)).toHaveCSS('background-color', 'rgb(255, 242, 204)');
+    await expect(tableCellText(page, 'table_v2_markup', 9999, 1)).toHaveCSS('color', 'rgb(192, 0, 0)');
+
+    await toolbar.getByTitle('Отменить').click();
+    await expect(tableCellText(page, 'table_v2_markup', 9999, 1)).not.toHaveCSS('color', 'rgb(192, 0, 0)');
+    await toolbar.getByTitle('Повторить').click();
+    await expect(tableCellText(page, 'table_v2_markup', 9999, 1)).toHaveCSS('color', 'rgb(192, 0, 0)');
   });
 
   test('applies current fill color from main button and changes strip color from palette', async ({ page }) => {
@@ -756,5 +1041,41 @@ test.describe('behavior: table v2 toolbar', () => {
     await expect(duplicatedCell).toHaveCSS('background-color', 'rgb(255, 242, 204)');
     await expect(duplicatedText).toHaveCSS('color', 'rgb(192, 0, 0)');
     await expect(duplicatedText).toHaveCSS('font-weight', '700');
+  });
+
+  test('last-row keyboard duplication keeps rows sequential', async ({ page }) => {
+    await ensureTableV2MarkupRows(page, 12);
+    const initialRows = await table(page, 'table_v2_markup').locator('tbody tr[data-display-row]').count();
+    await tableCell(page, 'table_v2_markup', initialRows - 1, 1).click();
+
+    for (let index = 0; index < 8; index += 1) {
+      await page.keyboard.press('Alt+Shift+ArrowDown');
+      await expect(table(page, 'table_v2_markup').locator('tbody tr[data-display-row]')).toHaveCount(initialRows + index + 1);
+    }
+
+    const runtimeLineNumbers = await page.evaluate(() => {
+      type TableDebugEntry = {
+        instance?: {
+          tableData?: Array<{ cells?: unknown[] }>;
+        };
+      };
+      type TableDebugWindow = Window & {
+        __YAMLS_WIDGET_INSTANCE_DEBUG__?: {
+          entries?: Record<string, TableDebugEntry>;
+        };
+      };
+      const rows = (window as TableDebugWindow).__YAMLS_WIDGET_INSTANCE_DEBUG__?.entries?.table_v2_markup?.instance?.tableData;
+      return Array.isArray(rows) ? rows.map((row) => String(row.cells?.[0] ?? '')) : [];
+    });
+    const expectedTail = Array.from({ length: 8 }, (_item, index) => String(initialRows + index + 1));
+    expect(runtimeLineNumbers.slice(-8)).toEqual(expectedTail);
+
+    await scrollTableToDisplayRow(page, 'table_v2_markup', initialRows + 7, 'end');
+    await expect(tableCellText(page, 'table_v2_markup', initialRows + 7, 0)).toHaveText(String(initialRows + 8));
+
+    const visibleLineNumbers = await table(page, 'table_v2_markup')
+      .locator('tbody tr[data-display-row] td[data-col="0"] .widget-table__cell-value')
+      .evaluateAll((items) => items.map((item) => item.textContent?.trim() || ''));
+    expect(visibleLineNumbers.slice(-8)).toEqual(expectedTail);
   });
 });

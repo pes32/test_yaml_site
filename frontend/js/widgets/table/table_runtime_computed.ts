@@ -1,13 +1,22 @@
 import type {
+    TableDataDisplayRow,
     TableDisplayRow,
     TableRuntimeColumn,
     TableToolbarState,
+    TableVisibleCellGridRow,
     TableRuntimeComputedDefinitions,
     TableRuntimeVm
 } from './table_contract.ts';
 
 import { canAddGroupingLevel } from './table_grouping.ts';
-import { columnLettersForRuntimeColumns } from './table_column_headers_model.ts';
+import {
+    buildTableViewModel,
+    columnLettersForRuntimeColumns,
+    createDefaultTableToolbarState,
+    emptyTableViewModel,
+    runtimeDisplaySelection,
+    selectionRectFromDisplay
+} from './table_internal.ts';
 import { buildMenuItems } from './table_menu_runtime.ts';
 import { isApplePlatform } from './table_platform.ts';
 import {
@@ -15,8 +24,6 @@ import {
     sortKeysFromRuntime,
     withUniqueColumnKeys
 } from './table_state_core.ts';
-import { createDefaultTableToolbarState } from './table_toolbar_model.ts';
-import { buildTableViewModel, emptyTableViewModel } from './table_view_model.ts';
 
 function runtimeAccessor<TValue>(
     getValue: (vm: TableRuntimeVm) => TValue,
@@ -37,6 +44,102 @@ function booleanRuntimeAccessor(
     setValue: (vm: TableRuntimeVm, value: boolean) => void
 ) {
     return runtimeAccessor((vm) => !!getValue(vm), (vm, value) => setValue(vm, !!value));
+}
+
+function valueClassFromConfig(config: unknown, value: unknown): string {
+    const map = (config as { value_class_map?: Record<string, string> } | null)?.value_class_map;
+    if (!map || typeof map !== 'object') return '';
+    const key = String(value ?? '');
+    const className = map[key];
+    return typeof className === 'string' ? className : '';
+}
+
+/** Тяжёлая часть visible grid; `stubIsEditing` исключает подписку на editing/focus state. */
+function buildVisibleCellGridRows(
+    vm: TableRuntimeVm,
+    options: { countStableBuilds: boolean; stubIsEditing: boolean }
+): TableVisibleCellGridRow[] {
+    if (options.countStableBuilds && typeof window !== 'undefined') {
+        const counter = window as Window & { __tableVisibleCellGridBuildCount?: number };
+        counter.__tableVisibleCellGridBuildCount =
+            (counter.__tableVisibleCellGridBuildCount ?? 0) + 1;
+    }
+
+    const colKeys = vm.runtimeColumnKeyList || [];
+    return vm.visibleDisplayRows.map((visibleRow): TableVisibleCellGridRow => {
+        const displayRow = visibleRow.row;
+        if (displayRow.kind === 'group') {
+            return {
+                displayIndex: visibleRow.displayIndex,
+                groupRow: displayRow,
+                kind: 'group',
+                pathKey: visibleRow.pathKey
+            };
+        }
+        const cells = vm.tableColumns
+            .map((column, colIndex) => {
+                const colKey = colKeys[colIndex] || vm.runtimeColumnKey(colIndex);
+                const rowId = displayRow.rowId;
+                const displayIndex = visibleRow.displayIndex;
+                const formattedValue = vm.formatCellValueByIdentity(rowId, colKey, column, colIndex);
+                const actions = vm
+                    .cellDisplayActionsByIdentity(rowId, colKey, colIndex, column)
+                    .map((action) => ({
+                        ...action,
+                        actionClass: vm.cellDisplayActionClass(action)
+                    }));
+                const usesEmbeddedWidget = vm.cellUsesEmbeddedWidgetByIdentity(
+                    rowId,
+                    colKey,
+                    colIndex,
+                    column
+                );
+                return {
+                    actions,
+                    actionsClass: vm.cellDisplayActionsClassByIdentity(rowId, colKey, colIndex, column),
+                    allowsEditing: vm.cellAllowsEditing(displayIndex, colIndex),
+                    colIndex,
+                    colKey,
+                    column,
+                    displayClass: vm.cellDisplayClassByIdentity(rowId, colKey, colIndex, column),
+                    displayIndex,
+                    displayTextClass: vm.cellDisplayTextClassByIdentity(rowId, colKey, colIndex, column),
+                    effectiveType: vm.effectiveCellTypeByIdentity(rowId, colKey, colIndex, column),
+                    formattedValue,
+                    isEditing: options.stubIsEditing ? false : vm.isCellEditing(displayIndex, colIndex),
+                    rawValue: vm.cellValueByIdentity(rowId, colKey, colIndex),
+                    rowId,
+                    tabindex: -1,
+                    tdClass: {
+                        'widget-table__cell--line-number': vm.isLineNumberColumn(column)
+                    },
+                    tdStyle: vm.cellTdStyleByIdentity(rowId, colKey, displayIndex, colIndex),
+                    textStyle: vm.cellVisualTextStyleByIdentity(rowId, colKey, colIndex, column),
+                    usesEmbeddedWidget,
+                    usesNativeInput: vm.cellUsesNativeInputByIdentity(rowId, colKey, colIndex, column),
+                    valueClass: valueClassFromConfig(vm.widgetConfig, formattedValue),
+                    widgetComponent: usesEmbeddedWidget
+                        ? vm.cellWidgetComponentByIdentity(rowId, colKey, colIndex, column)
+                        : null,
+                    widgetConfig: usesEmbeddedWidget
+                        ? vm.cellWidgetConfigByIdentity(rowId, colKey, displayIndex, colIndex, column)
+                        : undefined,
+                    widgetName: usesEmbeddedWidget
+                        ? vm.cellWidgetNameByIdentity(rowId, colKey, displayIndex, colIndex, column)
+                        : '',
+                    widgetRefName: usesEmbeddedWidget
+                        ? vm.cellWidgetRefNameByIdentity(rowId, colKey, displayIndex, colIndex, column)
+                        : ''
+                };
+            });
+        return {
+            cells,
+            dataRow: displayRow,
+            displayIndex: visibleRow.displayIndex,
+            kind: 'data',
+            pathKey: visibleRow.pathKey
+        };
+    });
 }
 
 const tableRuntimeComputed: TableRuntimeComputedDefinitions = {
@@ -107,6 +210,29 @@ const tableRuntimeComputed: TableRuntimeComputedDefinitions = {
     runtimeColumnKeyList(this: TableRuntimeVm) {
         return withUniqueColumnKeys(this.tableColumns).map((column) => column.columnKey);
     },
+    selectionRenderState(this: TableRuntimeVm) {
+        const rect = selectionRectFromDisplay(
+            runtimeDisplaySelection(this),
+            this.tbodyRowCount ? this.tbodyRowCount() : this.tableData.length,
+            this.tableColumns.length
+        );
+        const focus = this.selFocus || { r: 0, c: 0 };
+        const anchor = this.selAnchor || { r: 0, c: 0 };
+        const columnCount = this.tableColumns.length;
+        const readonly = !!(this.widgetConfig && this.widgetConfig.readonly_row_selection);
+        const isMulti = (rect.r1 - rect.r0 + 1) * (rect.c1 - rect.c0 + 1) > 1;
+        return {
+            anchorCol: anchor.c,
+            anchorRow: anchor.r,
+            focus: { r: focus.r, c: focus.c },
+            isFullColumnBlock: !!this.selFullHeightCols,
+            isFullRowBlock: columnCount > 0 && !this.selFullHeightCols && rect.c0 === 0 && rect.c1 === columnCount - 1,
+            isMulti,
+            readonly,
+            rect,
+            showSelection: (this.isEditable && this._tableFocusWithin) || (readonly && !!this.selFullWidthRows)
+        };
+    },
     toolbarEnabled(this: TableRuntimeVm) {
         return !!(
             this.widgetConfig &&
@@ -176,6 +302,9 @@ const tableRuntimeComputed: TableRuntimeComputedDefinitions = {
         if (!Number.isFinite(parsed) || parsed < 1) return 0;
         return Math.floor(parsed);
     },
+    tableDataMode(this: TableRuntimeVm) {
+        return this.tableRemote?.mode === 'remote-paged' ? 'remote-paged' : 'local-full';
+    },
     tableRowIdToDataIndex(this: TableRuntimeVm) {
         const map = new Map<string, number>();
         this.tableData.forEach((row, index) => {
@@ -227,10 +356,100 @@ const tableRuntimeComputed: TableRuntimeComputedDefinitions = {
         return (this.groupingState?.levels.length || 0) > 0;
     },
     displayRows(this: TableRuntimeVm) {
+        if (this.tableRemote?.mode === 'remote-paged') {
+            return [];
+        }
         return this.tableViewModel.displayRows as TableDisplayRow[];
     },
+    visibleDisplayRows(this: TableRuntimeVm) {
+        if (this.tableRemote?.mode === 'remote-paged') {
+            const start = Math.max(0, Math.min(this.tableRemote.totalRows, this.virtualState.start || 0));
+            const end = Math.max(start, Math.min(this.tableRemote.totalRows, this.virtualState.end || this.tableRemote.totalRows));
+            const rows = [];
+            for (let displayIndex = start; displayIndex < end; displayIndex += 1) {
+                const item = this.tableRemote.itemsByDisplayIndex[displayIndex];
+                if (item?.kind === 'group') {
+                    const columnIndex = item.columnKey
+                        ? (this.runtimeColumnKeyList || []).indexOf(item.columnKey)
+                        : -1;
+                    const column = columnIndex >= 0 ? this.tableColumns[columnIndex] : null;
+                    const columnLabel =
+                        column?.label != null && String(column.label).trim() !== ''
+                            ? String(column.label).trim()
+                            : item.columnKey || item.key;
+                    rows.push({
+                        displayIndex,
+                        pathKey: item.groupId,
+                        row: {
+                            colIndex: 0,
+                            columnLabel,
+                            depth: item.level,
+                            kind: 'group',
+                            label: `${columnLabel}: ${item.key} (${item.count})`,
+                            level: item.level,
+                            pathKey: item.groupId,
+                            value: item.key
+                        } as TableDisplayRow
+                    });
+                    continue;
+                }
+                const rowId = item?.kind === 'row'
+                    ? item.rowId
+                    : `remote_missing_${displayIndex}`;
+                const dataRow: TableDataDisplayRow = {
+                    dataIndex: displayIndex,
+                    depth: 0,
+                    kind: 'data',
+                    pathKey: rowId,
+                    rowId
+                };
+                rows.push({
+                    displayIndex,
+                    pathKey: dataRow.pathKey,
+                    row: dataRow
+                });
+            }
+            return rows;
+        }
+        const rows = this.displayRows || [];
+        const start = Math.max(0, Math.min(rows.length, this.virtualState.start || 0));
+        const end = Math.max(start, Math.min(rows.length, this.virtualState.end || rows.length));
+        return rows.slice(start, end).map((row, index) => ({
+            displayIndex: start + index,
+            pathKey: row.pathKey,
+            row
+        }));
+    },
+    visibleCellGridStableRows(this: TableRuntimeVm): TableVisibleCellGridRow[] {
+        return buildVisibleCellGridRows(this, { countStableBuilds: true, stubIsEditing: true });
+    },
+    visibleCellGrid(this: TableRuntimeVm): TableVisibleCellGridRow[] {
+        const stable = this.visibleCellGridStableRows;
+        return stable.map((row): TableVisibleCellGridRow => {
+            if (row.kind === 'group') {
+                return row;
+            }
+            return {
+                ...row,
+                cells: row.cells.map((cell) => ({
+                    ...cell,
+                    isEditing: this.isCellEditing(cell.displayIndex, cell.colIndex)
+                }))
+            };
+        });
+    },
     tableLazyUiActive(this: TableRuntimeVm) {
-        return this.lazyEnabled && !this.isFullyLoaded && !this.groupingActive;
+        return false;
+    },
+    virtualTopSpacerStyle(this: TableRuntimeVm) {
+        return {
+            height: `${Math.max(0, this.virtualState.topSpacerPx || 0)}px`
+        };
+    },
+    virtualBottomSpacerStyle(this: TableRuntimeVm) {
+        return {
+            height: `${Math.max(0, this.virtualState.bottomSpacerPx || 0)}px`
+        };
     },
     toolbarState(this: TableRuntimeVm) {
         return typeof this.tableToolbarState === 'function'

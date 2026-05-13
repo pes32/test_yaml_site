@@ -20,6 +20,20 @@ from .config_shared import (
     _relpath,
 )
 
+SQL_DESCRIPTOR_PREFIXES = (
+    "select",
+    "with",
+    "call",
+    "insert",
+    "update",
+    "delete",
+    "create",
+    "alter",
+    "drop",
+    "truncate",
+    "do",
+)
+
 
 @dataclass(frozen=True)
 class _AttrValidationContext:
@@ -50,13 +64,73 @@ class _AttrValidationContext:
             )
         )
 
+def _is_db_source_descriptor(value: Any) -> bool:
+    text = str(value or "").strip()
+    if not text:
+        return False
+    if text.lower().endswith(" -pg"):
+        return True
+    first_token = text.split(None, 1)[0].strip().lower()
+    return first_token in SQL_DESCRIPTOR_PREFIXES
+
+
+def _parse_voc_db_columns_config(
+    attr_name: str,
+    columns_value: Any,
+    columns_node: Any,
+    *,
+    ctx: _AttrValidationContext,
+) -> tuple[list[str] | None, list[str] | None, list]:
+    diagnostics: list = []
+    if not isinstance(columns_value, str):
+        return None, None, diagnostics
+
+    labels: list[str] = []
+    db_columns: list[str] = []
+    for line_index, raw_line in enumerate(str(columns_value or "").splitlines()):
+        line_text = str(raw_line or "").strip()
+        if not line_text:
+            continue
+        db_column, sep, label = line_text.partition("/")
+        db_column = db_column.strip()
+        label = label.strip() if sep else db_column
+        if not db_column or not label:
+            ctx.push(
+                diagnostics,
+                "error",
+                "invalid_voc_column_label",
+                (
+                    f"attrs '{attr_name}.columns' строка {line_index + 1} должна иметь вид "
+                    "<столбец> /<заголовок>"
+                ),
+                line=_table_attr_ref_line(columns_node, line_index)
+                if isinstance(columns_node, ScalarNode)
+                else _node_line(columns_node),
+                node_path=f"{attr_name}.columns",
+            )
+            continue
+        db_columns.append(db_column)
+        labels.append(label)
+
+    if not labels:
+        ctx.push(
+            diagnostics,
+            "error",
+            "voc_columns_required",
+            f"attrs '{attr_name}.columns' должен содержать хотя бы один столбец",
+            line=_node_line(columns_node),
+            node_path=f"{attr_name}.columns",
+        )
+    return labels, db_columns, diagnostics
+
+
 def _validate_voc_columns_config(
     attr_name: str,
     columns_value: Any,
     *,
     ctx: _AttrValidationContext,
     line: int | None,
-) -> list:
+    ) -> list:
     diagnostics: list = []
     if not isinstance(columns_value, list):
         return diagnostics
@@ -92,6 +166,8 @@ def _validate_voc_source_config(
     ctx: _AttrValidationContext,
 ) -> list:
     diagnostics: list = []
+    if _is_db_source_descriptor(source_value):
+        return diagnostics
     if not isinstance(columns_value, list) or not columns_value:
         return diagnostics
     column_count = len(columns_value)
@@ -162,6 +238,8 @@ def _validate_voc_source_config(
     return diagnostics
 def _voc_source_is_unsupported_scalar(source_value: Any, source_node: Any) -> bool:
     if not isinstance(source_value, str):
+        return False
+    if _is_db_source_descriptor(source_value):
         return False
     if not isinstance(source_node, ScalarNode):
         return False
@@ -265,6 +343,9 @@ def _validate_attr_config(
                 node_path=f"{attr_name}.{option_name}",
             )
     if widget_type == "list" and "source" in normalized_config:
+        columns_value = normalized_config.get("columns")
+        if isinstance(columns_value, str) and columns_value.strip():
+            normalized_config["x_db_columns"] = [columns_value.strip()]
         source_node = node_items.get("source", (None, None))[1]
         duplicate_warning = _build_duplicate_scalar_list_source_warning(
             attr_name,
@@ -287,6 +368,16 @@ def _validate_attr_config(
                 node_path=f"{attr_name}.columns",
             )
         else:
+            parsed_labels, parsed_db_columns, parsed_diagnostics = _parse_voc_db_columns_config(
+                attr_name,
+                normalized_config.get("columns"),
+                columns_node,
+                ctx=ctx,
+            )
+            diagnostics.extend(parsed_diagnostics)
+            if parsed_labels is not None:
+                normalized_config["columns"] = parsed_labels
+                normalized_config["x_db_columns"] = parsed_db_columns or []
             diagnostics.extend(
                 _validate_voc_columns_config(
                     attr_name,

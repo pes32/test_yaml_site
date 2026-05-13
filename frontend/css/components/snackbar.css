@@ -99,6 +99,10 @@
     to { transform: scaleX(0); }
 }
 
+.page-snackbar-host--elevated {
+    bottom: calc(var(--space-md) + 5.75rem);
+}
+
 @media (max-width: 640px) {
     .page-snackbar-host {
         left: var(--space-md);

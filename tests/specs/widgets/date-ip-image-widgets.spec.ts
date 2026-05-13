@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import {
   expectWidgetError,
   fillAndBlur,
@@ -6,6 +6,13 @@ import {
   widget,
   widgetInput
 } from '../../support/app';
+
+async function openDateCalendarAndDismissWithBackdrop(page: Page, widgetName: string, calendar: Locator) {
+  await widget(page, widgetName).getByRole('button', { name: 'Выбрать дату' }).click();
+  await expect(calendar).toBeVisible();
+  await page.locator('body').click({ position: { x: 1, y: 1 } });
+  await expect(calendar).toBeHidden();
+}
 
 test.describe('behavior: date, time, ip and image widgets', () => {
   test.beforeEach(async ({ page }) => {
@@ -23,10 +30,7 @@ test.describe('behavior: date, time, ip and image widgets', () => {
     await calendar.locator('.widget-dt-day:not(.is-outside)').nth(1).click();
     await expect(dateInput).toHaveValue('02.01.2026');
 
-    await widget(page, 'date_widget').getByRole('button', { name: 'Выбрать дату' }).click();
-    await expect(calendar).toBeVisible();
-    await page.locator('body').click({ position: { x: 1, y: 1 } });
-    await expect(calendar).toBeHidden();
+    await openDateCalendarAndDismissWithBackdrop(page, 'date_widget', calendar);
 
     const timeInput = widgetInput(page, 'time_widget');
     await fillAndBlur(timeInput, '123456');
@@ -44,10 +48,7 @@ test.describe('behavior: date, time, ip and image widgets', () => {
     await expect(datetimeInputs.nth(0)).not.toHaveValue('');
     await expect(datetimeInputs.nth(1)).not.toHaveValue('');
 
-    await widget(page, 'demo_datetime').getByRole('button', { name: 'Выбрать дату' }).click();
-    await expect(calendar).toBeVisible();
-    await page.locator('body').click({ position: { x: 1, y: 1 } });
-    await expect(calendar).toBeHidden();
+    await openDateCalendarAndDismissWithBackdrop(page, 'demo_datetime', calendar);
 
     await widget(page, 'demo_datetime').getByRole('button', { name: 'Выбрать время' }).click();
     await expect(timePopover).toBeVisible();

@@ -1,3 +1,5 @@
+import type { PagesIndexState } from './api_contract.ts';
+
 export type ActionItemType = 'url' | 'source' | 'command';
 
 export type ActionItem = {
@@ -41,9 +43,13 @@ export type ConfirmDialogConfig = {
     title?: string;
 };
 
+export type ConfirmModalOpenConfig = ConfirmDialogConfig & {
+    onAccept?: () => void | Promise<void>;
+    onCancel?: () => void;
+};
+
 export type ConfirmModalController = {
-    _acceptHandler?: () => void;
-    open?: (config: Required<ConfirmDialogConfig>) => void;
+    open?: (config: ConfirmModalOpenConfig) => void;
 };
 
 export type ProbeableSourceDescriptor = {
@@ -53,12 +59,5 @@ export type ProbeableSourceDescriptor = {
     pathname: string;
 };
 
-export type PageTitleRecord = {
-    name?: unknown;
-    title?: unknown;
-    url?: unknown;
-};
-
-export type PageTitlePayload = {
-    pages?: PageTitleRecord[];
-};
+/** Ответ `fetchPages`: тот же shape, что и `PagesIndexState`. */
+export type PageTitlePayload = PagesIndexState;

@@ -1,9 +1,10 @@
 import { canAddGroupingLevel } from './table_grouping.ts';
-import { buildContextMenuSnapshot, isContextMenuSnapshotCurrent } from './table_context_menu_model.ts';
 import {
+    buildContextMenuSnapshot,
     buildCoreSelectionFromDisplay,
+    isContextMenuSnapshotCurrent,
     runtimeDisplaySelection
-} from './table_selection_model.ts';
+} from './table_internal.ts';
 import { TABLE_RUNTIME_SYNC } from './table_runtime_state.ts';
 import { columnIndexByKey, columnKeyAt } from './table_state_core.ts';
 import { isApplePlatform } from './table_platform.ts';
@@ -19,7 +20,7 @@ import type {
     TableSelectionRect,
     TableSortState
 } from './table_contract.ts';
-import { firstUserColumnIndex, type UserColumnRuntime } from './table_column_navigation.ts';
+import { firstUserColumnIndex, type UserColumnRuntime } from './table_internal.ts';
 type TableContextMenuBodyMode = 'cell' | 'cells' | 'row' | null;
 type RowMoveDuplicateOpsOptions = {
     bodyMode: TableContextMenuBodyMode;
@@ -701,6 +702,24 @@ const MenuRuntimeMethods = {
             ? snapshot.groupingLevelKeysSnapshot.slice()
             : [];
         if (snapshotLevels.indexOf(colKey) >= 0) return;
+        if (this.tableRemote.mode === 'remote-paged') {
+            const nextLevelKeys = snapshotLevels.concat(colKey);
+            this.dispatchTableCoreCommand(
+                {
+                    colKeys: nextLevelKeys,
+                    expandedPathKeys: [],
+                    type: 'SET_GROUP_LEVELS'
+                },
+                'remote group add level',
+                { ...TABLE_RUNTIME_SYNC.GROUPING_ONLY, skipHistory: true }
+            );
+            void this.queryRemoteTableWindow({
+                expandedGroups: [],
+                group: nextLevelKeys.map((columnKey) => ({ columnKey })),
+                offset: 0
+            });
+            return;
+        }
         const prevLevels = this.groupingState.levels.slice();
         const prevExpanded = new Set(this.groupingState.expanded);
         const prevPending = this._lazyPendingRows.slice();
@@ -754,6 +773,19 @@ const MenuRuntimeMethods = {
             ? snapshot.groupingLevelKeysSnapshot
             : [];
         if (!snapshotLevels.length) return;
+        if (this.tableRemote.mode === 'remote-paged') {
+            this.dispatchTableCoreCommand(
+                { colKeys: [], expandedPathKeys: [], type: 'SET_GROUP_LEVELS' },
+                'remote clear grouping',
+                { ...TABLE_RUNTIME_SYNC.GROUPING_ONLY, skipHistory: true }
+            );
+            void this.queryRemoteTableWindow({
+                expandedGroups: [],
+                group: [],
+                offset: 0
+            });
+            return;
+        }
         this.dispatchTableCoreCommand(
             { colKeys: [], expandedPathKeys: [], type: 'SET_GROUP_LEVELS' },
             'clear grouping',

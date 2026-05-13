@@ -1,13 +1,15 @@
 import type {
+    TableCellMetaHistorySnapshot,
     TableCellMetaMap,
     TableCoreSelectionState,
+    TableFullHistoryEntry,
     TableGroupingState,
     TableHistoryEntry,
     TableHistorySnapshot,
     TableDataRow,
     TableSortState
 } from './table_contract.ts';
-import { cloneCellMetaMap } from './table_cell_meta.ts';
+import { cellMetaEqual, cloneCellMetaMap } from './table_cell_meta.ts';
 import { getRowCells } from './table_utils.ts';
 
 const HISTORY_LIMIT = 80;
@@ -44,6 +46,65 @@ function cloneHistorySnapshot(snapshot: TableHistorySnapshot): TableHistorySnaps
     };
 }
 
+function cloneFullHistoryEntry(
+    label: string,
+    before: TableHistorySnapshot,
+    after: TableHistorySnapshot,
+    snapshotsAlreadyOwned = false
+): TableFullHistoryEntry {
+    return {
+        after: snapshotsAlreadyOwned ? after : cloneHistorySnapshot(after),
+        before: snapshotsAlreadyOwned ? before : cloneHistorySnapshot(before),
+        kind: 'full',
+        label: String(label || 'change')
+    };
+}
+
+function cellMetaMapsEqual(
+    left: TableCellMetaMap | null | undefined,
+    right: TableCellMetaMap | null | undefined
+): boolean {
+    if (left === right) return true;
+    const leftMap = left || {};
+    const rightMap = right || {};
+    const leftKeys = Object.keys(leftMap);
+    const rightKeys = Object.keys(rightMap);
+    return (
+        leftKeys.length === rightKeys.length &&
+        leftKeys.every((rowId) => {
+            if (!Object.prototype.hasOwnProperty.call(rightMap, rowId)) return false;
+            const leftBucket = leftMap[rowId] || {};
+            const rightBucket = rightMap[rowId] || {};
+            const leftCols = Object.keys(leftBucket);
+            const rightCols = Object.keys(rightBucket);
+            return (
+                leftCols.length === rightCols.length &&
+                leftCols.every((colKey) =>
+                    Object.prototype.hasOwnProperty.call(rightBucket, colKey) &&
+                    cellMetaEqual(leftBucket[colKey], rightBucket[colKey])
+                )
+            );
+        })
+    );
+}
+
+function selectionStatesEqual(
+    left: TableCoreSelectionState,
+    right: TableCoreSelectionState
+): boolean {
+    return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function cellMetaHistorySnapshotsEqual(
+    left: TableCellMetaHistorySnapshot,
+    right: TableCellMetaHistorySnapshot
+): boolean {
+    return (
+        cellMetaMapsEqual(left.cellMetaByKey, right.cellMetaByKey) &&
+        selectionStatesEqual(left.selection, right.selection)
+    );
+}
+
 function snapshotsEqual(left: TableHistorySnapshot, right: TableHistorySnapshot): boolean {
     return JSON.stringify({
         ...left,
@@ -64,7 +125,9 @@ function appendHistoryEntry(
 
 export {
     appendHistoryEntry,
+    cellMetaHistorySnapshotsEqual,
     cloneGroupingState,
+    cloneFullHistoryEntry,
     cloneHistorySnapshot,
     cloneRowsForHistory,
     cloneSelectionState,

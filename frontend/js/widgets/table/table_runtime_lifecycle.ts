@@ -5,8 +5,15 @@ function mountTableRuntime(runtime: Pick<TableRuntimeVm, 'initializeTable'>) {
 }
 
 function unmountTableRuntime(
-    runtime: Pick<TableRuntimeVm, '_detachContextMenuGlobalListeners' | '_teardownLazyObserver' | '_unbindStickyThead'>
+    runtime: Pick<
+        TableRuntimeVm,
+        | '_detachContextMenuGlobalListeners'
+        | '_teardownLazyObserver'
+        | '_unbindStickyThead'
+        | '_unbindVirtualRows'
+    >
 ) {
+    runtime._unbindVirtualRows?.();
     runtime._unbindStickyThead?.();
     runtime._detachContextMenuGlobalListeners?.();
     runtime._teardownLazyObserver?.();

@@ -49,7 +49,10 @@ def register_static_routes(app):
     def serve_icon(filename):  # noqa: D401 (simple function)
         """Отдаёт SVG-иконки из каталога templates/icons."""
         try:
-            return send_from_directory(icons_dir, filename, mimetype="image/svg+xml")
+            response = send_from_directory(icons_dir, filename, mimetype="image/svg+xml", max_age=31536000)
+            response.cache_control.public = True
+            response.cache_control.immutable = True
+            return response
         except NotFound:
             raise
         except Exception as exc:  # pragma: no cover

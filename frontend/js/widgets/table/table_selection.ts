@@ -7,14 +7,14 @@ import type {
     TableSelectionRuntimeSurface,
     TableSelectionState
 } from './table_contract.ts';
-import { firstUserColumnIndex } from './table_column_navigation.ts';
 import {
     buildCoreSelectionFromDisplay,
     displayCellToCore,
+    firstUserColumnIndex,
     runtimeDisplaySelection,
     setSelectionCommandFromCore,
     selectionRectFromDisplay
-} from './table_selection_model.ts';
+} from './table_internal.ts';
 import { TABLE_RUNTIME_SYNC } from './table_runtime_state.ts';
 import { clamp } from './table_utils.ts';
 
@@ -33,6 +33,8 @@ type ClearCellPatchRuntimeSurface = Pick<
     | 'tableColumns'
     | 'tableViewModelSnapshot'
 >;
+
+const EMPTY_SELECTION_STYLE: Record<string, string> = {};
 
 function getSelectionAnchor(vm: SelectionVm) {
     return vm.selAnchor || { r: 0, c: 0 };
@@ -135,7 +137,31 @@ const SelectionMethods = {
                 },
                 'select full row'
             );
+            if (this.tableRemote.mode === 'remote-paged') {
+                this.tableRemote = {
+                    ...this.tableRemote,
+                    selectionExpression: {
+                        kind: 'cell-range',
+                        r0: normalizedRow,
+                        r1: normalizedRow,
+                        c0: 0,
+                        c1: Math.max(0, this.tableColumns.length - 1)
+                    }
+                };
+            }
             return focus;
+        },
+        /** Выделение строки по `row.id` для режима readonly_row_selection (например синхронизация с деревом). */
+        applyReadonlySelectedRowFromConfig() {
+            const cfg = this.widgetConfig as { readonly_row_selection?: boolean; readonly_selected_row_id?: string | null };
+            if (!cfg?.readonly_row_selection || cfg.readonly_selected_row_id == null || cfg.readonly_selected_row_id === '') {
+                return;
+            }
+            const id = String(cfg.readonly_selected_row_id);
+            const idx = this.tableData.findIndex((r) => String(r?.id) === id);
+            if (idx >= 0) {
+                this.selectFullRow(idx);
+            }
         },
         setSelFullHeightColSpan(c0: number, c1: number) {
             const anchorCol = this.normCol(c0);
@@ -155,6 +181,21 @@ const SelectionMethods = {
                 },
                 'set full column selection'
             );
+            if (this.tableRemote.mode === 'remote-paged') {
+                const columnKey = lo === hi ? this.runtimeColumnKey(lo) : '';
+                this.tableRemote = {
+                    ...this.tableRemote,
+                    selectionExpression: columnKey
+                        ? { kind: 'full-column', columnKey, scope: 'entireDataset' }
+                        : {
+                            kind: 'cell-range',
+                            r0: 0,
+                            r1: Math.max(0, this.tbodyRowCount() - 1),
+                            c0: lo,
+                            c1: hi
+                        }
+                };
+            }
             return focus;
         },
         selectAllTable() {
@@ -174,6 +215,15 @@ const SelectionMethods = {
                 },
                 'select all table'
             );
+            if (this.tableRemote.mode === 'remote-paged') {
+                this.tableRemote = {
+                    ...this.tableRemote,
+                    selectionExpression: {
+                        kind: 'all-rows',
+                        scope: 'entireDataset'
+                    }
+                };
+            }
             return focus;
         },
         getSelRect() {
@@ -218,9 +268,11 @@ const SelectionMethods = {
             const hasError =
                 typeof this.cellHasCommitError === 'function' &&
                 this.cellHasCommitError(r, c);
-            const inSelection = this.isEditable && this.isCellInSelection(r, c);
-            const selectionVisible = inSelection && this._tableFocusWithin;
-            if (!selectionVisible && !hasError) return {};
+            const state = this.selectionRenderState;
+            const { r0, r1, c0, c1 } = state.rect;
+            const inSel = r >= r0 && r <= r1 && c >= c0 && c <= c1;
+            const selectionVisible = state.showSelection && inSel;
+            if (!selectionVisible && !hasError) return EMPTY_SELECTION_STYLE;
             const color = hasError
                 ? 'var(--bs-danger, #dc3545)'
                 : 'var(--focus-color)';
@@ -236,13 +288,11 @@ const SelectionMethods = {
                 ].join(', ');
                 return style;
             }
-            const { r0, r1, c0, c1 } = this.getSelRect();
-            const multi = this.isMultiCellSelection();
             const fw =
-                multi &&
-                !this.selectionIsFullRowBlock() &&
-                r === getSelectionFocus(this).r &&
-                c === getSelectionFocus(this).c
+                state.isMulti &&
+                !state.isFullRowBlock &&
+                r === state.focus.r &&
+                c === state.focus.c
                     ? 3
                     : 2;
             const parts = [];
@@ -254,17 +304,19 @@ const SelectionMethods = {
             return style;
         },
         cellTdClass(row: number, col: number) {
+            const readonlySel = !!(this.widgetConfig && this.widgetConfig.readonly_row_selection);
+            const state = this.selectionRenderState;
             return {
                 'widget-table__cell--line-number': this.isLineNumberColumn(this.tableColumns[col]),
-                'widget-table__td-focusable': this.isEditable,
+                'widget-table__td-focusable': this.isEditable || readonlySel,
                 'widget-table__cell--error':
                     typeof this.cellHasCommitError === 'function' &&
                     this.cellHasCommitError(row, col),
                 'widget-table__cell--sel-anchor':
                     this.isEditable &&
-                    this.isMultiCellSelection() &&
-                    getSelectionAnchor(this).r === row &&
-                    getSelectionAnchor(this).c === col
+                    state.isMulti &&
+                    state.anchorRow === row &&
+                    state.anchorCol === col
             };
         },
         setSelectionSingle(r: number, c: number) {
